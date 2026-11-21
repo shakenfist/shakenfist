@@ -4478,8 +4478,10 @@ def _get_namespace_claim_holds_table() -> sa.Table:
     ``created_at`` and ``updated_at`` follow the cluster_locks
     TIMESTAMP idiom: server-side timestamps, so the order in which
     bookings were taken and the age of a row are judged against the
-    database's NOW() rather than against whichever node happened to
-    write it.
+    database's own clock rather than against whichever node happened to
+    write it. Unlike the rest of this family they carry microseconds,
+    because these are the only rows in it whose order against each
+    other is a rule somebody relies on; see the comment beside them.
 
     There are no foreign keys, because nothing in this schema has any:
     referential integrity between a hold and its claim, node and
@@ -4514,8 +4516,25 @@ def _get_namespace_claim_holds_table() -> sa.Table:
                 sa.Column('node_uuid', uuid_column_type(), nullable=True),
                 sa.Column('instance_uuid', uuid_column_type(),
                           nullable=True),
-                sa.Column('created_at', sa.DateTime(), nullable=False),
-                sa.Column('updated_at', sa.DateTime(), nullable=False),
+                # Microsecond precision, and it is load bearing rather
+                # than decorative. A shrink gives this claim's holds
+                # back most recently booked first, ordered by
+                # created_at, so the precision of this column is the
+                # resolution of that rule: at whole seconds two
+                # bookings a moment apart tie, and "newest first"
+                # degrades to the uuid tie-break -- stable, but not
+                # what the rule says. The dialect type is used because
+                # sa.DateTime() renders as a plain DATETIME with no way
+                # to ask for fractional seconds, and every statement
+                # that stamps these two columns has to match it with
+                # NOW(6) (_now_microseconds()), because NOW() into a
+                # DATETIME(6) column stores .000000 and coarsens the
+                # ordering back again without changing anything a
+                # reader would notice.
+                sa.Column('created_at', sa.dialects.mysql.DATETIME(fsp=6),
+                          nullable=False),
+                sa.Column('updated_at', sa.dialects.mysql.DATETIME(fsp=6),
+                          nullable=False),
                 sa.Index('idx_namespace_claim_holds_claim', 'claim_uuid'),
                 sa.Index('idx_namespace_claim_holds_node', 'node_uuid'),
                 sa.Index('idx_namespace_claim_holds_instance',
@@ -28279,6 +28298,30 @@ def _reconcile_fetch_demand(
     return demand
 
 
+def _read_expired_claim_holds(
+        conn: sa.Connection) -> list['NamespaceClaimHoldRow']:
+    """The hold rows belonging to claims whose coverage has lapsed.
+
+    Read with the claim filter as a subquery rather than as a second
+    round trip, so what comes back is one consistent answer and the
+    holds index does the work. Expected to be empty on almost every
+    pass: it is only ever non-empty for the one pass that lapses a claim
+    which had bookings, and then as the repair for anything that left a
+    hold behind.
+
+    Ordered oldest first, like every other hold read, so a pass's log
+    reads in booking order.
+    """
+    claims = _get_namespace_claims_table()
+    holds = _get_namespace_claim_holds_table()
+    lapsed = sa.select(claims.c.uuid).where(
+        claims.c.state == CLAIM_STATE_EXPIRED).scalar_subquery()
+    rows = conn.execute(_hold_select().where(
+        holds.c.claim_uuid.in_(lapsed)).order_by(
+            holds.c.created_at, holds.c.uuid)).fetchall()
+    return [_hold_row_to_dict(row) for row in rows]
+
+
 def _direct_reconcile_scheduler_capacity(
         demand_per_vcpu: float,
         demand_decay_seconds: int,
@@ -28334,6 +28377,30 @@ def _direct_reconcile_scheduler_capacity(
                     claims.c.expires_at < sa.func.now()
                 )).values(state=CLAIM_STATE_EXPIRED, updated_at=sa.func.now())
             ).rowcount)
+
+            # A lapsed claim's shape holds are released rather than kept
+            # or moved elsewhere. A hold is room *inside* a claim's
+            # limits, and an expired claim has no limits for it to be
+            # inside: the claimed_* rebuild below sums active claims
+            # only, so there is no aggregate left for a booking to sit
+            # in, and releasing it is the only honest outcome. The
+            # holder re-books under a new claim, exactly as it does for
+            # a claim its play replaced.
+            #
+            # Expressed over every expired claim rather than only the
+            # ones this pass just lapsed, which makes it idempotent and
+            # self-healing: an expired claim holding a booking is a
+            # condition this pass should end however it arose. Nothing
+            # can be booked onto one of these claims while the pass
+            # runs, because a booking has to take the claim row's lock
+            # that the UPDATE above is holding.
+            expired_holds = _read_expired_claim_holds(conn)
+            if expired_holds:
+                released, clamps = _release_hold_rows(conn, expired_holds)
+                LOG.warning(
+                    f'Released {released} shape hold(s) belonging to '
+                    f'expired namespace claims, with {len(clamps)} node '
+                    f'counter(s) clamped at zero')
 
             # Snapshot the previous capacity rows for delta reporting,
             # NULL-metrics limit retention and node add/remove counting.
@@ -29435,22 +29502,32 @@ def _demand_guard_clause(
         <= target_load * schedulable)
 
 
-def _floored_node_decrement(
-        conn: sa.Connection, node_key: UUID, cpus: int, memory_mb: int,
-        disk_gb: int) -> tuple[bool, Optional[CapacityClampDetailDict]]:
-    """Decrement a node's used_* counters, floored at zero.
+def _floored_node_counter_decrement(
+        conn: sa.Connection, node_key: UUID, columns: tuple[str, str, str],
+        amounts: tuple[int, int, int]
+) -> tuple[bool, Optional[CapacityClampDetailDict]]:
+    """Decrement one triple of a node's capacity counters, floored at zero.
 
-    First the guarded form (``used >= x`` per dimension), which is the
+    First the guarded form (``counter >= x`` per dimension), which is the
     ordinary case and leaves the counters exactly right. On a miss --
     the counters are already lower than this release believes, because a
     reconcile pass has recomputed them from ground truth in between --
-    the unguarded ``GREATEST(0, used - x)`` form runs instead, so a
+    the unguarded ``GREATEST(0, counter - x)`` form runs instead, so a
     release racing the reconciler can never drive a counter negative.
 
-    ``expected_demand`` is deliberately not decremented: the D13 term
-    decays with instance age and the reconciler recomputes it every
-    pass, so subtracting a placement's original contribution here would
-    over-credit a node whose contribution had already decayed.
+    ``columns`` is which triple to move, in cpu, memory and disk order,
+    because the node row carries two of them: ``used_*`` for the
+    placements it hosts and ``held_*`` for the shapes booked on it. Both
+    are drawdowns against the same limits and both are recomputed by the
+    reconciler rather than trusted, so both come back the same way, and
+    rendering the idiom once is what stops the second copy drifting from
+    the first.
+
+    ``expected_demand`` is deliberately not decremented whichever triple
+    this is: the demand term decays with instance age and the reconciler
+    recomputes it every pass, so subtracting a placement's original
+    contribution here would over-credit a node whose contribution had
+    already decayed.
 
     Returns ``(touched, clamp_detail)``. ``touched`` is False when there
     is no capacity row for the node at all, which is the unguarded
@@ -29460,17 +29537,15 @@ def _floored_node_decrement(
     drifted and by how much rather than a bare boolean (issue 4050).
     """
     capacity = _get_scheduler_node_capacity_table()
+    pairs = list(zip(columns, amounts))
 
     guarded = sa.update(capacity).where(sa.and_(
-        capacity.c.node_uuid == node_key,
-        capacity.c.used_cpus >= cpus,
-        capacity.c.used_memory_mb >= memory_mb,
-        capacity.c.used_disk_gb >= disk_gb,
-    )).values(
-        used_cpus=capacity.c.used_cpus - cpus,
-        used_memory_mb=capacity.c.used_memory_mb - memory_mb,
-        used_disk_gb=capacity.c.used_disk_gb - disk_gb,
-        updated_at=sa.func.now())
+        capacity.c.node_uuid == node_key, *[
+            capacity.c[column] >= amount for column, amount in pairs
+        ])).values(updated_at=sa.func.now(), **{
+            column: capacity.c[column] - amount
+            for column, amount in pairs
+        })
     if conn.execute(guarded).rowcount > 0:
         return True, None
 
@@ -29484,25 +29559,48 @@ def _floored_node_decrement(
 
     clamp = sa.update(capacity).where(
         capacity.c.node_uuid == node_key
-    ).values(
-        used_cpus=sa.func.greatest(0, capacity.c.used_cpus - cpus),
-        used_memory_mb=sa.func.greatest(
-            0, capacity.c.used_memory_mb - memory_mb),
-        used_disk_gb=sa.func.greatest(0, capacity.c.used_disk_gb - disk_gb),
-        updated_at=sa.func.now())
+    ).values(updated_at=sa.func.now(), **{
+        column: sa.func.greatest(0, capacity.c[column] - amount)
+        for column, amount in pairs
+    })
     if conn.execute(clamp).rowcount > 0:
         detail = _capacity_clamp_detail(
-            str(node_key), row,
-            ('used_cpus', 'used_memory_mb', 'used_disk_gb'),
-            (cpus, memory_mb, disk_gb))
+            str(node_key), row, columns, amounts)
         LOG.warning(
-            f'Clamped capacity decrement on node {node_key}: counters were '
-            f'below the released allocation ({cpus} cpus, {memory_mb} MB, '
-            f'{disk_gb} GB) by ({detail["shortfall_cpus"]} cpus, '
+            f'Clamped capacity decrement of {columns[0]} and its siblings '
+            f'on node {node_key}: counters were below the released '
+            f'allocation ({amounts[0]} cpus, {amounts[1]} MB, '
+            f'{amounts[2]} GB) by ({detail["shortfall_cpus"]} cpus, '
             f'{detail["shortfall_memory_mb"]} MB, '
             f'{detail["shortfall_disk_gb"]} GB)')
         return True, detail
     return False, None
+
+
+def _floored_node_decrement(
+        conn: sa.Connection, node_key: UUID, cpus: int, memory_mb: int,
+        disk_gb: int) -> tuple[bool, Optional[CapacityClampDetailDict]]:
+    """Give a placement's room back to a node's used_* counters."""
+    return _floored_node_counter_decrement(
+        conn, node_key, ('used_cpus', 'used_memory_mb', 'used_disk_gb'),
+        (cpus, memory_mb, disk_gb))
+
+
+def _floored_node_hold_decrement(
+        conn: sa.Connection, node_key: UUID, cpus: int, memory_mb: int,
+        disk_gb: int) -> tuple[bool, Optional[CapacityClampDetailDict]]:
+    """Give a released hold's booked room back to a node's held_* counters.
+
+    The other half of the booking guard, run when a hold ends: the room
+    was charged to ``held_*`` when the shape was booked, so it comes off
+    the same counters when the booking stops existing. Floored for the
+    reason a placement release is floored -- the reconciler recomputes
+    these counters from the hold rows, so a release that races a pass
+    must not be able to leave a negative behind.
+    """
+    return _floored_node_counter_decrement(
+        conn, node_key, ('held_cpus', 'held_memory_mb', 'held_disk_gb'),
+        (cpus, memory_mb, disk_gb))
 
 
 def _floored_namespace_decrement(
@@ -31011,6 +31109,11 @@ class UpdateNamespaceClaimResult(TypedDict):
     refused_reason: str
     dimensions: list[CapacityDimensionDetailDict]
     claim: Optional[NamespaceClaimRow]
+    # The holds a shrink had to give back because the new limit no
+    # longer covered the sum of them, most recently booked first. Empty
+    # on a grow, on an expiry change, and on a shrink the bookings
+    # already fit inside.
+    released_holds: list['NamespaceClaimHoldRow']
 
 
 class DeleteNamespaceClaimResult(TypedDict):
@@ -31022,7 +31125,14 @@ class DeleteNamespaceClaimResult(TypedDict):
     returned_cpus: int
     returned_memory_mb: int
     returned_disk_gb: int
+    # True when the claimed_* decrement, or a released hold's node
+    # counters, had to be floored at zero.
     clamped: bool
+    # Every hold the claim had booked, released with it: a hold is room
+    # inside the claim's limits, so it cannot outlive the row that
+    # promised it. Named here rather than merely counted so the caller
+    # can say which bookings a holder has lost.
+    released_holds: list['NamespaceClaimHoldRow']
 
 
 class _ClaimRefused(Exception):
@@ -31094,6 +31204,7 @@ def _empty_update_claim_result() -> UpdateNamespaceClaimResult:
         'refused_reason': '',
         'dimensions': [],
         'claim': None,
+        'released_holds': [],
     }
 
 
@@ -31107,6 +31218,7 @@ def _empty_delete_claim_result() -> DeleteNamespaceClaimResult:
         'returned_memory_mb': 0,
         'returned_disk_gb': 0,
         'clamped': False,
+        'released_holds': [],
     }
 
 
@@ -31562,6 +31674,39 @@ def _direct_create_namespace_claim(
         return result
 
 
+def _holds_a_shrink_releases(
+        rows: list['NamespaceClaimHoldRow'], new_limits: dict[str, int],
+        shrinking: set[str]) -> list['NamespaceClaimHoldRow']:
+    """Which of these holds a shrink has to give back, newest first.
+
+    Most recently booked first, because the holds a claim has had
+    longest are the ones a holder is most likely to be relying on,
+    and the booking that pushed it over is the one that was asked
+    for last. ``rows`` arrives oldest first, so this walks it
+    backwards.
+
+    It stops as soon as what is left fits, so a shrink releases the
+    least it can and a shrink the bookings already fit inside
+    releases nothing at all.
+
+    Only the dimensions actually being shrunk are considered. The
+    others already satisfy the invariant -- their limits are not
+    moving -- and releasing a booking to correct a dimension nobody
+    touched would be this function deciding something the operator
+    did not ask for.
+    """
+    remaining = {d: sum(_hold_size(row)[d] for row in rows)
+                 for d in CAPACITY_DIMENSIONS}
+    releasing: list['NamespaceClaimHoldRow'] = []
+    for row in reversed(rows):
+        if all(remaining[d] <= new_limits[d] for d in shrinking):
+            break
+        releasing.append(row)
+        for dimension, booked in _hold_size(row).items():
+            remaining[dimension] -= booked
+    return releasing
+
+
 def _direct_update_namespace_claim(
         claim_uuid: str, fields: list[str], limit_cpus: int,
         limit_memory_mb: int, limit_disk_gb: int,
@@ -31587,9 +31732,27 @@ def _direct_update_namespace_claim(
       ``used_*`` and no further. The floor is a SQL guard (``used_* <=
       new limit``) rather than a Python comparison against the probe, so
       an instance create that commits between the probe and the
-      transaction cannot slip the claim under its own usage.
+      transaction cannot slip the claim under its own usage. The floor
+      is deliberately *not* ``used_* + held_*``: returning capacity must
+      not be harder than taking it, and an operator who had to hunt down
+      and release every booking before a claim could shrink would be
+      being asked to undo somebody else's work. A shrink that leaves the
+      sum of the claim's holds above the new limit releases holds
+      instead, most recently booked first, until the claim fits, and
+      names each one in the reply.
     * **Expiry** may be extended or shortened, and is written from the
       server's clock (see _claim_expiry_expression).
+
+    The releases a shrink has to make are computed from a read outside
+    the transaction and then applied *inside* it, in the canonical order
+    after the limit change, so there is no window in which the limit is
+    down and the bookings are not. What stops that read going stale is
+    the claim UPDATE's own guard: it asserts, as a subquery against the
+    committed state, that the holds which will *remain* fit inside the
+    new limit (_claim_hold_sum_guard with the new limit and the released
+    uuids excluded). A booking that landed between the read and the lock
+    is therefore inside that sum and the whole attempt re-probes, rather
+    than leaving a claim over a limit it was just told to respect.
 
     The deltas are computed from limits read outside the transaction, so
     the claim UPDATE also carries an optimistic guard on those limits.
@@ -31673,6 +31836,17 @@ def _direct_update_namespace_claim(
         if grows and not cluster_present:
             raise _ClaimRefused('no_cluster_capacity')
 
+        # Which bookings a shrink has to give back, decided out here
+        # because the hold rows cannot be read inside the transaction
+        # before its first guarded UPDATE -- and then asserted in SQL by
+        # that UPDATE, which is what makes a stale answer safe. A request
+        # that shrinks nothing reads nothing.
+        shrinking = {d for d in CAPACITY_DIMENSIONS if deltas[d] < 0}
+        releasing = _holds_a_shrink_releases(
+            _read_hold_rows(claim_key), new_limits,
+            shrinking) if shrinking else []
+        released_keys = [UUID(row['uuid']) for row in releasing]
+
         with engine.begin() as conn:
             # INVARIANT: the first statement executed on this connection
             # must be a guarded UPDATE, per the block comment above
@@ -31712,10 +31886,10 @@ def _direct_update_namespace_claim(
                             **cluster_values)).rowcount == 0:
                     raise _ClaimRefused('capacity', requested=grows)
 
-            # namespace_claims, second in the canonical order. Three
+            # namespace_claims, second in the canonical order. Four
             # kinds of clause: the key, the optimistic guard on the
-            # limits the deltas were computed from, and D8's shrink
-            # floor.
+            # limits the deltas were computed from, the shrink floor,
+            # and the hold sum a shrink has to leave the claim inside.
             claim_where = [claims.c.uuid == claim_key,
                            claims.c.state == CLAIM_STATE_ACTIVE]
             for dimension in CAPACITY_DIMENSIONS:
@@ -31724,6 +31898,16 @@ def _direct_update_namespace_claim(
                 if deltas[dimension] < 0:
                     claim_where.append(claims.c[f'used_{dimension}']
                                        <= new_limits[dimension])
+                    # The holds that will still be there once the
+                    # releases below have run have to fit inside the new
+                    # limit. Asserted against the committed state from
+                    # inside this statement, so a booking that landed
+                    # after the read above is counted and the attempt
+                    # re-probes rather than leaving the claim over a
+                    # limit it was just given.
+                    claim_where.append(_claim_hold_sum_guard(
+                        dimension, claim_key, limit=new_limits[dimension],
+                        excluding=released_keys))
             claim_values: dict[str, Any] = {'updated_at': sa.func.now()}
             for dimension in changing:
                 claim_values[f'limit_{dimension}'] = new_limits[dimension]
@@ -31733,11 +31917,30 @@ def _direct_update_namespace_claim(
             if conn.execute(sa.update(claims).where(
                     sa.and_(*claim_where)).values(
                         **claim_values)).rowcount == 0:
-                # Either the shrink floor bound or the row moved. Which
-                # of the two is decided from a fresh read after the
-                # rollback, below, because MariaDB cannot say which
-                # clause failed and this transaction is about to vanish.
+                # Either the shrink floor bound, the hold sum did, or the
+                # row moved. Which of them is decided from a fresh read
+                # after the rollback, below, because MariaDB cannot say
+                # which clause failed and this transaction is about to
+                # vanish. Only the floor is a refusal; the other two
+                # re-probe.
                 raise _ClaimRowStale()
+
+            # scheduler_node_capacity and then the hold rows, last in
+            # the canonical order, inside the same transaction as the
+            # limit change above. A shrink that lowered the limit in one
+            # transaction and released the bookings in another would
+            # leave a window in which the claim was over its new limit
+            # with nothing to show for it.
+            if releasing:
+                # A clamp here is logged by the decrement itself and is
+                # not on this reply: an update's reply describes a limit
+                # change, and a drifted node counter is neither
+                # something the operator asked about nor something they
+                # can act on -- the next reconcile pass recomputes it.
+                deleted, _clamped = _release_hold_rows(conn, releasing)
+                if deleted != len(releasing):
+                    raise _ClaimRowStale()
+                outcome['released_holds'] = releasing
 
             # Read back what we just wrote, for the reply. After our own
             # write, on a row we hold the lock on.
@@ -31753,7 +31956,8 @@ def _direct_update_namespace_claim(
         """Which dimensions a shrink could not get under, read fresh.
 
         Empty means the claim UPDATE missed for some other reason -- a
-        concurrent writer moved the limits -- and the operation retries.
+        concurrent writer moved the limits, or booked a hold the release
+        set was computed without -- and the operation retries.
 
         Only dimensions actually being shrunk are considered, because
         the SQL floor is only applied to those, and this has to diagnose
@@ -31897,6 +32101,35 @@ class BookClaimHoldsResult(TypedDict):
     holds: list[NamespaceClaimHoldRow]
 
 
+class ReleaseClaimHoldsResult(TypedDict):
+    """The reply _direct_release_claim_holds builds.
+
+    ``released`` is the rows that are now gone, so a caller can event or
+    report what it gave back; an empty list on a successful call means
+    there was nothing left to release, which a repeat release reads as.
+    ``clamped`` and ``clamps`` are the node counters that had to be
+    floored at zero and by how much, in the same vocabulary a placement
+    release reports them.
+    """
+
+    success: bool
+    error: str
+    released: list[NamespaceClaimHoldRow]
+    clamped: bool
+    clamps: list[CapacityClampDetailDict]
+
+
+class _HoldReleaseStale(Exception):
+    """The hold rows moved between the probe and the release transaction.
+
+    Nothing failed and nothing was refused: the rows this release was
+    computed from are no longer the rows that are there, so the only
+    correct response is to re-read them and run again. Bounded by
+    _CLAIM_STALE_MAX_ATTEMPTS, exactly as the claim row's own optimistic
+    guard is.
+    """
+
+
 class _HoldBookingDenied(Exception):
     """A guarded UPDATE in a booking matched no row, so it must abort.
 
@@ -31931,13 +32164,25 @@ def _empty_book_holds_result() -> BookClaimHoldsResult:
     }
 
 
+def _empty_release_holds_result() -> ReleaseClaimHoldsResult:
+    """A successful release reply with nothing released yet."""
+    return {
+        'success': True,
+        'error': '',
+        'released': [],
+        'clamped': False,
+        'clamps': [],
+    }
+
+
 def _claim_hold_sum_guard(
-        dimension: str, claim_key: UUID,
-        requested: int = 0) -> sa.ColumnElement[bool]:
+        dimension: str, claim_key: UUID, requested: int = 0,
+        limit: Optional[int] = None,
+        excluding: Optional[list[UUID]] = None) -> sa.ColumnElement[bool]:
     """``limit_* >= sum(this claim's holds) + requested``, for one dimension.
 
     The one rendering of the claim-side invariant, shared by every
-    statement that has to assert it so the two sites cannot drift apart.
+    statement that has to assert it so the sites cannot drift apart.
     It is built to be dropped into the WHERE of a guarded UPDATE of the
     claim's own row and nowhere else -- see the section comment above for
     why a SELECT of the same sum ahead of that UPDATE is a concurrency
@@ -31950,13 +32195,72 @@ def _claim_hold_sum_guard(
 
     ``requested`` is what the statement is about to book and is zero for
     a caller that is only asserting the invariant still holds.
+
+    ``limit`` replaces the claim row's own column with a literal, for the
+    one statement whose UPDATE is *changing* that column: a shrink's
+    WHERE is evaluated against the row as it stands, so a guard reading
+    ``limit_cpus`` there would test the limit being replaced rather than
+    the one being written, and pass every time.
+
+    ``excluding`` leaves named holds out of the sum, for the same
+    statement: a shrink that releases bookings has not deleted their rows
+    yet when the claim's UPDATE runs -- the holds table comes last in the
+    canonical write order -- so the sum it has to assert is over the holds
+    that will still be there afterwards. Rows committed by anybody else
+    stay in it, which is what makes this the test that catches a booking
+    landing between the shrink's read and its transaction.
     """
     claims = _get_namespace_claims_table()
     holds = _get_namespace_claim_holds_table()
+    where = [holds.c.claim_uuid == claim_key]
+    if excluding:
+        where.append(holds.c.uuid.notin_(excluding))
     booked = sa.func.coalesce(
         sa.select(sa.func.sum(holds.c[dimension])).where(
-            holds.c.claim_uuid == claim_key).scalar_subquery(), 0)
-    return claims.c[f'limit_{dimension}'] >= booked + requested
+            sa.and_(*where)).scalar_subquery(), 0)
+    ceiling: sa.ColumnElement[Any] = (
+        claims.c[f'limit_{dimension}'] if limit is None
+        else sa.literal(limit))
+    return ceiling >= booked + requested
+
+
+def _claim_hold_count_guard(
+        claim_key: UUID, expected: int) -> sa.ColumnElement[bool]:
+    """``count(this claim's holds) = expected``, as a subquery.
+
+    Not a capacity test but a completeness one, for the two statements
+    that have to release *every* hold a claim has: the count they read
+    before opening their transaction is the count that must still be
+    there when they get the claim's row lock, or a booking landed in
+    between and the set they are about to release is not all of it. A
+    mismatch re-probes rather than refusing, because nothing is wrong --
+    the plan was simply computed against a world that moved.
+
+    Counting rows rather than summing their dimensions, because this
+    asks whether a row exists and a zero-sized hold is a row like any
+    other. It rides inside the guarded UPDATE's WHERE for the same
+    reason the sum does.
+    """
+    holds = _get_namespace_claim_holds_table()
+    return sa.select(sa.func.count()).select_from(holds).where(
+        holds.c.claim_uuid == claim_key).scalar_subquery() == expected
+
+
+def _now_microseconds() -> sa.ColumnElement[Any]:
+    """``NOW(6)``: the server's clock to the microsecond.
+
+    The only statements that may stamp a hold row's timestamps, because
+    those columns are DATETIME(6) and a plain ``NOW()`` into one stores
+    whole seconds with six zeroes after them. That would leave the
+    column looking precise, the rows ordering by second, and the
+    "release the most recently booked hold first" rule quietly decided
+    by the uuid tie-break instead -- a change with nothing visible to
+    notice it by.
+
+    The fsp is a literal because it has to be: ``sa.func.now(6)``
+    renders ``now(%s)`` and a bind parameter is not valid there.
+    """
+    return sa.func.now(sa.literal_column('6'))
 
 
 def _hold_select() -> sa.Select[Any]:
@@ -31966,7 +32270,9 @@ def _hold_select() -> sa.Select[Any]:
     reason _claim_select() does it: they are DATETIME columns written
     from the server's own clock, and a client that reinterpreted them in
     its own timezone would publish a booking order that is not the one
-    a release will act on.
+    a release will act on. UNIX_TIMESTAMP carries the fractional part of
+    a DATETIME(6) through, so what a caller reads orders the same way
+    the column does.
     """
     holds = _get_namespace_claim_holds_table()
     return sa.select(
@@ -31991,6 +32297,18 @@ def _hold_row_to_dict(row: sa.Row[Any]) -> NamespaceClaimHoldRow:
         'created_at': float(row.created_at or 0),
         'updated_at': float(row.updated_at or 0),
     }
+
+
+def _hold_size(row: NamespaceClaimHoldRow) -> dict[str, int]:
+    """One hold's booked room, keyed by capacity dimension.
+
+    The hold row spells its dimensions as plain columns -- on a hold row
+    the whole row *is* the holding, so there is no prefix to strip -- and
+    this is the one place that turns them into the dimension-keyed form
+    the rest of the capacity arithmetic is written in.
+    """
+    return {'cpus': int(row['cpus']), 'memory_mb': int(row['memory_mb']),
+            'disk_gb': int(row['disk_gb'])}
 
 
 def _parse_hold_shapes(
@@ -32280,7 +32598,9 @@ def _direct_book_claim_holds(
             # (4) namespace_claim_holds, last. The instance uuid is left
             # NULL: nothing has consumed a hold at the moment it is
             # booked, and that column is the whole of the consumption
-            # state.
+            # state. The timestamps are NOW(6) and not NOW(), because
+            # these columns are DATETIME(6) and a release orders by
+            # them -- see _now_microseconds().
             conn.execute(sa.insert(holds).values([
                 {
                     'uuid': hold_key,
@@ -32291,8 +32611,8 @@ def _direct_book_claim_holds(
                     'disk_gb': wanted['disk_gb'],
                     'node_uuid': node_key,
                     'instance_uuid': None,
-                    'created_at': sa.func.now(),
-                    'updated_at': sa.func.now(),
+                    'created_at': _now_microseconds(),
+                    'updated_at': _now_microseconds(),
                 }
                 for hold_key, (node_key, wanted) in zip(hold_keys, parsed)
             ]))
@@ -32375,9 +32695,89 @@ def _direct_get_namespace_claim_holds(
             f'{e}') from e
 
 
+def _read_hold_rows(
+        claim_key: UUID, hold_keys: Optional[list[UUID]] = None
+) -> list[NamespaceClaimHoldRow]:
+    """Read a claim's hold rows on their own connection, newest last.
+
+    Every release path needs the rows' sizes and nodes *before* it opens
+    its transaction, for the reason _read_claim_row() does: the
+    transaction's first statement has to be a guarded UPDATE. What the
+    rows might have become by then is handled by a guard inside that
+    transaction rather than by reading them again under it.
+
+    ``hold_keys`` restricts the read to named holds, filtered in SQL and
+    scoped to this claim, so a uuid belonging to somebody else's claim
+    reads as absent rather than as a hold this caller may release.
+
+    Ordered by ``created_at`` then uuid, the order
+    _direct_get_namespace_claim_holds() publishes, so a shrink releasing
+    the most recently booked first can simply walk it backwards.
+    """
+    holds = _get_namespace_claim_holds_table()
+    where = [holds.c.claim_uuid == claim_key]
+    if hold_keys is not None:
+        where.append(holds.c.uuid.in_(hold_keys))
+
+    engine = _get_engine()
+    with engine.connect() as conn:
+        rows = conn.execute(_hold_select().where(sa.and_(*where)).order_by(
+            holds.c.created_at, holds.c.uuid)).fetchall()
+    return [_hold_row_to_dict(row) for row in rows]
+
+
+def _release_hold_rows(
+        conn: sa.Connection, rows: list[NamespaceClaimHoldRow]
+) -> tuple[int, list[CapacityClampDetailDict]]:
+    """Give these holds' booked room back and delete their rows.
+
+    The second half of every path that ends a hold, so the arithmetic
+    and the write order exist once: the nodes first, in uuid order, then
+    the rows, which is the canonical table order (and, within the node
+    table, the fixed intra-table order that keeps two releases touching
+    the same pair of nodes queueing rather than deadlocking).
+
+    A hold with no node is booked on nothing, so there is no counter to
+    credit -- only its row goes.
+
+    Returns the number of rows actually deleted and the clamp details.
+    The count is what lets a caller which read these rows before its
+    transaction opened tell a row that vanished underneath it from one it
+    released; this function deliberately does not decide what that
+    means, because for a caller holding the claim's row lock against a
+    set it has just proved complete it cannot happen, and for the others
+    it is a re-probe.
+    """
+    holds = _get_namespace_claim_holds_table()
+    clamps: list[CapacityClampDetailDict] = []
+
+    per_node: dict[UUID, dict[str, int]] = {}
+    for row in rows:
+        if not row['node_uuid']:
+            continue
+        node_total = per_node.setdefault(
+            UUID(row['node_uuid']), {d: 0 for d in CAPACITY_DIMENSIONS})
+        for dimension, booked in _hold_size(row).items():
+            node_total[dimension] += booked
+
+    for node_key in sorted(per_node, key=lambda key: key.int):
+        wanted = per_node[node_key]
+        _, clamp_detail = _floored_node_hold_decrement(
+            conn, node_key, wanted['cpus'], wanted['memory_mb'],
+            wanted['disk_gb'])
+        if clamp_detail is not None:
+            clamps.append(clamp_detail)
+
+    if not rows:
+        return 0, clamps
+    deleted = int(conn.execute(sa.delete(holds).where(
+        holds.c.uuid.in_([UUID(row['uuid']) for row in rows]))).rowcount)
+    return deleted, clamps
+
+
 def _direct_release_claim_holds(
     claim_uuid: str, hold_uuids: list[str], all_holds: bool = False
-) -> dict[str, Any]:
+) -> ReleaseClaimHoldsResult:
     """Release holds a claim has booked, naming them or asking for all.
 
     ``all_holds`` is how a caller asks for every hold the claim has, and
@@ -32390,6 +32790,34 @@ def _direct_release_claim_holds(
     database tier call this function directly and would otherwise bypass
     it.
 
+    One transaction in the canonical order, retried as a whole on
+    transient contention:
+
+    1. The hold rows and the claim row, probed **outside** the
+       transaction (_read_hold_rows, _read_claim_row), because the
+       transaction's first statement must be a guarded UPDATE -- see the
+       block comment above _probe_admission_rows().
+    2. namespace_claims, a guarded UPDATE of the claim's own
+       ``updated_at``. It changes nothing a reader cares about and is
+       not there for its SET: it takes the claim row's lock, which is
+       what every writer of this claim's holds takes first, so two
+       releases of one claim, and a release racing a booking, serialise
+       against each other instead of interleaving. For ``all_holds`` it
+       also carries _claim_hold_count_guard, which is what notices a
+       booking that landed between the probe and the lock -- without it
+       "every hold" would mean "every hold a moment ago".
+    3. scheduler_node_capacity and then the hold rows, both in
+       _release_hold_rows().
+
+    A claim with no row is still released from. Its holds are orphans
+    whose room is charged to real nodes, a claim uuid is never reused,
+    and nothing can book against a claim that is not there -- so there is
+    no row to lock and no race to lose, and the transaction opens with
+    the node decrement instead. The named-hold case is kept honest by the
+    delete's own rowcount: releasing exactly the rows that were read, and
+    aborting when that is not what happened, is what stops two concurrent
+    releases of one hold both crediting its node.
+
     Raises until the release is written, for the reason booking does: a
     release that returned success without moving the node counters would
     leave booked room that nothing could account for.
@@ -32397,7 +32825,83 @@ def _direct_release_claim_holds(
     if not hold_uuids and not all_holds:
         raise ValueError(
             'release_claim_holds needs hold_uuids or all_holds')
-    raise NotImplementedError('releasing claim holds is not implemented')
+
+    result = _empty_release_holds_result()
+
+    try:
+        claim_key = UUID(claim_uuid)
+        hold_keys = None if all_holds else [UUID(u) for u in hold_uuids]
+    except ValueError as e:
+        LOG.warning(f'release_claim_holds given a malformed uuid: {e}')
+        result['success'] = False
+        result['error'] = f'malformed uuid: {e}'
+        return result
+
+    engine = _get_engine()
+    claims = _get_namespace_claims_table()
+
+    def _attempt() -> ReleaseClaimHoldsResult:
+        outcome = _empty_release_holds_result()
+
+        # The probes, on their own connection outside the transaction.
+        # Re-run on every attempt, so an attempt that lost a race
+        # re-reads the world rather than re-deciding on the losing view.
+        rows = _read_hold_rows(claim_key, hold_keys)
+        if not rows:
+            # Nothing to release: either the claim holds nothing or the
+            # named holds are already gone, which is what a repeat
+            # release looks like. No transaction is opened, because a
+            # decrement here would credit a node for room no row is
+            # holding any more.
+            return outcome
+        claim_present = _read_claim_row(claim_key) is not None
+
+        with engine.begin() as conn:
+            # INVARIANT: the first statement executed on this connection
+            # must be a guarded UPDATE. A plain SELECT here establishes
+            # the transaction's read view early and makes every later
+            # guarded UPDATE against a contended row abort with
+            # ER_CHECKREAD under innodb_snapshot_isolation. See the
+            # block comment above _probe_admission_rows().
+            if claim_present:
+                claim_where = [claims.c.uuid == claim_key]
+                if all_holds:
+                    claim_where.append(
+                        _claim_hold_count_guard(claim_key, len(rows)))
+                if conn.execute(sa.update(claims).where(
+                        sa.and_(*claim_where)).values(
+                            updated_at=sa.func.now())).rowcount == 0:
+                    raise _HoldReleaseStale()
+
+            deleted, clamps = _release_hold_rows(conn, rows)
+            if deleted != len(rows):
+                raise _HoldReleaseStale()
+
+            outcome['released'] = rows
+            outcome['clamps'] = clamps
+            outcome['clamped'] = bool(clamps)
+
+        return outcome
+
+    for _attempt_number in range(_CLAIM_STALE_MAX_ATTEMPTS):
+        try:
+            return _retry_transaction(
+                _attempt, f'release_claim_holds({claim_uuid})')
+        except _HoldReleaseStale:
+            continue
+        except (OperationalError, IntegrityError) as e:
+            LOG.warning(
+                f'MariaDB release_claim_holds failed for {claim_uuid}: {e}')
+            result['success'] = False
+            result['error'] = f'MariaDB error: {e}'
+            return result
+
+    LOG.warning(
+        f'release_claim_holds({claim_uuid}): the hold rows kept moving '
+        f'under {_CLAIM_STALE_MAX_ATTEMPTS} attempts, giving up')
+    result['success'] = False
+    result['error'] = 'the holds kept changing under concurrent writers'
+    return result
 
 
 def _direct_delete_namespace_claim(
@@ -32421,7 +32925,10 @@ def _direct_delete_namespace_claim(
     claims only, and its unclaimed fold skips only namespaces holding an
     *active* claim -- so an expired claim's limits are already out of
     ``claimed_*`` and its namespace's usage is already counted in
-    ``unclaimed_used_*``. Migrating either again would double it.
+    ``unclaimed_used_*``. Migrating either again would double it. Its
+    holds are a different matter and are released whatever its coverage
+    state, because ``held_*`` is a per-node counter and a node is
+    charged for a booking until the booking stops existing.
     """
     result = _empty_delete_claim_result()
 
@@ -32440,11 +32947,12 @@ def _direct_delete_namespace_claim(
     def _attempt() -> DeleteNamespaceClaimResult:
         outcome = _empty_delete_claim_result()
 
-        # The probe, outside the transaction, per the block comment
+        # The probes, outside the transaction, per the block comment
         # above _probe_admission_rows().
         current = _read_claim_row(claim_key)
         if current is None:
             return outcome
+        held = _read_hold_rows(claim_key)
 
         active = current.state == CLAIM_STATE_ACTIVE
         limits = {d: int(getattr(current, f'limit_{d}'))
@@ -32500,16 +33008,37 @@ def _direct_delete_namespace_claim(
 
             # namespace_claims, second in the canonical order. The
             # optimistic guard is on exactly the counters the credit
-            # above was computed from.
+            # above was computed from, and on the number of holds the
+            # probe saw: a hold booked between the probe and here would
+            # otherwise outlive the claim it belongs inside, with its
+            # room still charged to a node and no claim left to explain
+            # it. A booking cannot land *after* this statement, because
+            # it has to take this row's lock first and will then find no
+            # row.
             delete = sa.delete(claims).where(sa.and_(
                 claims.c.uuid == claim_key,
                 claims.c.state == current.state,
+                _claim_hold_count_guard(claim_key, len(held)),
                 *[claims.c[f'limit_{d}'] == limits[d]
                   for d in CAPACITY_DIMENSIONS],
                 *[claims.c[f'used_{d}'] == used[d]
                   for d in CAPACITY_DIMENSIONS]))
             if conn.execute(delete).rowcount == 0:
                 raise _ClaimRowStale()
+
+            # scheduler_node_capacity and then the hold rows, last in
+            # the canonical order. A hold is room inside a claim's
+            # limits, so it cannot outlive the claim: the bookings go
+            # back to their nodes in the same transaction that returns
+            # the claim's own capacity, and a hold whose instance has
+            # been deleted is deliberately not what ends a hold -- only
+            # its claim going away, lapsing, or shrinking under it is.
+            deleted, clamps = _release_hold_rows(conn, held)
+            if deleted != len(held):
+                raise _ClaimRowStale()
+            outcome['released_holds'] = held
+            if clamps:
+                outcome['clamped'] = True
 
             outcome['deleted'] = True
             if active:
@@ -32718,6 +33247,8 @@ def _grpc_update_namespace_claim(
         result['refused_reason'] = reply.refused_reason
         result['dimensions'] = [
             _dimension_from_proto(d) for d in reply.dimensions]
+        result['released_holds'] = [
+            _hold_from_proto(h) for h in reply.released_holds]
         if reply.HasField('claim'):
             result['claim'] = _claim_from_proto(reply.claim)
         return result
@@ -32743,6 +33274,8 @@ def _grpc_delete_namespace_claim(
         result['returned_memory_mb'] = int(reply.returned_memory_mb)
         result['returned_disk_gb'] = int(reply.returned_disk_gb)
         result['clamped'] = bool(reply.clamped)
+        result['released_holds'] = [
+            _hold_from_proto(h) for h in reply.released_holds]
         return result
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.error(f'gRPC DeleteNamespaceClaim failed: {e}')
@@ -32867,6 +33400,40 @@ def _grpc_get_namespace_claim_holds(
     return [_hold_from_proto(hold) for hold in reply.holds]
 
 
+def _grpc_release_claim_holds(
+        claim_uuid: str, hold_uuids: list[str],
+        all_holds: bool = False) -> ReleaseClaimHoldsResult:
+    """Release holds via the database microservice.
+
+    The empty-and-unflagged guard is checked here as well as in the
+    direct function, so a caller gets the same ValueError whichever side
+    of the tier boundary it is on rather than a refusal shaped like a
+    database error.
+    """
+    if not hold_uuids and not all_holds:
+        raise ValueError(
+            'release_claim_holds needs hold_uuids or all_holds')
+
+    result = _empty_release_holds_result()
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ReleaseNamespaceClaimHoldsRequest(
+            claim_uuid=claim_uuid, hold_uuids=hold_uuids,
+            all_holds=all_holds)
+        reply = _grpc_call(stub.ReleaseNamespaceClaimHolds, request)
+        result['success'] = bool(reply.success)
+        result['error'] = reply.error
+        result['released'] = [_hold_from_proto(h) for h in reply.released]
+        result['clamped'] = bool(reply.clamped)
+        result['clamps'] = [_clamp_from_proto(c) for c in reply.clamps]
+        return result
+    except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
+        LOG.error(f'gRPC ReleaseNamespaceClaimHolds failed: {e}')
+        result['success'] = False
+        result['error'] = f'database unavailable: {e}'
+        return result
+
+
 def create_namespace_claim(
         claim_uuid: str, namespace: str, limit_cpus: int,
         limit_memory_mb: int, limit_disk_gb: int,
@@ -32926,7 +33493,14 @@ def update_namespace_claim(
          'refused_reason': '' | 'capacity' | 'below_usage' | 'not_found'
                               | 'not_active' | 'no_cluster_capacity'
                               | 'conflict',
-         'dimensions': [...], 'claim': {...} | None}
+         'dimensions': [...], 'claim': {...} | None,
+         'released_holds': [{...}, ...]}
+
+    ``released_holds`` is the bookings a shrink had to give back because
+    the new limit no longer covered the sum of them, most recently
+    booked first. The shrink floor itself is still the claim's
+    ``used_*``: a shrink releases holds rather than being refused for
+    them.
     """
     if _use_database_service():
         return _grpc_update_namespace_claim(
@@ -32944,10 +33518,14 @@ def delete_namespace_claim(claim_uuid: str) -> DeleteNamespaceClaimResult:
 
         {'success': bool, 'error': str, 'deleted': bool,
          'returned_cpus': int, 'returned_memory_mb': int,
-         'returned_disk_gb': int, 'clamped': bool}
+         'returned_disk_gb': int, 'clamped': bool,
+         'released_holds': [{...}, ...]}
 
     ``deleted`` is False when there was no claim to delete, which is how
     a repeat call is told from a real one. Deleting twice is harmless.
+    ``released_holds`` is every hold the claim had booked: they are room
+    inside its limits, so they go back to their nodes in the same
+    transaction that removes the row.
     """
     if _use_database_service():
         return _grpc_delete_namespace_claim(claim_uuid)
@@ -33019,3 +33597,36 @@ def get_namespace_claim_holds(claim_uuid: str) -> list[NamespaceClaimHoldRow]:
     if _use_database_service():
         return _grpc_get_namespace_claim_holds(claim_uuid)
     return _direct_get_namespace_claim_holds(claim_uuid)
+
+
+def release_claim_holds(
+        claim_uuid: str, hold_uuids: Optional[list[str]] = None,
+        all_holds: bool = False) -> ReleaseClaimHoldsResult:
+    """Give back holds a claim has booked, naming them or asking for all.
+
+    The named holds are released together, or every hold the claim has
+    when ``all_holds`` is set. A request that names nothing and does not
+    set the flag raises ValueError: proto3 cannot tell a list left unset
+    from one explicitly empty, and releasing is destructive, so the wide
+    reading of an empty request must not be the default.
+
+    The nodes the holds were booked on get their ``held_*`` room back in
+    the same transaction that removes the rows, floored at zero so a
+    release racing a reconcile pass cannot leave a counter negative.
+
+    Returns:
+
+        {'success': bool, 'error': str, 'released': [{...}, ...],
+         'clamped': bool, 'clamps': [{...}, ...]}
+
+    ``released`` is the rows that are now gone; empty on a successful
+    call means there was nothing left to release, which is what a repeat
+    release of the same holds reads as.
+    """
+    names = hold_uuids or []
+    if not names and not all_holds:
+        raise ValueError(
+            'release_claim_holds needs hold_uuids or all_holds')
+    if _use_database_service():
+        return _grpc_release_claim_holds(claim_uuid, names, all_holds)
+    return _direct_release_claim_holds(claim_uuid, names, all_holds)

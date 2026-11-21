@@ -3233,6 +3233,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 refused_reason=result['refused_reason'])
             for dimension in result['dimensions']:
                 reply.dimensions.add(**dimension)
+            for hold in result['released_holds']:
+                reply.released_holds.append(self._hold_message(hold))
             if result['claim'] is not None:
                 reply.claim.CopyFrom(self._claim_message(result['claim']))
             return reply
@@ -3251,7 +3253,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         try:
             self.monitor.counters['delete_namespace_claim'].inc()
             result = mariadb._direct_delete_namespace_claim(request.uuid)
-            return database_pb2.DeleteNamespaceClaimReply(
+            reply = database_pb2.DeleteNamespaceClaimReply(
                 success=result['success'],
                 error=result['error'],
                 deleted=result['deleted'],
@@ -3259,6 +3261,9 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 returned_memory_mb=result['returned_memory_mb'],
                 returned_disk_gb=result['returned_disk_gb'],
                 clamped=result['clamped'])
+            for hold in result['released_holds']:
+                reply.released_holds.append(self._hold_message(hold))
+            return reply
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database DeleteNamespaceClaim failed', e)
@@ -3350,7 +3355,18 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 clamped=result['clamped'])
             for hold in result['released']:
                 reply.released.append(self._hold_message(hold))
+            for clamp in result['clamps']:
+                reply.clamps.add(**clamp)
             return reply
+        except ValueError as e:
+            # A request naming no holds and not asking for all of them.
+            # The caller's mistake rather than a database fault, so it
+            # gets an argument status rather than a recorded exception,
+            # and never the release of everything it did not ask for.
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details(str(e))
+            return database_pb2.ReleaseNamespaceClaimHoldsReply(
+                success=False, error=str(e))
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database ReleaseNamespaceClaimHolds failed', e)

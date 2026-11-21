@@ -3333,6 +3333,13 @@ message UpdateNamespaceClaimReply {
   string refused_reason = 4;
   repeated CapacityDimensionDetail dimensions = 5;
   NamespaceClaim claim = 6;
+  // The holds a shrink gave back, most recently booked first, because
+  // the new limit no longer covered the sum of them. Empty on a grow, on
+  // an expiry change, and on a shrink the bookings already fit inside.
+  // The shrink floor itself is unchanged and still stops at the claim's
+  // used_*: returning capacity must not be harder than taking it, so a
+  // shrink releases bookings rather than being refused for them.
+  repeated NamespaceClaimHold released_holds = 7;
 }
 
 message DeleteNamespaceClaimRequest {
@@ -3350,10 +3357,15 @@ message DeleteNamespaceClaimReply {
   int64 returned_cpus = 4;
   int64 returned_memory_mb = 5;
   int64 returned_disk_gb = 6;
-  // The claimed_* decrement had to be floored at zero, meaning the
-  // singleton and the claims disagreed before this delete. Corrected by
-  // the next reconcile pass.
+  // The claimed_* decrement, or a node's held_* decrement for a hold
+  // this delete released, had to be floored at zero -- meaning the
+  // counters and the rows they are derived from disagreed before this
+  // delete. Corrected by the next reconcile pass.
   bool clamped = 7;
+  // Every hold the claim had booked. A hold lives inside its claim's
+  // limits, so removing the claim removes them too, in the same
+  // transaction that returns the claim's capacity.
+  repeated NamespaceClaimHold released_holds = 8;
 }
 
 // Shape holds (MariaDB)
@@ -3440,4 +3452,8 @@ message ReleaseNamespaceClaimHoldsReply {
   // the rows disagreed before this release. Corrected by the next
   // reconcile pass.
   bool clamped = 4;
+  // Which node's held_* counters a true clamped is about, and the
+  // per-dimension drift the clamp erased. Empty when nothing clamped, or
+  // when the reply came from an sf-database predating the field.
+  repeated CapacityClampDetail clamps = 5;
 }

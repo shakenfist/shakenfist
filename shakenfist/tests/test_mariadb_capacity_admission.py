@@ -2455,7 +2455,13 @@ class GetSchedulerNodeCapacityTestCase(base.ShakenFistTestCase):
 
 
 class HoldRpcTestCase(base.ShakenFistTestCase):
-    """The hold RPCs exist on the wire, but nothing behind them does yet."""
+    """The hold RPCs on the wire, and what they do with a bad request.
+
+    The transactions behind them are covered in
+    test_mariadb_capacity_holds.py and its live sibling; what is here is
+    the wire surface, and that a request the handler cannot act on
+    answers failure rather than something shaped like a success.
+    """
 
     def _servicer(self):
         servicer = database_main.DatabaseService.__new__(
@@ -2463,23 +2469,24 @@ class HoldRpcTestCase(base.ShakenFistTestCase):
         servicer.monitor = mock.MagicMock()
         return servicer
 
-    def test_booking_reports_unimplemented_rather_than_success(self):
+    def test_a_booking_of_a_malformed_claim_is_a_failure(self):
         reply = self._servicer().BookNamespaceClaimHolds(
             database_pb2.BookNamespaceClaimHoldsRequest(claim_uuid='c'),
             mock.MagicMock())
         self.assertFalse(reply.success)
         self.assertFalse(reply.booked)
 
-    def test_release_reports_unimplemented_rather_than_success(self):
-        # all_holds set, so this reaches the unimplemented body rather
-        # than stopping at the empty-request guard below. Without the
-        # flag this test would pass on the guard and stop saying
-        # anything about the release itself.
+    def test_a_release_of_a_malformed_claim_is_a_failure(self):
+        # all_holds set, so this reaches the uuid parse rather than
+        # stopping at the empty-request guard below. Without the flag
+        # this test would pass on the guard and stop saying anything
+        # about the release itself.
         reply = self._servicer().ReleaseNamespaceClaimHolds(
             database_pb2.ReleaseNamespaceClaimHoldsRequest(
                 claim_uuid='c', all_holds=True),
             mock.MagicMock())
         self.assertFalse(reply.success)
+        self.assertEqual(0, len(reply.released))
 
     def test_a_release_naming_nothing_at_all_is_refused(self):
         # An empty hold_uuids with all_holds unset must not be read as
@@ -2500,9 +2507,12 @@ class HoldRpcTestCase(base.ShakenFistTestCase):
         # bypassed by exactly the callers that release in bulk.
         self.assertRaises(
             ValueError, mariadb._direct_release_claim_holds, 'c', [])
-        self.assertRaises(
-            NotImplementedError, mariadb._direct_release_claim_holds,
-            'c', [], True)
+        # The same request with the flag set gets past the guard and is
+        # then refused for the uuid, which is what says the guard is
+        # about the empty list and nothing else.
+        result = mariadb._direct_release_claim_holds('c', [], True)
+        self.assertFalse(result['success'])
+        self.assertIn('malformed uuid', result['error'])
 
     def test_listing_a_claim_with_no_holds_is_empty(self):
         reply = self._servicer().GetNamespaceClaimHolds(

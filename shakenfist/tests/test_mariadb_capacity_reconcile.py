@@ -618,12 +618,25 @@ def _deleted_row_count(stmt):
 
 
 def _capacity_row(node_uuid, limit_cpus, limit_memory_mb, limit_disk_gb,
-                  used_cpus=0, used_memory_mb=0, used_disk_gb=0):
+                  used_cpus=0, used_memory_mb=0, used_disk_gb=0,
+                  held_cpus=0, held_memory_mb=0, held_disk_gb=0):
     return SimpleNamespace(
         node_uuid=node_uuid, limit_cpus=limit_cpus,
         limit_memory_mb=limit_memory_mb, limit_disk_gb=limit_disk_gb,
         used_cpus=used_cpus, used_memory_mb=used_memory_mb,
-        used_disk_gb=used_disk_gb, expected_demand=0.0, updated_at=None)
+        used_disk_gb=used_disk_gb, held_cpus=held_cpus,
+        held_memory_mb=held_memory_mb, held_disk_gb=held_disk_gb,
+        expected_demand=0.0, updated_at=None)
+
+
+def _hold_row(uuid, claim_uuid, node_uuid, cpus=2, memory_mb=2048,
+              disk_gb=20):
+    """A hold row in the shape _hold_select() projects."""
+    return SimpleNamespace(
+        uuid=uuid, claim_uuid=claim_uuid, namespace='ns1', cpus=cpus,
+        memory_mb=memory_mb, disk_gb=disk_gb, node_uuid=node_uuid,
+        instance_uuid=None, created_at=1799000000.0,
+        updated_at=1799000000.0)
 
 
 class _ReconcileRouterMixin:
@@ -646,8 +659,27 @@ class _ReconcileRouterMixin:
         except AttributeError:
             text = str(stmt)
 
+        # Every statement, in order, so a test can assert that a pass
+        # issued one and what shape it had. self.executed below is the
+        # narrower record of the ones no branch here answers.
+        if not hasattr(self, 'all_statements'):
+            self.all_statements = []
+        self.all_statements.append((text, stmt))
+
         if 'UPDATE namespace_claims' in text and 'expires_at' in text:
             return self._fake_result(rowcount=3)
+        # The hold branches come before the claims one, because a hold
+        # read filters on the claims table in a subquery and would
+        # otherwise be answered with claim rows.
+        if 'DELETE FROM namespace_claim_holds' in text:
+            return self._fake_result(
+                rowcount=len(getattr(self, 'hold_rows', [])))
+        if 'FROM namespace_claim_holds' in text:
+            return self._fake_result(rows=getattr(self, 'hold_rows', []))
+        if 'UPDATE scheduler_node_capacity' in text:
+            # The held_* decrement a lapsed claim's release makes. A
+            # match, so the clamp form never runs in these fixtures.
+            return self._fake_result(rowcount=1)
         if 'DELETE FROM scheduler_node_capacity' in text:
             # Report the number of uuids the statement actually names, so
             # nodes_removed assertions test the reconciler's removal set
@@ -999,6 +1031,105 @@ class ReconcileHypervisorFilterTestCase(
         self.assertEqual(str(NODE2), result['nodes'][0]['node_uuid'])
         self.assertEqual(10, result['nodes'][0]['limit_cpus'])
         self.assertEqual(0, result['nodes_removed'])
+
+
+class ReconcileLapsedHoldReleaseTestCase(
+        _ReconcileRouterMixin, base.ShakenFistTestCase):
+    """A lapsed claim's shape holds are released by the pass that lapses it.
+
+    A hold is room inside a claim's limits, and the cluster rebuild in
+    this same pass sums claimed_* over *active* claims only -- so once a
+    claim has expired there is no aggregate left for its bookings to sit
+    inside, and the only honest outcome is to give them back. Displacing
+    them instead would move a booking into a total that does not count
+    the claim it belongs to.
+    """
+
+    def _run(self, hold_rows):
+        self.previous_rows = []
+        self.metrics_rows = []
+        self.non_hypervisor_rows = []
+        self.fresh_metrics_rows = []
+        self.node_rows = []
+        self.active_rows = []
+        self.claim_rows = []
+        self.hold_rows = hold_rows
+        self.executed = []
+        self.all_statements = []
+
+        mock_engine = mock.MagicMock()
+        conn = mock_engine.connect.return_value.__enter__.return_value
+        conn.execute.side_effect = self._route
+        with mock.patch('shakenfist.mariadb._get_engine',
+                        return_value=mock_engine), \
+                mock.patch('shakenfist.mariadb._reconcile_fetch_usage',
+                           return_value={}), \
+                mock.patch('shakenfist.mariadb._reconcile_fetch_demand',
+                           return_value={}), \
+                mock.patch.object(mariadb.config,
+                                  'CPU_OVERCOMMIT_RATIO', 3.0), \
+                mock.patch.object(mariadb.config,
+                                  'RAM_OVERCOMMIT_RATIO', 3.0):
+            result = mariadb._direct_reconcile_scheduler_capacity(2.5, 600, 1.0)
+        return result
+
+    def _texts(self, prefix):
+        return [text for text, _ in self.all_statements
+                if text.startswith(prefix)]
+
+    def test_the_expired_holds_read_follows_the_expiry_update(self):
+        # Order matters twice over: the UPDATE is the pass's first
+        # statement, which is what the ER_CHECKREAD invariant requires,
+        # and it holds the claim rows' locks, so nothing can book
+        # against a claim this read is about to find the holds of.
+        self.assertEqual(
+            [], self._run([_hold_row(UUID(int=1), CLAIM1, NODE1)]).get(
+                'nodes'))
+        texts = [text for text, _ in self.all_statements]
+        expiry = next(index for index, text in enumerate(texts)
+                      if text.startswith('UPDATE namespace_claims'))
+        read = next(index for index, text in enumerate(texts)
+                    if 'FROM namespace_claim_holds' in text
+                    and text.startswith('SELECT'))
+        self.assertEqual(0, expiry)
+        self.assertLess(expiry, read)
+
+    def test_the_read_is_restricted_to_expired_claims(self):
+        self._run([])
+        [read] = [text for text in self._texts('SELECT')
+                  if 'FROM namespace_claim_holds' in text]
+        self.assertIn('FROM namespace_claims', read)
+        self.assertIn('namespace_claims.state = ', read)
+
+    def test_a_lapsed_holds_node_is_credited_and_its_row_deleted(self):
+        self._run([_hold_row(UUID(int=1), CLAIM1, NODE1, cpus=2,
+                             memory_mb=2048, disk_gb=20)])
+
+        [decrement] = self._texts('UPDATE scheduler_node_capacity')
+        self.assertIn('held_cpus=(scheduler_node_capacity.held_cpus - ',
+                      decrement)
+        self.assertIn('scheduler_node_capacity.held_cpus >= ', decrement)
+        # used_* belongs to the placements the node is hosting and is
+        # not what a booking charged.
+        self.assertNotIn('used_cpus=', decrement)
+        self.assertEqual(1, len(self._texts('DELETE FROM '
+                                            'namespace_claim_holds')))
+
+    def test_two_lapsed_holds_on_one_node_are_credited_together(self):
+        self._run([_hold_row(UUID(int=1), CLAIM1, NODE1, cpus=2),
+                   _hold_row(UUID(int=2), CLAIM1, NODE1, cpus=3)])
+
+        statements = [stmt for text, stmt in self.all_statements
+                      if text.startswith('UPDATE scheduler_node_capacity')]
+        self.assertEqual(1, len(statements))
+        params = statements[0].compile(dialect=MYSQL_DIALECT).params
+        self.assertIn(5, params.values())
+
+    def test_a_pass_with_no_lapsed_holds_touches_no_hold_row(self):
+        self._run([])
+        self.assertEqual([], self._texts('UPDATE scheduler_node_capacity'))
+        self.assertEqual(
+            [], self._texts('DELETE FROM namespace_claim_holds'))
 
 
 class ReconcileNodeStateFilterTestCase(

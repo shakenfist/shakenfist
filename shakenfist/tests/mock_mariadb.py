@@ -3102,7 +3102,12 @@ class MockMariaDB():
         """
         result = {
             'success': True, 'error': '', 'updated': False,
-            'refused_reason': '', 'dimensions': [], 'claim': None}
+            'refused_reason': '', 'dimensions': [], 'claim': None,
+            # This mock has no holds model, so a shrink here never
+            # releases one. Carried anyway because the real reply always
+            # has the key and a caller reading it must not have to
+            # wonder which implementation it is talking to.
+            'released_holds': []}
         row = self._claim_by_uuid(claim_uuid)
         if row is None:
             result['refused_reason'] = 'not_found'
@@ -3147,7 +3152,8 @@ class MockMariaDB():
         result = {
             'success': True, 'error': '', 'deleted': False,
             'returned_cpus': 0, 'returned_memory_mb': 0,
-            'returned_disk_gb': 0, 'clamped': False}
+            'returned_disk_gb': 0, 'clamped': False,
+            'released_holds': []}
         row = self._claim_by_uuid(claim_uuid)
         if row is None:
             return result

@@ -65,6 +65,7 @@ DSN_ENV = 'SF_MARIADB_TEST_DSN'
 TEST_TABLES = [
     'scheduler_node_capacity',
     'namespace_claims',
+    'namespace_claim_holds',
     'cluster_capacity',
     'node_metrics',
     'object_references',
@@ -142,6 +143,7 @@ class _LiveCapacityFixture(base.ShakenFistTestCase):
                        mariadb._ensure_node_metrics_schema,
                        mariadb._ensure_scheduler_node_capacity_schema,
                        mariadb._ensure_namespace_claims_schema,
+                       mariadb._ensure_namespace_claim_holds_schema,
                        mariadb._ensure_cluster_capacity_schema):
             ensure(self.engine)
 

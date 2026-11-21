@@ -1192,7 +1192,8 @@ class ClaimServicerTestCase(base.ShakenFistTestCase):
                 return_value={
                     'success': True, 'error': '', 'updated': True,
                     'refused_reason': '', 'dimensions': [],
-                    'claim': self._claim()}) as direct:
+                    'claim': self._claim(),
+                    'released_holds': []}) as direct:
             reply = self.servicer.UpdateNamespaceClaim(
                 database_pb2.UpdateNamespaceClaimRequest(
                     uuid=str(CLAIM1), limit_cpus=32,
@@ -1208,7 +1209,8 @@ class ClaimServicerTestCase(base.ShakenFistTestCase):
                 return_value={
                     'success': True, 'error': '', 'deleted': True,
                     'returned_cpus': 4, 'returned_memory_mb': 4096,
-                    'returned_disk_gb': 40, 'clamped': False}):
+                    'returned_disk_gb': 40, 'clamped': False,
+                    'released_holds': []}):
             reply = self.servicer.DeleteNamespaceClaim(
                 database_pb2.DeleteNamespaceClaimRequest(uuid=str(CLAIM1)),
                 self.context)

@@ -287,9 +287,25 @@ class CapacityTableDefinitionTestCase(base.ShakenFistTestCase):
         # timestamp idiom: created_at is what orders a shrink's
         # releases, so it must come from the database's clock rather
         # than from whichever node took the booking.
+        #
+        # The microsecond precision is pinned, not merely the type. At
+        # whole seconds two bookings a moment apart tie and "release the
+        # most recently booked first" becomes "release in uuid order" --
+        # stable, and not what the rule says. A later tidy-up that put
+        # the fsp back to a plain DATETIME would coarsen that ordering
+        # with nothing visible to notice it by, so it fails here.
         for name in ('created_at', 'updated_at'):
             self.assertIsInstance(table.c[name].type, sa.DateTime, name)
+            self.assertEqual(6, table.c[name].type.fsp, name)
             self.assertFalse(table.c[name].nullable, name)
+
+        # And the DDL that reaches the server says so, because the fsp
+        # only arrives through the dialect type: a plain sa.DateTime()
+        # renders as DATETIME with no way to ask for the fraction.
+        ddl = ' '.join(str(sa.schema.CreateTable(table).compile(
+            dialect=sa.dialects.mysql.dialect())).split())
+        self.assertIn('created_at DATETIME(6) NOT NULL', ddl)
+        self.assertIn('updated_at DATETIME(6) NOT NULL', ddl)
 
     def test_namespace_claim_holds_indexes(self):
         table = mariadb._get_namespace_claim_holds_table()

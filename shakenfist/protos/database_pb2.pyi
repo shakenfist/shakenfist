@@ -10641,6 +10641,7 @@ class UpdateNamespaceClaimReply(_message.Message):
     REFUSED_REASON_FIELD_NUMBER: _builtins.int
     DIMENSIONS_FIELD_NUMBER: _builtins.int
     CLAIM_FIELD_NUMBER: _builtins.int
+    RELEASED_HOLDS_FIELD_NUMBER: _builtins.int
     success: _builtins.bool
     """The RPC ran; false means an error, see error"""
     error: _builtins.str
@@ -10658,6 +10659,16 @@ class UpdateNamespaceClaimReply(_message.Message):
     def dimensions(self) -> _containers.RepeatedCompositeFieldContainer[Global___CapacityDimensionDetail]: ...
     @_builtins.property
     def claim(self) -> Global___NamespaceClaim: ...
+    @_builtins.property
+    def released_holds(self) -> _containers.RepeatedCompositeFieldContainer[Global___NamespaceClaimHold]:
+        """The holds a shrink gave back, most recently booked first, because
+        the new limit no longer covered the sum of them. Empty on a grow, on
+        an expiry change, and on a shrink the bookings already fit inside.
+        The shrink floor itself is unchanged and still stops at the claim's
+        used_*: returning capacity must not be harder than taking it, so a
+        shrink releases bookings rather than being refused for them.
+        """
+
     def __init__(
         self,
         *,
@@ -10667,10 +10678,11 @@ class UpdateNamespaceClaimReply(_message.Message):
         refused_reason: _builtins.str = ...,
         dimensions: _abc.Iterable[Global___CapacityDimensionDetail] | None = ...,
         claim: Global___NamespaceClaim | None = ...,
+        released_holds: _abc.Iterable[Global___NamespaceClaimHold] | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["claim", b"claim"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["claim", b"claim", "dimensions", b"dimensions", "error", b"error", "refused_reason", b"refused_reason", "success", b"success", "updated", b"updated"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["claim", b"claim", "dimensions", b"dimensions", "error", b"error", "refused_reason", b"refused_reason", "released_holds", b"released_holds", "success", b"success", "updated", b"updated"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -10707,6 +10719,7 @@ class DeleteNamespaceClaimReply(_message.Message):
     RETURNED_MEMORY_MB_FIELD_NUMBER: _builtins.int
     RETURNED_DISK_GB_FIELD_NUMBER: _builtins.int
     CLAMPED_FIELD_NUMBER: _builtins.int
+    RELEASED_HOLDS_FIELD_NUMBER: _builtins.int
     success: _builtins.bool
     """The RPC ran; false means an error, see error"""
     error: _builtins.str
@@ -10720,10 +10733,18 @@ class DeleteNamespaceClaimReply(_message.Message):
     returned_memory_mb: _builtins.int
     returned_disk_gb: _builtins.int
     clamped: _builtins.bool
-    """The claimed_* decrement had to be floored at zero, meaning the
-    singleton and the claims disagreed before this delete. Corrected by
-    the next reconcile pass.
+    """The claimed_* decrement, or a node's held_* decrement for a hold
+    this delete released, had to be floored at zero -- meaning the
+    counters and the rows they are derived from disagreed before this
+    delete. Corrected by the next reconcile pass.
     """
+    @_builtins.property
+    def released_holds(self) -> _containers.RepeatedCompositeFieldContainer[Global___NamespaceClaimHold]:
+        """Every hold the claim had booked. A hold lives inside its claim's
+        limits, so removing the claim removes them too, in the same
+        transaction that returns the claim's capacity.
+        """
+
     def __init__(
         self,
         *,
@@ -10734,10 +10755,11 @@ class DeleteNamespaceClaimReply(_message.Message):
         returned_memory_mb: _builtins.int = ...,
         returned_disk_gb: _builtins.int = ...,
         clamped: _builtins.bool = ...,
+        released_holds: _abc.Iterable[Global___NamespaceClaimHold] | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["clamped", b"clamped", "deleted", b"deleted", "error", b"error", "returned_cpus", b"returned_cpus", "returned_disk_gb", b"returned_disk_gb", "returned_memory_mb", b"returned_memory_mb", "success", b"success"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["clamped", b"clamped", "deleted", b"deleted", "error", b"error", "released_holds", b"released_holds", "returned_cpus", b"returned_cpus", "returned_disk_gb", b"returned_disk_gb", "returned_memory_mb", b"returned_memory_mb", "success", b"success"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -10993,6 +11015,7 @@ class ReleaseNamespaceClaimHoldsReply(_message.Message):
     ERROR_FIELD_NUMBER: _builtins.int
     RELEASED_FIELD_NUMBER: _builtins.int
     CLAMPED_FIELD_NUMBER: _builtins.int
+    CLAMPS_FIELD_NUMBER: _builtins.int
     success: _builtins.bool
     """The RPC ran; false means an error, see error"""
     error: _builtins.str
@@ -11003,6 +11026,13 @@ class ReleaseNamespaceClaimHoldsReply(_message.Message):
     """
     @_builtins.property
     def released(self) -> _containers.RepeatedCompositeFieldContainer[Global___NamespaceClaimHold]: ...
+    @_builtins.property
+    def clamps(self) -> _containers.RepeatedCompositeFieldContainer[Global___CapacityClampDetail]:
+        """Which node's held_* counters a true clamped is about, and the
+        per-dimension drift the clamp erased. Empty when nothing clamped, or
+        when the reply came from an sf-database predating the field.
+        """
+
     def __init__(
         self,
         *,
@@ -11010,10 +11040,11 @@ class ReleaseNamespaceClaimHoldsReply(_message.Message):
         error: _builtins.str = ...,
         released: _abc.Iterable[Global___NamespaceClaimHold] | None = ...,
         clamped: _builtins.bool = ...,
+        clamps: _abc.Iterable[Global___CapacityClampDetail] | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["clamped", b"clamped", "error", b"error", "released", b"released", "success", b"success"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["clamped", b"clamped", "clamps", b"clamps", "error", b"error", "released", b"released", "success", b"success"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

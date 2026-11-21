@@ -57,6 +57,7 @@ from testtools import content
 
 from shakenfist.constants import GiB
 from shakenfist import mariadb
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 
 
@@ -234,6 +235,68 @@ class _LiveHoldFixture(base.ShakenFistTestCase):
                 table.c.claim_uuid == UUID(claim_uuid))
         with self.engine.connect() as conn:
             return conn.execute(statement).fetchall()
+
+    def _claim_row(self, claim_uuid):
+        table = mariadb._get_namespace_claims_table()
+        with self.engine.connect() as conn:
+            return conn.execute(sa.select(table).where(
+                table.c.uuid == UUID(claim_uuid))).first()
+
+    def _set_claim_used(self, claim_uuid, cpus=0, memory_mb=0, disk_gb=0):
+        """Charge the claim as though it were hosting instances.
+
+        The shrink floor is about the claim's own usage, and seeding the
+        counter is how a test gets there without having to place real
+        instances in a suite that is about bookings.
+        """
+        table = mariadb._get_namespace_claims_table()
+        with self.engine.connect() as conn:
+            conn.execute(sa.update(table).where(
+                table.c.uuid == UUID(claim_uuid)).values(
+                    used_cpus=cpus, used_memory_mb=memory_mb,
+                    used_disk_gb=disk_gb))
+            conn.commit()
+
+    def _lapse_claim(self, claim_uuid):
+        """Put the claim's expiry in the past, leaving its state active.
+
+        Which is the state the reconciler's expiry sweep exists to find:
+        coverage that has run out but which nothing has lapsed yet.
+        """
+        table = mariadb._get_namespace_claims_table()
+        with self.engine.connect() as conn:
+            conn.execute(sa.update(table).where(
+                table.c.uuid == UUID(claim_uuid)).values(
+                    expires_at=sa.text('NOW() - INTERVAL 1 HOUR')))
+            conn.commit()
+
+    def _make_schedulable(self, node):
+        """Give a node the rows the reconciler needs to keep its row.
+
+        A pass deletes the capacity row of anything that is not an
+        active hypervisor it can find in the nodes table, so a test
+        which runs a pass and then reads held_* has to seed both.
+        """
+        with self.engine.connect() as conn:
+            self._insert(conn, mariadb._get_nodes_table(), uuid=node,
+                         fqdn=f'n-{str(node)[:8]}')
+            self._insert(conn, mariadb._get_object_states_table(),
+                         object_type=ObjectType.NODE, object_uuid=str(node),
+                         state_value='created', update_time=time.time())
+            conn.commit()
+
+    def _reconcile(self):
+        return mariadb._direct_reconcile_scheduler_capacity(2.5, 600, 1.0)
+
+    def _release(self, claim_uuid, hold_uuids=None, all_holds=False):
+        return mariadb._direct_release_claim_holds(
+            claim_uuid, hold_uuids or [], all_holds)
+
+    def _shrink(self, claim_uuid, **limits):
+        fields = [f'limit_{name}' for name in limits]
+        return mariadb._direct_update_namespace_claim(
+            claim_uuid, fields, limits.get('cpus', 0),
+            limits.get('memory_mb', 0), limits.get('disk_gb', 0), 0)
 
     def _report(self, label, text):
         self.addDetail(label, content.text_content(text))
@@ -510,9 +573,10 @@ class HoldBookingLiveTestCase(_LiveHoldFixture):
                               limit_disk_gb=1000)
         claim = self._create_claim(limit_cpus=100, limit_memory_mb=100000,
                                    limit_disk_gb=1000)
+        # No wait between them: created_at carries microseconds, so two
+        # bookings back to back are genuinely ordered rather than tied.
         first = self._book(claim, [
             self._shape(node, cpus=4, memory_mb=1024, disk_gb=10)])
-        time.sleep(1.1)
         second = self._book(claim, [
             self._shape(node, cpus=2, memory_mb=1024, disk_gb=10)])
 
@@ -805,3 +869,628 @@ class HoldConcurrencyLiveTestCase(_LiveHoldFixture):
         self._report('hold-cross-claim-race', (
             f'{RACE_THREADS} concurrent bookings of separate claims: all '
             f'landed, node held equals the sum of the rows'))
+
+
+@unittest.skipUnless(
+    os.environ.get(DSN_ENV),
+    f'{DSN_ENV} not set; requires a disposable MariaDB database')
+class HoldReleaseLiveTestCase(_LiveHoldFixture):
+    """The three things that end a hold, against a real MariaDB.
+
+    A hold ends when its claim is deleted, when the expiry sweep lapses
+    the claim, or when a shrink leaves the claim's limits under the sum
+    of its bookings. It deliberately does *not* end when an instance is
+    deleted -- that is a later phase, and callers which delete and
+    recreate under one claim depend on the booking surviving.
+
+    What the mocked suite cannot say is whether the guards bind and
+    whether the counters actually come back: a floored decrement, a
+    DELETE scoped to one claim, and an expiry sweep that has to find the
+    holds of a claim it lapsed in the same transaction are all
+    statements whose behaviour is the database's rather than ours.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._prepare_database()
+        self._set_cluster()
+
+    # ------------------------------------------------------------------
+    # Releasing on request
+    # ------------------------------------------------------------------
+
+    def test_a_named_release_credits_the_node_and_deletes_the_row(self):
+        node = self._add_node()
+        claim = self._create_claim()
+        booked = self._book(claim, [
+            self._shape(node, cpus=4, memory_mb=4096, disk_gb=40)])
+        self.assertTrue(booked['booked'], booked['error'])
+
+        result = self._release(claim, [booked['holds'][0]['uuid']])
+
+        self.assertTrue(result['success'], result['error'])
+        self.assertEqual([booked['holds'][0]['uuid']],
+                         [hold['uuid'] for hold in result['released']])
+        self.assertFalse(result['clamped'])
+        self.assertEqual(0, self._node_row(node).held_cpus)
+        self.assertEqual(0, self._node_row(node).held_memory_mb)
+        self.assertEqual(0, self._node_row(node).held_disk_gb)
+        self.assertEqual([], self._hold_rows(claim))
+
+    def test_one_of_two_holds_leaves_the_other_booked(self):
+        node = self._add_node()
+        claim = self._create_claim()
+        booked = self._book(claim, [
+            self._shape(node, cpus=4, memory_mb=4096, disk_gb=40),
+            self._shape(node, cpus=2, memory_mb=2048, disk_gb=20)])
+
+        self._release(claim, [booked['holds'][1]['uuid']])
+
+        self.assertEqual(4, self._node_row(node).held_cpus)
+        self.assertEqual(4096, self._node_row(node).held_memory_mb)
+        rows = self._hold_rows(claim)
+        self.assertEqual(1, len(rows))
+        self.assertEqual(booked['holds'][0]['uuid'], str(rows[0].uuid))
+
+    def test_releasing_everything_takes_every_hold_on_two_nodes(self):
+        node_a = self._add_node()
+        node_b = self._add_node()
+        claim = self._create_claim()
+        self._book(claim, [
+            self._shape(node_a, cpus=4, memory_mb=4096, disk_gb=40),
+            self._shape(node_b, cpus=2, memory_mb=2048, disk_gb=20)])
+
+        result = self._release(claim, all_holds=True)
+
+        self.assertEqual(2, len(result['released']))
+        self.assertEqual(0, self._node_row(node_a).held_cpus)
+        self.assertEqual(0, self._node_row(node_b).held_cpus)
+        self.assertEqual([], self._hold_rows(claim))
+
+    def test_a_repeat_release_is_a_no_op_rather_than_a_second_credit(self):
+        node = self._add_node(held_cpus=0)
+        claim = self._create_claim()
+        booked = self._book(claim, [self._shape(node, cpus=4)])
+        hold = booked['holds'][0]['uuid']
+
+        self.assertEqual(1, len(self._release(claim, [hold])['released']))
+        again = self._release(claim, [hold])
+
+        self.assertTrue(again['success'], again['error'])
+        self.assertEqual([], again['released'])
+        self.assertEqual(0, self._node_row(node).held_cpus)
+
+    def test_another_claims_hold_cannot_be_released_through_this_one(self):
+        node = self._add_node(limit_cpus=100, limit_memory_mb=100000,
+                              limit_disk_gb=1000)
+        mine = self._create_claim(namespace='ci-1')
+        theirs = self._create_claim(namespace='ci-2')
+        booked = self._book(theirs, [self._shape(node, cpus=4)])
+
+        result = self._release(mine, [booked['holds'][0]['uuid']])
+
+        self.assertTrue(result['success'], result['error'])
+        self.assertEqual([], result['released'])
+        self.assertEqual(1, len(self._hold_rows(theirs)))
+        self.assertEqual(4, self._node_row(node).held_cpus)
+
+    def test_an_empty_request_without_the_flag_is_refused(self):
+        claim = self._create_claim()
+        self.assertRaises(ValueError, self._release, claim)
+
+    def test_a_release_cannot_drive_a_counter_negative(self):
+        # The reconciler recomputes held_* from the hold rows, so a
+        # release can find the counter already lower than the room it is
+        # giving back. A negative counter would hand out capacity that
+        # does not exist.
+        node = self._add_node()
+        claim = self._create_claim()
+        booked = self._book(claim, [self._shape(node, cpus=4,
+                                                memory_mb=4096, disk_gb=40)])
+        capacity = mariadb._get_scheduler_node_capacity_table()
+        with self.engine.connect() as conn:
+            conn.execute(sa.update(capacity).where(
+                capacity.c.node_uuid == node).values(
+                    held_cpus=1, held_memory_mb=1024, held_disk_gb=10))
+            conn.commit()
+
+        result = self._release(claim, [booked['holds'][0]['uuid']])
+
+        self.assertTrue(result['success'], result['error'])
+        self.assertTrue(result['clamped'])
+        self.assertEqual(str(node), result['clamps'][0]['counter'])
+        self.assertEqual(3, result['clamps'][0]['shortfall_cpus'])
+        row = self._node_row(node)
+        self.assertEqual(0, row.held_cpus)
+        self.assertEqual(0, row.held_memory_mb)
+        self.assertEqual(0, row.held_disk_gb)
+
+    def test_released_room_can_be_booked_again(self):
+        # The point of the whole exercise: the claim and the node both
+        # have the room back, not just the row gone.
+        node = self._add_node(limit_cpus=8, limit_memory_mb=100000,
+                              limit_disk_gb=1000)
+        claim = self._create_claim(limit_cpus=8, limit_memory_mb=100000,
+                                   limit_disk_gb=1000)
+        booked = self._book(claim, [self._shape(node, cpus=8, memory_mb=1,
+                                                disk_gb=1)])
+        refused = self._book(claim, [self._shape(node, cpus=8, memory_mb=1,
+                                                 disk_gb=1)])
+        self.assertFalse(refused['booked'])
+
+        self._release(claim, [booked['holds'][0]['uuid']])
+
+        again = self._book(claim, [self._shape(node, cpus=8, memory_mb=1,
+                                               disk_gb=1)])
+        self.assertTrue(again['booked'], again['refused_reason'])
+
+    def test_a_displaced_hold_is_released_without_a_node_to_credit(self):
+        node = self._add_node()
+        claim = self._create_claim()
+        booked = self._book(claim, [self._shape(node, cpus=4)])
+        holds = mariadb._get_namespace_claim_holds_table()
+        with self.engine.connect() as conn:
+            conn.execute(sa.update(holds).where(
+                holds.c.uuid == UUID(booked['holds'][0]['uuid'])).values(
+                    node_uuid=None))
+            conn.commit()
+
+        result = self._release(claim, all_holds=True)
+
+        self.assertEqual(1, len(result['released']))
+        self.assertEqual('', result['released'][0]['node_uuid'])
+        self.assertEqual([], self._hold_rows(claim))
+        # The counter was not credited, because this hold was not
+        # charged to that node any more. The reconciler owns the
+        # discrepancy, and correcting it here would credit a node twice
+        # for one booking.
+        self.assertEqual(4, self._node_row(node).held_cpus)
+
+    # ------------------------------------------------------------------
+    # Releasing because the claim went away
+    # ------------------------------------------------------------------
+
+    def test_deleting_a_claim_releases_its_holds(self):
+        node_a = self._add_node()
+        node_b = self._add_node()
+        claim = self._create_claim()
+        self._book(claim, [self._shape(node_a, cpus=4, memory_mb=4096,
+                                       disk_gb=40),
+                           self._shape(node_b, cpus=2, memory_mb=2048,
+                                       disk_gb=20)])
+
+        result = mariadb._direct_delete_namespace_claim(claim)
+
+        self.assertTrue(result['deleted'], result['error'])
+        self.assertEqual(2, len(result['released_holds']))
+        self.assertEqual(0, self._node_row(node_a).held_cpus)
+        self.assertEqual(0, self._node_row(node_b).held_cpus)
+        self.assertEqual([], self._hold_rows(claim))
+
+    def test_deleting_a_claim_with_no_holds_still_works(self):
+        claim = self._create_claim()
+        result = mariadb._direct_delete_namespace_claim(claim)
+        self.assertTrue(result['deleted'], result['error'])
+        self.assertEqual([], result['released_holds'])
+
+    def test_an_expired_claims_holds_go_when_the_claim_does(self):
+        node = self._add_node()
+        claim = self._create_claim()
+        self._book(claim, [self._shape(node, cpus=4)])
+        claims = mariadb._get_namespace_claims_table()
+        with self.engine.connect() as conn:
+            conn.execute(sa.update(claims).where(
+                claims.c.uuid == UUID(claim)).values(state='expired'))
+            conn.commit()
+
+        result = mariadb._direct_delete_namespace_claim(claim)
+
+        self.assertTrue(result['deleted'], result['error'])
+        self.assertEqual(1, len(result['released_holds']))
+        self.assertEqual(0, self._node_row(node).held_cpus)
+
+    # ------------------------------------------------------------------
+    # Releasing because the claim lapsed
+    # ------------------------------------------------------------------
+
+    def test_the_expiry_sweep_releases_a_lapsed_claims_holds(self):
+        # An expired claim's limits are not in claimed_* -- the rebuild
+        # in this same pass sums active claims only -- so there is no
+        # aggregate left for a booking to sit inside and release is the
+        # only honest outcome.
+        node = self._add_node()
+        self._make_schedulable(node)
+        claim = self._create_claim()
+        self._book(claim, [self._shape(node, cpus=4, memory_mb=4096,
+                                       disk_gb=40)])
+        self._lapse_claim(claim)
+
+        result = self._reconcile()
+
+        self.assertIsNotNone(result)
+        self.assertEqual(1, result['claims_expired'])
+        self.assertEqual([], self._hold_rows(claim))
+        row = self._node_row(node)
+        self.assertEqual(0, row.held_cpus)
+        self.assertEqual(0, row.held_memory_mb)
+        self.assertEqual(0, row.held_disk_gb)
+        self.assertEqual('expired', self._claim_row(claim).state)
+
+    def test_an_active_claims_holds_survive_a_pass(self):
+        node = self._add_node()
+        self._make_schedulable(node)
+        claim = self._create_claim()
+        self._book(claim, [self._shape(node, cpus=4)])
+
+        self.assertIsNotNone(self._reconcile())
+
+        self.assertEqual(1, len(self._hold_rows(claim)))
+        self.assertEqual(4, self._node_row(node).held_cpus)
+
+    def test_a_second_pass_finds_nothing_left_to_release(self):
+        node = self._add_node()
+        self._make_schedulable(node)
+        claim = self._create_claim()
+        self._book(claim, [self._shape(node, cpus=4)])
+        self._lapse_claim(claim)
+
+        self._reconcile()
+        self.assertIsNotNone(self._reconcile())
+
+        self.assertEqual([], self._hold_rows(claim))
+        self.assertEqual(0, self._node_row(node).held_cpus)
+
+    # ------------------------------------------------------------------
+    # Releasing because the claim shrank
+    # ------------------------------------------------------------------
+
+    def test_a_shrink_releases_the_most_recently_booked_hold_first(self):
+        # Two bookings back to back, microseconds apart, which the
+        # DATETIME(6) created_at can tell apart. This is the case the
+        # precision exists for: at whole seconds these two would tie and
+        # the release order would be the uuid tie-break instead.
+        node = self._add_node(limit_cpus=100, limit_memory_mb=100000,
+                              limit_disk_gb=10000)
+        claim = self._create_claim(limit_cpus=8, limit_memory_mb=100000,
+                                   limit_disk_gb=10000)
+        first = self._book(claim, [self._shape(node, cpus=4, memory_mb=1,
+                                               disk_gb=1)])
+        second = self._book(claim, [self._shape(node, cpus=4, memory_mb=1,
+                                                disk_gb=1)])
+        self.assertTrue(second['booked'], second['refused_reason'])
+        # Not a tie, and not ordered by uuid either: whichever way the
+        # uuids fall, the later booking has the later timestamp.
+        self.assertLess(first['holds'][0]['created_at'],
+                        second['holds'][0]['created_at'])
+
+        result = self._shrink(claim, cpus=4)
+
+        self.assertTrue(result['updated'], result['refused_reason'])
+        self.assertEqual([second['holds'][0]['uuid']],
+                         [hold['uuid'] for hold in result['released_holds']])
+        self.assertEqual([first['holds'][0]['uuid']],
+                         [str(row.uuid) for row in self._hold_rows(claim)])
+        self.assertEqual(4, self._node_row(node).held_cpus)
+        self.assertEqual(4, self._claim_row(claim).limit_cpus)
+
+    def test_the_hold_timestamps_really_carry_microseconds(self):
+        # Both halves of the precision, against the server rather than
+        # against rendered SQL: the column keeps a fraction, and the
+        # statement writes one. A plain NOW() into a DATETIME(6) column
+        # stores .000000, so a column type changed on its own would
+        # leave this reading zero and the ordering rule quietly back at
+        # second resolution.
+        node = self._add_node(limit_cpus=100, limit_memory_mb=100000,
+                              limit_disk_gb=10000)
+        claim = self._create_claim(limit_cpus=100,
+                                   limit_memory_mb=100000,
+                                   limit_disk_gb=10000)
+        self._book(claim, [self._shape(node, cpus=1, memory_mb=1,
+                                       disk_gb=1)])
+
+        [row] = self._hold_rows(claim)
+        self.assertNotEqual(0, row.created_at.microsecond)
+        self.assertNotEqual(0, row.updated_at.microsecond)
+
+        table = mariadb._get_namespace_claim_holds_table()
+        with self.engine.connect() as conn:
+            for column in ('created_at', 'updated_at'):
+                declared = conn.execute(sa.text(
+                    'SELECT column_type FROM information_schema.columns '
+                    'WHERE table_schema = DATABASE() '
+                    'AND table_name = :t AND column_name = :c'),
+                    {'t': table.name, 'c': column}).scalar()
+                self.assertEqual('datetime(6)', declared, column)
+
+    def test_a_shrink_stops_as_soon_as_the_claim_fits(self):
+        # Four holds, half the limit to give back, and so exactly two
+        # released. They are booked in one call and so share a
+        # timestamp by construction, which makes which two go
+        # unspecified -- correctly so: a shrink gives back the least it
+        # can, and when bookings are simultaneous there is no "most
+        # recent" among them to prefer.
+        node = self._add_node(limit_cpus=100, limit_memory_mb=100000,
+                              limit_disk_gb=10000)
+        claim = self._create_claim(limit_cpus=8, limit_memory_mb=100000,
+                                   limit_disk_gb=10000)
+        for _ in range(4):
+            booked = self._book(claim, [self._shape(node, cpus=2,
+                                                    memory_mb=1, disk_gb=1)])
+            self.assertTrue(booked['booked'], booked['refused_reason'])
+
+        result = self._shrink(claim, cpus=4)
+
+        self.assertTrue(result['updated'], result['refused_reason'])
+        self.assertEqual(2, len(result['released_holds']))
+        rows = self._hold_rows(claim)
+        self.assertEqual(2, len(rows))
+        self.assertEqual(4, sum(row.cpus for row in rows))
+        self.assertEqual(4, self._node_row(node).held_cpus)
+        self.assertEqual(4, self._claim_row(claim).limit_cpus)
+
+    def test_a_shrink_the_holds_fit_inside_changes_no_hold(self):
+        node = self._add_node(limit_cpus=100, limit_memory_mb=100000,
+                              limit_disk_gb=10000)
+        claim = self._create_claim(limit_cpus=16, limit_memory_mb=100000,
+                                   limit_disk_gb=10000)
+        self._book(claim, [self._shape(node, cpus=4, memory_mb=1,
+                                       disk_gb=1)])
+
+        result = self._shrink(claim, cpus=8)
+
+        self.assertTrue(result['updated'], result['refused_reason'])
+        self.assertEqual([], result['released_holds'])
+        self.assertEqual(1, len(self._hold_rows(claim)))
+        self.assertEqual(4, self._node_row(node).held_cpus)
+
+    def test_a_shrink_to_nothing_releases_every_hold(self):
+        node = self._add_node(limit_cpus=100, limit_memory_mb=100000,
+                              limit_disk_gb=10000)
+        claim = self._create_claim(limit_cpus=8, limit_memory_mb=100000,
+                                   limit_disk_gb=10000)
+        self._book(claim, [self._shape(node, cpus=4, memory_mb=1, disk_gb=1),
+                           self._shape(node, cpus=4, memory_mb=1,
+                                       disk_gb=1)])
+
+        result = self._shrink(claim, cpus=0)
+
+        self.assertTrue(result['updated'], result['refused_reason'])
+        self.assertEqual(2, len(result['released_holds']))
+        self.assertEqual([], self._hold_rows(claim))
+        self.assertEqual(0, self._node_row(node).held_cpus)
+
+    def test_the_shrink_floor_is_still_used_and_not_used_plus_held(self):
+        # Raising the floor to used + held was rejected twice in the
+        # design: it would make giving capacity back harder than taking
+        # it, because an operator would have to find and release every
+        # booking first. So a shrink below used_* is still refused, and
+        # a shrink that only crosses the holds is not.
+        node = self._add_node(limit_cpus=100, limit_memory_mb=100000,
+                              limit_disk_gb=10000)
+        claim = self._create_claim(limit_cpus=16, limit_memory_mb=100000,
+                                   limit_disk_gb=10000)
+        self._book(claim, [self._shape(node, cpus=8, memory_mb=1,
+                                       disk_gb=1)])
+        self._set_claim_used(claim, cpus=6)
+
+        under_usage = self._shrink(claim, cpus=4)
+        self.assertFalse(under_usage['updated'])
+        self.assertEqual('below_usage', under_usage['refused_reason'])
+        self.assertEqual([], under_usage['released_holds'])
+        self.assertEqual(1, len(self._hold_rows(claim)))
+        self.assertEqual(16, self._claim_row(claim).limit_cpus)
+
+        over_usage = self._shrink(claim, cpus=6)
+        self.assertTrue(over_usage['updated'], over_usage['refused_reason'])
+        self.assertEqual(1, len(over_usage['released_holds']))
+        self.assertEqual([], self._hold_rows(claim))
+        self.assertEqual(0, self._node_row(node).held_cpus)
+
+    def test_a_shrink_of_one_dimension_leaves_the_others_alone(self):
+        node = self._add_node(limit_cpus=100, limit_memory_mb=100000,
+                              limit_disk_gb=10000)
+        claim = self._create_claim(limit_cpus=8, limit_memory_mb=8192,
+                                   limit_disk_gb=80)
+        self._book(claim, [self._shape(node, cpus=2, memory_mb=8192,
+                                       disk_gb=80)])
+
+        result = self._shrink(claim, cpus=1)
+
+        self.assertTrue(result['updated'], result['refused_reason'])
+        self.assertEqual(1, len(result['released_holds']))
+        row = self._claim_row(claim)
+        self.assertEqual(1, row.limit_cpus)
+        self.assertEqual(8192, row.limit_memory_mb)
+        self.assertEqual(80, row.limit_disk_gb)
+
+    def test_a_grow_releases_nothing(self):
+        node = self._add_node(limit_cpus=100, limit_memory_mb=100000,
+                              limit_disk_gb=10000)
+        claim = self._create_claim(limit_cpus=8, limit_memory_mb=100000,
+                                   limit_disk_gb=10000)
+        self._book(claim, [self._shape(node, cpus=8, memory_mb=1,
+                                       disk_gb=1)])
+
+        result = self._shrink(claim, cpus=16)
+
+        self.assertTrue(result['updated'], result['refused_reason'])
+        self.assertEqual([], result['released_holds'])
+        self.assertEqual(1, len(self._hold_rows(claim)))
+
+
+@unittest.skipUnless(
+    os.environ.get(DSN_ENV),
+    f'{DSN_ENV} not set; requires a disposable MariaDB database')
+class HoldReleaseConcurrencyLiveTestCase(_LiveHoldFixture):
+    """A release and a shrink under contention, against a real MariaDB.
+
+    The shrink is the case worth the machinery. Which holds it has to
+    give back is decided from a read taken *before* its transaction
+    opens -- the hold rows cannot be read inside it before its first
+    guarded UPDATE -- so a booking that commits in between would leave
+    the claim over its new limit with nothing to show for it. What stops
+    that is a subquery in the claim UPDATE's own WHERE, asserting
+    against the committed state that the holds which will remain fit
+    inside the new limit. That is a property of InnoDB re-evaluating a
+    guarded UPDATE's WHERE against the rows as committed by whoever held
+    the lock first, and no mock can say anything about it.
+
+    Like the booking suite, this reports the server regime it ran under:
+    the ER_CHECKREAD invariant is only observably necessary against a
+    server with innodb_snapshot_isolation ON, the default from MariaDB
+    11.6.2.
+    """
+
+    ENGINE_KWARGS = {'pool_size': RACE_THREADS + 8, 'max_overflow': 8,
+                     'pool_timeout': 120}
+
+    def setUp(self):
+        super().setUp()
+        self._prepare_database()
+        self._set_cluster()
+        self._report_regime()
+
+    def _report_regime(self):
+        with self.engine.connect() as conn:
+            version = conn.execute(sa.text('SELECT VERSION()')).scalar()
+            try:
+                snapshot = conn.execute(sa.text(
+                    'SELECT @@innodb_snapshot_isolation')).scalar()
+            except sa.exc.OperationalError:
+                snapshot = 'absent (server predates it)'
+        self._report('server-regime', (
+            f'MariaDB {version}, innodb_snapshot_isolation {snapshot}'))
+
+    def _run_concurrently(self, calls):
+        """Fire every call at once; return the replies.
+
+        The barrier is load bearing: without it thread startup staggers
+        the calls enough that the first transaction commits before the
+        last begins, and the race never happens.
+        """
+        barrier = threading.Barrier(len(calls))
+        outcomes = [None] * len(calls)
+        failures = []
+
+        def _worker(index, call):
+            try:
+                barrier.wait(timeout=120)
+                outcomes[index] = call()
+            except BaseException as e:
+                failures.append(f'{type(e).__name__}: {e}')
+
+        threads = [threading.Thread(target=_worker, args=(index, call))
+                   for index, call in enumerate(calls)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=300)
+
+        self.assertEqual([], failures, 'a call raised instead of replying')
+        self.assertNotIn(None, outcomes, 'a worker did not complete')
+        return outcomes
+
+    def test_a_booking_during_a_shrink_cannot_leave_the_claim_over_it(self):
+        shapes = []
+        for round_number in range(RACE_ROUNDS):
+            node = self._add_node(limit_cpus=1000,
+                                  limit_memory_mb=1024000,
+                                  limit_disk_gb=10000)
+            claim = self._create_claim(
+                namespace=f'ns-{round_number}', limit_cpus=8,
+                limit_memory_mb=1024000, limit_disk_gb=10000)
+            booked = self._book(claim, [self._shape(node, cpus=4,
+                                                    memory_mb=1, disk_gb=1)])
+            self.assertTrue(booked['booked'], booked['refused_reason'])
+
+            shrink, booking = self._run_concurrently([
+                functools.partial(self._shrink, claim, cpus=4),
+                functools.partial(
+                    self._book, claim,
+                    [self._shape(node, cpus=4, memory_mb=1, disk_gb=1)])])
+
+            self.assertTrue(shrink['success'], shrink['error'])
+            self.assertTrue(booking['success'], booking['error'])
+            self.assertTrue(shrink['updated'],
+                            f'round {round_number}: '
+                            f'{shrink["refused_reason"]}')
+
+            # Whichever order they committed in, the claim is at four
+            # cpus and the holds inside it sum to no more than four.
+            rows = self._hold_rows(claim)
+            self.assertEqual(4, self._claim_row(claim).limit_cpus)
+            self.assertLessEqual(
+                sum(row.cpus for row in rows), 4,
+                f'round {round_number}: the claim is over its new limit')
+            # And the node's counter agrees with the rows, which is what
+            # says the releases and the limit change were one
+            # transaction rather than two.
+            self.assertEqual(sum(row.cpus for row in rows),
+                             self._node_row(node).held_cpus,
+                             f'round {round_number}')
+            shapes.append(
+                f'{len(rows)} hold(s) left, booking '
+                f'{"landed" if booking["booked"] else "refused"}')
+
+        self._report('shrink-race-shape', '; '.join(shapes))
+
+    def test_concurrent_releases_of_one_hold_credit_its_node_once(self):
+        # Both callers read the row, so both believe they have four cpus
+        # to give back. Only one may actually credit the node: the
+        # other's DELETE matches nothing and its whole transaction is
+        # rolled back and re-probed.
+        for round_number in range(RACE_ROUNDS):
+            node = self._add_node(limit_cpus=1000,
+                                  limit_memory_mb=1024000,
+                                  limit_disk_gb=10000)
+            claim = self._create_claim(
+                namespace=f'ns-{round_number}', limit_cpus=8,
+                limit_memory_mb=1024000, limit_disk_gb=10000)
+            booked = self._book(claim, [self._shape(node, cpus=4,
+                                                    memory_mb=1, disk_gb=1)])
+            hold = booked['holds'][0]['uuid']
+
+            replies = self._run_concurrently([
+                functools.partial(self._release, claim, [hold])
+                for _ in range(RACE_THREADS)])
+
+            for reply in replies:
+                self.assertTrue(reply['success'],
+                                f'round {round_number}: {reply["error"]}')
+            released = [r for r in replies if r['released']]
+            self.assertEqual(1, len(released), f'round {round_number}')
+            self.assertEqual([], self._hold_rows(claim))
+            self.assertEqual(0, self._node_row(node).held_cpus,
+                             f'round {round_number}')
+
+        self._report('release-race-shape', (
+            f'{RACE_ROUNDS} rounds x {RACE_THREADS} threads releasing one '
+            f'hold: exactly one credited the node per round'))
+
+    def test_a_release_during_a_booking_leaves_the_counters_consistent(self):
+        # The two halves of the same ledger running at once: a release
+        # of one hold and a booking of another, on one node, repeatedly.
+        # held_* must always equal the sum of the rows afterwards.
+        node = self._add_node(limit_cpus=1000, limit_memory_mb=1024000,
+                              limit_disk_gb=10000)
+        claim = self._create_claim(limit_cpus=1000,
+                                   limit_memory_mb=1024000,
+                                   limit_disk_gb=10000)
+        for _ in range(RACE_ROUNDS):
+            seeded = self._book(claim, [
+                self._shape(node, cpus=4, memory_mb=1, disk_gb=1)
+                for _ in range(RACE_THREADS)])
+            self.assertTrue(seeded['booked'], seeded['refused_reason'])
+
+            calls = []
+            for hold in seeded['holds']:
+                calls.append(functools.partial(
+                    self._release, claim, [hold['uuid']]))
+                calls.append(functools.partial(
+                    self._book, claim,
+                    [self._shape(node, cpus=1, memory_mb=1, disk_gb=1)]))
+            self._run_concurrently(calls)
+
+            rows = self._hold_rows(claim)
+            self.assertEqual(sum(row.cpus for row in rows),
+                             self._node_row(node).held_cpus)

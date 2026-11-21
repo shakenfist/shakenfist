@@ -56,6 +56,19 @@ def _params(stmt):
     return stmt.compile(dialect=MYSQL_DIALECT).params
 
 
+def _named_uuid_count(stmt):
+    """How many uuids does an IN list actually name?
+
+    The list binds as one expanding parameter, so this is its length --
+    what a real database would report as the rowcount for rows which all
+    still exist.
+    """
+    for value in _params(stmt).values():
+        if isinstance(value, (list, tuple)):
+            return len(value)
+    return 0
+
+
 def _claim_row(uuid=CLAIM1, namespace='ci-1', limit_cpus=16,
                limit_memory_mb=16384, limit_disk_gb=200, used_cpus=4,
                used_memory_mb=4096, used_disk_gb=40, state='active'):
@@ -125,6 +138,12 @@ class _HoldRouter:
             'node_update': 1,
             'hold_insert': 1,
             'cluster_update': 1,
+            # None means "however many uuids the DELETE actually
+            # names", which is what a real database reports for rows
+            # that all still exist. A test about a row that vanished
+            # underneath a release overrides it with a number.
+            'hold_delete': None,
+            'node_clamp': 1,
         }
         self.rowcounts.update(rowcounts or {})
         self.executed = []
@@ -178,9 +197,22 @@ class _HoldRouter:
         if text.startswith('UPDATE namespace_claims'):
             return self._result(rowcount=self.rowcounts['claim_update'])
         if text.startswith('UPDATE scheduler_node_capacity'):
+            # The floored form, which only runs when the guarded one
+            # matched nothing, is told apart by its GREATEST rather than
+            # by a counter of its own: the two are the same statement
+            # prefix against the same row.
+            if 'greatest(' in text:
+                return self._result(rowcount=self.rowcounts['node_clamp'])
             return self._result(rowcount=self.rowcounts['node_update'])
         if text.startswith('INSERT INTO namespace_claim_holds'):
             return self._result(rowcount=self.rowcounts['hold_insert'])
+        if text.startswith('DELETE FROM namespace_claim_holds'):
+            rowcount = self.rowcounts['hold_delete']
+            if rowcount is None:
+                rowcount = _named_uuid_count(stmt)
+            return self._result(rowcount=rowcount)
+        if text.startswith('DELETE FROM namespace_claims'):
+            return self._result(rowcount=self.rowcounts['claim_update'])
         return self._result()
 
     def statements(self, prefix):
@@ -431,7 +463,37 @@ class BookClaimHoldsTestCase(_HoldMixin, base.ShakenFistTestCase):
         self.assertTrue(self._run(router)['booked'])
         [insert] = router.of('INSERT INTO namespace_claim_holds')
         text, _ = _compiled(insert)
-        self.assertIn('now(), now())', text)
+        self.assertIn('now(6), now(6))', text)
+
+    def test_the_timestamps_are_stamped_to_the_microsecond(self):
+        # The hold columns are DATETIME(6), and a plain NOW() into one
+        # stores whole seconds with six zeroes after them: the column
+        # would look precise while the rows still ordered by second,
+        # leaving a shrink's "most recently booked first" to the uuid
+        # tie-break. The column type is only half the change; this
+        # statement is the other half.
+        router = _HoldRouter()
+        self._run(router)
+        [insert] = router.of('INSERT INTO namespace_claim_holds')
+        text, _ = _compiled(insert)
+        self.assertNotIn('now(),', text)
+        # A literal rather than a bound parameter, because MariaDB will
+        # not take the precision as one.
+        self.assertNotIn('now(%s)', text)
+
+    def test_the_claim_and_node_rows_keep_whole_second_stamps(self):
+        # Only the hold rows are ordered against each other, so only
+        # they pay for the precision: namespace_claims and
+        # scheduler_node_capacity stay plain DATETIME with a plain
+        # NOW(), and a booking must not start writing them a value
+        # their columns would truncate anyway.
+        router = _HoldRouter()
+        self._run(router)
+        for prefix in ('UPDATE namespace_claims',
+                       'UPDATE scheduler_node_capacity'):
+            [stmt] = router.of(prefix)
+            text, _ = _compiled(stmt)
+            self.assertIn('updated_at=now()', text, prefix)
 
     def test_a_refused_claim_guard_writes_nothing(self):
         # All or nothing: the node is never touched and no hold row is
@@ -1092,3 +1154,831 @@ class ClaimBookHoldsTestCase(base.ShakenFistTestCase):
         self.assertRaises(ValueError, self.claim.book_holds, [],
                           scheduler=scheduler)
         scheduler.find_candidates_for_shapes.assert_not_called()
+
+
+HOLD2 = UUID('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb')
+CLAIM2 = UUID('dddddddd-dddd-dddd-dddd-dddddddddddd')
+
+
+class HoldGuardShapeTestCase(base.ShakenFistTestCase):
+    """The two guards a release and a shrink assert their plan with."""
+
+    def _sum_where(self, **kwargs):
+        stmt = sa.update(mariadb._get_namespace_claims_table()).where(
+            mariadb._claim_hold_sum_guard('cpus', CLAIM1, **kwargs)).values(
+                updated_at=sa.func.now())
+        text, params = _compiled(stmt)
+        return ' '.join(text.split('WHERE', 1)[1].split()), params
+
+    def test_a_literal_limit_replaces_the_column_being_rewritten(self):
+        # A shrink's WHERE is evaluated against the row as it stands, so
+        # a guard reading limit_cpus there would test the limit about to
+        # be replaced and pass every time.
+        where, params = self._sum_where(limit=4)
+        self.assertNotIn('namespace_claims.limit_cpus >=', where)
+        self.assertIn('coalesce((SELECT sum(namespace_claim_holds.cpus)',
+                      where)
+        self.assertIn(4, params.values())
+
+    def test_the_released_holds_are_left_out_of_the_sum(self):
+        # The hold rows are deleted after the claim UPDATE -- they are
+        # last in the canonical order -- so the sum that statement has to
+        # assert is over the holds which will still be there.
+        where, _ = self._sum_where(limit=4, excluding=[HOLD1])
+        self.assertIn('namespace_claim_holds.uuid NOT IN', where)
+
+    def test_excluding_nothing_leaves_the_sum_unrestricted(self):
+        where, _ = self._sum_where(excluding=[])
+        self.assertNotIn('NOT IN', where)
+
+    def test_the_count_guard_counts_rows_rather_than_room(self):
+        # Completeness, not capacity: this asks whether a row exists,
+        # and a zero-sized hold is a row like any other.
+        stmt = sa.update(mariadb._get_namespace_claims_table()).where(
+            mariadb._claim_hold_count_guard(CLAIM1, 2)).values(
+                updated_at=sa.func.now())
+        text, params = _compiled(stmt)
+        where = ' '.join(text.split('WHERE', 1)[1].split())
+        self.assertIn('(SELECT count(*) AS count_1 FROM '
+                      'namespace_claim_holds', where)
+        self.assertIn('namespace_claim_holds.claim_uuid = %s', where)
+        self.assertIn(2, params.values())
+
+
+class FlooredHoldDecrementTestCase(base.ShakenFistTestCase):
+    """held_* comes back guarded first and floored at zero on a miss."""
+
+    def _run(self, guarded_rowcount, clamp_rowcount=1, row=None):
+        statements = []
+
+        def _execute(stmt, *args, **kwargs):
+            text, _ = _compiled(stmt)
+            statements.append(text)
+            result = mock.MagicMock()
+            result.first.return_value = row
+            if not text.startswith('UPDATE'):
+                result.rowcount = 0
+            elif len([t for t in statements
+                      if t.startswith('UPDATE')]) == 1:
+                result.rowcount = guarded_rowcount
+            else:
+                result.rowcount = clamp_rowcount
+            return result
+
+        conn = mock.MagicMock()
+        conn.execute.side_effect = _execute
+        touched, clamp = mariadb._floored_node_hold_decrement(
+            conn, NODE1, 4, 4096, 40)
+        return touched, clamp, statements
+
+    def test_the_ordinary_case_is_one_guarded_update(self):
+        touched, clamp, statements = self._run(guarded_rowcount=1)
+        self.assertTrue(touched)
+        self.assertIsNone(clamp)
+        self.assertEqual(1, len(statements))
+        self.assertIn('scheduler_node_capacity.held_cpus >= ', statements[0])
+        self.assertIn('held_cpus=(scheduler_node_capacity.held_cpus - ',
+                      statements[0])
+
+    def test_used_counters_are_not_touched(self):
+        # The placements a node is hosting are a different ledger from
+        # the shapes booked on it, and a release of one must not credit
+        # the other.
+        _, _, statements = self._run(guarded_rowcount=1)
+        self.assertNotIn('used_cpus', statements[0])
+
+    def test_a_counter_already_too_low_is_clamped_rather_than_negative(self):
+        # The reconciler recomputes held_* from the hold rows, so a
+        # release racing a pass can find the counter already lower than
+        # the room it is giving back. Going negative there would hand out
+        # capacity that does not exist.
+        row = _capacity_row(held_cpus=1, held_memory_mb=1024, held_disk_gb=10)
+        touched, clamp, statements = self._run(guarded_rowcount=0, row=row)
+
+        self.assertTrue(touched)
+        self.assertIsNotNone(clamp)
+        self.assertEqual(str(NODE1), clamp['counter'])
+        self.assertEqual(3, clamp['shortfall_cpus'])
+        self.assertEqual(3072, clamp['shortfall_memory_mb'])
+        self.assertEqual(30, clamp['shortfall_disk_gb'])
+        clamped = [t for t in statements if t.startswith('UPDATE')][-1]
+        self.assertIn('greatest(%s, scheduler_node_capacity.held_cpus - ',
+                      clamped)
+
+    def test_a_node_with_no_capacity_row_is_not_a_clamp(self):
+        touched, clamp, _ = self._run(guarded_rowcount=0, clamp_rowcount=0)
+        self.assertFalse(touched)
+        self.assertIsNone(clamp)
+
+
+class ReleaseClaimHoldsTestCase(_HoldMixin, base.ShakenFistTestCase):
+    """The guarded release transaction."""
+
+    def _call(self, **kwargs):
+        args = {'claim_uuid': str(CLAIM1), 'hold_uuids': [str(HOLD1)],
+                'all_holds': False}
+        args.update(kwargs)
+        return mariadb._direct_release_claim_holds(**args)
+
+    def test_an_empty_request_without_the_flag_is_refused(self):
+        # proto3 cannot tell a repeated field left unset from one
+        # explicitly empty, and releasing is destructive, so the wide
+        # reading of an empty request must not be the default.
+        router = _HoldRouter(hold_rows=[_hold_row()])
+        self.assertRaises(ValueError, self._run, router, hold_uuids=[])
+        self.assertEqual([], router.statements('DELETE'))
+
+    def test_the_guard_refuses_before_anything_is_read(self):
+        engine = mock.MagicMock()
+        with mock.patch('shakenfist.mariadb._get_engine',
+                        return_value=engine):
+            self.assertRaises(
+                ValueError, mariadb._direct_release_claim_holds,
+                str(CLAIM1), [])
+        engine.connect.assert_not_called()
+        engine.begin.assert_not_called()
+
+    def test_a_release_credits_the_node_and_deletes_the_row(self):
+        router = _HoldRouter(hold_rows=[_hold_row(cpus=4, memory_mb=4096,
+                                                  disk_gb=40)])
+        result = self._run(router)
+
+        self.assertTrue(result['success'], result['error'])
+        self.assertEqual([str(HOLD1)],
+                         [hold['uuid'] for hold in result['released']])
+        [decrement] = router.of('UPDATE scheduler_node_capacity')
+        text, params = _compiled(decrement)
+        self.assertIn('held_cpus=(scheduler_node_capacity.held_cpus - ', text)
+        self.assertEqual(NODE1, params['node_uuid_1'])
+        self.assertEqual(1, len(router.of('DELETE FROM '
+                                          'namespace_claim_holds')))
+
+    def test_the_tables_are_taken_in_the_canonical_order(self):
+        # namespace_claims, then the node rows, then the hold rows --
+        # the same order a booking takes them in, which is what keeps a
+        # release and a booking queueing rather than deadlocking.
+        router = _HoldRouter(hold_rows=[_hold_row()])
+        self.assertTrue(self._run(router)['success'])
+        tables = [text.split()[1] if text.startswith('UPDATE')
+                  else text.split()[2]
+                  for text in router.transactional
+                  if text.startswith(('UPDATE', 'DELETE'))]
+        self.assertEqual(['namespace_claims', 'scheduler_node_capacity',
+                          'namespace_claim_holds'], tables)
+
+    def test_nothing_reads_inside_the_transaction_before_the_guard(self):
+        # The ER_CHECKREAD invariant: a plain SELECT first establishes
+        # the read view early and makes every later guarded UPDATE
+        # against a contended row abort under
+        # innodb_snapshot_isolation.
+        router = _HoldRouter(hold_rows=[_hold_row()])
+        self.assertTrue(self._run(router)['success'])
+        self.assertTrue(router.transactional[0].startswith(
+            'UPDATE namespace_claims'), router.transactional[0])
+
+    def test_the_probes_run_outside_the_transaction(self):
+        router = _HoldRouter(hold_rows=[_hold_row()])
+        self._run(router)
+        self.assertTrue(
+            all(text.startswith('SELECT') for text in router.autocommit),
+            router.autocommit)
+
+    def test_the_claim_row_is_locked_but_not_charged(self):
+        # A hold's room is not counted on the claim row, so the only
+        # reason to touch it is the lock every writer of this claim's
+        # holds takes first.
+        router = _HoldRouter(hold_rows=[_hold_row()])
+        self._run(router)
+        [claim_update] = router.of('UPDATE namespace_claims')
+        text, _ = _compiled(claim_update)
+        self.assertIn('SET updated_at=now()', text)
+        for column in ('used_cpus', 'limit_cpus'):
+            self.assertNotIn(f'{column}=', text)
+
+    def test_a_named_release_does_not_assert_the_hold_count(self):
+        # Releasing named holds does not care whether somebody booked
+        # another one; releasing all of them does.
+        router = _HoldRouter(hold_rows=[_hold_row()])
+        self._run(router)
+        [claim_update] = router.of('UPDATE namespace_claims')
+        text, _ = _compiled(claim_update)
+        self.assertNotIn('count(*)', text)
+
+    def test_releasing_everything_asserts_the_count_it_read(self):
+        router = _HoldRouter(hold_rows=[_hold_row(), _hold_row(uuid=HOLD2)])
+        result = self._run(router, hold_uuids=[], all_holds=True)
+
+        self.assertEqual(2, len(result['released']))
+        [claim_update] = router.of('UPDATE namespace_claims')
+        text, params = _compiled(claim_update)
+        self.assertIn('count(*)', text)
+        self.assertIn(2, params.values())
+        # And the read it counted against was unrestricted.
+        [read] = [text for text, _ in router.executed
+                  if text.startswith('SELECT')
+                  and 'FROM namespace_claim_holds' in text]
+        self.assertNotIn('uuid IN', read)
+
+    def test_a_named_release_is_scoped_to_the_claim(self):
+        # A uuid belonging to somebody else's claim reads as absent
+        # rather than as a hold this caller may release.
+        router = _HoldRouter(hold_rows=[_hold_row()])
+        self._run(router)
+        [read] = [text for text, _ in router.executed
+                  if text.startswith('SELECT')
+                  and 'FROM namespace_claim_holds' in text]
+        self.assertIn('namespace_claim_holds.claim_uuid = %s', read)
+        self.assertIn('namespace_claim_holds.uuid IN', read)
+
+    def test_two_holds_on_one_node_are_credited_together(self):
+        router = _HoldRouter(hold_rows=[
+            _hold_row(cpus=4, memory_mb=4096, disk_gb=40),
+            _hold_row(uuid=HOLD2, cpus=2, memory_mb=2048, disk_gb=20)])
+        self._run(router, hold_uuids=[str(HOLD1), str(HOLD2)])
+
+        [decrement] = router.of('UPDATE scheduler_node_capacity')
+        params = _params(decrement)
+        self.assertIn(6, params.values())
+        self.assertIn(6144, params.values())
+
+    def test_the_node_rows_are_taken_in_uuid_order(self):
+        router = _HoldRouter(hold_rows=[
+            _hold_row(uuid=HOLD1, node_uuid=NODE2),
+            _hold_row(uuid=HOLD2, node_uuid=NODE1)])
+        self._run(router, hold_uuids=[str(HOLD1), str(HOLD2)])
+
+        charged = [_params(stmt)['node_uuid_1']
+                   for stmt in router.of('UPDATE scheduler_node_capacity')]
+        self.assertEqual([NODE1, NODE2], charged)
+
+    def test_a_displaced_hold_credits_nothing_and_still_goes(self):
+        router = _HoldRouter(hold_rows=[_hold_row(node_uuid=None)])
+        result = self._run(router)
+
+        self.assertEqual(1, len(result['released']))
+        self.assertEqual([], router.statements(
+            'UPDATE scheduler_node_capacity'))
+        self.assertEqual(1, len(router.of('DELETE FROM '
+                                          'namespace_claim_holds')))
+
+    def test_nothing_to_release_opens_no_transaction(self):
+        # A decrement here would credit a node for room no row holds any
+        # more, which is what makes a repeat release harmful rather than
+        # merely redundant.
+        router = _HoldRouter(hold_rows=[])
+        result = self._run(router)
+
+        self.assertTrue(result['success'])
+        self.assertEqual([], result['released'])
+        self.assertEqual([], router.transactional)
+
+    def test_a_clamped_decrement_is_reported_with_its_drift(self):
+        router = _HoldRouter(hold_rows=[_hold_row(cpus=4, memory_mb=4096,
+                                                  disk_gb=40)],
+                             node_row=_capacity_row(held_cpus=1,
+                                                    held_memory_mb=1024,
+                                                    held_disk_gb=10),
+                             rowcounts={'node_update': 0})
+        result = self._run(router)
+
+        self.assertTrue(result['success'], result['error'])
+        self.assertTrue(result['clamped'])
+        self.assertEqual(1, len(result['clamps']))
+        self.assertEqual(3, result['clamps'][0]['shortfall_cpus'])
+
+    def test_a_row_that_vanished_under_the_release_retries_and_gives_up(self):
+        router = _HoldRouter(hold_rows=[_hold_row()],
+                             rowcounts={'hold_delete': 0})
+        result = self._run(router)
+
+        self.assertFalse(result['success'])
+        self.assertIn('kept changing', result['error'])
+        self.assertEqual([], result['released'])
+        self.assertEqual(
+            mariadb._CLAIM_STALE_MAX_ATTEMPTS,
+            len(router.of('DELETE FROM namespace_claim_holds')))
+
+    def test_a_claim_whose_row_is_gone_still_releases_its_orphans(self):
+        # The room is charged to real nodes, a claim uuid is never
+        # reused, and nothing can book against a claim that is not
+        # there, so there is no row to lock and no race to lose.
+        router = _HoldRouter(claim=None, hold_rows=[_hold_row()])
+        result = self._run(router)
+
+        self.assertTrue(result['success'], result['error'])
+        self.assertEqual(1, len(result['released']))
+        self.assertEqual([], router.statements('UPDATE namespace_claims'))
+        self.assertTrue(router.transactional[0].startswith(
+            'UPDATE scheduler_node_capacity'), router.transactional[0])
+
+    def test_a_malformed_uuid_is_an_error(self):
+        router = _HoldRouter(hold_rows=[_hold_row()])
+        for kwargs in ({'claim_uuid': 'not-a-uuid'},
+                       {'hold_uuids': ['not-a-uuid']}):
+            result = self._run(router, **kwargs)
+            self.assertFalse(result['success'])
+            self.assertIn('malformed uuid', result['error'])
+
+    def test_a_database_error_is_a_failure_and_not_a_silent_release(self):
+        router = _HoldRouter(hold_rows=[_hold_row()])
+        engine = mock.MagicMock()
+        engine.connect.return_value.__enter__.return_value.execute \
+            .side_effect = router.on('autocommit')
+        engine.begin.side_effect = OperationalError(
+            'UPDATE', {}, Exception('gone'))
+        with mock.patch('shakenfist.mariadb._get_engine',
+                        return_value=engine):
+            result = mariadb._direct_release_claim_holds(
+                str(CLAIM1), [str(HOLD1)])
+
+        self.assertFalse(result['success'])
+        self.assertIn('MariaDB error', result['error'])
+        self.assertEqual([], result['released'])
+
+
+class ShrinkReleaseSetTestCase(base.ShakenFistTestCase):
+    """Which holds a shrink gives back, and in which order."""
+
+    def _hold(self, uuid, cpus):
+        return mariadb._hold_row_to_dict(
+            _hold_row(uuid=uuid, cpus=cpus, memory_mb=1, disk_gb=1))
+
+    def test_a_shrink_the_holds_fit_inside_releases_nothing(self):
+        rows = [self._hold(HOLD1, 2), self._hold(HOLD2, 2)]
+        self.assertEqual([], mariadb._holds_a_shrink_releases(
+            rows, {'cpus': 4, 'memory_mb': 100, 'disk_gb': 100}, {'cpus'}))
+
+    def test_the_most_recently_booked_hold_goes_first(self):
+        rows = [self._hold(HOLD1, 2), self._hold(HOLD2, 2)]
+        releasing = mariadb._holds_a_shrink_releases(
+            rows, {'cpus': 2, 'memory_mb': 100, 'disk_gb': 100}, {'cpus'})
+        self.assertEqual([str(HOLD2)], [row['uuid'] for row in releasing])
+
+    def test_it_stops_as_soon_as_the_claim_fits(self):
+        rows = [self._hold(UUID(int=index), 1) for index in range(1, 6)]
+        releasing = mariadb._holds_a_shrink_releases(
+            rows, {'cpus': 3, 'memory_mb': 100, 'disk_gb': 100}, {'cpus'})
+        self.assertEqual([str(UUID(int=5)), str(UUID(int=4))],
+                         [row['uuid'] for row in releasing])
+
+    def test_a_shrink_to_nothing_releases_everything(self):
+        rows = [self._hold(HOLD1, 2), self._hold(HOLD2, 2)]
+        releasing = mariadb._holds_a_shrink_releases(
+            rows, {'cpus': 0, 'memory_mb': 100, 'disk_gb': 100}, {'cpus'})
+        self.assertEqual(2, len(releasing))
+
+    def test_only_the_dimensions_being_shrunk_are_considered(self):
+        # Releasing a booking to correct a dimension nobody touched
+        # would be the database deciding something the operator did not
+        # ask for.
+        rows = [self._hold(HOLD1, 2)]
+        self.assertEqual([], mariadb._holds_a_shrink_releases(
+            rows, {'cpus': 4, 'memory_mb': 0, 'disk_gb': 0}, {'cpus'}))
+
+
+class ClaimDeleteReleaseTestCase(_HoldMixin, base.ShakenFistTestCase):
+    """Deleting a claim gives its bookings back in the same transaction."""
+
+    def _call(self, **kwargs):
+        args = {'claim_uuid': str(CLAIM1)}
+        args.update(kwargs)
+        return mariadb._direct_delete_namespace_claim(**args)
+
+    def test_the_holds_go_with_the_claim(self):
+        router = _HoldRouter(hold_rows=[_hold_row(cpus=4, memory_mb=4096,
+                                                  disk_gb=40)],
+                             cluster_row=_capacity_row())
+        result = self._run(router)
+
+        self.assertTrue(result['deleted'], result['error'])
+        self.assertEqual([str(HOLD1)],
+                         [hold['uuid'] for hold in result['released_holds']])
+        [decrement] = router.of('UPDATE scheduler_node_capacity')
+        text, _ = _compiled(decrement)
+        self.assertIn('held_cpus=(scheduler_node_capacity.held_cpus - ', text)
+        self.assertEqual(1, len(router.of('DELETE FROM '
+                                          'namespace_claim_holds')))
+
+    def test_the_release_is_in_the_transaction_that_removes_the_row(self):
+        # One transaction, in the canonical order: the singleton, the
+        # claim row, then the node rows and the hold rows. A hold that
+        # outlived its claim would be room charged to a node with
+        # nothing left to account for it.
+        router = _HoldRouter(hold_rows=[_hold_row()],
+                             cluster_row=_capacity_row())
+        self._run(router)
+        tables = []
+        for text in router.transactional:
+            if text.startswith('UPDATE'):
+                tables.append(text.split()[1])
+            elif text.startswith('DELETE'):
+                tables.append(text.split()[2])
+        self.assertEqual(['cluster_capacity', 'namespace_claims',
+                          'scheduler_node_capacity',
+                          'namespace_claim_holds'], tables)
+
+    def test_the_claim_delete_asserts_the_hold_count_it_read(self):
+        # A booking that landed between the probe and here would
+        # otherwise outlive the claim it belongs inside.
+        router = _HoldRouter(hold_rows=[_hold_row()],
+                             cluster_row=_capacity_row())
+        self._run(router)
+        [delete] = router.of('DELETE FROM namespace_claims')
+        text, params = _compiled(delete)
+        self.assertIn('count(*)', text)
+        self.assertIn(1, params.values())
+
+    def test_a_claim_with_no_holds_touches_no_hold_row(self):
+        router = _HoldRouter(hold_rows=[], cluster_row=_capacity_row())
+        result = self._run(router)
+
+        self.assertTrue(result['deleted'])
+        self.assertEqual([], result['released_holds'])
+        self.assertEqual([], router.statements(
+            'UPDATE scheduler_node_capacity'))
+        self.assertEqual([], router.statements(
+            'DELETE FROM namespace_claim_holds'))
+
+    def test_an_expired_claims_holds_are_released_too(self):
+        # Its limits are already out of claimed_*, but held_* is a
+        # per-node counter and the node is charged until the booking
+        # stops existing.
+        router = _HoldRouter(claim=_claim_row(state='expired'),
+                             hold_rows=[_hold_row()],
+                             cluster_row=_capacity_row())
+        result = self._run(router)
+
+        self.assertTrue(result['deleted'])
+        self.assertEqual(1, len(result['released_holds']))
+        self.assertEqual(0, result['returned_cpus'])
+
+    def test_a_clamped_hold_decrement_is_reported_as_clamped(self):
+        router = _HoldRouter(hold_rows=[_hold_row(cpus=4)],
+                             cluster_row=_capacity_row(),
+                             node_row=_capacity_row(held_cpus=1),
+                             rowcounts={'node_update': 0})
+        result = self._run(router)
+
+        self.assertTrue(result['deleted'], result['error'])
+        self.assertTrue(result['clamped'])
+
+
+class ShrinkReleaseStatementTestCase(_HoldMixin, base.ShakenFistTestCase):
+    """A shrink's releases ride in the transaction that lowers the limit."""
+
+    def _call(self, **kwargs):
+        args = {'claim_uuid': str(CLAIM1), 'fields': ['limit_cpus'],
+                'limit_cpus': 4, 'limit_memory_mb': 0, 'limit_disk_gb': 0,
+                'expires_in_seconds': 0}
+        args.update(kwargs)
+        return mariadb._direct_update_namespace_claim(**args)
+
+    def test_a_shrink_releases_the_newest_hold_and_credits_its_node(self):
+        router = _HoldRouter(
+            claim=_claim_row(limit_cpus=16, used_cpus=0),
+            cluster_row=_capacity_row(),
+            hold_rows=[_hold_row(uuid=HOLD1, cpus=4),
+                       _hold_row(uuid=HOLD2, cpus=4)])
+        result = self._run(router, limit_cpus=4)
+
+        self.assertTrue(result['updated'], result['error'])
+        self.assertEqual([str(HOLD2)],
+                         [hold['uuid'] for hold in result['released_holds']])
+        [decrement] = router.of('UPDATE scheduler_node_capacity')
+        text, _ = _compiled(decrement)
+        self.assertIn('held_cpus=(scheduler_node_capacity.held_cpus - ', text)
+
+    def test_the_limit_change_and_the_releases_are_one_transaction(self):
+        # A shrink that lowered the limit in one transaction and
+        # released the bookings in another would leave a window in which
+        # the claim was over its new limit with nothing to show for it.
+        router = _HoldRouter(
+            claim=_claim_row(limit_cpus=16, used_cpus=0),
+            cluster_row=_capacity_row(),
+            hold_rows=[_hold_row(uuid=HOLD1, cpus=8)])
+        self._run(router, limit_cpus=4)
+
+        tables = []
+        for text in router.transactional:
+            if text.startswith('UPDATE'):
+                tables.append(text.split()[1])
+            elif text.startswith('DELETE'):
+                tables.append(text.split()[2])
+        self.assertEqual(['cluster_capacity', 'namespace_claims',
+                          'scheduler_node_capacity',
+                          'namespace_claim_holds'], tables)
+
+    def test_the_claim_update_asserts_what_will_be_left(self):
+        # The holds are deleted after this statement, so the sum it has
+        # to assert is over the ones that will still be there -- against
+        # the new limit, as a literal, because the column it would
+        # otherwise read is the one being replaced.
+        router = _HoldRouter(
+            claim=_claim_row(limit_cpus=16, used_cpus=0),
+            cluster_row=_capacity_row(),
+            hold_rows=[_hold_row(uuid=HOLD1, cpus=8)])
+        self._run(router, limit_cpus=4)
+
+        [claim_update] = router.of('UPDATE namespace_claims')
+        text, params = _compiled(claim_update)
+        where = ' '.join(text.split('WHERE', 1)[1].split())
+        self.assertIn('coalesce((SELECT sum(namespace_claim_holds.cpus)',
+                      where)
+        self.assertIn('namespace_claim_holds.uuid NOT IN', where)
+        # The shrink floor is still used_* and is still there.
+        self.assertIn('namespace_claims.used_cpus <= ', where)
+        self.assertIn(4, params.values())
+
+    def test_a_shrink_the_holds_fit_inside_changes_no_hold(self):
+        router = _HoldRouter(
+            claim=_claim_row(limit_cpus=16, used_cpus=0),
+            cluster_row=_capacity_row(),
+            hold_rows=[_hold_row(uuid=HOLD1, cpus=2)])
+        result = self._run(router, limit_cpus=4)
+
+        self.assertTrue(result['updated'], result['error'])
+        self.assertEqual([], result['released_holds'])
+        self.assertEqual([], router.statements(
+            'DELETE FROM namespace_claim_holds'))
+        self.assertEqual([], router.statements(
+            'UPDATE scheduler_node_capacity'))
+
+    def test_a_grow_reads_no_hold_and_guards_no_sum(self):
+        router = _HoldRouter(claim=_claim_row(limit_cpus=4),
+                             cluster_row=_capacity_row(),
+                             hold_rows=[_hold_row(uuid=HOLD1, cpus=2)])
+        result = self._run(router, limit_cpus=8)
+
+        self.assertTrue(result['updated'], result['error'])
+        self.assertEqual([], result['released_holds'])
+        self.assertEqual(
+            [], [text for text, _ in router.executed
+                 if text.startswith('SELECT')
+                 and 'FROM namespace_claim_holds' in text])
+
+    def test_the_shrink_floor_still_refuses_a_shrink_below_usage(self):
+        # Raising the floor to used + held was rejected: returning
+        # capacity must not be harder than taking it. The floor itself
+        # is untouched, and a shrink under used_* is still below_usage
+        # rather than a release.
+        router = _HoldRouter(
+            claim=_claim_row(limit_cpus=16, used_cpus=8),
+            cluster_row=_capacity_row(),
+            hold_rows=[_hold_row(uuid=HOLD1, cpus=4)],
+            rowcounts={'claim_update': 0})
+        result = self._run(router, limit_cpus=4)
+
+        self.assertFalse(result['updated'])
+        self.assertEqual('below_usage', result['refused_reason'])
+        self.assertEqual([], result['released_holds'])
+        self.assertEqual([], router.statements(
+            'DELETE FROM namespace_claim_holds'))
+
+
+class HoldReleaseGrpcTestCase(base.ShakenFistTestCase):
+    """The client and server sides of the release RPC."""
+
+    def setUp(self):
+        super().setUp()
+        self.stub = mock.MagicMock()
+        patcher = mock.patch('shakenfist.mariadb._get_database_stub',
+                             return_value=self.stub)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_a_release_carries_its_rows_and_clamps_back(self):
+        self.stub.ReleaseNamespaceClaimHolds.return_value = \
+            database_pb2.ReleaseNamespaceClaimHoldsReply(
+                success=True, released=[
+                    database_pb2.NamespaceClaimHold(
+                        uuid=str(HOLD1), claim_uuid=str(CLAIM1),
+                        namespace='ci-1', cpus=4, node_uuid=str(NODE1))],
+                clamped=True, clamps=[
+                    database_pb2.CapacityClampDetail(
+                        counter=str(NODE1), shortfall_cpus=3)])
+
+        result = mariadb._grpc_release_claim_holds(
+            str(CLAIM1), [str(HOLD1)])
+
+        self.assertTrue(result['success'])
+        self.assertEqual(str(HOLD1), result['released'][0]['uuid'])
+        self.assertTrue(result['clamped'])
+        self.assertEqual(3, result['clamps'][0]['shortfall_cpus'])
+        request = self.stub.ReleaseNamespaceClaimHolds.call_args[0][0]
+        self.assertEqual([str(HOLD1)], list(request.hold_uuids))
+        self.assertFalse(request.all_holds)
+
+    def test_asking_for_all_sets_the_flag_rather_than_sending_nothing(self):
+        self.stub.ReleaseNamespaceClaimHolds.return_value = \
+            database_pb2.ReleaseNamespaceClaimHoldsReply(success=True)
+        mariadb._grpc_release_claim_holds(str(CLAIM1), [], all_holds=True)
+        request = self.stub.ReleaseNamespaceClaimHolds.call_args[0][0]
+        self.assertEqual([], list(request.hold_uuids))
+        self.assertTrue(request.all_holds)
+
+    def test_an_empty_request_never_reaches_the_wire(self):
+        self.assertRaises(ValueError, mariadb._grpc_release_claim_holds,
+                          str(CLAIM1), [])
+        self.stub.ReleaseNamespaceClaimHolds.assert_not_called()
+
+    def test_an_unreachable_database_is_a_failed_release(self):
+        self.stub.ReleaseNamespaceClaimHolds.side_effect = \
+            exceptions.DatabaseUnavailable('down')
+        result = mariadb._grpc_release_claim_holds(str(CLAIM1), [str(HOLD1)])
+        self.assertFalse(result['success'])
+        self.assertEqual([], result['released'])
+
+    def test_an_update_carries_its_released_holds_back(self):
+        self.stub.UpdateNamespaceClaim.return_value = \
+            database_pb2.UpdateNamespaceClaimReply(
+                success=True, updated=True, released_holds=[
+                    database_pb2.NamespaceClaimHold(
+                        uuid=str(HOLD1), node_uuid=str(NODE1))])
+        result = mariadb._grpc_update_namespace_claim(
+            str(CLAIM1), ['limit_cpus'], 4, 0, 0, 0)
+        self.assertEqual(str(HOLD1), result['released_holds'][0]['uuid'])
+
+    def test_a_delete_carries_its_released_holds_back(self):
+        self.stub.DeleteNamespaceClaim.return_value = \
+            database_pb2.DeleteNamespaceClaimReply(
+                success=True, deleted=True, released_holds=[
+                    database_pb2.NamespaceClaimHold(
+                        uuid=str(HOLD1), node_uuid=str(NODE1))])
+        result = mariadb._grpc_delete_namespace_claim(str(CLAIM1))
+        self.assertEqual(str(HOLD1), result['released_holds'][0]['uuid'])
+
+
+class HoldReleaseServicerTestCase(base.ShakenFistTestCase):
+    """The servicer handler behind the release RPC."""
+
+    def setUp(self):
+        super().setUp()
+        self.service = database_main.DatabaseService.__new__(
+            database_main.DatabaseService)
+        self.service.monitor = mock.MagicMock()
+        self.context = mock.MagicMock()
+
+    def _released(self):
+        return {
+            'uuid': str(HOLD1), 'claim_uuid': str(CLAIM1),
+            'namespace': 'ci-1', 'cpus': 4, 'memory_mb': 4096,
+            'disk_gb': 40, 'node_uuid': str(NODE1), 'instance_uuid': '',
+            'created_at': 1799000000.0, 'updated_at': 1799000000.0,
+        }
+
+    def test_the_rows_and_the_clamps_both_reach_the_reply(self):
+        with mock.patch(
+                'shakenfist.mariadb._direct_release_claim_holds',
+                return_value={
+                    'success': True, 'error': '',
+                    'released': [self._released()], 'clamped': True,
+                    'clamps': [{'counter': str(NODE1),
+                                'shortfall_cpus': 3,
+                                'shortfall_memory_mb': 0,
+                                'shortfall_disk_gb': 0}]}) as released:
+            reply = self.service.ReleaseNamespaceClaimHolds(
+                database_pb2.ReleaseNamespaceClaimHoldsRequest(
+                    claim_uuid=str(CLAIM1), hold_uuids=[str(HOLD1)]),
+                self.context)
+
+        self.assertEqual(str(HOLD1), reply.released[0].uuid)
+        self.assertTrue(reply.clamped)
+        self.assertEqual(3, reply.clamps[0].shortfall_cpus)
+        released.assert_called_once_with(
+            str(CLAIM1), [str(HOLD1)], all_holds=False)
+
+    def test_an_empty_request_is_an_invalid_argument(self):
+        reply = self.service.ReleaseNamespaceClaimHolds(
+            database_pb2.ReleaseNamespaceClaimHoldsRequest(
+                claim_uuid=str(CLAIM1)), self.context)
+        self.assertFalse(reply.success)
+        self.context.set_code.assert_called_once_with(
+            grpc.StatusCode.INVALID_ARGUMENT)
+
+    def test_an_update_reply_names_the_holds_a_shrink_released(self):
+        with mock.patch(
+                'shakenfist.mariadb._direct_update_namespace_claim',
+                return_value={
+                    'success': True, 'error': '', 'updated': True,
+                    'refused_reason': '', 'dimensions': [], 'claim': None,
+                    'released_holds': [self._released()]}):
+            reply = self.service.UpdateNamespaceClaim(
+                database_pb2.UpdateNamespaceClaimRequest(
+                    uuid=str(CLAIM1), fields=['limit_cpus'], limit_cpus=4),
+                self.context)
+        self.assertEqual(str(HOLD1), reply.released_holds[0].uuid)
+
+    def test_a_delete_reply_names_the_holds_it_released(self):
+        with mock.patch(
+                'shakenfist.mariadb._direct_delete_namespace_claim',
+                return_value={
+                    'success': True, 'error': '', 'deleted': True,
+                    'returned_cpus': 0, 'returned_memory_mb': 0,
+                    'returned_disk_gb': 0, 'clamped': False,
+                    'released_holds': [self._released()]}):
+            reply = self.service.DeleteNamespaceClaim(
+                database_pb2.DeleteNamespaceClaimRequest(uuid=str(CLAIM1)),
+                self.context)
+        self.assertEqual(str(HOLD1), reply.released_holds[0].uuid)
+
+
+class HoldReleaseDispatchTestCase(base.ShakenFistTestCase):
+    """The public wrapper picks a tier and keeps the guard on both."""
+
+    def test_a_release_dispatches_to_grpc_when_the_service_is_in_use(self):
+        with mock.patch('shakenfist.mariadb._use_database_service',
+                        return_value=True), \
+                mock.patch('shakenfist.mariadb._grpc_release_claim_holds',
+                           return_value=mariadb._empty_release_holds_result()
+                           ) as released:
+            mariadb.release_claim_holds(str(CLAIM1), [str(HOLD1)])
+        released.assert_called_once_with(str(CLAIM1), [str(HOLD1)], False)
+
+    def test_a_release_dispatches_direct_otherwise(self):
+        with mock.patch('shakenfist.mariadb._use_database_service',
+                        return_value=False), \
+                mock.patch('shakenfist.mariadb._direct_release_claim_holds',
+                           return_value=mariadb._empty_release_holds_result()
+                           ) as released:
+            mariadb.release_claim_holds(str(CLAIM1), all_holds=True)
+        released.assert_called_once_with(str(CLAIM1), [], True)
+
+    def test_an_empty_request_is_refused_before_either_tier(self):
+        with mock.patch('shakenfist.mariadb._use_database_service',
+                        return_value=False), \
+                mock.patch('shakenfist.mariadb._direct_release_claim_holds'
+                           ) as released:
+            self.assertRaises(ValueError, mariadb.release_claim_holds,
+                              str(CLAIM1))
+        released.assert_not_called()
+
+
+class ClaimReleaseHoldsTestCase(base.ShakenFistTestCase):
+    """NamespaceClaim.release_holds(), and the events a release leaves."""
+
+    def setUp(self):
+        super().setUp()
+        self.claim = namespace_claim.NamespaceClaim({
+            'uuid': str(CLAIM1), 'namespace': 'ci-1', 'version': 1})
+        events = mock.patch.object(
+            namespace_claim.NamespaceClaim, 'add_event')
+        self.add_event = events.start()
+        self.addCleanup(events.stop)
+
+    def _hold(self):
+        return {
+            'uuid': str(HOLD1), 'claim_uuid': str(CLAIM1),
+            'namespace': 'ci-1', 'cpus': 4, 'memory_mb': 4096,
+            'disk_gb': 40, 'node_uuid': str(NODE1), 'instance_uuid': '',
+            'created_at': 1799000000.0, 'updated_at': 1799000000.0,
+        }
+
+    def test_a_release_is_recorded_against_the_claim(self):
+        with mock.patch('shakenfist.mariadb.release_claim_holds',
+                        return_value={
+                            'success': True, 'error': '',
+                            'released': [self._hold()], 'clamped': False,
+                            'clamps': []}):
+            released = self.claim.release_holds([str(HOLD1)])
+
+        self.assertEqual(1, len(released))
+        extra = self.add_event.call_args[1]['extra']
+        self.assertEqual(str(HOLD1), extra['holds'][0]['uuid'])
+        self.assertEqual(str(NODE1), extra['holds'][0]['node'])
+
+    def test_releasing_nothing_records_nothing(self):
+        with mock.patch('shakenfist.mariadb.release_claim_holds',
+                        return_value=mariadb._empty_release_holds_result()):
+            self.assertEqual([], self.claim.release_holds(all_holds=True))
+        self.add_event.assert_not_called()
+
+    def test_a_failed_release_raises_rather_than_reporting_room_back(self):
+        with mock.patch('shakenfist.mariadb.release_claim_holds',
+                        return_value={
+                            'success': False, 'error': 'down',
+                            'released': [], 'clamped': False, 'clamps': []}):
+            self.assertRaises(exceptions.WriteException,
+                              self.claim.release_holds, [str(HOLD1)])
+
+    def test_a_shrinks_releases_are_evented_on_the_claim(self):
+        with mock.patch('shakenfist.mariadb.update_namespace_claim',
+                        return_value={
+                            'success': True, 'error': '', 'updated': True,
+                            'refused_reason': '', 'dimensions': [],
+                            'claim': None,
+                            'released_holds': [self._hold()]}):
+            self.claim.update(limit_cpus=4, fields=['limit_cpus'])
+
+        messages = [call[0][1] for call in self.add_event.call_args_list]
+        self.assertIn('released shape holds to shrink the claim', messages)
+        extra = self.add_event.call_args[1]['extra']
+        self.assertEqual(str(HOLD1), extra['holds'][0]['uuid'])
+
+    def test_an_update_that_released_nothing_events_only_the_update(self):
+        with mock.patch('shakenfist.mariadb.update_namespace_claim',
+                        return_value={
+                            'success': True, 'error': '', 'updated': True,
+                            'refused_reason': '', 'dimensions': [],
+                            'claim': None, 'released_holds': []}):
+            self.claim.update(limit_cpus=8, fields=['limit_cpus'])
+        self.assertEqual(1, self.add_event.call_count)
