@@ -317,6 +317,23 @@ every extent. A three-extent flat image holding 512 KiB per extent reports
 1576960 bytes for the image and 524288 for each extent child, not 4096 -- the
 descriptor's own allocation -- for all of them.
 
+Two size figures are involved as well. An extent child's `virtual-size`
+(`file length` in the human rendering) is its file's own length rounded up to
+a 512-byte sector, because qemu-img opens an extent as a raw protocol node;
+the span the descriptor's extent line declares is in the format-specific
+`extents` array instead. The two are the same number for a flat extent, whose
+file is exactly as long as its span, and nothing like each other for a sparse
+one: the last extent of a 33 GiB split-sparse image declares a 1 GiB span in
+a 192 KiB file.
+
+A split-sparse image reports a `cluster-size` and a flat one does not. The
+figure is the grain size the extents' own binary headers declare, and
+qemu-img reports it for the image only when every extent is sparse and all of
+them declare the same grain size; a descriptor mixing flat and sparse extents
+reports none, and neither does one whose sparse extents disagree. Each sparse
+extent still reports its own grain size in the format-specific `extents`
+array, where a flat extent has no `cluster-size` key at all.
+
 ### Compatibility Considerations
 
 When writing scripts that parse qemu-img/instar output:
