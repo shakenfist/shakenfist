@@ -48,6 +48,7 @@ from sqlalchemy.exc import DataError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import SQLAlchemyError
 from shakenfist_utilities import logs
 
 from shakenfist.config import config
@@ -613,7 +614,7 @@ MAPPING_RULE_ATTRIBUTES_VERSION = 1
 ARTIFACTS_VERSION = 3
 ARTIFACT_ATTRIBUTES_VERSION = 2
 ARTIFACT_INDEXES_VERSION = 2
-NETWORK_INTERFACES_VERSION = 3
+NETWORK_INTERFACES_VERSION = 4
 NETWORK_INTERFACE_ATTRIBUTES_VERSION = 2
 NETWORKS_VERSION = 3
 NETWORK_ATTRIBUTES_VERSION = 3
@@ -4703,9 +4704,10 @@ def _direct_set_state(object_type: ObjectType, object_uuid: str, state: State) -
 
     For NetworkInterface objects, also nulls out the
     ``network_interfaces.active`` flag when the new state is
-    ``deleted``. The flag is part of the composite UNIQUE constraint
-    on macaddr — clearing it lets the MAC be reused immediately
-    while the soft-deleted row remains in place for audit.
+    ``deleted``. The flag is part of both composite UNIQUE constraints
+    on that table — the one on macaddr and the one on the per-instance
+    order — so clearing it lets the MAC and the device index be reused
+    immediately while the soft-deleted row remains in place for audit.
 
     A deadlock or lock wait timeout is retried with a short escalating
     sleep before degrading to a failed write (issue 4273); the worst
@@ -17921,11 +17923,11 @@ def _get_network_interfaces_table() -> sa.Table:
             # NetworkInterfaceData DTO. It is TRUE while an interface is
             # live and NULLed when the interface enters the ``deleted``
             # state — see ``_direct_set_state``. The flag exists so that
-            # the macaddr UNIQUE constraint below can ignore soft-deleted
+            # the UNIQUE constraints below can ignore soft-deleted
             # rows: NULL values do not collide with each other in MariaDB
             # UNIQUE indexes, so a deleted interface keeps its row (for
-            # audit) without blocking MAC reuse during the
-            # ``CLEANER_DELAY`` window.
+            # audit) without blocking MAC or device-index reuse during
+            # the ``CLEANER_DELAY`` window.
             _network_interfaces_table.append_column(
                 sa.Column('active', sa.Boolean(), nullable=True))
             # MAC must be unique among ACTIVE interfaces on the same
@@ -17938,6 +17940,20 @@ def _get_network_interfaces_table() -> sa.Table:
                 _network_interfaces_table.c.active,
                 _network_interfaces_table.c.network_uuid,
                 name='uq_network_interfaces_macaddr_active_network')
+            # ``order`` is the per-instance device index, and an
+            # identity rather than a label: interfaces_for_instance()
+            # keys a dict on it and the libvirt device naming reads it.
+            # Two concurrent hot plugs both read the highest index in
+            # use and both took the next one (issue 4946); this makes
+            # the second one lose, which NetworkInterface.new() answers
+            # by reading the index again and retrying. ``active`` is in
+            # the key for the same reason it is in the macaddr
+            # constraint: a soft-deleted row must not hold its slot.
+            sa.UniqueConstraint(
+                _network_interfaces_table.c.instance_uuid,
+                _network_interfaces_table.c.order,
+                _network_interfaces_table.c.active,
+                name='uq_network_interfaces_instance_order_active')
     return _network_interfaces_table
 
 
@@ -18094,6 +18110,78 @@ def _ensure_network_interfaces_schema(engine: sa.Engine) -> dict[str, Any]:
         current_ver = 3
         _set_table_version(engine, table_name, current_ver)
 
+    if current_ver <= 3:
+        # The per-instance device index must be unique among the
+        # interfaces an instance currently has, because that is what
+        # both interfaces_for_instance() and the libvirt device naming
+        # treat it as (issue 4946).
+        LOG.info(f'Upgrading {table_name} table to version 4 '
+                 '(UNIQUE on instance_uuid, order and active)')
+        constraint_name = 'uq_network_interfaces_instance_order_active'
+        with engine.connect() as conn:
+            # Asked for, not inferred from a failed ALTER. Unlike the
+            # earlier steps this constraint *is* the fix, so "already
+            # here" -- what a fresh install sees, its table having been
+            # built from the definition above -- has to be told apart
+            # from "could not be added", and reading that out of the
+            # driver's error text would be a guess.
+            present = _table_has_constraint(
+                conn, table_name, constraint_name)
+
+            if present:
+                LOG.debug(f'{constraint_name} is already present on '
+                          f'{table_name}')
+            else:
+                # Rows which already collide would refuse the ALTER,
+                # and are already broken anyway. Renumbering the losers
+                # repairs them and clears the way. Any database error
+                # here is logged rather than raised, like the steps
+                # around it: the ALTER below then refuses on whatever
+                # duplicates are left, and the step is retried.
+                try:
+                    _migrate_duplicate_interface_orders(conn, table)
+                except SQLAlchemyError as e:
+                    conn.rollback()
+                    LOG.warning(
+                        f'Could not repair duplicate interface orders on '
+                        f'{table_name}: {e}')
+
+                try:
+                    conn.execute(sa.text(
+                        f'ALTER TABLE {table_name} '
+                        f'ADD CONSTRAINT {constraint_name} '
+                        'UNIQUE (instance_uuid, `order`, active)'))
+                    conn.commit()
+                except SQLAlchemyError as e:
+                    # Rolled back before the probe below reuses the
+                    # connection: after a disconnect-flavoured error the
+                    # transaction is dead, and the probe would otherwise
+                    # raise PendingRollbackError rather than answer.
+                    conn.rollback()
+                    LOG.warning(
+                        f'{constraint_name} could not be added to '
+                        f'{table_name}: {e}')
+
+                present = _table_has_constraint(
+                    conn, table_name, constraint_name)
+
+        # Only a table which has the constraint is version 4. Stamping
+        # it regardless would make every later run skip this step, and
+        # leave next_order()'s read-then-insert with no arbiter at all:
+        # issue 4946 again, with nothing to say so. An ALTER on a
+        # serving cluster can lose on a lock wait timeout, so failing
+        # once is not unusual, and the probe makes a retry harmless.
+        if present:
+            current_ver = 4
+            _set_table_version(engine, table_name, current_ver)
+        else:
+            LOG.warning(
+                f'{table_name} stays at version {current_ver} without '
+                f'{constraint_name}, so overlapping interface hot plugs '
+                f'on one instance are still able to share a device '
+                f'index. The next ensure-mariadb-schema run will try '
+                f'again.')
+
     return {
         'table': table_name,
         'start_version': start_ver,
@@ -18101,6 +18189,97 @@ def _ensure_network_interfaces_schema(engine: sa.Engine) -> dict[str, Any]:
         'target_version': NETWORK_INTERFACES_VERSION,
         'migrated': start_ver != current_ver
     }
+
+
+def _table_has_constraint(
+        conn: sa.Connection, table_name: str, constraint_name: str) -> bool:
+    """Ask information_schema whether a table carries a named constraint.
+
+    A probe which itself fails reads as absent: the caller then tries to
+    add the constraint, and does not record a schema version which
+    claims it. Any SQLAlchemy error counts, not only OperationalError:
+    a probe on a connection whose transaction died raises
+    PendingRollbackError, and that must read as absent too rather than
+    abort the whole schema ensure. The connection is rolled back so the
+    caller can keep using it.
+    """
+    try:
+        return conn.execute(
+            sa.text(
+                'SELECT CONSTRAINT_NAME FROM '
+                'information_schema.TABLE_CONSTRAINTS '
+                'WHERE TABLE_SCHEMA = DATABASE() '
+                'AND TABLE_NAME = :table_name '
+                'AND CONSTRAINT_NAME = :constraint_name'),
+            {'table_name': table_name,
+             'constraint_name': constraint_name}).first() is not None
+    except SQLAlchemyError as e:
+        LOG.debug(
+            f'Could not probe {table_name} for {constraint_name}, '
+            f'assuming it is absent: {e}')
+        try:
+            conn.rollback()
+        except SQLAlchemyError:
+            pass
+        return False
+
+
+def _migrate_duplicate_interface_orders(
+        conn: sa.Connection, table: sa.Table) -> int:
+    """Renumber active interfaces which share an instance and an order.
+
+    Only runs once, from the v3 to v4 migration. The read is a plain
+    non-locking SELECT and the writes are by primary key, so this does
+    not need the batched backfill helper: there is no table-wide UPDATE
+    here, and on any cluster which never raced a hot plug there are no
+    writes at all.
+
+    A moved row belongs to an instance which may be running. Daemons
+    already up hold network interfaces in their process-local object
+    cache for OBJECT_CACHE_TTL_IMMUTABLE, so they can read the old index
+    for up to that long; nothing here can reach their caches, which is
+    another reason the schema is ensured before the nodes restart onto
+    new code. The guest only sees the new index once its config drive is
+    rebuilt at the next power on.
+
+    Returns the number of rows moved.
+    """
+    groups = conn.execute(
+        sa.select(table.c.instance_uuid, table.c.order)
+        .where(table.c.active.is_(True))
+        .group_by(table.c.instance_uuid, table.c.order)
+        .having(sa.func.count() > 1)).fetchall()
+
+    moved = 0
+    for instance_uuid, order in groups:
+        colliding = conn.execute(
+            sa.select(table.c.uuid).where(sa.and_(
+                table.c.instance_uuid == instance_uuid,
+                table.c.order == order,
+                table.c.active.is_(True)))
+            .order_by(table.c.uuid)).fetchall()
+        highest = conn.execute(
+            sa.select(sa.func.max(table.c.order)).where(sa.and_(
+                table.c.instance_uuid == instance_uuid,
+                table.c.active.is_(True)))).scalar()
+
+        # The first row keeps the slot; every other claimant is given a
+        # fresh one above everything the instance is using. Recomputed
+        # per group, so an instance with two colliding groups does not
+        # hand out the same new index twice.
+        next_order = (highest if highest is not None else -1) + 1
+        for (ni_uuid, ) in colliding[1:]:
+            conn.execute(sa.update(table)
+                         .where(table.c.uuid == ni_uuid)
+                         .values(order=next_order))
+            LOG.warning(
+                f'Interface {ni_uuid} shared order {order} on instance '
+                f'{instance_uuid} and has been moved to {next_order}')
+            next_order += 1
+            moved += 1
+        conn.commit()
+
+    return moved
 
 
 def _ensure_network_interface_attributes_schema(
@@ -18151,8 +18330,15 @@ def _direct_create_network_interface(data: NetworkInterfaceData) -> bool:
         data: The NetworkInterfaceData to insert.
 
     Returns:
-        True if the record was created, False if it already exists or
-        error.
+        True if the record was created, or was already there exactly as
+        asked for; False if a UNIQUE constraint refused it.
+
+    Raises:
+        DatabaseUnavailable: the insert failed for any other reason. A
+            database outage must not read as a collision: the caller
+            retries a collision with a fresh device index, and reports
+            an exhausted budget as a 409 which names the wrong cause.
+        DatabaseException: a different row already holds this uuid.
     """
     engine = _get_engine()
     table = _get_network_interfaces_table()
@@ -18168,22 +18354,76 @@ def _direct_create_network_interface(data: NetworkInterfaceData) -> bool:
                 order=data.order,
                 model=data.model,
                 version=data.version,
-                # Marks the row as participating in the macaddr UNIQUE
-                # constraint. ``_direct_set_state`` will null this out
-                # when the interface transitions to ``deleted`` so the
-                # MAC can be reused.
+                # Marks the row as participating in the macaddr and
+                # per-instance order UNIQUE constraints.
+                # ``_direct_set_state`` will null this out when the
+                # interface transitions to ``deleted`` so both the MAC
+                # and the device index can be reused.
                 active=True,
             )
             conn.execute(stmt)
             conn.commit()
             return True
     except IntegrityError:
-        return False
-    except OperationalError as e:
+        # Refused -- unless what refused it is this very row. _grpc_call()
+        # re-sends a call which hit DEADLINE_EXCEEDED or CANCELLED, so an
+        # insert whose commit landed but whose reply was lost arrives a
+        # second time with the same uuid and fails on the primary key.
+        # Read as a collision, that sends new() round its retries and has
+        # the API release the address the committed row holds, which
+        # hands it to a second guest.
+        return _network_interface_already_inserted(engine, table, data)
+    except SQLAlchemyError as e:
         LOG.warning(
             f'MariaDB create failed for network_interface '
             f'{data.uuid}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'network interface {data.uuid} could not be created: {e}'
+        ) from e
+
+
+def _network_interface_already_inserted(
+        engine: Any, table: sa.Table, data: NetworkInterfaceData) -> bool:
+    """Whether a refused interface insert was refused by its own row.
+
+    Called after an IntegrityError. True means a row with this uuid is
+    already there as asked for -- an earlier delivery of the same insert
+    committed -- which makes the insert idempotent for a retried RPC.
+    False means no row has this uuid, so a UNIQUE constraint on the MAC
+    or the device index refused it: the genuine collision.
+
+    Raises:
+        DatabaseUnavailable: the row could not be read. An unanswered
+            question is not a refusal, and _direct_get_network_interface()
+            is not used because it answers an outage with None.
+        DatabaseException: a row with this uuid exists but is not this
+            insert's. That row holds what it holds, so this insert neither
+            succeeded nor was refused, and neither answer is safe.
+    """
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(
+                sa.select(table).where(table.c.uuid == data.uuid)).fetchone()
+    except SQLAlchemyError as e:
+        LOG.warning(
+            f'MariaDB read failed for refused network_interface '
+            f'{data.uuid}: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'network interface {data.uuid} could not be created: {e}'
+        ) from e
+
+    if row is None:
         return False
+
+    asked = (str(data.instance_uuid), str(data.network_uuid), data.macaddr,
+             data.ipv4, data.order)
+    held = (str(row.instance_uuid), str(row.network_uuid), row.macaddr,
+            row.ipv4, row.order)
+    if held != asked:
+        raise exceptions.DatabaseException(
+            f'network interface {data.uuid} already exists as a different '
+            f'interface: {held} rather than {asked}')
+    return True
 
 
 def _direct_get_network_interface(
@@ -18576,10 +18816,16 @@ def _grpc_create_network_interface(
         reply = _grpc_call(stub.CreateNetworkInterface, request)
         return bool(reply.success)
     except grpc.RpcError as e:
+        # Only success=False on an OK status means a UNIQUE constraint
+        # refused the row. Any failed call -- including the INTERNAL the
+        # servicer answers for an unexpected error -- says nothing about
+        # a collision, so it must not be returned as one.
         LOG.error(
             f'gRPC CreateNetworkInterface failed for '
             f'{data.uuid}: {e}')
-        return False
+        raise exceptions.DatabaseUnavailable(
+            f'network interface {data.uuid} could not be created: {e}'
+        ) from e
 
 
 def _grpc_get_network_interface(
@@ -18870,7 +19116,16 @@ def create_network_interface(data: NetworkInterfaceData) -> bool:
         data: The NetworkInterfaceData to insert.
 
     Returns:
-        True if created, False if already exists or error.
+        True if created, or already there exactly as asked for (a
+        retried call whose first delivery committed); False if a UNIQUE
+        constraint refused it.
+
+    Raises:
+        DatabaseUnavailable: the database could not be asked, or failed
+            for some other reason. Nothing is known about the row then.
+        DatabaseException: a different row already holds this uuid
+            (direct path only; over gRPC it arrives as
+            DatabaseUnavailable, the servicer answering INTERNAL).
     """
     if _use_database_service():
         return _grpc_create_network_interface(data)

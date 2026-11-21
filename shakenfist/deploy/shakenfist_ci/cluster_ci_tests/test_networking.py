@@ -1,5 +1,7 @@
 import ipaddress
 import json
+import threading
+from concurrent import futures
 
 from testtools import content
 
@@ -407,3 +409,85 @@ class TestNetworking(base.BaseNamespacedTestCase):
         self.assertEqual('', results['stderr'])
         self.assertTrue(' 0% packet' in results['stdout'], results['stdout'])
         self.assertNotIn('DUP', results['stdout'])
+
+    def test_concurrent_hotplug_device_indexes_are_unique(self):
+        """Overlapping hot plugs must not share a device index.
+
+        Issue 4946: the hot plug endpoint read the highest index in use
+        and then created the interface, two steps with nothing
+        serialising them, so two overlapping requests both took the same
+        next index. ``interfaces_for_instance()`` keys a dict on the
+        index and so dropped one of the pair outright, and the libvirt
+        device naming which reads it addressed the wrong NIC.
+
+        Each request gets its own client because they are issued at the
+        same moment, and a client which pauses for the async result
+        would serialise them here rather than at the server. One pass
+        cannot prove the race is gone -- the requests may simply not
+        have overlapped -- but the invariant asserted was only ever
+        reachable through that window.
+        """
+        plugs = 3
+        inst = self.create_instance(
+            'hotplug-order', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net_two['uuid']
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': base.CLUSTER_CI_IMAGE,
+                    'type': 'disk'
+                }
+            ], None, None)
+        self.addDetail(
+            'instance',
+            content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
+        self._await_instance_create(inst['uuid'])
+
+        ready = threading.Barrier(plugs)
+
+        def _plug():
+            client = apiclient.Client(
+                base_url=self.system_client.base_url,
+                namespace=self.namespace, key=self.namespace_key,
+                async_strategy=apiclient.ASYNC_CONTINUE)
+            ready.wait(timeout=60)
+            return client.add_instance_interface(
+                inst['uuid'], {'network_uuid': self.net_two['uuid']})
+
+        with futures.ThreadPoolExecutor(max_workers=plugs) as pool:
+            plugged = [f.result() for f in
+                       [pool.submit(_plug) for _ in range(plugs)]]
+
+        self._await_instance_operations_complete(inst['uuid'])
+
+        interfaces = self.test_client.get_instance_interfaces(inst['uuid'])
+        self.addDetail(
+            'interfaces',
+            content.text_content(json.dumps(interfaces, indent=4,
+                                            sort_keys=True)))
+
+        # The create's interface plus one per hot plug, each on its own
+        # index. Only the size of the index set is asserted, not its
+        # contents: which plug ends up on which index depends on the
+        # order the server admitted them in, and no caller may rely on
+        # that.
+        self.assertEqual(plugs + 1, len(interfaces))
+        self.assertEqual(plugs + 1, len({ni['order'] for ni in interfaces}))
+
+        # Every plug produced a row of its own. This listing is the API
+        # view, a plain query of the instance's interfaces which is never
+        # keyed on the index, so it is a floor rather than the regression
+        # check: a duplicate index would still list both rows here. The
+        # distinct-index assertion above is what catches issue 4946. It
+        # was interfaces_for_instance(), the hypervisor-side view, which
+        # keyed a dict on the index and dropped one of a colliding pair.
+        listed = {ni['uuid'] for ni in interfaces}
+        for plug in plugged:
+            self.assertIn(
+                plug['uuid'], listed,
+                'Hot plugged interface %s is missing from the instance'
+                % plug['uuid'])

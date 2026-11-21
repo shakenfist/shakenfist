@@ -1629,7 +1629,7 @@ values (immutable data set at creation time):
 | `trusted_issuers` | TrustedIssuer | uuid, name, version |
 | `mapping_rules` | MappingRule | uuid, namespace, name, version |
 | `artifacts` | Artifact | uuid, artifact_type, source_url, name, namespace, version |
-| `network_interfaces` | NetworkInterface | uuid, network_uuid, instance_uuid, macaddr, ipv4, order, model, version |
+| `network_interfaces` | NetworkInterface | uuid, network_uuid, instance_uuid, macaddr, ipv4, order, model, version. UNIQUE indexes on (macaddr, active, network_uuid) and (instance_uuid, order, active); see [Network interface uniqueness](#network-interface-uniqueness) |
 | `ipams` | IPAM | uuid, namespace, network_uuid, ipblock, version |
 | `networks` | Network | uuid, name, namespace, netblock, provide_dhcp, provide_nat, provide_dns, vxid (unique), egress_nic, mesh_nic, version |
 | `agent_operations` | AgentOperation | uuid, namespace, instance_uuid (indexed), commands (JSON list), depends_on (JSON list), runs_after (JSON list), deadline (nullable), progress_timeout (nullable), version |
@@ -1637,6 +1637,19 @@ values (immutable data set at creation time):
 
 These tables use the object's UUID as the primary key, except for
 `namespaces` which uses the namespace name (a string) as its primary key.
+
+##### Network interface uniqueness
+
+`network_interfaces` carries two UNIQUE indexes: a MAC address is unique on
+its network, and a device index (`order`) is unique on its instance. Both
+include `active`, a server-managed flag which is TRUE on a live interface and
+NULL once it is deleted. NULLs do not collide in a MariaDB UNIQUE index, so a
+deleted interface releases its MAC and its device index immediately rather
+than at the end of the cleaner delay, while its row stays for audit.
+
+The MAC can be reused at once. A hot plug's automatically chosen device index
+still steps over a deleted row's until the row is reaped, so the indexes of an
+instance which has plugged and unplugged interfaces are sparse.
 
 #### Per-Type Attribute Tables
 

@@ -50,6 +50,7 @@ TEST_TABLES = [
 
 MACADDR_CONSTRAINT = 'uq_network_interfaces_macaddr'
 COMPOSITE_CONSTRAINT = 'uq_network_interfaces_macaddr_active_network'
+ORDER_CONSTRAINT = 'uq_network_interfaces_instance_order_active'
 
 
 @unittest.skipUnless(
@@ -90,9 +91,15 @@ class NetworkInterfaceActiveBackfillLiveTestCase(base.ShakenFistTestCase):
 
         A version 2 table has no ``active`` column and a global UNIQUE
         on macaddr, which is what a cluster upgrading onto the composite
-        constraint actually has.
+        constraint actually has. Nor has it the version 4 constraint on
+        the per-instance order, and that has to go first: it is over
+        ``active`` too, and MariaDB will not drop a column a
+        multi-column UNIQUE still names.
         """
         with self.engine.connect() as conn:
+            conn.execute(sa.text(
+                f'ALTER TABLE network_interfaces '
+                f'DROP INDEX {ORDER_CONSTRAINT}'))
             conn.execute(sa.text(
                 f'ALTER TABLE network_interfaces '
                 f'DROP INDEX {COMPOSITE_CONSTRAINT}'))
@@ -176,9 +183,11 @@ class NetworkInterfaceActiveBackfillLiveTestCase(base.ShakenFistTestCase):
 
         result = mariadb._ensure_network_interfaces_schema(self.engine)
 
-        self.assertEqual(3, result['end_version'])
+        # The upgrade does not stop at version 3: the order constraint
+        # of version 4 lands in the same ensure.
+        self.assertEqual(4, result['end_version'])
         self.assertEqual(
-            3, mariadb._get_table_version(self.engine, 'network_interfaces'))
+            4, mariadb._get_table_version(self.engine, 'network_interfaces'))
         self.assertTrue(self._active(live))
         self.assertIsNone(self._active(deleted))
         # No state row reads as "not deleted", which is the safe way
@@ -188,6 +197,7 @@ class NetworkInterfaceActiveBackfillLiveTestCase(base.ShakenFistTestCase):
         constraints = self._constraints()
         self.assertIn(COMPOSITE_CONSTRAINT, constraints)
         self.assertNotIn(MACADDR_CONSTRAINT, constraints)
+        self.assertIn(ORDER_CONSTRAINT, constraints)
 
         # What the constraint is for, both ways round: a row the
         # backfill marked live holds its MAC, and one it marked deleted
@@ -219,6 +229,8 @@ class NetworkInterfaceActiveBackfillLiveTestCase(base.ShakenFistTestCase):
         constraints = self._constraints()
         self.assertIn(MACADDR_CONSTRAINT, constraints)
         self.assertNotIn(COMPOSITE_CONSTRAINT, constraints)
+        # An aborted version 3 step never reaches version 4's either.
+        self.assertNotIn(ORDER_CONSTRAINT, constraints)
 
         # The point of all of it: the live interface's MAC is still
         # spoken for. Landing the composite constraint over an unfilled
@@ -245,7 +257,7 @@ class NetworkInterfaceActiveBackfillLiveTestCase(base.ShakenFistTestCase):
         result = mariadb._ensure_network_interfaces_schema(self.engine)
 
         self.assertEqual(2, result['start_version'])
-        self.assertEqual(3, result['end_version'])
+        self.assertEqual(4, result['end_version'])
         self.assertTrue(self._active(live))
         self.assertIsNone(self._active(deleted))
         self.assertIn(COMPOSITE_CONSTRAINT, self._constraints())

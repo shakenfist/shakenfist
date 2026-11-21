@@ -749,6 +749,37 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
         mock_mariadb.ensure_schema.assert_called_once()
         self.assertIn('verified', result.output.lower())
 
+    @mock.patch('shakenfist.client.ctl.config')
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_ensure_mariadb_schema_short_of_target_fails(
+            self, mock_mariadb, mock_config):
+        """A table left below its target is a failure, not "up to date".
+
+        sf-database refuses to start on any table below the version the
+        release expects, so a schema run which could not apply a step --
+        the network_interfaces v4 constraint losing a lock wait, say --
+        must not report itself verified and exit zero, or the deploy
+        only finds out at the gateway restart.
+        """
+        from shakenfist.client.ctl import ensure_mariadb_schema
+
+        mock_config.MARIADB_HOST = 'localhost'
+        mock_mariadb.ensure_schema.return_value = [
+            {'table': 'fine', 'migrated': False, 'start_version': 2,
+             'end_version': 2, 'target_version': 2},
+            {'table': 'network_interfaces', 'migrated': False,
+             'start_version': 3, 'end_version': 3, 'target_version': 4},
+            {'altered_columns': [], 'migrated': False},
+        ]
+
+        result = self.runner.invoke(ensure_mariadb_schema)
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("'network_interfaces' is at version 3, short of "
+                      'version 4', result.output)
+        self.assertNotIn('up to date (version 3)', result.output)
+        self.assertNotIn('verified', result.output.lower())
+
     @mock.patch('shakenfist.client.ctl.vdi_tokens')
     def test_ensure_kerbside_signing_key_creates(self, mock_vdi_tokens):
         from shakenfist.client.ctl import ensure_kerbside_signing_key

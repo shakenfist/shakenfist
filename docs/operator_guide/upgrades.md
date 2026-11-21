@@ -369,6 +369,17 @@ let it finish rather than interrupting it. If it does fail part way
 through, the table's schema version is not advanced and re-running the
 command resumes where it stopped.
 
+A step which logs its failure and carries on, rather than stopping the
+run, also leaves its table's version where it was. The command then names
+each table it left short (`Table '<table>' is at version N, short of
+version M`) and exits non-zero instead of reporting the schema verified,
+because `sf-database` refuses to start on any table below the version the
+release expects. The `network_interfaces` version 4 step is one such: it
+adds the UNIQUE constraint which keeps an instance's interface device
+indexes distinct, and an `ALTER TABLE` on a serving cluster can lose a
+lock wait. Re-run the command once the warning it logged has been dealt
+with.
+
 Not every migration costs that, and the cheap ones are kept cheap
 deliberately. Widening the columns which hold an object key, for
 example, is metadata-only: 63 characters of `utf8mb4` is 252 bytes,

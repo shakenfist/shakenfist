@@ -3403,14 +3403,31 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.CreateNetworkInterfaceRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.StatusReply:
-        """Create a NetworkInterface record in MariaDB."""
+        """Create a NetworkInterface record in MariaDB.
+
+        success=False on an OK status means a UNIQUE constraint refused
+        the row, and nothing else may: the client retries that as a
+        collision. A MariaDB failure answers UNAVAILABLE, which
+        _grpc_call retries and then raises as DatabaseUnavailable, and an
+        unexpected error answers INTERNAL, which the client also raises
+        rather than reading as a collision.
+        """
         try:
             self.monitor.counters['create_network_interface'].inc()
             data = self._ni_from_proto(request.network_interface)
             success = mariadb._direct_create_network_interface(data)
             return database_pb2.StatusReply(success=success, error='')
+        except exceptions.DatabaseUnavailable as e:
+            LOG.warning(
+                f'CreateNetworkInterface transient MariaDB error for '
+                f'{request.network_interface.uuid}: {e}')
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            context.set_details(str(e))
+            return database_pb2.StatusReply(success=False, error=str(e))
         except Exception as e:
             util_exceptions.ignore_exception('database CreateNetworkInterface failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
             return database_pb2.StatusReply(success=False, error=str(e))
 
     def GetNetworkInterface(

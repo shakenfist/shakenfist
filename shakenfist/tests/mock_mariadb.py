@@ -15,6 +15,7 @@ from unittest import mock
 from uuid import UUID
 from uuid import uuid4
 
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist import mariadb_hard_delete
 from shakenfist.config import config
@@ -668,6 +669,13 @@ class MockMariaDB():
             side_effect=self._mariadb_update_network_interface)
         self.mariadb_update_network_interface.start()
         self.test_obj.addCleanup(self.mariadb_update_network_interface.stop)
+
+        self.mariadb_get_network_interfaces_by_instance = mock.patch(
+            'shakenfist.mariadb.get_network_interfaces_by_instance',
+            side_effect=self._mariadb_get_network_interfaces_by_instance)
+        self.mariadb_get_network_interfaces_by_instance.start()
+        self.test_obj.addCleanup(
+            self.mariadb_get_network_interfaces_by_instance.stop)
 
         self.mariadb_find_network_interfaces = mock.patch(
             'shakenfist.mariadb.find_network_interfaces',
@@ -2329,8 +2337,15 @@ class MockMariaDB():
         """Mock implementation of mariadb.create_network_interface()"""
         key = str(data.uuid)
         if key in self.network_interface_objects:
+            # As the real insert: the same row delivered twice (a retried
+            # RPC whose first delivery committed) is success, and a
+            # different row under this uuid is neither a success nor a
+            # refusal.
             self._trace(f'MockMariaDB.create_network_interface({key}): already exists')
-            return False
+            if self.network_interface_objects[key] == data:
+                return True
+            raise exceptions.DatabaseException(
+                f'network interface {key} already exists as a different interface')
         self.network_interface_objects[key] = data
         self._trace(f'MockMariaDB.create_network_interface({key}): created')
         return True
@@ -2342,6 +2357,21 @@ class MockMariaDB():
         data = self.network_interface_objects.get(key)
         self._trace(f'MockMariaDB.get_network_interface({key}): {data}')
         return data
+
+    def _mariadb_get_network_interfaces_by_instance(
+            self, instance_uuid) -> list[NetworkInterfaceData]:
+        """Mock implementation of mariadb.get_network_interfaces_by_instance().
+
+        Every row on the instance whatever its state, as the real query
+        does: it does not join object_states.
+        """
+        key = str(instance_uuid)
+        results = [d for d in self.network_interface_objects.values()
+                   if str(d.instance_uuid) == key]
+        self._trace(
+            f'MockMariaDB.get_network_interfaces_by_instance({key}): '
+            f'{len(results)} results')
+        return results
 
     def _mariadb_delete_network_interface(self, ni_uuid) -> bool:
         """Mock implementation of mariadb.delete_network_interface()"""

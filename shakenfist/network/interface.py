@@ -61,10 +61,15 @@ class NetworkInterface(dbo):
 
     @classmethod
     def _db_create(cls, object_uuid: str, metadata: dict[str, Any]) -> None:
-        """Create a NetworkInterface record in both etcd and MariaDB."""
-        # Write to etcd (base class behavior)
-        super()._db_create(object_uuid, metadata)
+        """Create a NetworkInterface record in MariaDB.
 
+        Raises NetworkInterfaceCollision when a UNIQUE constraint refuses
+        the row, and lets DatabaseUnavailable through when the database
+        could not be asked. The base class's audit event is written only
+        once the row exists: new() retries a refused insert, and each
+        refusal used to leave a 'db record created' event behind for an
+        interface which never was.
+        """
         # Also write static values to MariaDB. Ensure UUIDs are uuid.UUID
         # objects as required by SQLAlchemy's native UUID type. Values may
         # already be UUID objects (e.g. from baseobject.uuid property).
@@ -87,7 +92,12 @@ class NetworkInterface(dbo):
             version=metadata['version']
         )
         if not mariadb.create_network_interface(data):
-            raise RuntimeError(f'Failed to create network interface {object_uuid} in MariaDB')
+            raise exceptions.NetworkInterfaceCollision(
+                f'Network interface {object_uuid} was refused by a UNIQUE '
+                f'constraint: MAC {metadata["macaddr"]} or device index '
+                f'{metadata["order"]} is already in use')
+
+        super()._db_create(object_uuid, metadata)
 
     @staticmethod
     def _static_values_to_dict(data):
@@ -132,7 +142,51 @@ class NetworkInterface(dbo):
         return None
 
     @classmethod
-    def new(cls, interface_uuid, netdesc, instance_uuid, order):
+    def next_order(cls, instance_uuid):
+        """The next free device index on an instance.
+
+        Read immediately before the insert which uses it, and read
+        again when that insert loses the UNIQUE constraint on
+        (instance_uuid, order, active). Reading it once and trusting it
+        is what issue 4946 was: two concurrent hot plugs both saw the
+        same highest index and both took the next one. The constraint
+        is the arbiter; this is only how a caller finds its next guess.
+
+        The guess only converges if every index the constraint is
+        holding is visible to this read, so the read must be a superset
+        of the constraint's key: every row on the instance, whatever its
+        state. It must not be filtered on state. A row takes its slot
+        in the constraint the moment it is inserted, but new() gives it
+        a state only after the insert loop, so a state-filtered read
+        cannot see a sibling's freshly won index and offers the same
+        losing guess again until the retry budget is gone -- which is
+        what the merge CI run for this fix did, ten guesses in 90ms.
+
+        Soft-deleted rows are counted too. That means an index freed by
+        a delete is not handed out again until the row is reaped, so
+        repeated plug and unplug cycles leave the indexes sparse. The
+        constraint only needs them unique, but they are guest-visible:
+        the config drive's network_data.json, rebuilt on every power on,
+        names each link eth{order}, so a second NIC can be published as
+        eth7. cloud-init matches links on ethernet_mac_address rather
+        than that name, which is why sparse is acceptable there.
+
+        An empty list is also what the underlying read returns when it
+        fails, and that reads here as index 0. That is safe rather than
+        right: on an instance which does have live interfaces the insert
+        then loses the constraint and the caller's retry budget runs
+        out, so a broken read fails the create rather than duplicating
+        an index.
+        """
+        orders = [
+            d.order for d in mariadb.get_network_interfaces_by_instance(
+                UUID(str(instance_uuid)))]
+        if not orders:
+            return 0
+        return max(orders) + 1
+
+    @classmethod
+    def new(cls, interface_uuid, netdesc, instance_uuid, order=None):
         # If the caller supplied a MAC, honour it exactly. A collision
         # against the UNIQUE constraint on network_interfaces.macaddr
         # must surface as an error rather than be silently replaced with
@@ -147,11 +201,31 @@ class NetworkInterface(dbo):
             # uuid should only be specified in testing
             interface_uuid = str(uuid4())
 
+        # An order of None means "whatever index is free on this
+        # instance", which is what hot plug wants: it cannot safely pick
+        # a slot in a separate step from the insert. Instance create
+        # passes an explicit index, because there the index is the
+        # position the caller listed the network in.
+        auto_order = order is None
+
         # Only auto-generated MACs are retried on collision. A caller-
-        # supplied MAC is attempted exactly once and the RuntimeError
-        # from the UNIQUE constraint is left to propagate.
-        max_mac_attempts = 1 if caller_supplied_mac else 10
-        for attempt in range(max_mac_attempts):
+        # supplied MAC is attempted exactly once and the
+        # NetworkInterfaceCollision from the UNIQUE constraint is left to
+        # propagate -- unless the order is ours to choose, in which case
+        # the insert may have lost on the order rather than on the MAC,
+        # and is worth another attempt with the requested MAC untouched.
+        # Which constraint refused the row is not asked: over gRPC it
+        # could only be read out of the driver's error text, and the
+        # cost of not knowing is a few fast failed inserts on a request
+        # which was going to be refused anyway.
+        #
+        # DatabaseUnavailable is not caught. A database which cannot be
+        # reached is not a collision, and retrying it here would only
+        # spend the budget before reporting the wrong cause.
+        max_attempts = 10 if (auto_order or not caller_supplied_mac) else 1
+        for attempt in range(max_attempts):
+            if auto_order:
+                order = cls.next_order(instance_uuid)
             try:
                 NetworkInterface._db_create(
                     interface_uuid,
@@ -167,14 +241,17 @@ class NetworkInterface(dbo):
                     }
                 )
                 break
-            except RuntimeError:
-                if attempt >= max_mac_attempts - 1:
+            except exceptions.NetworkInterfaceCollision:
+                if attempt >= max_attempts - 1:
                     raise
-                netdesc['macaddress'] = util_network.random_macaddr()
+                if not caller_supplied_mac:
+                    netdesc['macaddress'] = util_network.random_macaddr()
                 LOG.with_fields({
-                    'interface_uuid': interface_uuid
-                }).info('MAC address collision, retrying with %s'
-                        % netdesc['macaddress'])
+                    'interface_uuid': interface_uuid,
+                    'instance_uuid': str(instance_uuid),
+                    'order': order
+                }).info('Network interface create collided, retrying '
+                        'with MAC %s' % netdesc['macaddress'])
 
         ni = NetworkInterface.from_db(interface_uuid)
 
