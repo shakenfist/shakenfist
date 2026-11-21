@@ -280,7 +280,7 @@ push audit.
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
-| 1. Repair live zombies forward | This file, "Phase 1" below | Not started | — |
+| 1. Repair live zombies forward | This file, "Phase 1" below | Complete | f79a23cd5c (#4419) |
 | 2. Push audit | This file, "Phase 2" below | Not started | — |
 
 ### Phase 1: repair live zombies forward
