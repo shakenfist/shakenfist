@@ -15439,7 +15439,14 @@ def _direct_get_trusted_issuer(
     except OperationalError as e:
         LOG.warning(
             f'MariaDB get failed for trusted_issuer {issuer_uuid}: {e}')
-        return None
+        # None means "no such issuer" to callers, and both the CRUD API
+        # and the exchange treat that as authoritative -- a 404, or a
+        # refusal to believe an identity token. A database failure must
+        # therefore raise rather than masquerade as a deliberate
+        # absence, which is what the gRPC twin already does (issue
+        # 5017, following issue 3836 for the attributes readers).
+        raise exceptions.DatabaseUnavailable(
+            f'trusted issuer {issuer_uuid} could not be read: {e}') from e
 
 
 def _direct_get_trusted_issuer_by_name(
@@ -15463,7 +15470,8 @@ def _direct_get_trusted_issuer_by_name(
     except OperationalError as e:
         LOG.warning(
             f'MariaDB get failed for trusted_issuer named {name}: {e}')
-        return None
+        raise exceptions.DatabaseUnavailable(
+            f'trusted issuer {name} could not be read: {e}') from e
 
 
 def _direct_get_all_trusted_issuers() -> list[TrustedIssuerData]:
@@ -15480,8 +15488,12 @@ def _direct_get_all_trusted_issuers() -> list[TrustedIssuerData]:
                 for row in rows
             ]
     except OperationalError as e:
+        # An empty list here would read as "this cluster trusts
+        # nobody", which is indistinguishable from a correct answer and
+        # is also what lets two issuers claim one iss.
         LOG.warning(f'MariaDB list failed for trusted_issuers: {e}')
-        return []
+        raise exceptions.DatabaseUnavailable(
+            f'trusted issuers could not be listed: {e}') from e
 
 
 def _direct_delete_trusted_issuer(issuer_uuid: UUID) -> bool:
@@ -15884,21 +15896,35 @@ def create_trusted_issuer(data: TrustedIssuerData) -> bool:
 
 
 def get_trusted_issuer(issuer_uuid: UUID) -> Optional[TrustedIssuerData]:
-    """Get a TrustedIssuer's static values by UUID."""
+    """Get a TrustedIssuer's static values by UUID.
+
+    Returns None if the issuer does not exist. Raises
+    DatabaseUnavailable when the database cannot be read.
+    """
     if _use_database_service():
         return _grpc_get_trusted_issuer(issuer_uuid)
     return _direct_get_trusted_issuer(issuer_uuid)
 
 
 def get_trusted_issuer_by_name(name: str) -> Optional[TrustedIssuerData]:
-    """Look up a TrustedIssuer by its unique name."""
+    """Look up a TrustedIssuer by its unique name.
+
+    Returns None if no issuer has that name. Raises DatabaseUnavailable
+    when the database cannot be read: this is the exchange's issuer
+    lookup, and an unreadable database must not refuse a token as
+    though the operator had never configured the issuer.
+    """
     if _use_database_service():
         return _grpc_get_trusted_issuer_by_name(name)
     return _direct_get_trusted_issuer_by_name(name)
 
 
 def get_all_trusted_issuers() -> list[TrustedIssuerData]:
-    """Every configured TrustedIssuer."""
+    """Every configured TrustedIssuer.
+
+    Raises DatabaseUnavailable on a failed read rather than returning
+    an empty list, which would read as "this cluster trusts nobody".
+    """
     if _use_database_service():
         return _grpc_get_all_trusted_issuers()
     return _direct_get_all_trusted_issuers()
@@ -16160,7 +16186,11 @@ def _direct_get_mapping_rule(rule_uuid: UUID) -> Optional[MappingRuleData]:
             return _mapping_rule_row_to_data(row)
     except OperationalError as e:
         LOG.warning(f'MariaDB get failed for mapping_rule {rule_uuid}: {e}')
-        return None
+        # None means "no such rule", which the exchange treats as
+        # authoritative -- a refusal to mint. As above, a failed read
+        # raises instead (issue 5017).
+        raise exceptions.DatabaseUnavailable(
+            f'mapping rule {rule_uuid} could not be read: {e}') from e
 
 
 def _direct_get_mapping_rule_by_name(
@@ -16186,7 +16216,8 @@ def _direct_get_mapping_rule_by_name(
     except OperationalError as e:
         LOG.warning(
             f'MariaDB get failed for mapping_rule {namespace}/{name}: {e}')
-        return None
+        raise exceptions.DatabaseUnavailable(
+            f'mapping rule {namespace}/{name} could not be read: {e}') from e
 
 
 def _direct_get_mapping_rules_in_namespace(
@@ -16204,9 +16235,13 @@ def _direct_get_mapping_rules_in_namespace(
             rows = conn.execute(stmt).fetchall()
             return [_mapping_rule_row_to_data(row) for row in rows]
     except OperationalError as e:
+        # An empty list would read as "this namespace federates with
+        # nobody", which is a valid looking answer and therefore the
+        # worst possible thing to invent during an outage.
         LOG.warning(
             f'MariaDB list failed for mapping_rules in {namespace}: {e}')
-        return []
+        raise exceptions.DatabaseUnavailable(
+            f'mapping rules in {namespace} could not be listed: {e}') from e
 
 
 def _direct_get_all_mapping_rules() -> list[MappingRuleData]:
@@ -16220,7 +16255,8 @@ def _direct_get_all_mapping_rules() -> list[MappingRuleData]:
             return [_mapping_rule_row_to_data(row) for row in rows]
     except OperationalError as e:
         LOG.warning(f'MariaDB list failed for mapping_rules: {e}')
-        return []
+        raise exceptions.DatabaseUnavailable(
+            f'mapping rules could not be listed: {e}') from e
 
 
 def _direct_find_mapping_rules(
@@ -16747,7 +16783,11 @@ def create_mapping_rule(data: MappingRuleData) -> bool:
 
 
 def get_mapping_rule(rule_uuid: UUID) -> Optional[MappingRuleData]:
-    """Get a MappingRule's static values."""
+    """Get a MappingRule's static values.
+
+    Returns None if the rule does not exist. Raises DatabaseUnavailable
+    when the database cannot be read.
+    """
     if _use_database_service():
         return _grpc_get_mapping_rule(rule_uuid)
     return _direct_get_mapping_rule(rule_uuid)
@@ -16755,21 +16795,34 @@ def get_mapping_rule(rule_uuid: UUID) -> Optional[MappingRuleData]:
 
 def get_mapping_rule_by_name(
         namespace: str, name: str) -> Optional[MappingRuleData]:
-    """Look a MappingRule up by its (namespace, name) pair."""
+    """Look a MappingRule up by its (namespace, name) pair.
+
+    Returns None if the pair names no rule. Raises DatabaseUnavailable
+    when the database cannot be read, so the exchange refuses to mint
+    with a 503 rather than as though the rule did not exist.
+    """
     if _use_database_service():
         return _grpc_get_mapping_rule_by_name(namespace, name)
     return _direct_get_mapping_rule_by_name(namespace, name)
 
 
 def get_mapping_rules_in_namespace(namespace: str) -> list[MappingRuleData]:
-    """Every MappingRule owned by one namespace."""
+    """Every MappingRule owned by one namespace.
+
+    Raises DatabaseUnavailable on a failed read rather than returning
+    an empty list, which would read as a namespace with no rules.
+    """
     if _use_database_service():
         return _grpc_get_mapping_rules_in_namespace(namespace)
     return _direct_get_mapping_rules_in_namespace(namespace)
 
 
 def get_all_mapping_rules() -> list[MappingRuleData]:
-    """Every MappingRule on the cluster."""
+    """Every MappingRule on the cluster.
+
+    Raises DatabaseUnavailable on a failed read rather than returning
+    an empty list.
+    """
     if _use_database_service():
         return _grpc_get_all_mapping_rules()
     return _direct_get_all_mapping_rules()

@@ -17,8 +17,11 @@ from sqlalchemy.exc import OperationalError
 
 from shakenfist import baseobject
 from shakenfist import exceptions
+from shakenfist import federation
 from shakenfist import locks
+from shakenfist import mapping_rule
 from shakenfist import mariadb
+from shakenfist import trusted_issuer
 from shakenfist.daemons import daemon
 from shakenfist.daemons.database import main as daemons_database_main
 from shakenfist.daemons.queues import main as queues_main
@@ -443,6 +446,135 @@ class AttributeReadFailureTestCase(base.ShakenFistTestCase):
                 self.assertRaises(
                     exceptions.DatabaseUnavailable,
                     getattr(mariadb, public), self.KEY_UUID)
+
+
+class CredentialPointAndListReadFailureTestCase(base.ShakenFistTestCase):
+    """Issue 5017: the trusted issuer and mapping rule point, by-name and
+    listing reads are the paths the federated exchange and the orphan
+    reconciler's liveness predicates resolve a credential with. Their
+    gRPC twins raise, so until this landed the answer a caller got for a
+    database blip -- "no such issuer" or "the database is unavailable" --
+    depended on whether the cluster runs the database service."""
+
+    ISSUER_UUID = uuid.UUID('22222222-2222-2222-2222-222222222222')
+    RULE_UUID = uuid.UUID('33333333-3333-3333-3333-333333333333')
+
+    # (public reader, direct reader, gRPC reader, arguments)
+    READERS = [
+        ('get_trusted_issuer', '_direct_get_trusted_issuer',
+         '_grpc_get_trusted_issuer', (ISSUER_UUID,)),
+        ('get_trusted_issuer_by_name', '_direct_get_trusted_issuer_by_name',
+         '_grpc_get_trusted_issuer_by_name', ('keystone',)),
+        ('get_all_trusted_issuers', '_direct_get_all_trusted_issuers',
+         '_grpc_get_all_trusted_issuers', ()),
+        ('get_mapping_rule', '_direct_get_mapping_rule',
+         '_grpc_get_mapping_rule', (RULE_UUID,)),
+        ('get_mapping_rule_by_name', '_direct_get_mapping_rule_by_name',
+         '_grpc_get_mapping_rule_by_name', ('banana', 'rule1')),
+        ('get_mapping_rules_in_namespace',
+         '_direct_get_mapping_rules_in_namespace',
+         '_grpc_get_mapping_rules_in_namespace', ('banana',)),
+        ('get_all_mapping_rules', '_direct_get_all_mapping_rules',
+         '_grpc_get_all_mapping_rules', ()),
+    ]
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_direct_operational_error_raises_database_unavailable(
+            self, mock_engine):
+        mock_engine.return_value.connect.side_effect = OperationalError(
+            'SELECT', {}, Exception('server has gone away'))
+        for _, direct, _, args in self.READERS:
+            with self.subTest(reader=direct):
+                self.assertRaises(
+                    exceptions.DatabaseUnavailable,
+                    getattr(mariadb, direct), *args)
+
+    @mock.patch('shakenfist.mariadb._grpc_call',
+                side_effect=FakeRpcError(grpc.StatusCode.RESOURCE_EXHAUSTED))
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_grpc_error_raises_database_unavailable(
+            self, mock_stub, mock_call):
+        for _, _, grpc_reader, args in self.READERS:
+            with self.subTest(reader=grpc_reader):
+                self.assertRaises(
+                    exceptions.DatabaseUnavailable,
+                    getattr(mariadb, grpc_reader), *args)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=False)
+    def test_public_wrappers_raise_on_direct_failure(
+            self, mock_use, mock_engine):
+        mock_engine.return_value.connect.side_effect = OperationalError(
+            'SELECT', {}, Exception('server has gone away'))
+        for public, _, _, args in self.READERS:
+            with self.subTest(reader=public):
+                self.assertRaises(
+                    exceptions.DatabaseUnavailable,
+                    getattr(mariadb, public), *args)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=False)
+    def test_by_name_lookups_do_not_report_a_blip_as_absent(
+            self, mock_use, mock_engine):
+        # The read path the liveness predicates cite. None here means
+        # "no such live object" and nothing else.
+        mock_engine.return_value.connect.side_effect = OperationalError(
+            'SELECT', {}, Exception('server has gone away'))
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            trusted_issuer.TrustedIssuer.from_db_by_name, 'keystone')
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mapping_rule.MappingRule.from_db_by_name, 'banana', 'rule1')
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mapping_rule.rules_in_namespace, 'banana')
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=False)
+    def test_the_issuer_listing_does_not_invent_an_untrusted_cluster(
+            self, mock_use, mock_engine):
+        # issuer_claiming_url() is both the exchange's issuer resolution
+        # and the uniqueness check which refuses a second issuer for one
+        # iss. An empty listing would answer "nobody claims this URL" to
+        # both, which refuses a valid token and lets two issuers claim
+        # one iss.
+        mock_engine.return_value.connect.side_effect = OperationalError(
+            'SELECT', {}, Exception('server has gone away'))
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            federation.issuer_claiming_url, 'https://idp.example.com')
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_the_servicer_does_not_answer_with_an_empty_reply(
+            self, mock_engine):
+        # A reply whose only payload is a repeated field has nowhere to
+        # say "the read failed", so the status has to carry it or the
+        # client reads the empty list as an answer.
+        mock_engine.return_value.connect.side_effect = OperationalError(
+            'SELECT', {}, Exception('server has gone away'))
+        servicer = daemons_database_main.DatabaseService(mock.MagicMock())
+
+        for method, request in [
+                ('GetTrustedIssuerByName',
+                 database_pb2.GetTrustedIssuerByNameRequest(name='keystone')),
+                ('GetAllTrustedIssuers',
+                 database_pb2.GetAllTrustedIssuersRequest()),
+                ('GetMappingRulesInNamespace',
+                 database_pb2.GetMappingRulesInNamespaceRequest(
+                     namespace='banana')),
+                ('GetAllMappingRules',
+                 database_pb2.GetAllMappingRulesRequest())]:
+            with self.subTest(method=method):
+                context = mock.MagicMock()
+                getattr(servicer, method)(request, context)
+                context.set_code.assert_called_once()
+                self.assertNotEqual(
+                    grpc.StatusCode.OK,
+                    context.set_code.call_args[0][0])
 
 
 class GrpcCallMethodNameTestCase(base.ShakenFistTestCase):

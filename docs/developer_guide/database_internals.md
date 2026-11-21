@@ -413,6 +413,24 @@ shape a new accessor should have, and
 [`PLAN-grpc-bounded-replies.md`](../plans/PLAN-grpc-bounded-replies.md)
 for the reply-size work this came out of.
 
+The credential readers are the other exception, and there the reason
+is authentication rather than deletion. A read which decides whether a
+caller authenticates must not answer "no such issuer" when what
+happened is "we could not look": once that is a login refused for a
+reason nothing in the response or the audit trail records, and once it
+is a licence for orphan reconciliation to repair a live credential to
+`deleted`, because the liveness predicates cite these reads as their
+authority. So they raise instead of returning `None` or `[]`:
+`get_namespace_key_by_name()` and `find_namespace_keys()` (issue
+3522), the three `*_attributes` readers for keys, issuers and rules
+(issue 3836), and every read of a trusted issuer or mapping rule --
+by uuid, by name, by namespace and the full listings (issue 5017,
+which closed the last direct accessors in the family whose gRPC twin
+already raised). The REST layer answers 503 for all of them via
+`handle_database_unavailable`. `get_namespace_key()`, the point read
+by uuid, is the one credential read still collapsing a failure into
+`None` on both backends; it is part of issue 3373's remaining sweep.
+
 The object iterators are the widest consumer of all this, and they
 propagate. `DatabaseBackedObjectIterator._find()` catches nothing:
 a `DatabaseUnavailable` raised part way through `Blobs()`, `IPAMs()`
