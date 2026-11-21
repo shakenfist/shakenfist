@@ -100,8 +100,10 @@ class FakeBlob:
     STATE_CREATED = dbo.STATE_CREATED
     STATE_DELETED = dbo.STATE_DELETED
 
+    STATE_ERROR = dbo.STATE_ERROR
+
     def __init__(self, uuid, state='created', ref_count=1, locations=None,
-                 last_used=None, fetched_at=None):
+                 last_used=None, fetched_at=None, state_update_time=0.0):
         self.uuid = uuid
         self._state_value = state
         self._ref_count = ref_count
@@ -110,10 +112,16 @@ class FakeBlob:
         # period; new tests pass explicit timestamps.
         self.last_used = last_used if last_used is not None else 0.0
         self.fetched_at = fetched_at if fetched_at is not None else 0.0
+        # When the state was last written, which is the clock the errored
+        # blob retention is measured against. Default to the epoch, which
+        # is "long ago" for every retention.
+        self._state_update_time = state_update_time
+        self.events = []
 
     @property
     def state(self):
-        return mock.MagicMock(value=self._state_value)
+        return mock.MagicMock(value=self._state_value,
+                              update_time=self._state_update_time)
 
     @state.setter
     def state(self, value):
@@ -128,7 +136,7 @@ class FakeBlob:
         return list(self._locations)
 
     def add_event(self, *args, **kwargs):
-        pass
+        self.events.append((args, kwargs))
 
 
 class FakeNode:
@@ -167,8 +175,29 @@ class FillPerBlobQueueTestCase(base.ShakenFistTestCase):
         st._fill_per_blob_queue()
 
         mock_get_by_state.assert_called_once_with(
-            ObjectType.BLOB, [Blob.STATE_CREATED], updated_before=None)
+            ObjectType.BLOB, [Blob.STATE_CREATED, Blob.STATE_ERROR],
+            updated_before=None)
         self.assertEqual(2, st.BLOB_CHECKS_QUEUE.qsize())
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.Blob.from_db')
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_objects_by_state')
+    def test_fill_includes_errored_blobs(
+            self, mock_get_by_state, mock_from_db):
+        """An errored blob must reach this sweep (issue 5001).
+
+        Nothing else ever moves a blob out of 'error', and while it sits
+        there it holds the references it was created with -- a failed thin
+        snapshot's depends_on pins the blob it was taken from, so that
+        blob's data is never reclaimed either.
+        """
+        mock_get_by_state.return_value = [BLOB_UUID_1]
+        mock_from_db.return_value = FakeBlob(BLOB_UUID_1, state='error')
+
+        st._fill_per_blob_queue()
+
+        self.assertIn(
+            Blob.STATE_ERROR, mock_get_by_state.call_args[0][1])
+        self.assertEqual(1, st.BLOB_CHECKS_QUEUE.qsize())
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.Blob.from_db')
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_objects_by_state')
@@ -461,6 +490,53 @@ class ProcessPerBlobQueueTestCase(base.ShakenFistTestCase):
         st._process_per_blob_queue(execution_limit=5)
 
         self.assertEqual(dbo.STATE_CREATED, blob._state_value)
+        mock_get_targets.assert_not_called()
+        mock_create_and_enqueue.assert_not_called()
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.nbo_schema.create_and_enqueue')
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_cluster_operation_targets_for_object')
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_blob_hashes')
+    def test_errored_blob_is_deleted_after_retention(
+            self, mock_get_hashes, mock_get_targets,
+            mock_create_and_enqueue):
+        """An errored blob is moved to deleted, which is what reclaims it.
+
+        Issue 5001: a snapshot failure errors the blobs it accumulated and
+        nothing ever moved them on, so the references they hold -- a thin
+        snapshot's depends_on in particular -- pinned another blob's data
+        forever. The reference count is deliberately non-zero here: the
+        decision does not depend on it, because an errored blob is never
+        usable again whatever still points at it.
+        """
+        blob = FakeBlob(
+            BLOB_UUID_1, state='error', ref_count=3,
+            state_update_time=time.time() - st.BLOB_ERROR_RETENTION - 1)
+        st.BLOB_CHECKS_QUEUE.put(blob)
+
+        st._process_per_blob_queue(execution_limit=5)
+
+        self.assertEqual(dbo.STATE_DELETED, blob._state_value)
+        self.assertEqual(1, len(blob.events))
+        # No checksum work for a blob which has no data worth checking.
+        mock_get_targets.assert_not_called()
+        mock_create_and_enqueue.assert_not_called()
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.nbo_schema.create_and_enqueue')
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_cluster_operation_targets_for_object')
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.mariadb.get_blob_hashes')
+    def test_recently_errored_blob_is_left_alone(
+            self, mock_get_hashes, mock_get_targets,
+            mock_create_and_enqueue):
+        """The retention window is the operator's chance to see the error."""
+        blob = FakeBlob(
+            BLOB_UUID_1, state='error', ref_count=0,
+            state_update_time=time.time())
+        st.BLOB_CHECKS_QUEUE.put(blob)
+
+        st._process_per_blob_queue(execution_limit=5)
+
+        self.assertEqual(dbo.STATE_ERROR, blob._state_value)
+        self.assertEqual([], blob.events)
         mock_get_targets.assert_not_called()
         mock_create_and_enqueue.assert_not_called()
 

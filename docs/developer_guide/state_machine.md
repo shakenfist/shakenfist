@@ -167,7 +167,13 @@ stateDiagram-v2
   and a placeholder database entry created.
 * `created`: the blob has data associated with it.
 * `deleted`: the blob has been deleted.
-* `error`: the blob is in an error state.
+* `error`: the blob is in an error state. This is not a resting place: a
+  blob reaches it when a snapshot fails, or when the last copy of its
+  data is lost, and the cluster daemon's per-blob sweep moves it on to
+  `deleted` an hour later. That transition is what removes the
+  references the blob holds -- a thin snapshot's `depends_on` keeps the
+  blob it was taken from alive -- so a blob left in `error` forever
+  would pin another blob's data forever with it.
 
 The following transitions are possible:
 

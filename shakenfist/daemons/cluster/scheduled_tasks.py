@@ -69,6 +69,17 @@ class NamedQueue(queue.Queue):
 BLOB_CHECKS_QUEUE = NamedQueue('per-blob')
 INSTANCE_CHECKS_QUEUE = NamedQueue('per-instance')
 
+# How long an errored blob is left in 'error' before the per-blob sweep
+# moves it to 'deleted'. An errored blob is dead -- 'error' leads only to
+# 'deleted' in Blob.state_targets, ensure_local() refuses anything which
+# is not 'created', and resolve_to_blob() will not hand one out -- so this
+# window is for a human reading the failure, not for the blob. It is
+# shorter than it looks: sf-cleaner already unlinks the blob's files
+# within two CLEANER_DELAYs of the error, because they are absent from
+# get_active_blob_uuids(), and the hard-delete sweep then keeps the row
+# itself for its own retention once the state is 'deleted'.
+BLOB_ERROR_RETENTION = 3600
+
 # The deleted-object sweep's work, held per object type. A single queue
 # filled type by type let one large backlog take every pass's whole budget,
 # so the types behind it were never reached at all. Instead the drain takes
@@ -526,8 +537,17 @@ def per_blob_checks():
 
 
 def _fill_per_blob_queue():
+    # Errored blobs are swept alongside created ones because nothing else
+    # ever moves one on, and a blob which stays in 'error' forever holds
+    # the references it was created with forever too -- a thin snapshot's
+    # depends_on pins the blob it was taken from above a reference count
+    # of zero, so that blob's data is never reclaimed either (issue 5001,
+    # the same leak as issue 4558 reached through 'error' instead). The
+    # references are removed on the transition to 'deleted', in
+    # Blob._state_update, which is why this sweep moves the state rather
+    # than removing the references itself.
     work = _sweep_work_list(
-        'per_blob', ObjectType.BLOB, [Blob.STATE_CREATED])
+        'per_blob', ObjectType.BLOB, [Blob.STATE_CREATED, Blob.STATE_ERROR])
     if work.uuids is None:
         return
     for blob_uuid in work.uuids:
@@ -552,6 +572,28 @@ def _process_per_blob_queue(execution_limit=10):
 
         processed += 1
 
+        # Read once and reuse: every access to .state is a database read,
+        # and this sweep sees every created blob on the cluster. It is read
+        # here rather than at fill time because the state can have moved on
+        # since, which is what the created check below is for.
+        state = b.state
+
+        if state.value == Blob.STATE_ERROR:
+            # Checked before the reference count, because the decision does
+            # not depend on it: an errored blob is never usable again, and
+            # the references which remain -- an artifact index pointing at
+            # the failed snapshot, say -- are references to a blob which
+            # already has no data behind it.
+            age = time.time() - state.update_time
+            if age > BLOB_ERROR_RETENTION:
+                b.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'deleting blob which has been in state error for '
+                    f'more than {BLOB_ERROR_RETENTION}s',
+                    extra={'age': age})
+                b.state = Blob.STATE_DELETED
+            continue
+
         if b.ref_count == 0:
             # Grace period prevents racing freshly-registered blobs whose
             # owning reference (e.g. an artifact_index) has not yet been
@@ -570,7 +612,7 @@ def _process_per_blob_queue(execution_limit=10):
             b.state = Blob.STATE_DELETED
             continue
 
-        if b.state.value != Blob.STATE_CREATED:
+        if state.value != Blob.STATE_CREATED:
             continue
 
         # Every blob location should have a checksum performed at least every
