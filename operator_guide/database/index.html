@@ -19798,6 +19798,11 @@ allocation. This provides:</p>
   only guards against <em>random</em> reallocation: a reservation explicitly
   requesting a haloed address (for example an instance create with a static
   <code>address=</code>) atomically takes the halo over</li>
+<li><strong>Expiry in the reserving statement</strong>: once a halo is older than
+  <code>IP_DELETION_HALO_DURATION</code> any reservation takes it over, done by the same
+  statement which was going to do the reserving. An expired halo is therefore
+  a free address which still has a row, and is reaped as a row by the
+  allocation loop rather than before every reservation attempt</li>
 <li><strong>Idempotent for a re-sent request</strong>: a database call whose reply is lost is
   re-sent, so a reserve whose commit landed can arrive a second time and be
   refused by its own row. That is answered as success rather than as "address
@@ -19878,7 +19883,8 @@ IP address comparison operations.</p>
 </table>
 <p>A <code>deletion-halo</code> entry is evicted by a request which names that specific
 address, since the halo only exists to keep an address out of <em>random</em>
-allocation for a while. A <code>manual</code> reservation is not: it is held for
+allocation for a while, and by any request at all once it is older than
+<code>IP_DELETION_HALO_DURATION</code>. A <code>manual</code> reservation is not: it is held for
 something Shaken Fist does not manage, so a request to reserve or allocate
 that address is refused rather than granted, and only an explicit
 <code>DELETE /networks/{network_ref}/addresses/{address}</code> releases it.</p>

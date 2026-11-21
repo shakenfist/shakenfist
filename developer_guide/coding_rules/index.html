@@ -16641,6 +16641,37 @@ to reach for and the loop body to be plainly an index lookup.</p>
 <code>Blob.depends_on</code> and <code>Blob.transcoded</code> each ran their own filtered
 <code>get_references_from</code> while the caller had already read the same rows
 unfiltered; that was the other half of #3876.</p>
+<h2 id="two-attributes-of-one-row-are-read-inside-one-memo">Two attributes of one row are read inside one memo<a class="headerlink" href="#two-attributes-of-one-row-are-read-inside-one-memo" title="Permanent link">&para;</a></h2>
+<p>Every MariaDB-backed <code>Instance</code> attribute -- the set in
+<code>Instance.MARIADB_ATTRIBUTES</code> -- lives in one <code>instance_attributes</code>
+row, and reading one of them fetches that row. Reading two therefore
+fetches it twice, for no reason at all:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Wrong: two GetInstanceAttributes RPCs for one row.</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">block_devices</span> <span class="o">=</span> <span class="n">inst</span><span class="o">.</span><span class="n">block_devices</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">ports</span> <span class="o">=</span> <span class="n">inst</span><span class="o">.</span><span class="n">ports</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="c1"># Right: one.</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="k">with</span> <span class="n">inst</span><span class="o">.</span><span class="n">attribute_memo</span><span class="p">():</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">block_devices</span> <span class="o">=</span> <span class="n">inst</span><span class="o">.</span><span class="n">block_devices</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">ports</span> <span class="o">=</span> <span class="n">inst</span><span class="o">.</span><span class="n">ports</span>
+</code></pre></div>
+<p>The memo is per call, not a cache: it is discarded when the block
+exits, including on an exception, and any attribute write inside the
+block invalidates it so the write's own read-modify-write starts from
+fresh data. Nothing outside the block sees different staleness.</p>
+<p>The counter-rule matters just as much. A re-read whose <em>purpose</em> is to
+see a change -- the power state read again after taking the instance
+lock, so a power off which finished while we waited is noticed, or the
+one <code>record_observed_agent_state()</code> does after its write -- must not be
+memoized, because the memo would answer with the value from before.
+Those methods are named in <code>MUST_NOT_MEMOIZE</code> in
+<code>shakenfist/tests/test_instance_attribute_memo_sweep.py</code>, which fails
+if one of them grows a memo block.</p>
+<p>That same test is the sweep: a method reading two of these attributes
+outside a memo either gets one or gets an entry in <code>EXEMPT</code> saying why
+it cannot. It is lexical, so it does not follow calls -- a method whose
+memo its caller entered, or whose second read happens inside a helper,
+has to say so there.</p>
 <h2 id="a-no_log-default-is-a-cluster-wide-redaction">A <code>no_log</code> default is a cluster-wide redaction<a class="headerlink" href="#a-no_log-default-is-a-cluster-wide-redaction" title="Permanent link">&para;</a></h2>
 <p>An option declared <code>no_log: true</code> in a role's <code>meta/argument_specs.yml</code> is not
 a per-task setting. Ansible registers whatever value the argument spec
