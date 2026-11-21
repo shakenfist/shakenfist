@@ -400,7 +400,7 @@ landed reads `—`. Phases that land in client-python record
 |-------|------|--------|--------|
 | 0. Decisions and the live-memory baseline | [PLAN-placeable-capacity-phase-00-decisions.md](PLAN-placeable-capacity-phase-00-decisions.md) | Complete | `ab19cf67e7` (#4822) |
 | 1. Extract the shared set-placement core | [PLAN-placeable-capacity-phase-01-placement-core.md](PLAN-placeable-capacity-phase-01-placement-core.md) | Complete | `d20a7d7516` (#4835) |
-| 2. The placement dry run (`C`) | [PLAN-placeable-capacity-phase-02-dry-run.md](PLAN-placeable-capacity-phase-02-dry-run.md) | Complete | `e02a35e514` (#4850); review round #4860, merge commit recorded at phase 3's close-out; client-python `4ff8a7d` (#448) |
+| 2. The placement dry run (`C`) | [PLAN-placeable-capacity-phase-02-dry-run.md](PLAN-placeable-capacity-phase-02-dry-run.md) | Complete | `e02a35e514` (#4850); review round `1d1e5df2aa` (#4860); client-python `4ff8a7d` (#448) |
 | 3. Shape holds: schema and the node guard (`A`) | PLAN-placeable-capacity-phase-03-holds-schema.md (to be written) | Not started | — |
 | 4. Shape holds: consumption, release and displacement | PLAN-placeable-capacity-phase-04-holds-lifecycle.md (to be written) | Not started | — |
 | 5. The refusal contract | PLAN-placeable-capacity-phase-05-refusal-contract.md (to be written) | Not started | — |
@@ -445,12 +445,29 @@ before either admission change.
   re-applied, so a live share anywhere near the baseline's reopens
   `Q1` before phase 3 is written. The reading is private-ci's and
   gates phase 3, not phase 2.
-- **Phase 3** is gated, and the gate is recorded rather than
-  remembered: it may not be planned until private-ci has switched its
-  shadow fit check from a local model to a call to the dry run,
-  soaked it and read the agreement counts, which is where `D13`'s
-  live-memory question is re-tested. The entry is `plan-blockers`
-  `b4` against this plan. Phase 3 then gives the core the right to
+- **Phase 3** was gated, and **the gate is now open.** It could not
+  be planned until private-ci had switched its shadow fit check from
+  a local model to a call to the dry run, soaked it and read the
+  agreement counts, which is where `D13`'s live-memory question is
+  re-tested; the entry was `plan-blockers` `b4` against this plan.
+  private-ci read it on 2026-11-21 in
+  `PLAN-placeable-claims-phase-05a-fit-by-query.md`'s 5a-6 section
+  and its `D4` verdict is **`Hold`**: over the seven-day soak the
+  live share of memory-stage node-drops was 12.9% in-job and 5.8%
+  runner-create against a pre-registered 25% threshold, and no runner
+  the query said would fit was then refused by the cluster
+  (`conductor_placement_query_agreement_total{query="fit",
+  server="refused"}` was zero over 2640 scored fit answers, which is
+  `Q1`'s test in its most direct form). `b4` is resolved, `Q1` does
+  not reopen, and this Execution table's order stands unamended --
+  live memory is not sequenced ahead of `A`. Two readings to carry
+  into phase 3 and phase 7: the in-job live share **rose** from 4.1%
+  and 1.3% to 12.9%, which is half the threshold but the first window
+  in which the deferred quantity moved up at all, so phase 7's
+  comparison figure is 12.9% rather than 1.3%; and `D14`'s retune,
+  `D13`'s one foreseeable falsifier, still has not landed (no
+  `node_ram_reservation_gb` in 33fl, `RAM_OVERCOMMIT_RATIO` still
+  1.0). Phase 3 then gives the core the right to
   book: the per-node held
   column, the node guard term (`G6`), claim-limit validation
   against the sum of holds, and the reconciler and release paths.
