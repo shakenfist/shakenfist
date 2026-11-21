@@ -16474,7 +16474,13 @@ the operation's own deadline, and is never taken by <code>execute</code> operati
   and a placeholder database entry created.</li>
 <li><code>created</code>: the blob has data associated with it.</li>
 <li><code>deleted</code>: the blob has been deleted.</li>
-<li><code>error</code>: the blob is in an error state.</li>
+<li><code>error</code>: the blob is in an error state. This is not a resting place: a
+  blob reaches it when a snapshot fails, or when the last copy of its
+  data is lost, and the cluster daemon's per-blob sweep moves it on to
+  <code>deleted</code> an hour later. That transition is what removes the
+  references the blob holds -- a thin snapshot's <code>depends_on</code> keeps the
+  blob it was taken from alive -- so a blob left in <code>error</code> forever
+  would pin another blob's data forever with it.</li>
 </ul>
 <p>The following transitions are possible:</p>
 <pre class="mermaid"><code>stateDiagram-v2
