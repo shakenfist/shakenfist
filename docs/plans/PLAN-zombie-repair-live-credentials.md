@@ -274,14 +274,16 @@ spelling above is the one to write.
     the whole-plan status, so it only reaches `Complete` once
     every phase has been completed, abandoned or superseded.
 
-This is a single pull request. It has no separate phase files: the
-steps below are the whole of phase 1, and phase 2 is the mandatory
-push audit.
+Phase 1 is a single pull request, and its steps are inline below
+rather than in a phase file of their own. Phase 2 is the mandatory
+push audit, and it does carry a phase file: its range, its lenses and
+its disposition are a plan's worth of decisions, as they are for every
+other push-audit phase in this repository.
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 1. Repair live zombies forward | This file, "Phase 1" below | Complete | f79a23cd5c (#4419) |
-| 2. Push audit | This file, "Phase 2" below | Not started | — |
+| 2. Push audit | [PLAN-zombie-repair-live-credentials-phase-02-push-audit.md](PLAN-zombie-repair-live-credentials-phase-02-push-audit.md) | In progress | — |
 
 ### Phase 1: repair live zombies forward
 
