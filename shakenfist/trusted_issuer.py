@@ -140,6 +140,11 @@ class TrustedIssuer(dbo):
         resolves issuers by name and would otherwise keep believing
         one an operator had explicitly stopped believing. The same
         filter is what lets the name be reused straight away.
+
+        None therefore means "no such live issuer", and nothing else: a
+        failed read raises DatabaseUnavailable (issue 5017), so a
+        database blip refuses the exchange with a 503 rather than
+        reporting a configured issuer as absent.
         """
         data = mariadb.get_trusted_issuer_by_name(name)
         if not data:

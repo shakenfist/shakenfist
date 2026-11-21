@@ -322,6 +322,10 @@ class MappingRule(dbo):
         must stop it minting keys immediately rather than when the
         reaper eventually collects the row, and the same filter is what
         lets the name be reused straight away.
+
+        None therefore means "no such live rule", and nothing else: a
+        failed read raises DatabaseUnavailable (issue 5017) rather than
+        reporting a configured rule as absent.
         """
         data = mariadb.get_mapping_rule_by_name(namespace, name)
         if not data:
