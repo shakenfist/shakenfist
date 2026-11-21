@@ -16857,7 +16857,7 @@ landed reads <code>—</code>. Phases that land in client-python record
 <td>2. The placement dry run (<code>C</code>)</td>
 <td><a href="../PLAN-placeable-capacity-phase-02-dry-run/">PLAN-placeable-capacity-phase-02-dry-run.md</a></td>
 <td>Complete</td>
-<td><code>e02a35e514</code> (#4850); review round #4860, merge commit recorded at phase 3's close-out; client-python <code>4ff8a7d</code> (#448)</td>
+<td><code>e02a35e514</code> (#4850); review round <code>1d1e5df2aa</code> (#4860); client-python <code>4ff8a7d</code> (#448)</td>
 </tr>
 <tr>
 <td>3. Shape holds: schema and the node guard (<code>A</code>)</td>
@@ -16929,12 +16929,29 @@ before either admission change.</p>
   re-applied, so a live share anywhere near the baseline's reopens
   <code>Q1</code> before phase 3 is written. The reading is private-ci's and
   gates phase 3, not phase 2.</li>
-<li><strong>Phase 3</strong> is gated, and the gate is recorded rather than
-  remembered: it may not be planned until private-ci has switched its
-  shadow fit check from a local model to a call to the dry run,
-  soaked it and read the agreement counts, which is where <code>D13</code>'s
-  live-memory question is re-tested. The entry is <code>plan-blockers</code>
-  <code>b4</code> against this plan. Phase 3 then gives the core the right to
+<li><strong>Phase 3</strong> was gated, and <strong>the gate is now open.</strong> It could not
+  be planned until private-ci had switched its shadow fit check from
+  a local model to a call to the dry run, soaked it and read the
+  agreement counts, which is where <code>D13</code>'s live-memory question is
+  re-tested; the entry was <code>plan-blockers</code> <code>b4</code> against this plan.
+  private-ci read it on 2026-11-21 in
+  <code>PLAN-placeable-claims-phase-05a-fit-by-query.md</code>'s 5a-6 section
+  and its <code>D4</code> verdict is <strong><code>Hold</code></strong>: over the seven-day soak the
+  live share of memory-stage node-drops was 12.9% in-job and 5.8%
+  runner-create against a pre-registered 25% threshold, and no runner
+  the query said would fit was then refused by the cluster
+  (<code>conductor_placement_query_agreement_total{query="fit",
+  server="refused"}</code> was zero over 2640 scored fit answers, which is
+  <code>Q1</code>'s test in its most direct form). <code>b4</code> is resolved, <code>Q1</code> does
+  not reopen, and this Execution table's order stands unamended --
+  live memory is not sequenced ahead of <code>A</code>. Two readings to carry
+  into phase 3 and phase 7: the in-job live share <strong>rose</strong> from 4.1%
+  and 1.3% to 12.9%, which is half the threshold but the first window
+  in which the deferred quantity moved up at all, so phase 7's
+  comparison figure is 12.9% rather than 1.3%; and <code>D14</code>'s retune,
+  <code>D13</code>'s one foreseeable falsifier, still has not landed (no
+  <code>node_ram_reservation_gb</code> in 33fl, <code>RAM_OVERCOMMIT_RATIO</code> still
+  1.0). Phase 3 then gives the core the right to
   book: the per-node held
   column, the node guard term (<code>G6</code>), claim-limit validation
   against the sum of holds, and the reconciler and release paths.
