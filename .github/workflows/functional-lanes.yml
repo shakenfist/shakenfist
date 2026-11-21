@@ -291,11 +291,22 @@ jobs:
       # The lifecycle test kills nodes, so upload the cached image to a
       # random hypervisor rather than the primary the action selected --
       # matching the getsf-era behaviour of exercising non-primary uploads.
+      #
+      # The node list comes from the cluster rather than from a
+      # hardcoded table of the slim-primary topology's addresses, which
+      # lives in shakenfist/actions and is consumed unpinned, so a node
+      # added there was never chosen and a node renumbered there failed
+      # for a reason that said nothing about topology (issue #4320).
+      # tools/ci-cluster-nodes.sh explains how, and exits non-zero
+      # rather than printing a short list.
       - name: Choose a random upload target
         run: |
-          nodes=(10.0.0.20 10.0.0.21 10.0.0.22 10.0.0.23 10.0.0.24)
-          random_index=$(( RANDOM % 5 ))
-          echo "UPLOAD_TARGET=${nodes[$random_index]}" >> $GITHUB_ENV
+          set -e -o pipefail
+          . ${GITHUB_WORKSPACE}/ci-environment.sh
+          target=$(bash ${GITHUB_WORKSPACE}/shakenfist/tools/ci-cluster-nodes.sh \
+              | shuf -n 1 | cut -d' ' -f3)
+          echo "Uploading the cached image to ${target}"
+          echo "UPLOAD_TARGET=${target}" >> $GITHUB_ENV
 
       - name: Import cached images to the random target
         run: |

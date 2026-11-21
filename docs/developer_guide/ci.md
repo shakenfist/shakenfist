@@ -85,6 +85,30 @@ teardown powers nodes off and the reusable workflow's does not. It has no
 `concurrency_key` to pass, so its own `concurrency.group` carries the lane
 name, and the seam test reads it from there.
 
+Two of its steps reach the cluster's nodes over ssh: the cached-image
+upload, which deliberately targets a hypervisor rather than the primary,
+and `tools/ci-restart-cluster-nodes.sh`, which power cycles every node
+once the test has killed some. Both ask `tools/ci-cluster-nodes.sh` which
+nodes exist. They used to carry the same hand-written list of five
+addresses, indexed positionally against `sf1_uuid`..`sf5_uuid` — and
+those addresses are the `slim-primary` topology, which lives in
+`shakenfist/actions` and is consumed at `@main` with nothing to bump. The
+list was correct and nothing made it stay correct; both failure modes
+were quiet (#4320). A renumbered node failed for a reason that said
+nothing about topology, and an *added* node was never chosen, because
+`RANDOM % 5` keeps picking from the first five, so the coverage the
+upload step exists to provide narrowed without anything noticing.
+
+The helper enumerates the `sf<N>_uuid` variables `ci-environment.sh`
+exports — the same ones both callers already needed, so it adds no new
+coupling — and asks the under-cloud for each of those instances'
+address, which removes the `sf<N>` to `10.0.0.(19+N)` convention that
+was the real link to the other repository. It exits non-zero rather than
+printing a short or guessed list, since a caller which silently got
+fewer nodes than the cluster has is the failure being replaced.
+`shakenfist/tests/test_ci_cluster_nodes_seams.py` holds the node set out
+of both callers and out of the helper.
+
 A weekly run now deploys all five weekly lanes at once: twenty-two nested
 instances (six each for the three `slim-primary` lanes, three for
 `slim-tier`, one for `localhost`; see `ci-topology-*.yml` in
