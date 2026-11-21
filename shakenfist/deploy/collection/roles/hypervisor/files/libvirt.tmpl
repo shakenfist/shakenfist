@@ -45,11 +45,39 @@
   <devices>
     <emulator>/usr/bin/kvm</emulator>
 
+    <!-- NOTE(mikal): discard='unmap' passes guest TRIM / SCSI UNMAP through to
+         the image file. qemu defaults to discard='ignore', which silently
+         drops those requests, so an instance's qcow2 only ever grows: a guest
+         running fstrim weekly on a 148GB root filesystem with 20GB of real
+         data was found holding 141GB on the hypervisor, and eight identical
+         instances created within a minute of each other had diverged to
+         anywhere between 4.7GB and 141GB of host allocation after a week of
+         churn. The space is never given back without this (issue 5008).
+
+         It is only set for device='disk'. A cdrom is read only media the guest
+         cannot trim, and more importantly a cdrom's backing file is a hard
+         link into the image cache (see _configure_block_devices()), which is
+         shared with every other instance using that image and with the blob
+         store underneath it. A discard honoured through that link would punch
+         holes in shared data, so the attribute stays off those devices
+         deliberately rather than incidentally.
+
+         detect_zeroes='unmap' is deliberately not set alongside it: it would
+         add a zero scan to every guest write to reclaim a case (a guest
+         writing zeroes instead of trimming) that the fstrim path above
+         already covers.
+
+         A libvirt domain definition is persistent and we only render this
+         template when libvirt has no domain for the instance, so an existing
+         instance does not gain this by being powered off and on, or by the
+         hypervisor rebooting, or by a redeploy shipping this file. It has to
+         be recreated. See docs/operator_guide/upgrades.md. -->
     {%- for disk in disks %}
     {%- if disk.bus != 'nvme' %}
     <disk type='{{disk.source_type}}' device='{{disk.present_as}}'>
       <driver name='qemu' type='{{disk.type}}' cache='{{disk.cache_mode}}'
-              error_policy='stop' rerror_policy='stop'/>
+              error_policy='stop' rerror_policy='stop'
+              {%- if disk.present_as == 'disk' %} discard='unmap'{% endif %}/>
       {{disk.source}}
       {{disk.backing}}
       <target dev='{{disk.device}}' bus='{{disk.bus}}'/>

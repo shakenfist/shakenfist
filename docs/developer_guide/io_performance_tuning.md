@@ -87,6 +87,21 @@ Specifically, I don't think that Shaken Fist should use any unsafe caching mode,
 
 **Recommendation: we should convert to using cache mode "none" for instances. It provides slower read performance, but much better write performance.**
 
+## Discard
+
+qemu's default discard mode is `ignore`, which means a guest's TRIM (or SCSI UNMAP, or NVMe dataset management deallocate) is accepted by the virtual disk and then thrown away. The guest believes it has returned the blocks, the image file keeps them, and so an instance's disk allocation on the hypervisor can only ever grow towards its full provisioned size no matter how little data the guest actually holds.
+
+That is not a slow leak. Issue 5008 measured a cluster where one instance with 20GB of real data on a 148GB root filesystem was holding 141GB on its hypervisor, with `fstrim.timer` enabled and running weekly inside the guest the whole time. Eight instances created from the same image within a minute of each other had diverged to between 4.7GB and 141GB of host allocation after a week of ordinary churn, because the only thing that had ever reclaimed anything was recreating the instance.
+
+`libvirt.tmpl` therefore sets `discard='unmap'` on the `<driver>` element of every writable disk, and `_initialize_block_devices()` sets the equivalent `discard=unmap` on the `-drive` arguments it builds for NVMe-bus disks, which do not get a libvirt `<disk>` element at all. Discards reaching a qcow2 free the cluster in that image; where the image has a backing file, qcow2 marks the cluster zero rather than unallocated, so a discard cannot expose the backing image's data to the guest.
+
+Two deliberate exclusions:
+
+* **cdrom devices do not get it.** A cdrom's image file is a hard link into the local image cache, which is shared with every other instance booted from that image and with the blob store underneath it. A discard honoured through that link would punch holes in data other instances are reading. The guest cannot trim read only media anyway, so this costs nothing.
+* **`detect_zeroes='unmap'` is not set.** It converts a guest write of zeroes into a discard, which buys the case of a guest that zeroes instead of trimming, at the cost of scanning every write on the IO hot path. The trim path above covers the case that matters. If this is ever wanted, it should come with a measurement of the scan on the write path, in the style of the rest of this page.
+
+A libvirt domain definition is persistent, and Shaken Fist renders the template only when the hypervisor has no definition for an instance, so this applies to new instances only. See [the upgrade notes](../operator_guide/upgrades.md#discard-applies-to-new-instances) for what that means for an existing cluster.
+
 ## Cluster size
 
 qcow2 defaults to a cluster size of 64KB, and the maximum is 2MB. The value must be a power of two. The balance here is that the cluster size is the unit of allocation of disk when the disk needs to grow -- so a large cluster size will cause an image to grow larger than it might otherwise, but 2MB doesn't seem like a large overhead. However, if you are using a copy on write layer and change one byte of a fully allocated cluster, a 2MB cluster size means that 2MB must be read from the backing file, the byte changed, and then that 2MB written to the copy on write layer. That IO cost can add up depending on your workload.

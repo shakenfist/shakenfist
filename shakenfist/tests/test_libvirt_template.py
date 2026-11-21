@@ -83,6 +83,16 @@ BASE_CONTEXT = {
 # The same single disk, on the SCSI bus instead of virtio.
 SCSI_DISKS = [dict(BASE_CONTEXT['disks'][0], device='sda', bus='scsi')]
 
+# A writable disk alongside a cdrom, which is how an instance booted from an
+# ISO looks. The cdrom's path is a hard link into the image cache, so the two
+# must not be treated the same way.
+CDROM_DISKS = [
+    BASE_CONTEXT['disks'][0],
+    dict(BASE_CONTEXT['disks'][0], present_as='cdrom', type='raw',
+         device='sdb', bus='usb',
+         source="<source file='/srv/shakenfist/instances/i/sdb'/>"),
+]
+
 # The template's jinja conditionals gate large blocks on these, so a single
 # render never sees the whole file.
 VARIANTS = [
@@ -167,6 +177,56 @@ class LibvirtTemplateTestCase(base.ShakenFistTestCase):
             self.assertEqual(
                 '10', stats.get('period'),
                 f'{name} variant memballoon stats period is not 10 seconds')
+
+    def _disk_drivers(self, **overrides):
+        root = ET.fromstring(render(**overrides))
+        return [(d.get('device'), d.find('./driver'))
+                for d in root.findall('./devices/disk')]
+
+    def test_writable_disks_pass_guest_discards_through(self):
+        # Issue 5008: without discard='unmap' qemu uses its default of
+        # discard='ignore', so a guest's fstrim is silently dropped and the
+        # qcow2 only ever grows towards its provisioned size. A guest with
+        # 20GB of data on a 148GB root filesystem, trimming weekly, was found
+        # holding 141GB on its hypervisor.
+        for name, overrides in VARIANTS:
+            drivers = self._disk_drivers(**overrides)
+            self.assertNotEqual(
+                [], drivers, f'{name} variant rendered no disks at all')
+            for device, driver in drivers:
+                self.assertEqual(
+                    'unmap', driver.get('discard'),
+                    f'{name} variant {device} has lost discard=unmap, so '
+                    'guest trims no longer reach the image and its '
+                    'allocation can only grow (issue 5008)')
+
+    def test_cdrom_disks_do_not_discard(self):
+        # A cdrom's backing file is a hard link into the image cache, which is
+        # shared with every other instance using that image and with the blob
+        # store underneath it, so a discard honoured through it would punch
+        # holes in shared data. The guest cannot trim read only media anyway.
+        drivers = dict(self._disk_drivers(disks=CDROM_DISKS))
+        self.assertEqual(
+            {'disk', 'cdrom'}, set(drivers),
+            'the cdrom render did not produce one writable disk and one cdrom')
+        self.assertEqual('unmap', drivers['disk'].get('discard'))
+        self.assertIsNone(
+            drivers['cdrom'].get('discard'),
+            'a cdrom was given a discard mode, and its image file is a hard '
+            'link into the shared image cache')
+
+    def test_detect_zeroes_is_not_set(self):
+        # Deliberately absent rather than forgotten: detect_zeroes='unmap'
+        # would scan every guest write for zeroes to catch a guest which
+        # writes zeroes instead of trimming, which the discard path above
+        # already covers. If it is ever wanted, it belongs with a measurement
+        # of what the scan costs on the write path.
+        for name, overrides in VARIANTS:
+            for device, driver in self._disk_drivers(**overrides):
+                self.assertIsNone(
+                    driver.get('detect_zeroes'),
+                    f'{name} variant {device} gained detect_zeroes without '
+                    'the write path cost being measured')
 
     def test_uefi_loader_is_the_selected_firmware(self):
         # The loader path used to be hard-coded here, and the 2 MB image it

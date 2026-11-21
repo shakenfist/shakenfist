@@ -1176,14 +1176,25 @@ class Instance(dbowo):
         # default 'report' policy and pass a backing-store I/O error to the guest
         # while the domain kept running, which is exactly the failure the disk
         # error policy exists to make visible (the domain pauses instead).
+        #
+        # discard=unmap is the same story for guest TRIM: qemu defaults to
+        # discard=ignore, so without it the NVME device accepts the guest's
+        # dataset management deallocate and drops it, and the image only ever
+        # grows (issue 5008). It is the qemu-commandline equivalent of the
+        # discard='unmap' libvirt.tmpl sets on the buses it does render, and
+        # like that attribute it is only set for a writable disk: a cdrom's
+        # backing file is a hard link into the shared image cache.
         nvme_counter = 0
         for d in block_devices['devices']:
             if d['bus'] == 'nvme':
                 nvme_counter += 1
+                discard = ''
+                if d.get('present_as') == 'disk':
+                    discard = ',discard=unmap'
                 block_devices['extracommands'].extend([
                     '-drive',
                     f'file={d["path"]},format={d["type"]},if=none,'
-                    f'id=NVME{nvme_counter},werror=stop,rerror=stop',
+                    f'id=NVME{nvme_counter},werror=stop,rerror=stop{discard}',
                     '-device', f'nvme,drive=NVME{nvme_counter},serial=nvme-{nvme_counter}'
                 ])
 
