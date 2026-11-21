@@ -48,6 +48,13 @@ DHCP_PROBE_FAILURE_EVENTS = (
     'could not check whether dnsmasq is answering DHCP',
 )
 
+# The network event which says the probe ran and was answered. This is
+# what makes the readiness assertion below non-vacuous: a probe which is
+# never reached records no failure, which the old shape -- wait out the
+# settle window, pass if no failure appeared -- could not tell from a
+# healthy network (issue #4977).
+DHCP_PROBE_SERVING_EVENT = 'dnsmasq is answering DHCP'
+
 
 class DhcpStateTestsMixin:
     """A network's dnsmasq on the network node: it answers, and it is removed.
@@ -190,6 +197,14 @@ class DhcpStateTestsMixin:
         # which on a node is an interpreter with no shakenfist, so every
         # network failed its probe on every pass and was rebuilt -- and
         # nothing in CI looked. This looks.
+        #
+        # It waits for the positive event rather than for the settle
+        # window to run out. A pass which never reached the probe records
+        # neither a failure nor a success, so the old shape passed on it
+        # just as readily as on a healthy network -- and burned the full
+        # window every time (issue #4977). Returning on the event makes
+        # this finish in about the time one pass takes, and the timeout is
+        # now a failure rather than the way it ends.
         deadline = time.time() + DHCP_PROBE_SETTLE
         events = []
         while True:
@@ -205,6 +220,18 @@ class DhcpStateTestsMixin:
                     'Network %s recorded a failed DHCP readiness probe: %s'
                     % (self.net['uuid'],
                        json.dumps(failures, sort_keys=True, default=str)))
-            if time.time() > deadline:
+            if any(e.get('message') == DHCP_PROBE_SERVING_EVENT
+                   for e in events):
                 return
+            if time.time() > deadline:
+                self.addDetail('events', content.text_content(json.dumps(
+                    events, indent=4, sort_keys=True, default=str)))
+                self.fail(
+                    'Network %s recorded no DHCP readiness probe result in '
+                    '%d seconds: no %r event, and no failure either, so a '
+                    'maintenance pass on network node %s did not reach the '
+                    'probe'
+                    % (self.net['uuid'], DHCP_PROBE_SETTLE,
+                       DHCP_PROBE_SERVING_EVENT,
+                       self.network_node.get('name')))
             time.sleep(10)

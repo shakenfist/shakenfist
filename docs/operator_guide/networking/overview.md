@@ -650,6 +650,19 @@ The events to look for on a network are `network not ok, dnsmasq not
 running` (liveness) and `network not ok, dnsmasq not answering DHCP`
 (readiness). The second is the one which used to be invisible.
 
+A probe which ran and *was* answered records `dnsmasq is answering
+DHCP`, once when a network starts being answered and again after any
+episode of not being answered -- never once per pass, which for every
+healthy network would be an event row every thirty seconds saying what
+the first one said. It is the positive half of the pair above, and it
+exists because nothing else distinguishes a healthy network from one
+whose probe was never reached: an `is_okay()` gate which stops calling
+the probe, or a network refreshed inside the maintain pass's skip
+window, records no failure at all. Operationally it is the event which
+says readiness is actually being checked; in CI it is what the
+readiness test waits for, instead of waiting out a window and passing
+because nothing complained.
+
 A probe which could not be run at all is a third outcome, and is not
 treated as either. If the network node cannot reach `sf-privexec`, or
 the probe exits with anything but its own "no answer" status, the
