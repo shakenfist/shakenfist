@@ -11,7 +11,10 @@ request parameters themselves -- `deadline_seconds`,
 accepts -- see
 [the API reference](../developer_guide/api_reference/instances.md#bounding-how-long-an-agent-operation-may-take).
 This page is about what happens operationally once a request is
-enqueued.
+enqueued. What callers can express -- ordering, and dependencies between
+operations -- is described in
+[the developer guide's agent operations page](../developer_guide/agent_operations.md),
+and is what they will be asking you to tune for.
 
 ## One executor per instance
 
@@ -257,16 +260,16 @@ If that happens:
   operation is moved to `abort` and a `runs_after` one runs anyway. It
   is counted from the first dispatcher pass which found the operation
   blocked, in wall-clock time, so how often the dispatcher looks does
-  not change it. It is also the ceiling on a per-edge `settle_seconds`,
+  not change it. It is also the ceiling on a per-edge
+  [`settle_seconds`](../developer_guide/api_reference/instances.md#agentdependency),
   because the dispatcher adds a declared settle to the budget once the
   dependency has been seen to finish: an operation with a settle can
   hold the queue head for the budget plus the settle, and capping the
-  settle at the budget caps that hold at twice it. A caller over the
-  ceiling is refused with a 400 when they ask rather than five minutes
-  later. The wait contains the dependency's
-  own queue time as well as its execution, so a chain several hops deep
-  against a busy instance can legitimately exceed the default. The
-  trade-off is that a blocked operation keeps its place in its
+  settle at the budget caps that hold at twice it. Which edges actually
+  spend the budget, and why an edge between two operations on the same
+  instance does not, are in
+  [what waiting for a dependency costs](../developer_guide/agent_operations.md#what-waiting-for-a-dependency-costs).
+  The trade-off is that a blocked operation keeps its place in its
   instance's strict FIFO queue and holds up everything behind it, so
   raising the option raises how long one caller's blocked chain can
   stall another caller's operations against the same instance. Raise
@@ -277,9 +280,3 @@ If that happens:
   `settle_seconds`, so a lower value refuses settle delays callers could
   previously submit, and the OpenAPI document a deployment serves
   changes with it.
-
-  The guarantee that a settle inside that ceiling can always elapse
-  holds for the edge carrying the settle, and only while it is the last
-  thing holding the operation. An operation with another unfinished
-  edge has already spent this budget by the time a long settle elapses,
-  so that edge gives up as soon as it is reached.
