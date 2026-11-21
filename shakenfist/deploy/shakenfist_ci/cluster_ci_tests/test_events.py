@@ -1,5 +1,6 @@
 import json
 import time
+from xml.etree import ElementTree
 
 from testtools import content
 
@@ -94,16 +95,18 @@ class TestEvents(base.BaseNamespacedTestCase):
             'instance create emitted no "instance placed" audit event')
 
     def test_instance_domain_xml_event(self):
-        """The XML libvirt was actually handed carries free page reporting.
+        """The XML libvirt was actually handed carries the silent attributes.
 
-        A unit test asserts the template in this repository has
-        freePageReporting on its memballoon. That is not the same claim as
-        the hypervisor having rendered it: the template is an ansible file
-        copied onto each node, so a deploy that ships a stale copy, or a
-        node whose copy did not update, produces domains without it and
-        nothing else notices. Instance._create_domain_xml() emits the XML it
-        generated as a mutate event, which is the only view of that from
-        outside the hypervisor.
+        Unit tests assert the template in this repository has
+        freePageReporting on its memballoon and discard='unmap' on its
+        writable disks. That is not the same claim as the hypervisor having
+        rendered them: the template is an ansible file copied onto each node,
+        so a deploy that ships a stale copy, or a node whose copy did not
+        update, produces domains without them and nothing else notices --
+        both attributes fail by silently wasting a host resource rather than
+        by an instance failing to start. Instance._create_domain_xml() emits
+        the XML it generated as a mutate event, which is the only view of
+        that from outside the hypervisor.
         """
         inst = self.create_instance(
             'test-instance-domain-xml', 1, 1024,
@@ -131,3 +134,27 @@ class TestEvents(base.BaseNamespacedTestCase):
             'reporting on its balloon, so the guest cannot hand freed '
             'memory back to the host (issue 3920). The most likely cause '
             'is a hypervisor running an older copy of libvirt.tmpl.')
+
+        # Parse rather than string match: either form of the event can be
+        # the newest (see _await_domain_xml), and libvirt rewrites attribute
+        # order and quoting in its own. Writable disks must discard, and the
+        # cdrom exclusion means the assertion is per device rather than over
+        # the whole document. This instance has a root disk and a config
+        # drive, both device='disk'.
+        root = ElementTree.fromstring(xml)
+        writable = [d for d in root.findall('./devices/disk')
+                    if d.get('device') == 'disk']
+        self.assertNotEqual(
+            0, len(writable),
+            'the domain XML this hypervisor generated has no writable disks')
+        for disk in writable:
+            driver = disk.find('./driver')
+            self.assertIsNotNone(
+                driver, 'a disk in the generated domain XML has no driver')
+            self.assertEqual(
+                'unmap', driver.get('discard'),
+                'a writable disk in the domain XML this hypervisor generated '
+                'does not pass guest discards through, so the guest can '
+                'never give space back and its image grows to its full '
+                'provisioned size (issue 5008). The most likely cause is a '
+                'hypervisor running an older copy of libvirt.tmpl.')

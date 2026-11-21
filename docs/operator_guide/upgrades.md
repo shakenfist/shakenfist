@@ -136,6 +136,33 @@ the existing definition. Recreating the instance is the supported
 route; this is a workaround, and it is on you to confirm the instance
 comes back.
 
+### Discard applies to new instances
+
+Instance disks are now created with `discard='unmap'`, so a guest's
+`fstrim` (or online `discard` mount option) reaches the image file and
+the space is actually returned to the hypervisor's filesystem.
+Previously qemu's default of `discard='ignore'` accepted those requests
+and dropped them, so an instance's disk allocation only ever grew
+towards its full provisioned size however little data the guest held.
+The detail is in [IO performance
+tuning](../developer_guide/io_performance_tuning.md#discard).
+
+This is subject to the same persistent-domain limitation as free page
+reporting above: an instance created before the upgrade keeps the
+domain XML it was created with, and keeps dropping its guest's trims,
+until it is deleted and recreated. The same `virsh undefine` workaround
+applies, with the same caveats.
+
+Recreating an instance is the only reclaim path Shaken Fist offers.
+Nothing here runs `virt-sparsify` or otherwise rewrites an existing
+image, and you should not run such a tool against a running instance's
+disk. Once a recreated or new instance is running, the reclaim is the
+guest's to make: nothing in Shaken Fist trims on its behalf, so an
+image shrinks when the guest's own `fstrim` runs. Expect host
+allocation for those instances to fall rather than rise from that point,
+which is a change in what the free space on a hypervisor's instance
+filesystem does over time.
+
 ### UEFI instances and the 4 MB OVMF firmware
 
 UEFI firmware comes in two flash sizes, and a firmware image only boots

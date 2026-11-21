@@ -317,6 +317,35 @@ class InstanceTestCase(base.ShakenFistTestCase):
         self.assertIn('werror=stop', drive_args[0])
         self.assertIn('rerror=stop', drive_args[0])
 
+    def _nvme_drive_args(self, disk_spec):
+        instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance(
+            'nvmebox', instance_uuid, disk_spec=disk_spec)
+        i = instance.Instance.from_db(instance_uuid)
+        extra = i._initialize_block_devices()['extracommands']
+        return [extra[idx + 1] for idx, tok in enumerate(extra)
+                if tok == '-drive']
+
+    def test_nvme_bus_disk_passes_discards_through(self):
+        # Issue 5008. NVME-bus disks get their qemu options from here rather
+        # than from libvirt.tmpl, so they need discard=unmap of their own.
+        # Without it qemu's default of discard=ignore accepts the guest's
+        # deallocate request and drops it, and the image only grows.
+        drive_args = self._nvme_drive_args(
+            [{'base': 'cirros', 'size': 21}, {'size': 10, 'bus': 'nvme'}])
+        self.assertEqual(1, len(drive_args))
+        self.assertIn('discard=unmap', drive_args[0])
+
+    def test_nvme_bus_cdrom_does_not_discard(self):
+        # The same exclusion libvirt.tmpl makes: a cdrom's image file is a
+        # hard link into the shared image cache, so a discard honoured
+        # through it would punch holes in data other instances are reading.
+        drive_args = self._nvme_drive_args(
+            [{'base': 'cirros', 'size': 21},
+             {'size': 10, 'bus': 'nvme', 'type': 'cdrom'}])
+        self.assertEqual(1, len(drive_args))
+        self.assertNotIn('discard', drive_args[0])
+
     def test_make_config_drive(self):
         instance_uuid = str(uuid.uuid4())
         network_uuid = str(uuid.uuid4())
