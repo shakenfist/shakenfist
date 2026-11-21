@@ -16450,6 +16450,15 @@ defaults instead. A null <code>vdi</code> is defaulted like an absent one.</p>
 <p>As of Shaken Fist v0.8, it is also possible to add network interfaces to an
 existing instance, assuming that your guest operating system supports device hot
 plugging (all modern Linux versions do).</p>
+<p>The new interface is given the next free device index on the instance, chosen
+by the server under a database constraint, so overlapping hot plugs on one
+instance each get their own index. A hot plug answers 409 when the requested
+address is in use, when a requested MAC address is already in use on that
+network, or in the unlikely case that more concurrent hot plugs competed for
+the instance's next device index than the server retries. It answers 503 with
+a <code>Retry-After</code> header when the database could not be reached while recording
+the interface; that is worth retrying, and a 409 for a requested address or
+MAC address is not.</p>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>

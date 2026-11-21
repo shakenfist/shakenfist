@@ -16884,6 +16884,16 @@ upgrade, so run <code>sf-ctl ensure-mariadb-schema</code> when you can afford to
 let it finish rather than interrupting it. If it does fail part way
 through, the table's schema version is not advanced and re-running the
 command resumes where it stopped.</p>
+<p>A step which logs its failure and carries on, rather than stopping the
+run, also leaves its table's version where it was. The command then names
+each table it left short (<code>Table '&lt;table&gt;' is at version N, short of
+version M</code>) and exits non-zero instead of reporting the schema verified,
+because <code>sf-database</code> refuses to start on any table below the version the
+release expects. The <code>network_interfaces</code> version 4 step is one such: it
+adds the UNIQUE constraint which keeps an instance's interface device
+indexes distinct, and an <code>ALTER TABLE</code> on a serving cluster can lose a
+lock wait. Re-run the command once the warning it logged has been dealt
+with.</p>
 <p>Not every migration costs that, and the cheap ones are kept cheap
 deliberately. Widening the columns which hold an object key, for
 example, is metadata-only: 63 characters of <code>utf8mb4</code> is 252 bytes,

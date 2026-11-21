@@ -15985,6 +15985,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Per-Type Static Value Tables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#network-interface-uniqueness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network interface uniqueness
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -17223,6 +17240,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Per-Type Static Value Tables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#network-interface-uniqueness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network interface uniqueness
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -19226,7 +19260,7 @@ values (immutable data set at creation time):</p>
 <tr>
 <td><code>network_interfaces</code></td>
 <td>NetworkInterface</td>
-<td>uuid, network_uuid, instance_uuid, macaddr, ipv4, order, model, version</td>
+<td>uuid, network_uuid, instance_uuid, macaddr, ipv4, order, model, version. UNIQUE indexes on (macaddr, active, network_uuid) and (instance_uuid, order, active); see <a href="#network-interface-uniqueness">Network interface uniqueness</a></td>
 </tr>
 <tr>
 <td><code>ipams</code></td>
@@ -19252,6 +19286,16 @@ values (immutable data set at creation time):</p>
 </table>
 <p>These tables use the object's UUID as the primary key, except for
 <code>namespaces</code> which uses the namespace name (a string) as its primary key.</p>
+<h5 id="network-interface-uniqueness">Network interface uniqueness<a class="headerlink" href="#network-interface-uniqueness" title="Permanent link">&para;</a></h5>
+<p><code>network_interfaces</code> carries two UNIQUE indexes: a MAC address is unique on
+its network, and a device index (<code>order</code>) is unique on its instance. Both
+include <code>active</code>, a server-managed flag which is TRUE on a live interface and
+NULL once it is deleted. NULLs do not collide in a MariaDB UNIQUE index, so a
+deleted interface releases its MAC and its device index immediately rather
+than at the end of the cleaner delay, while its row stays for audit.</p>
+<p>The MAC can be reused at once. A hot plug's automatically chosen device index
+still steps over a deleted row's until the row is reaped, so the indexes of an
+instance which has plugged and unplugged interfaces are sparse.</p>
 <h4 id="per-type-attribute-tables">Per-Type Attribute Tables<a class="headerlink" href="#per-type-attribute-tables" title="Permanent link">&para;</a></h4>
 <p>Mutable attributes that are specific to an object type are stored in
 dedicated attribute tables:</p>
