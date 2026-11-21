@@ -261,7 +261,7 @@ Out of scope:
   this plan keeps it.
 - The pinning policy itself, which `PLAN-workflow-ref-trust.md`
   owns. This plan provides the grouping that policy needs, and
-  its phase 3 must land before that plan's step 3b.
+  its phase 3 must land before that plan's step 4a.
 - Turning other copied workflow templates into shared workflows.
   Renovate is a special case: a reusable workflow would still run
   once per repository, while a central runner runs once in total.
@@ -1479,6 +1479,15 @@ and nothing in it is done without an explicit yes.
    rule to drop `templates/renovate/renovate.yml` first, which
    phase 3 has to do anyway. The reasoning is in that plan's step
    3a record.
+
+   **Lifted 2026-11-21.** The pin was declined rather than waited
+   for. Adding the `with: toolchain: stable` block it needed to the
+   template would have made 16 fleet copies of `renovate.yml` drift
+   from it. So this repository's root `renovate.json` keeps
+   `dtolnay/rust-toolchain` unpinned in exactly these two files
+   until this plan's phase 3 deletes them, and disabling strands
+   nothing that is owed. The record is at the end of that plan's
+   phase 3.
 4. **Turn the schedule on, and watch a full day.** The workflow
    lands with `workflow_dispatch` only, so this step is a pull
    request of its own adding the `schedule` block its header comment
@@ -1744,6 +1753,157 @@ Answering it needs debug logging, which the workflow does not expose
 as an input; it is carried to phase 3 rather than left looking
 settled.
 
+**Cutover step 2: the write path works, and the global rule is now
+proved positively** (2026-11-21). `development`'s own hourly
+`renovate.yml` was disabled first -- `gh workflow disable` reports it
+`disabled_manually` -- and it stays disabled going into step 3. The
+update ticked on dashboard #58 was
+`unpend-branch=renovate/renovate-44.x`, the `renovate` npm pin: a
+workflow-file dependency, and the one available to tick, because it
+is found by `custom.regex` and the CI-tooling group's `matchManagers`
+never matched it, so unlike the actions it is not held to the monthly
+window. Run 44862446166 then dispatched with `dry_run:
+write-for-real` and `autodiscover_filter: shakenfist/development`:
+8m54s wall, 6m54s of job, 5m16s inside Renovate, with two minutes of
+queue against step 1's 2h37m and 27m, so the drained pool recorded
+there was transient.
+
+The probe ran first and reported the same 40 repositories, 23 managed
+and `the token can push to all 23 repositories`, naming the same 23.
+This run's probe came after `development`'s own workflow was
+disabled, so it is step 1's two runs that satisfy the
+definition-of-done clause about running before anything was disabled;
+this one confirms the token has not changed. Renovate then logged
+exactly one repository, `repository=shakenfist/development`, so the
+filter input narrows as survey item 6 said, and logged both `Branch
+created` and `PR created` for `renovate/renovate-44.x`.
+
+The result is pull request #431, head `fe58da5`, opened by
+`shakenfist-bot`, and it changes
+`.github/workflows/renovate-fleet.yml` and nothing else: one line,
+`PINNED_RENOVATE_VERSION` from 44.251.0 to 44.257.5. The same pin
+exists in `.github/workflows/renovate.yml` and
+`templates/renovate/renovate.yml` and was not touched. So the central
+runner can push a file under `.github/workflows/`, which is the
+capability the probe cannot see and the reason this step ticks a
+workflow-file update rather than a requirements pin, and the
+temporary rule holds on the write path as well as in a dry run. The
+canary's own pull request merged as `d1cfabc` at 04:53, so the branch
+the central runner pushed was mergeable on its own terms and the
+fleet runner now installs the version it proposed.
+
+The dashboard was rewritten at 03:50:40. The ticked entry moved to
+*Open* against #431, the stale reference to #426 -- merged at 01:48,
+while the dashboard still showed it open -- is gone, and
+`.github/workflows/renovate.yml` and
+`templates/renovate/renovate.yml` have disappeared from *Detected
+Dependencies* altogether, where the local runner's dashboard listed
+four github-actions and two regex dependencies for each. That is the
+evidence step 1's record said it did not have. There, the `full` pass
+could only show the rule acting on the four repositories that
+happened to have a pending `renovate.yml` update, and the 23 `Would
+ensure Dependency Dashboard` lines showed each config resolving
+rather than this entry matching. Here the entry is visibly removing
+dependencies from a repository that had no pending update in either
+file.
+
+Two smaller findings. `renovate/stability-days` was still pending on
+#431 when it merged, and is pending now: ticking the dashboard box
+forces creation without satisfying `minimumReleaseAge`, and because
+`main` carries no branch protection -- `gh api
+repos/shakenfist/development/branches/main/protection` returns
+`Branch not protected`, which is what
+`PLAN-protect-development-main.md` is about -- nothing stopped the
+merge. So the age gate is advisory in this repository rather than
+enforced, and a tick does get around it. That is worth knowing before
+phase 3 starts ticking dashboards to drive the sweep. And
+the run's one WARN is spurious -- Renovate warns at startup that the
+default `gitAuthor` `renovate@whitesourcesoftware.com` is not
+recommended, because `renovate-runner.json` sets none, but
+`renovate-fleet.json` does and #431's commit is authored
+`shakenfist-bot <bot@shakenfist.com>`. The local runner's last
+scheduled run, 44832835607, emits the same line, so it belongs to the
+template rather than to the central runner. Commits are unsigned
+either way.
+
+One consequence to carry into step 3: `development` now has no
+scheduled Renovate at all, since its own copy is disabled and the
+central runner has no schedule until step 4. Step 3 puts the other 22
+in the same position, which is why step 4 follows it immediately
+rather than after a pause.
+
+**Cutover step 3: the fleet is disabled, and the first full write
+pass costs ten minutes of job and twenty-one of queue** (2026-11-21).
+The remaining 22 copies were disabled with `gh workflow disable`, and
+all 23 were then verified by reading each workflow's state back
+rather than trusting the command's exit status: 23 of 23 report
+`disabled_manually`.
+
+Run 44868757936 then dispatched `write-for-real` with no filter, so
+the runner config's `shakenfist/*` governed: 32m11s wall, 10m33s of
+job, and 9m03s inside Renovate over the 30 autodiscovered
+repositories. Against the 50-minute `timeout-minutes` set in 2a that
+is comfortable, and it is the first measurement of a real pass rather
+than the dry floor of 8m12s step 1 recorded. The cadence risk is not
+the job, though: 21m37s of that wall time was spent waiting for a VM,
+which sits outside `timeout-minutes` and outside what the concurrency
+group protects. An hourly cron that queues for 21 minutes and runs
+for 11 still fits the hour, but with little margin, and GitHub keeps
+only one pending run per concurrency group. Step 4's watch day is
+what says whether that margin holds.
+
+The pass was predicted before it ran, against the live state rather
+than step 1's week-old list, and both halves held. Five Renovate pull
+requests were open fleet-wide beforehand. The two whose change lay in
+a file `renovate-runner.json` disables were retired:
+`client-python-k3s#176` (`renovatebot/github-action` v46.3.14) closed
+at 05:24:36 and `kerbside-patches#2136` (the `renovate` pin) at
+05:29:19, both inside the run's window. The three ordinary dependency
+pull requests were adopted rather than reopened -- `instar#947`,
+`kerbside#734` and `kerbside#733` are still open and still carry the
+previous evening's `updatedAt`, so the pass left them untouched.
+Afterwards the only `renovate/` branches anywhere in the fleet are
+those three, so nothing was duplicated.
+
+Beside those two closures the pass wrote only two deletions, both
+`Deleting orphan branch` for `renovate/renovate-44.x` in `instar` and
+in `uncalibrated-sextant`: branches whose dependency now sits in a
+disabled file and which had no pull request to retire. Step 1's
+predicted four retirements -- `actions#251`, `andris#81`,
+`client-python-k3s#171` and `kerbside-client#24` -- had all merged or
+closed under the hourly copies in the week between, which is why the
+prediction was re-derived rather than carried forward.
+
+Eleven WARN lines, and every one is pre-existing rather than a
+property of the central runner. The `gitAuthor` line is the same one
+step 2 recorded. `Package lookup failures` appears for seven
+repositories; in `shakenfist` it is `Can't find version matching
+ec30cf07... for github-tags package stbenjam/skillsaw` in
+`.pre-commit-config.yaml`, and that repository's own last hourly run
+emits the same warning. `andris` reports three `Could not determine
+new digest` warnings where its own last hourly run reports seven, the
+difference being the `renovate.yml` dependencies the temporary rule
+now disables. So on both counts the central runner is no worse, and
+on one it is quieter.
+
+Step 3 also brought on the condition `docs/audits/renovate.md` warns
+about: with every copy disabled, nothing maintains the pins in
+`templates/renovate/renovate.yml` any more, because the central
+runner's temporary rule disables that path and the hourly copy that
+used to read it through `renovate.json` is off. The warning assumes
+the template outlives the copies, and under this plan it does not --
+phase 3 deletes the template along with them -- so the rule is left
+alone rather than narrowed, and those two files simply stop receiving
+pins for the weeks before they go. The drift criterion is unaffected,
+because it blanks pinned refs before comparing.
+
+Open question 1 is still unanswered, and a real pass has now failed
+to answer it. A full write pass over 23 repositories logs nothing
+about Dependabot or vulnerability alerts at INFO -- the only
+`security` matches in the log are npm deprecation notices from the
+install step. It needs debug logging, as the dry runs already said,
+and it stays carried to phase 3.
+
 #### Execution notes
 
 Dates are Australian Eastern Daylight Time (UTC+11).
@@ -1892,7 +2052,9 @@ differ in version as well as in mode.
   arrives. Mitigation: cutover steps 2 and 3 carry the date, and
   the alternative is to narrow the rule to drop the template path,
   which phase 3 has to do anyway --- the template outlives the
-  deployed copies the rule exists for.
+  deployed copies the rule exists for. **Lifted 2026-11-21:** that
+  pin was declined, as cutover step 3 now records, so the live case
+  is gone.
 
 * **The VM image may not have what Renovate needs.** The
   `audit-write` job's comment says the image "has git and python3
@@ -1935,14 +2097,17 @@ differ in version as well as in mode.
 Every item is checked by the management session against the files
 and the commands, not against a sub-agent's summary.
 
-* `.github/workflows/renovate-fleet.yml` exists, triggers on
-  `workflow_dispatch` and **nothing else**, carries top-level
+* `.github/workflows/renovate-fleet.yml` exists, carries top-level
   `permissions: contents: read`, names the `renovate-write`
   environment, runs on an ephemeral VM label, and contains no `uses:`
-  of `renovatebot/github-action`. The absence of a `schedule` is the
-  point: it is what stops the runner working the same repositories as
-  the copies that are still running, and the minute-23 block to add
-  at cutover is recorded in the workflow's header comment.
+  of `renovatebot/github-action`. It landed triggering on
+  `workflow_dispatch` and **nothing else**, because the absence of a
+  `schedule` is what stopped the runner working the same repositories
+  as the copies that were still running. Cutover step 4 added the
+  minute-23 `schedule` its header comment recorded, once every copy
+  was disabled, and the test moved with it: where it asserted that no
+  `schedule` existed, it now asserts the cron itself, so a schedule
+  silently moved to the top of the hour fails it.
   `scripts/tests/test_renovate_fleet_workflow.py` asserts each of
   these, including that no third-party action beside the token runs
   on a ref that can move.
@@ -2059,6 +2224,17 @@ ten copy-directly templates", the supporting-workflows list in
 phase 2 instead), the `renovate.yml` fixture in the packaging test
 module, and `docs/audits/renovate.md` itself; the mention in
 `docs/audits/scheduled-workflow-health.md` is history and stays.
+Since 2026-11-21 two more go with the files: the
+`dtolnay/rust-toolchain` rule in the root `renovate.json`, which keeps
+that action unpinned in exactly these two paths, and
+`test_only_the_doomed_renovate_copies_keep_rust_toolchain_unpinned`
+in `scripts/tests/test_packaging_renovate.py`, which fails while the
+rule names a path that does not exist, together with
+`test_the_root_config_holds_two_local_rules` beside it, whose count
+drops to one. `test_a_pinned_rust_toolchain_states_its_toolchain` in
+`scripts/tests/test_registry.py` reads both files as well; it goes,
+or is narrowed to `.github/workflows/renovate-fleet.yml`, where its
+docstring says the same reference is pinned by hand.
 The audit change lands first, and the
 `Renovate` issues it files at the next weekly run are the sweep's
 work queue. That is deliberate: it is the fleet's issue-driven
@@ -2449,7 +2625,7 @@ chosen to defer to here, so that we do not forget them.
   extreme case of a wider problem: on 2026-10-03, the 17 live copies
   of `codeql-analysis.yml` came in 12 versions. Converting the other
   verbatim-copied templates into callers of shared workflows in
-  `actions` is phase 5 of `PLAN-workflow-ref-trust.md`, because it
+  `actions` is phase 6 of `PLAN-workflow-ref-trust.md`, because it
   rests on that plan's decision to trust `actions` main.
 * GitHub dropping top-of-hour scheduled events (see Situation) is
   not specific to Renovate. Phase 2 moves the central runner off the
@@ -2459,7 +2635,8 @@ chosen to defer to here, so that we do not forget them.
 * Digest pinning moves github-actions out of Dependabot's reach.
   Step 1a found that GitHub raises Dependabot alerts for actions
   referenced by semantic version but not by commit sha, so
-  `PLAN-workflow-ref-trust.md`'s step 3b takes the fleet's 540
+  `PLAN-workflow-ref-trust.md`'s digest pinning (its phase 3, which
+  this plan's sweep carries to each repository) takes the fleet's 540
   third-party `uses:` references out of the one ecosystem that feeds
   `vulnerabilityAlerts`. Nothing in this plan changes because of it
   --- an action fix then waits for the monthly CI-tooling window,

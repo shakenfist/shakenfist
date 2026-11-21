@@ -72,22 +72,20 @@ VMware Virtual Machine Disk. Supported sub-formats for input/output:
 - monolithicFlat (input and output): two-file descriptor + flat extent.
   The VMM detects the descriptor prefix on the host, parses the
   extent line via `vmdk::parse_descriptor_extents`, validates
-  the flat path against the backing-file allowlist, and opens
-  the flat extent as a second virtio-block device. Guest
-  operations read content from that device through the same
-  `ChainConfig.data_device_idx` redirect used for QCOW2
-  external data files. Output via `--subformat monolithicFlat`.
+  the flat path against the backing-file allowlist, and attaches
+  the descriptor and the flat extent as one virtio-block device.
+  The chain config's extent table names the extent, and the guest
+  reads through it. Output via `--subformat monolithicFlat`.
 - twoGbMaxExtentFlat (input): multi-extent flat descriptors with
-  multiple flat extent files. Each extent is opened as a separate
-  virtio-block device and reads are dispatched to the correct
-  device based on the extent offset map.
+  multiple flat extent files. The descriptor and its extents are
+  attached as one virtio-block device, and reads are dispatched to
+  the correct extent from the chain config's extent table.
+- twoGbMaxExtentSparse (input): multi-extent descriptors whose
+  extents are sparse VMDKs, attached the same way; each extent keeps
+  its own header, grain directory and grain tables.
 - monolithicFlat with `parentFileNameHint=` (input): descriptors
   referencing a parent are followed as a backing chain, enabling
   flat images in overlay hierarchies.
-
-Detected but not yet supported for I/O:
-- twoGbMaxExtentSparse (multi-extent sparse, detected and rejected
-  gracefully)
 
 The check operation performs full structural validation: grain directory
 and grain table walk, grain offset bounds checking, compressed grain

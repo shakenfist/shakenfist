@@ -33,22 +33,24 @@ copy of `renovate.yml` in each repository, running Renovate over that
 repository alone. The fleet is moving to a single workflow that runs
 Renovate over every repository from one place, and that workflow is
 already in this repository as `.github/workflows/renovate-fleet.yml`.
-It has no schedule yet, and runs only when it is dispatched by hand,
-with a Renovate `dryRun` mode and an autodiscover filter as inputs, so
-a pass can be read-only or confined to one repository. A schedule here
-while every repository still runs its own hourly copy would have two
-Renovate instances working the same repository, racing on branch
-creation to produce duplicate or half-written pull requests, and the
-runner's concurrency group cannot prevent that because the two runs
-are different workflows in different repositories. Turning the
-schedule on is therefore a step of the cutover rather than part of
-adding the workflow. It will be hourly at minute 23 rather than on the
-hour, because GitHub delays and sometimes drops scheduled events at
-the top of the hour and a dropped run here would delay every
-repository at once. It installs Renovate from npm in a step that holds no
-secret, exactly as the template does, for the reasons given under
+It runs hourly at minute 23, and can also be dispatched by hand with a
+Renovate `dryRun` mode and an autodiscover filter as inputs, so a pass
+can be read-only or confined to one repository. Minute 23 rather than
+the hour, because GitHub delays and sometimes drops scheduled events
+at the top of the hour and a dropped run here would delay every
+repository at once. It installs Renovate from npm in a step that holds
+no secret, exactly as the template does, for the reasons given under
 [Renovate without Docker](#renovate-without-docker) and in the
 template README.
+
+The schedule was deliberately the last step of the cutover rather than
+part of adding the workflow. A schedule here while every repository
+still ran its own hourly copy would have had two Renovate instances
+working the same repository, racing on branch creation to produce
+duplicate or half-written pull requests, and the runner's concurrency
+group cannot prevent that because the two runs are different workflows
+in different repositories. Every per-repository copy is disabled now,
+so re-enabling one while this schedule is on reintroduces that race.
 
 Its global configuration is `renovate-runner.json` at the root of this
 repository. That file decides two things. Which repositories are
@@ -220,6 +222,17 @@ rule has to lose the `templates/renovate/renovate.yml` path or the
 pins in the template stop being maintained -- the template outlives
 the deployed copies the rest of the rule is there for.
 
+One reference in those two files is not pinned, by a second local
+rule in this repository's `renovate.json`: `dtolnay/rust-toolchain`
+stays on `@stable`. That action takes its `toolchain` input's default
+from the ref name, so a sha needs a `with: toolchain: stable` block
+that Renovate will not write, and that block in the template would
+make every fleet copy of `renovate.yml` drift from it under this
+criterion. The fleet runner's own workflow is pinned, with the input
+given. The rule goes when the two files do, and
+`scripts/tests/test_packaging_renovate.py` fails while either
+reference is pinned or either file is gone.
+
 The fleet's own actions are the exception, carried as a `packageRules`
 entry. `shakenfist/**` references are not pinned: every repository
 consumes them at `@main` on purpose, so that a fix to a shared
@@ -229,7 +242,8 @@ requiring review instead of by a sha. The exception names both the
 `action` and `workflow` dep types, because Renovate calls a job-level
 reusable workflow a `workflow` while every other `uses:` reference is
 an `action`. Both names, and the helper's own definition, are read
-from Renovate's source at the version this fleet runs, 44.227.4:
+from Renovate's source at 44.227.4, and re-read unchanged at
+44.251.0:
 the helper is the `pinGitHubActionDigests` entry in
 [`lib/config/presets/internal/helpers.preset.ts`](https://github.com/renovatebot/renovate/blob/83794a8993ff455b106ddf1e23ce4deca3f5277d/lib/config/presets/internal/helpers.preset.ts#L118-L126),
 and the dep type a reference is given is chosen by
@@ -237,7 +251,7 @@ and the dep type a reference is given is chosen by
 [`lib/modules/manager/github-actions/extract.ts`](https://github.com/renovatebot/renovate/blob/83794a8993ff455b106ddf1e23ce4deca3f5277d/lib/modules/manager/github-actions/extract.ts#L78-L111),
 which says `workflow` when the reference's sub-path matches
 `reusableWorkflowPathRe` and `action` otherwise. Both links are pinned
-to the commit that release was tagged from.
+to the commit 44.227.4 was tagged from.
 
 The preset sets no `vulnerabilityAlerts`: Renovate's defaults
 already drop the schedule, `minimumReleaseAge` and grouping for a

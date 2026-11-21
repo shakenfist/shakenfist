@@ -55,11 +55,13 @@ See
 ## VMDK validation
 
 For VMDK images (monolithicSparse, streamOptimized, and
-monolithicFlat — including multi-extent twoGbMaxExtentFlat
-and flat-in-backing-chain via parentFileNameHint), check validates:
+monolithicFlat — including the multi-extent twoGbMaxExtentFlat
+and twoGbMaxExtentSparse subformats, and flat-in-backing-chain
+via parentFileNameHint), check validates:
 
 - Full header parsing (version, capacity, grain size, flags, compression)
-- Descriptor bounds and multi-extent detection (graceful rejection)
+- Descriptor bounds and multi-extent layout (at most 64 extents per
+  descriptor; a larger one is refused)
 - Grain directory offset within file bounds
 - Full grain directory and grain table walk
 - Grain data offsets within file bounds

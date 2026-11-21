@@ -1155,13 +1155,76 @@ external, encrypted or compressed clusters").
 
 ### VMDK multi-extent sources are refused
 
-`qemu-img map` reads the VMDK descriptor and walks the
-multi-extent layout. instar's `VmdkState::init` only parses
-the VMDK4 binary header, so descriptor-driven (multi-extent
-monolithicFlat / 2GbMaxExtent…) sources fail init. The
-host CLI also refuses them via `peek_is_vmdk_descriptor`
-before launching the guest, pointing the user at `qemu-img
-map` as the workaround.
+**This applies to `map` and `measure` only.** `qemu-img map`
+reads the VMDK descriptor and walks the multi-extent layout.
+instar's `map` and `measure` refuse a descriptor-driven source
+(monolithicFlat or either `twoGbMaxExtent` subformat) in a
+host-side pre-check, `peek_is_vmdk_descriptor`, before launching
+the guest, pointing the user at `qemu-img` as the workaround. The
+refusal is policy, not inability: the guest reads a descriptor
+through the chain config's extent table for the commands that do
+support it, and what these two would need is the walk each of them
+uses instead -- `map`'s allocation walk and `measure`'s source
+scanner -- neither of which has been taught that table. The
+message names the descriptor rather than a subformat, because
+every descriptor-driven source is refused. Other commands do read
+these images:
+`info`, `check`, `compare` and `convert` attach the descriptor
+and its extents as one device and read through the extent table
+in the chain config.
+
+### VMDK extents instar refuses and qemu-img reads
+
+**Divergence.** The commands that do read a descriptor --
+`info`, `check`, `compare` and `convert` -- refuse five shapes of
+extent that `qemu-img` opens. Each is a refusal on a well-formed
+image rather than a parse failure, so the whole image is refused,
+not the extent. Three are caught on the host as the descriptor
+resolves, and name the descriptor, the extent's index and the
+bound:
+
+- **A kind other than `FLAT` or `SPARSE`.** `ZERO`, `VMFS` and
+  `VMFSSPARSE` are refused with "extent *N* has kind *K*; only
+  FLAT and SPARSE extents are supported". `FLAT` and `SPARSE` are
+  the kinds the chain config's extent table can describe: `ZERO`
+  has no file to attach, and the VMFS kinds name a layout on a
+  VMware filesystem rather than a file.
+- **A non-zero start offset.** An extent line whose optional
+  trailing sector offset is not 0 is refused with "extent *N* has
+  non-zero offset (*S* sectors); only offset-0 extents are
+  supported". qemu-img reads the extent from that offset inside
+  the file.
+- **More than 64 extents.** A descriptor declaring more extents
+  than `MAX_CHAIN_EXTENTS` is refused with "declares more than
+  the 64 extents a descriptor may have". The bound is instar's
+  own -- it is the size of the extent table the guest reads --
+  and qemu-img has none. It is not the sixteen-device-slot ceiling
+  of #934, which no longer applies to extents at all: a
+  descriptor's extents share its one device.
+
+The other two are caught in the guest as the extent's own header
+is read, so the operation fails rather than printing a message
+about the extent:
+
+- **A compressed sparse extent**, one whose header carries
+  `FLAG_COMPRESSED`. qemu-img decompresses these; instar's
+  descriptor reader does not reach its compressed-grain path from
+  an extent.
+- **A sparse extent whose header capacity is not the span the
+  descriptor line declares.** qemu takes the span from the
+  extent's own header and ignores the descriptor line; the host
+  has only the line, and writes it into the extent table. Where
+  the two differ every later extent sits at a different virtual
+  offset for qemu than in instar's table, so the image is refused
+  rather than read in a layout qemu does not see. qemu writes the
+  same number in both places when it creates a split image, so
+  this never fires on a qemu-created one.
+
+A sparse extent whose header cannot be read, carries no VMDK4
+magic, or declares a zero grain size is refused the same way;
+`info` reports no cluster size for it rather than guessing, which
+is as close as a description of the descriptor can come to
+qemu-img's refusal to open the image at all.
 
 ### qcow2 v3 standard-L2 `QCOW_OFLAG_ZERO` honoured (fixed)
 
