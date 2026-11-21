@@ -159,6 +159,48 @@ files nothing: `report_failures` prints the issue it would have filed
 to its log, because the failure is the branch's and not the lane's,
 and only runs of the default branch are reported.
 
+## The live MariaDB tests
+
+`shakenfist/tests/test_mariadb_*_live.py` need a real MariaDB server rather
+than the sqlite engine the unit suite uses, so they run in one place: the
+`Schema ENUM widening` job in `functional-tests.yml`, which apt-installs
+MariaDB and then runs every one of those modules
+(`tools/ci-enum-widening-test.sh`). The job and the script keep the ENUM
+widening name because it is a required status check; rename both together.
+
+That job ran on `merge_group` and `workflow_dispatch` only, so a change to a
+schema migration met a real server for the first time *after* review and
+approval, inside the queue. #4954 added `UNIQUE (instance_uuid, order,
+active)` to `network_interfaces`; a pre-existing live test rolls that table
+back to version 2 by dropping `active`, which the new constraint blocks, so
+the merge group failed with `Key column 'active' doesn't exist in table`,
+the entry was ejected, every functional lane in the group was cancelled, and
+the pull request went back for a fixup it could have had before review
+(issue #5005). The sqlite stand-in that closed the same gap for the batch
+hard delete (#4897, after #4880) does not carry over: a migration is MariaDB
+DDL, and sqlite neither runs `ALTER TABLE ... ADD CONSTRAINT` nor has the
+`information_schema` those tests probe.
+
+So the job also runs on a `pull_request` whose diff touches what those
+modules cover — `shakenfist/mariadb*.py`, `shakenfist/schema/**`, the live
+modules themselves, and the job's own three tools files — through the
+`live_mariadb` output of a second `dorny/paths-filter` step in
+`check_paths`. It is a second step and not another filter in the first
+because `predicate-quantifier` is a step-level input: the first step needs
+`every` for its "everything except docs" filter, and under `every` a
+multi-pattern filter matches nothing at all.
+
+Two asymmetries are deliberate. The pull request arm is narrower than a code
+change, because installing a database server on every pull request is not
+the trade. The `merge_group` arm is not narrowed at all and stays on
+`code_changed`, because `can_merge` excuses a skipped dependency only when
+`check_paths` found no code, so a narrower merge arm would fail every
+code-changing merge group that did not touch the schema.
+`shakenfist/tests/test_schema_enum_widening_seams.py` holds the filter to
+the files the job runs and holds those two arms apart, because a live module
+the filter does not match is one whose pull request CI has quietly stopped
+running it.
+
 ## Where the functional jobs get their code
 
 The functional jobs do not install released packages. `shakenfist/actions`'s
