@@ -208,6 +208,14 @@ qemu-img's:
   agree. (This is about measuring a fixed VHDX as the *source*; measuring
   one as the *target*, `-O vhdx -o subformat=fixed` above, is unaffected by
   `block_state_zero`.)
+- **VMDK descriptor sources are refused**: a source whose VMDK is a text
+  descriptor — `monolithicFlat`, or either `twoGbMaxExtent` subformat —
+  is refused in a host-side pre-check before the guest starts, with
+  `measure: VMDK descriptor source images are not yet supported (use
+  convert -f / qemu-img instead)`. `qemu-img measure` reads these images,
+  so it is the workaround. The refusal is policy rather than inability:
+  `info`, `check`, `compare` and `convert` read the same images. See
+  [quirks.md](/components/instar/quirks/#vmdk-multi-extent-sources-are-refused).
 - **VMDK multi-extent source layouts**: instar's extent map propagation
   differs from qemu-img for some non-trivial layouts.
 - **VHD legacy CHS-only sources**: instar's reported virtual_size differs

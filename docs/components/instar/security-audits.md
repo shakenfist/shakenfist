@@ -204,7 +204,19 @@ These architectural properties are verified during every audit:
 
 1. **KVM isolation:** All format parsing runs inside a KVM guest
    with a 32MB address space. A bug in format parsing cannot access
-   host memory, files, or network.
+   host memory, files, or network. Two narrow, deliberate exceptions
+   run on the host, both for VMDK descriptors, which are text files
+   with no binary header for the guest to find: the descriptor text
+   itself (at most 8 KiB, `MAX_DESCRIPTOR_BYTES`), parsed to resolve
+   and validate the extent paths before anything is attached; and
+   the first 79 bytes of each sparse extent, parsed for the grain
+   size `info` reports as a cluster size. Both are bounded by
+   construction -- fixed-size buffers, magic checked before
+   decoding, safe-Rust parsers over slices, and results that are
+   reported rather than used to compute a host-side offset or
+   length. Everything a command reads *through* an image still
+   parses in the guest. See
+   [vmdk/vmdk-extents.md](/components/instar/vmdk/vmdk-extents/#instar-support).
 
 2. **Rust memory safety:** The codebase is written in Rust with
    explicit `unsafe` blocks for hardware access and FFI. All unsafe

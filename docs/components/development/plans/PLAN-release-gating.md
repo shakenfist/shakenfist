@@ -99,7 +99,7 @@ required reviewer and restrict it to `v*` tags. Whether anyone did
 is invisible to the audit: no criterion reads `environments` or
 `deployment-branch-policies` (the only planned readers are
 `bypass-actor-identity` in `PLAN-bot-bypass-identity.md:639` and
-`moving-ref-source-protection` in `PLAN-workflow-ref-trust.md:519`,
+`moving-ref-source-protection` in `PLAN-workflow-ref-trust.md`'s phase 2,
 neither started). On the morning of this plan:
 
 | Repository | `release` environment | `v*` tags | Exposure |
@@ -214,9 +214,10 @@ deployment policies. `PLAN-bot-bypass-identity.md` step 3c assumes it
 can and names `AUDIT_TOKEN` while doing so, which is the wrong token
 since #278 moved `AUDIT_TOKEN` into the `audit-write` environment.
 
-**Relation to other plans.** `PLAN-workflow-ref-trust.md` phase 5
-(:564-615, not started) may turn copied templates into callers of
-shared workflows. It never names `release.yml`; step 5a classifies
+**Relation to other plans.** `PLAN-workflow-ref-trust.md` phase 6
+("shared workflows instead of copied templates", not started) may
+turn copied templates into callers of shared workflows. It never
+names `release.yml`; step 6a classifies
 "every template directory under `templates/`", so the release
 template is in scope only by implication. `PLAN-typescript-onboarding.md`
 met the unprotected-environment problem in hunkydory as HD-1
@@ -257,9 +258,9 @@ Out of scope, each for a stated reason:
   unable to reach PyPI, which is the half of the problem that is
   ours.
 * **Turning `release.yml` into a shared workflow.** That is
-  `PLAN-workflow-ref-trust.md` phase 5's decision to make. This plan
+  `PLAN-workflow-ref-trust.md` phase 6's decision to make. This plan
   puts the new logic in shared composite actions, so whichever way
-  phase 5 goes, the logic exists once.
+  phase 6 goes, the logic exists once.
 * **sdist contents.** An sdist carrying its tests is conventional
   and harmless, and `release-artifacts-exclude-plans` already guards
   the one thing in it that should not ship.
@@ -1169,7 +1170,7 @@ Per-repository facts. `workflows` is what `ci-gate` names.
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
-| 3a | medium | sonnet | none | In this repository, on this phase's branch. In `templates/release-automation/release.yml`, add the `ci-gate` job from Common edits above, with `workflows:` set to a `{{CI_WORKFLOWS}}` placeholder. Make `build` need it under the guard given there, with a comment explaining the guard: a skipped gate may only accompany a run that publishes nothing. The `${{ }}` wrapper is required, because YAML reads a bare value starting with `!` as a tag. Add a `check-dist` step after `twine check`. In `templates/release-automation/README.md`: add the placeholder row; add a section on the gate covering what counts as CI, the review-mark walk and why there is no override (link `shakenfist/actions`' `docs/actions.md`, do not restate it); add the recovery table from decision 3.6; and add prerequisites for gated CI. Those prerequisites are: CI runs on `push` to the default branch with a `branches:` filter, or on `merge_group`; a concurrency group never cancels a push run, keyed as decision 3.1 says; no named workflow may conclude `skipped` on the event that counts; and `paths-ignore` means a tag on a skipped commit fails. State that a converted template must still run `ci-gate` upstream of `build`; the cross-reference to `PLAN-workflow-ref-trust.md` phase 5 stays in this plan. Update `templates/release-automation/RELEASE-SETUP.md` to say the reviewer approves a release whose CI the gate has already checked, and to name the `release-environment-protection` criterion. Do not cite plan phases or decision numbers in the template or its docs. Run `pre-commit run --all-files`, which runs actionlint over the template. |
+| 3a | medium | sonnet | none | In this repository, on this phase's branch. In `templates/release-automation/release.yml`, add the `ci-gate` job from Common edits above, with `workflows:` set to a `{{CI_WORKFLOWS}}` placeholder. Make `build` need it under the guard given there, with a comment explaining the guard: a skipped gate may only accompany a run that publishes nothing. The `${{ }}` wrapper is required, because YAML reads a bare value starting with `!` as a tag. Add a `check-dist` step after `twine check`. In `templates/release-automation/README.md`: add the placeholder row; add a section on the gate covering what counts as CI, the review-mark walk and why there is no override (link `shakenfist/actions`' `docs/actions.md`, do not restate it); add the recovery table from decision 3.6; and add prerequisites for gated CI. Those prerequisites are: CI runs on `push` to the default branch with a `branches:` filter, or on `merge_group`; a concurrency group never cancels a push run, keyed as decision 3.1 says; no named workflow may conclude `skipped` on the event that counts; and `paths-ignore` means a tag on a skipped commit fails. State that a converted template must still run `ci-gate` upstream of `build`; the cross-reference to `PLAN-workflow-ref-trust.md` phase 6 stays in this plan. Update `templates/release-automation/RELEASE-SETUP.md` to say the reviewer approves a release whose CI the gate has already checked, and to name the `release-environment-protection` criterion. Do not cite plan phases or decision numbers in the template or its docs. Run `pre-commit run --all-files`, which runs actionlint over the template. |
 | 3b | medium | sonnet | own worktree of `shakenfist/actions` | In `tools/check-dist.py`, fail a wheel that holds nothing outside its `*.dist-info/` directory, the way client-python-k3s's `tools/check-dist.sh:88-92` rejects an empty wheel. A wheel whose only payload is under `*.data/` passes: ryll's wheels have just `<name>.data/scripts/ryll` and their dist-info. Add tests in `tests/test_check_dist.py` for an empty wheel, a dist-info-only wheel and a `.data`-only wheel, and update the `check-dist` section of `docs/actions.md`. Run the repository's pre-commit and `python3 -m unittest discover -s tests -t .`, and mutate the new branch on a copy to show that the tests catch it. Leave the work uncommitted. This lands as its own pull request in `shakenfist/actions`, before 3d. |
 | 3c | high | opus | own clone of the repository | The pilot: client-python-ova, with the Common edits and its table row, including decision 3.2's merge-queue CI change, which the later steps copy. Decision 3.2 drops the push trigger, so the re-keying the brief once asked for is not made. Its `release.yml` is the template's, so the diff should be the template's 3a diff, with `ci.yml` as `workflows`, plus the `merge_group` trigger and aggregator jobs, and the CI `check-dist` step. Build the wheel with the release's path (sdist, then the wheel from it) and run `check-dist` on it. Run the repository's pre-commit. Leave the change uncommitted on a branch named `release-gating`; the management session reviews, commits and pushes, and the commit body says it closes client-python-ova#19. After it merges, the management session asks the operator before dispatching `release.yml` on `develop`. The dry run must show `ci-gate` and the publishing jobs skipped, and `build` and `check-dist` succeeded. |
 | 3i | high | opus | none | In this repository, as its own pull request. Write `templates/release-automation-rust/` from ryll's `release.yml`, `tools/propose-release.sh` and `tools/tag-release.sh`, following decision 3.9. Read instar's and andris's `release.yml` too, so that the fixed jobs suit all three, and say in the README where each of the three differs inside the build section. The README lists the invariants as a checklist, which phase 4's helpers turn into rules. Run pre-commit, which lints the template. |
@@ -2903,7 +2904,7 @@ chosen to defer to here, so that we do not forget them.
   environments in the called workflow. `release-environment-protection`
   reads only `release.yml`, so it would report that no environment is
   named. That is the closed direction, but the message is wrong. If
-  `PLAN-workflow-ref-trust.md` phase 5 converts the template into that
+  `PLAN-workflow-ref-trust.md` phase 6 converts the template into that
   shape, the criterion must follow the `uses:` reference, in the same
   change that carries the `ci-gate` job.
 * **`check-dist` is tested only by its unit tests** in

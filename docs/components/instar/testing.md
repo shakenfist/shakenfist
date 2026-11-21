@@ -553,17 +553,41 @@ make test-report
 make clean-tests
 ```
 
+Each of these that runs the Python suite runs four stestr workers, from
+`STESTR_CONCURRENCY` in the `Makefile`; `make test-report` is the
+exception and runs serially. (`make test` is the Rust unit tests and
+then the Python suite, so the cap applies to its second half.) Four
+rather than one per core
+because each worker forks an `instar` and a `qemu-img` of its own, both
+working on multi-GB images: a run at stestr's default of one worker per
+core took a sixteen-core host to a load average of 69 and an IO
+pressure of 68%, which made the machine unusable for anything else
+sharing its disk. The containerised targets had the same four
+hardcoded; they read `STESTR_CONCURRENCY` too, so the override below
+reaches every target that runs the suite rather than the host-side ones
+alone. Raise it on a machine with room:
+
+```bash
+make test-integration STESTR_CONCURRENCY=8
+```
+
+The temporaries still go to `TMPDIR`, which is usually `/tmp`; on a
+host whose root filesystem is short of space or shared with anything
+else that matters, point it elsewhere.
+
 ### Direct stestr Usage
 
 ```bash
 cd tests
 source .venv/bin/activate
 
-# Run all tests
-stestr run
+# Run all tests. Note the concurrency: by hand there is no Makefile to
+# supply it, and the default is one worker per core, which is what made
+# a sixteen-core host unusable.
+stestr run --concurrency 4
 
 # Run specific test module
-stestr run test_info_safe
+stestr run --concurrency 4 test_info_safe
 
 # Run with verbose output
 stestr run --serial -- --verbose
@@ -2684,7 +2708,7 @@ guards. See the VHD and VHDX notes in
 [chain-config.md](/components/instar/chain-config/#format-specific-notes) for the
 composing path being guarded.
 
-There are **165 cases**, in fifteen groups.
+There are **172 cases**, in sixteen groups.
 
 Forty-seven cover the writer. Twenty-four mutate a library crate
 (`create`, `vhd`, `vhdx`) and are caught by a Rust unit or round-trip
@@ -2941,17 +2965,19 @@ are stored in reverse order on the host, so a read that runs on into
 the next host cluster cannot land on the right bytes by accident.
 
 Then **12 data-device cases**, guarding the fix for issue
-#792. The host puts a qcow2's external data file, and a VMDK flat
-descriptor's extents, in the device slots immediately after the image
-that owns them, inside its chain segment. Before the chain config
-marked them, the reader took the slot after a data-file image for the
-layer under it, and a cluster the image left unallocated read the data
-file at the virtual offset instead of the backing file or zeros, under
-success. Now the host sets `FLAG_DATA_DEVICE` on each data device, the
-reader steps over a marked device at the top of its device loop,
-`init_chain_states` refuses a config whose marks are not where the host
-puts them (`ChainConfig::data_devices_are_owned`), and the descriptor's
-extent walk stops at the end of its run of marked devices.
+#792. The host puts a qcow2's external data file in the device slot
+immediately after the image that owns it, inside its chain segment.
+Before the chain config marked it, the reader took the slot after a
+data-file image for the layer under it, and a cluster the image left
+unallocated read the data file at the virtual offset instead of the
+backing file or zeros, under success. Now the host sets
+`FLAG_DATA_DEVICE` on each data device, the reader steps over a marked
+device at the top of its device loop, `init_chain_states` refuses a
+config whose marks are not where the host puts them
+(`ChainConfig::data_devices_are_owned`), and a descriptor's extent walk
+is bounded by its own slice of the extent table
+(`ChainConfig::device_extents`) -- the extents take no device slots of
+their own, so a descriptor and all of them are one device.
 
 Three cases remove the reader's skip, each caught by a different test
 in the crate's subcluster fixture, which now lays its devices out as the
@@ -2968,6 +2994,32 @@ writing a data device unmarked, and passing an info operation's flags
 through with the mark intact. Both are caught by a `vmm` unit test that
 reads the host's config back as the guest's own type and checks it
 against the same rule.
+
+Then **7 descriptor-attachment cases**, on the host side of reading a
+VMDK descriptor made of separate extent files. The extents are laid out
+into the one device they make up twice over -- once for the table the
+guest reads, once to open the files as that device -- so the first case
+measures the files per pass instead of reading the one measurement
+chain discovery took: a file rewritten between the passes then puts the
+same extent at two offsets, and the guest reads inside the wrong extent
+and is told it succeeded. The second reads an extent the host could not
+measure as zero bytes long, which stacks every later extent on top of
+it. The third guesses `FLAT` for an extent that reached attachment with
+no kind, so a sparse extent's header is served as data. The fourth
+attaches a descriptor for writing, where a write crossing a member
+boundary cannot be routed to a file. The fifth and sixth restore an
+unguarded `open` on a path the descriptor named -- the allowlist
+constrains where such a path may point, not what kind of file it may
+point at -- in the extent-header read `instar info` reaches and in the
+device the extents make up; each is caught by a test that opens a FIFO
+on a thread and fails if the answer does not come back, so the
+regression is a failure rather than a suite that stops (issue #936).
+The last stops the device requiring each member to be a regular file.
+Only a regular file has a length to compare against the span the
+descriptor declares, so a FIFO, a block device or a character device
+among the extents would contribute its whole span as zero padding and
+the read would succeed -- a wrong answer reported as a success, where
+qemu-img cannot get the node's length and errors out.
 
 Then **8 data-file entry cases**, guarding the fix for
 issue #803. qemu applies two rules to the L2 entries of an image with

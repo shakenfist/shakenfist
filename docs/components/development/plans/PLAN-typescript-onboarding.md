@@ -2341,7 +2341,7 @@ than deleted, with where it went.
 
 * ~~**DEV-14: `templates/mermaid-lint/` has no staleness mechanism**~~
   (`shakenfist/development`). development#151 was closed on
-  2026-10-13 and folded into `PLAN-workflow-ref-trust.md` phase 5
+  2026-10-13 and folded into `PLAN-workflow-ref-trust.md` phase 6
   (development#250), whose answer is to turn shared templates into
   caller stubs rather than to version the copies. As written at the
   audit: `templates/shared-blocks/*.md` carry a `shared-block:
@@ -2408,7 +2408,7 @@ than deleted, with where it went.
 * ~~**HD-11: reusable workflows at `@main` with `secrets: inherit`**~~
   (`shakenfist/development`). development#153 was closed on
   2026-10-03 when `PLAN-workflow-ref-trust.md` (development#209)
-  took the question on; that plan's phase 4 records the settled
+  took the question on; that plan's phase 5 records the settled
   policy on which references may move. As written at the audit:
   `release.yml`'s `github-release` job calls a reusable workflow at
   a moving ref while inheriting every

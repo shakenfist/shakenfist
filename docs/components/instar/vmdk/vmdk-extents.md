@@ -242,31 +242,49 @@ instar recognises these VMDK input variants:
   binary KDMV header at offset 0): parsed entirely in the
   guest via the grain directory / grain table two-level
   lookup in `crates/vmdk`.
-- **monolithicFlat and twoGbMaxExtentFlat** (text descriptor
-  plus one or more flat extent files): the descriptor has no
-  binary magic and starts with `# Disk DescriptorFile`. The VMM
-  detects the prefix on the host and resolves it with
-  `resolve_vmdk_flat_descriptor` in `src/vmm/src/chain.rs`: it
-  parses the extent lines with `vmdk::parse_descriptor_extents`,
-  requires every extent to be `FLAT` with offset 0, validates
-  each extent path against the backing-file allowlist, and opens
-  each extent as its own virtio-block device. `ChainConfig` on
-  device 0 carries `format = VmdkDescriptor` and
-  `data_device_idx = 1`; the extents follow it in order, each
-  marked `FLAG_DATA_DEVICE`, and the guest reads through
-  `qcow2::read_chain_virtual_cluster`, dispatching each read to
-  the extent that covers its offset and stopping at the end of
-  the descriptor's run of marked devices.
+- **monolithicFlat, twoGbMaxExtentFlat and twoGbMaxExtentSparse**
+  (text descriptor plus one or more extent files, flat or sparse):
+  the descriptor has no binary magic and starts with
+  `# Disk DescriptorFile`. The VMM detects the prefix on the host
+  and resolves it with `resolve_vmdk_flat_descriptor` in
+  `src/vmm/src/chain.rs`: it parses the extent lines with
+  `vmdk::parse_descriptor_extents`, requires every extent to be
+  `FLAT` or `SPARSE` with offset 0, and validates each extent path
+  against the backing-file allowlist. The descriptor and its
+  extents are then attached as one virtio-block device, the files
+  laid end to end, and `ChainConfig` carries `format =
+  VmdkDescriptor` and an extent table recording where each extent
+  begins, how long its file is, how much of the disk it covers and
+  whether it is flat or sparse. The guest reads through
+  `qcow2::read_chain_virtual_cluster`, which finds the extent
+  covering the wanted offset in that table. A descriptor may name
+  at most 64 extents: that is the table's size, instar's own bound,
+  and qemu-img has none. See [chain-config.md](/components/instar/chain-config/).
+
+  The host also reads the first 79 bytes of each *sparse* extent,
+  for the grain size `info` reports as the image's and the extent's
+  cluster size — a descriptor is text and declares none of its own.
+  That is the one place the host parses a binary format structure
+  rather than descriptor text, so it is bounded on purpose: a
+  fixed-size stack array, `read_exact` so a short file is a failure
+  rather than a partial parse, the VMDK4 magic checked before
+  anything is decoded, a parser that is safe Rust over a slice, and
+  a result that is only ever printed — never an offset or a length
+  the host computes with. Only a regular file is opened, and with
+  `O_NONBLOCK`, so a path the descriptor named cannot block the
+  host. `extent_cluster_size` in `src/vmm/src/chain.rs` is the whole
+  of it. The record of this as a deviation from "all format parsing
+  runs inside the guest" is in
+  [security-audits.md](/components/instar/security-audits/#standing-security-properties).
 - **A flat descriptor with `parentFileNameHint=`** is followed as
   a backing chain: the hint is validated against the allowlist
   like any backing path, and chain discovery continues with the
-  parent, whose devices follow the descriptor's extents.
+  parent, whose device follows the descriptor's own. The extents
+  take no device slots of their own, so there is nothing between
+  the two.
 
-**twoGbMaxExtentSparse** (multi-file split extents whose
-extents are themselves sparse VMDKs) is refused, because host
-descriptor resolution accepts only `FLAT` extents: `instar info`
-fails with "only FLAT extents are supported". `map` refuses every
-descriptor-driven source; see
+`info`, `check`, `compare` and `convert` read all three. `map` and
+`measure` refuse every descriptor-driven source; see
 [quirks.md](/components/instar/quirks/#vmdk-multi-extent-sources-are-refused).
 
 ## References
