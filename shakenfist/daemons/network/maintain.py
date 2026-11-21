@@ -63,12 +63,14 @@ def forget_unvisited_quiesces(visited_networks):
     A network deleted while quiesced never reconciles cleanly, so the
     discard on a clean pass never removes it, and it would sit in the
     set for the life of the process. The same holds for a network
-    deleted while its DHCP probe could not be run. The stray vxid
-    caches are pruned against what a pass saw in the same way.
+    deleted while its DHCP probe could not be run, and for one deleted
+    while its probe was being answered. The stray vxid caches are
+    pruned against what a pass saw in the same way.
     """
     visited = {str(u) for u in visited_networks}
     QUIESCE_REPORTED.intersection_update(visited)
     network.DHCP_PROBE_FAILURE_REPORTED.intersection_update(visited)
+    network.DHCP_PROBE_SERVING_REPORTED.intersection_update(visited)
 
 
 # Instance states in which a domain on this node may still be attached

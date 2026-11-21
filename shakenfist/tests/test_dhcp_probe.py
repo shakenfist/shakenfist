@@ -721,6 +721,8 @@ class IsDnsmasqServingDhcpTestCase(base.ShakenFistTestCase):
         super().setUp()
         network_module.DHCP_PROBE_FAILURE_REPORTED.clear()
         self.addCleanup(network_module.DHCP_PROBE_FAILURE_REPORTED.clear)
+        network_module.DHCP_PROBE_SERVING_REPORTED.clear()
+        self.addCleanup(network_module.DHCP_PROBE_SERVING_REPORTED.clear)
 
     def _network(self, serving=True, side_effect=None):
         n = mock.MagicMock()
@@ -869,9 +871,14 @@ class IsDnsmasqServingDhcpTestCase(base.ShakenFistTestCase):
         d.is_serving_dhcp.side_effect = DHCPProbeFailed('no privexec')
         n.is_dnsmasq_serving_dhcp()
 
+        # The answering event appears between the recovery and the next
+        # episode: this network had never been reported serving, because
+        # its first probe could not run, so the first one which is
+        # answered says so (issue #4977).
         self.assertEqual(
             ['could not check whether dnsmasq is answering DHCP',
              'can check whether dnsmasq is answering DHCP again',
+             'dnsmasq is answering DHCP',
              'could not check whether dnsmasq is answering DHCP'],
             self._messages(n))
 
@@ -891,3 +898,100 @@ class IsDnsmasqServingDhcpTestCase(base.ShakenFistTestCase):
         self.assertFalse(n.is_dnsmasq_serving_dhcp())
         messages = [c.args[1] for c in n.add_event.call_args_list]
         self.assertIn('dnsmasq is running but not answering DHCP', messages)
+
+    def test_an_answered_probe_is_said(self):
+        # The positive signal. Without it the network records nothing
+        # when the probe runs and is answered, so a probe which is never
+        # reached looks exactly like a healthy one -- which is what let
+        # the CI readiness assertion pass vacuously (issue #4977).
+        n = self._network()
+        self.assertTrue(n.is_dnsmasq_serving_dhcp())
+        self.assertEqual(['dnsmasq is answering DHCP'], self._messages(n))
+        self.assertIn(
+            self.NETWORK_UUID, network_module.DHCP_PROBE_SERVING_REPORTED)
+
+    def test_being_answered_is_said_once_per_episode_not_per_pass(self):
+        # Same reasoning as the could-not-check event: a durable row per
+        # network, every thirty seconds, for the life of every healthy
+        # network, saying what the first one said.
+        n = self._network()
+        for _ in range(3):
+            self.assertTrue(n.is_dnsmasq_serving_dhcp())
+        self.assertEqual(['dnsmasq is answering DHCP'], self._messages(n))
+
+    def test_a_wedge_starts_a_new_answered_episode(self):
+        # The signal has to come back, or a network which wedges and
+        # recovers is silent about the recovery and the next CI run
+        # waiting for it would time out.
+        n = self._network()
+        n.is_dnsmasq_serving_dhcp()
+
+        d = n._get_dnsmasq_object.return_value
+        d.is_serving_dhcp.return_value = False
+        self.assertFalse(n.is_dnsmasq_serving_dhcp())
+        self.assertNotIn(
+            self.NETWORK_UUID, network_module.DHCP_PROBE_SERVING_REPORTED)
+
+        d.is_serving_dhcp.return_value = True
+        self.assertTrue(n.is_dnsmasq_serving_dhcp())
+        self.assertEqual(
+            ['dnsmasq is answering DHCP',
+             'dnsmasq is running but not answering DHCP',
+             'dnsmasq is answering DHCP'],
+            self._messages(n))
+
+    def test_an_answered_event_which_could_not_be_written_is_tried_again(self):
+        # Marked as reported only once the event is written, as the
+        # could-not-check event is, or a database blip loses the only
+        # positive signal for the life of the daemon.
+        n = self._network()
+        n.add_event.side_effect = RuntimeError('database went away')
+        self.assertRaises(RuntimeError, n.is_dnsmasq_serving_dhcp)
+        self.assertNotIn(
+            self.NETWORK_UUID, network_module.DHCP_PROBE_SERVING_REPORTED)
+
+        n.add_event.side_effect = None
+        self.assertTrue(n.is_dnsmasq_serving_dhcp())
+        # Two recorded calls, which is the point: the attempt which
+        # raised, and the retry on the next pass. A mock records a call
+        # before raising, so one entry here would mean the retry never
+        # happened.
+        self.assertEqual(
+            ['dnsmasq is answering DHCP', 'dnsmasq is answering DHCP'],
+            self._messages(n))
+        self.assertIn(
+            self.NETWORK_UUID, network_module.DHCP_PROBE_SERVING_REPORTED)
+
+    def test_a_recovery_does_not_also_say_it_is_answering(self):
+        # A network already reported serving, which then could not be
+        # probed for a while and now can be, has one transition and
+        # should record one event. The recovery event is that
+        # transition; a second beside it is noise.
+        n = self._network()
+        n.is_dnsmasq_serving_dhcp()
+
+        d = n._get_dnsmasq_object.return_value
+        d.is_serving_dhcp.side_effect = DHCPProbeFailed('no privexec')
+        n.is_dnsmasq_serving_dhcp()
+
+        d.is_serving_dhcp.side_effect = None
+        n.is_dnsmasq_serving_dhcp()
+
+        self.assertEqual(
+            ['dnsmasq is answering DHCP',
+             'could not check whether dnsmasq is answering DHCP',
+             'can check whether dnsmasq is answering DHCP again'],
+            self._messages(n))
+
+    def test_an_answered_network_no_pass_visits_is_forgotten(self):
+        # Or a deleted network leaves an entry for the life of the
+        # process, exactly as the could-not-check set would.
+        n = self._network()
+        n.is_dnsmasq_serving_dhcp()
+        maintain.forget_unvisited_quiesces([self.NETWORK_UUID])
+        self.assertIn(
+            self.NETWORK_UUID, network_module.DHCP_PROBE_SERVING_REPORTED)
+
+        maintain.forget_unvisited_quiesces(['some-other-network'])
+        self.assertNotIn(
+            self.NETWORK_UUID, network_module.DHCP_PROBE_SERVING_REPORTED)

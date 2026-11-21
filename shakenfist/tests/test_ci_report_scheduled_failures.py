@@ -15,6 +15,7 @@ path because tools/ is not a package.
 import importlib.util
 import io
 import os
+from unittest import mock
 
 from shakenfist.tests import base
 
@@ -154,6 +155,58 @@ class ReportTestCase(base.ShakenFistTestCase):
         github = FakeGitHub([_job(UBUNTU, 'success')])
         self.assertEqual(1, self._report(github))
         self.assertEqual(1, len(github.created))
+
+    def test_a_cancelled_run_which_lost_no_lane_reports_nothing(self):
+        # The workflow also calls this on a cancelled lanes job (issue
+        # #4869), because a mid-flight cancel buried real failures. The run
+        # which tested nothing -- a third overlapping dispatch displacing the
+        # pending one, or a hand cancel -- must stay silent, or every one of
+        # those files an issue.
+        github = FakeGitHub([_job(UBUNTU, 'cancelled'), _job(TIER, 'cancelled')])
+        out = io.StringIO()
+        self.assertEqual(
+            0, report_tool.report(github, 'scheduled-tests.yml', '100', '1', CALLER,
+                                  lanes_result='cancelled', out=out))
+        self.assertEqual([], github.created)
+        self.assertEqual([], github.comments)
+        self.assertIn('nothing to report', out.getvalue())
+
+    def test_a_cancelled_run_still_reports_the_lane_which_failed_first(self):
+        # The failure this change exists to recover: a lane fails, something
+        # cancels the run, and the run concludes cancelled rather than
+        # failure. The failed lane is reported and the cancelled one is not.
+        github = FakeGitHub([_job(UBUNTU, 'failure'), _job(TIER, 'cancelled')])
+        self.assertEqual(
+            1, report_tool.report(github, 'scheduled-tests.yml', '100', '1', CALLER,
+                                  lanes_result='cancelled', out=io.StringIO()))
+        self.assertEqual(['Scheduled lane failed: %s' % UBUNTU],
+                         [title for title, _ in github.created])
+
+    def test_a_cancelled_lanes_job_does_not_suppress_the_unattributed_issue(self):
+        # Only a cancellation with nothing attributable is quiet. A failed
+        # lanes job with no failed job keeps its unattributed issue, which is
+        # the guarantee that a red run never comes back silent.
+        github = FakeGitHub([_job(UBUNTU, 'cancelled')])
+        self.assertEqual(
+            1, report_tool.report(github, 'scheduled-tests.yml', '100', '1', CALLER,
+                                  lanes_result='failure', out=io.StringIO()))
+        self.assertEqual([report_tool.title_for(report_tool.UNATTRIBUTED)],
+                         [title for title, _ in github.created])
+
+    def test_an_unrecognised_lanes_result_is_refused_not_read_as_a_failure(self):
+        # A mis-expanded expression, a typo or a result this tool has no
+        # semantics for would otherwise fall through to failure and file the
+        # unattributed issue. argparse refuses it before anything is asked
+        # of GitHub.
+        for value in ('', 'canceled', 'skipped'):
+            with mock.patch('sys.stderr', new_callable=io.StringIO) as err:
+                with self.assertRaises(SystemExit) as raised:
+                    report_tool.main([
+                        '--repo', 'shakenfist/shakenfist', '--run-id', '100',
+                        '--workflow', 'scheduled-tests.yml', '--caller', CALLER,
+                        '--lanes-result', value])
+            self.assertEqual(2, raised.exception.code, value)
+            self.assertIn('--lanes-result', err.getvalue())
 
     def test_dry_run_writes_nothing(self):
         github = FakeGitHub([_job(UBUNTU, 'failure')])
