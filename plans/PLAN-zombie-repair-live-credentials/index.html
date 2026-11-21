@@ -16176,6 +16176,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Phase 2: push audit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#audit-of-phase-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Audit of phase 1
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -16531,15 +16548,22 @@ live. Concretely, when this plan is done:</p>
    get the same treatment issue 3522 gave <code>get_namespace_key_by_name()</code>.</li>
 <li>The decision lives in one place per type, on the object class, so
    the reconciler stays type-agnostic. A pinned test names the types
-   that override it, so whoever adds the next object type with a
-   by-name read path that ignores state is made to decide.</li>
-<li>Retrying a key creation heals the key rather than freezing it
-   stateless: <code>NamespaceKey.new()</code>'s rotation path writes the missing
-   state when the existing key has none.</li>
-<li>The docs say what the reconciler actually does, including the
-   stale <code>subsystem_internals.md</code> sentence and the docstring at
-   <code>namespace_key.py:402</code>.</li>
+   that override it, so changing that set is deliberate.</li>
 </ol>
+<p>As built, this is narrower than it was first written. The pinned
+   test asserts the set of <em>overriding</em> types, so it fires when an
+   override is added or removed -- but a newly registered object type
+   with no override leaves that set unchanged and the test green. The
+   push audit found this: the author of the next type whose read path
+   ignores state is not in fact made to decide. The gap is recorded as
+   a finding of the push-audit phase and is fixed in that phase's
+   follow-up pull request.
+4. Retrying a key creation heals the key rather than freezing it
+   stateless: <code>NamespaceKey.new()</code>'s rotation path writes the missing
+   state when the existing key has none.
+5. The docs say what the reconciler actually does, including the
+   stale <code>subsystem_internals.md</code> sentence and the docstring at
+   <code>namespace_key.py:402</code>.</p>
 <p>Out of scope: making creation atomic (one transaction for the static,
 attributes and state rows), and detecting a namespace with no usable
 key. See open questions 2 and 3.</p>
@@ -16644,9 +16668,11 @@ below, and once in the row this plan carries in
 the whole-plan status, so it only reaches <code>Complete</code> once
 every phase has been completed, abandoned or superseded.</p>
 </div>
-<p>This is a single pull request. It has no separate phase files: the
-steps below are the whole of phase 1, and phase 2 is the mandatory
-push audit.</p>
+<p>Phase 1 is a single pull request, and its steps are inline below
+rather than in a phase file of their own. Phase 2 is the mandatory
+push audit, and it does carry a phase file: its range, its lenses and
+its disposition are a plan's worth of decisions, as they are for every
+other push-audit phase in this repository.</p>
 <table>
 <thead>
 <tr>
@@ -16660,13 +16686,13 @@ push audit.</p>
 <tr>
 <td>1. Repair live zombies forward</td>
 <td>This file, "Phase 1" below</td>
-<td>Not started</td>
-<td>—</td>
+<td>Complete</td>
+<td>f79a23cd5c (#4419)</td>
 </tr>
 <tr>
 <td>2. Push audit</td>
-<td>This file, "Phase 2" below</td>
-<td>Not started</td>
+<td><a href="../PLAN-zombie-repair-live-credentials-phase-02-push-audit/">PLAN-zombie-repair-live-credentials-phase-02-push-audit.md</a></td>
+<td>Complete</td>
 <td>—</td>
 </tr>
 </tbody>
@@ -16915,6 +16941,47 @@ sentence, and this phase then closes itself out per the
 <p>Before the audit, file the follow-up issue from open question 3
 (detect a namespace with no usable key) and link it under Future
 work.</p>
+<h4 id="audit-of-phase-1">Audit of phase 1<a class="headerlink" href="#audit-of-phase-1" title="Permanent link">&para;</a></h4>
+<p>Run on 2026-11-21 over <code>f79a23cd5c^1..f79a23cd5c</code> (#4419), one range
+and one pass, through wave 1, the mechanical sweep and the four
+judgment lenses. Wave 1 is clean: <code>pre-commit</code> passes, <code>tox</code> passes
+with 8,028 tests and no failures, and the ten range commands are
+empty or benign. <strong>No blocking finding, and no critical or high
+security finding</strong>, so the phase closes here and the advisory
+findings land as their own pull request.</p>
+<p>The audit's most serious finding is that <code>_heal_missing_state()</code>, the
+function this plan added to heal a key on creation retry, decides
+"this key has no state row" from <code>get_state()</code>, which returns <code>None</code>
+both for an absent row and for a failed read. The plan exists to stop
+"unreadable" reading as "absent", and its own new function does
+exactly that. During a read blip it can write <code>initial</code> then <code>created</code>
+over a soft-deleted key -- the "objects do not undelete" guard
+compares the same misread value and does not fire -- or raise out of
+an already-successful rotation, losing the new secret. <code>mariadb.py</code>
+already has <code>get_state_checked()</code> for precisely this distinction, and
+its docstring warns against the pattern. Graded medium: it needs a
+read failure concurrent with a rotation of a soft-deleted key.</p>
+<p>Two findings bear on this plan's own claims. The pinned override test
+does not make the author of a new object type decide, which falsified
+mission statement 3 above and is corrected there. And the liveness
+stop never accounts against the sweep's failure-streak gauge -- worse,
+the work-list read succeeded on that pass, so the gauge was just reset
+to zero -- which means a reconciler repairing nothing hour after hour
+publishes zero failures, the exact silence those gauges exist to
+break.</p>
+<p>Three positives are worth recording. The divergence from brief 1b was
+independently judged correct: <code>DatabaseUnavailable</code> from these readers
+is tier-wide by construction, and the resume marker moves to the type
+after the one that stopped, so no object type starves. The four new
+mutations this phase added -- forcing the <code>TrustedIssuer</code> and
+<code>MappingRule</code> overrides to each state unconditionally -- were all
+caught, so phase 1's coverage is better than its own definition of
+done demonstrated. And the fail-closed change fixed an unrecorded
+hole: the issuer duplicate-URL guard used to read an existing issuer's
+<code>issuer_url</code> as <code>None</code> during a blip, so two issuers could end up
+claiming one <code>iss</code>.</p>
+<p>Findings, grades and dispositions are in
+<a href="../PLAN-zombie-repair-live-credentials-phase-02-push-audit/">the phase plan</a>.</p>
 <!-- shared-block: plan-push-audit-phase v3 -->
 <p>Push audit phase (shared block; do not edit -- the canonical
 copy lives in shakenfist/development at
@@ -17386,17 +17453,23 @@ chosen to defer to here, so that we do not forget them.</p>
   mapping rule in one transaction, through one RPC per type. This
   removes the window instead of making it harmless.</li>
 <li><strong>A namespace with no usable key</strong> (open question 3). This is a
-  health signal for <code>system</code> above all. It is filed as its own issue
-  in phase 2.</li>
+  health signal for <code>system</code> above all. Filed as
+  <a href="https://github.com/shakenfist/shakenfist/issues/5015">#5015</a>.</li>
 <li><strong>The legacy <code>namespace_attributes.keys</code> column.</strong> #3836 also points
   out that this column still holds live key material nobody reads, and
   that the auth-federation plan's open question 7 resolved every part
   of "when is it retired" except the retirement itself. It is
-  unrelated to the reconciler and is not taken up here. If no issue
-  tracks it, phase 2 files one.</li>
+  unrelated to the reconciler and is not taken up here. Filed as
+  <a href="https://github.com/shakenfist/shakenfist/issues/5016">#5016</a>.</li>
 <li><strong>Fail-closed reads more broadly.</strong> Step 1a fixes three readers
   because this plan depends on them. #3373 tracks the same
-  absent-versus-unreadable conflation across the rest of <code>mariadb.py</code>.</li>
+  absent-versus-unreadable conflation across the rest of <code>mariadb.py</code>,
+  but its scope is the gRPC client wrappers. The push audit found the
+  direct point and by-name readers for trusted issuers and mapping
+  rules still conflate the two, which matters because
+  <code>from_db_by_name()</code> is the read path the liveness predicates cite.
+  Filed as
+  <a href="https://github.com/shakenfist/shakenfist/issues/5017">#5017</a>.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>This section should list any bugs we encounter during development
