@@ -93,8 +93,11 @@ is a real coverage gap in phase 1.
 
 6. **Wave 2's mechanical sweep is already clean too.** No added
    `TODO`/`FIXME`/`HACK`/`XXX`, no new `# noqa`, `# type: ignore` or
-   `pragma: no cover`, no new `subprocess`/`os.system`/`shell=True`,
-   and no change to any dependency manifest. 25 new test functions.
+   `pragma: no cover`, and no new
+   `subprocess`/`os.system`/`shell=True`. 25 new test functions.
+   Separately, and not part of the runbook's sweep, no dependency
+   manifest changed either -- the sweep has no command for that, so
+   this one is an addition of this plan's own.
 
    The range is 20 files and 1,879 insertions, but that number
    flatters it: 1,034 insertions are the master plan file itself and
@@ -236,7 +239,7 @@ must not overlap step 2b.
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
 | 2a | medium | opus | none | **Done in the planning commit.** Write this plan. Close out phase 1 in its own commit first: master plan Execution table `Status` to `Complete` and `Merged` to `f79a23cd5c (#4419)`, and the `docs/plans/index.md` row to `In progress` / `1 of 2` with the phase 1 outcome and the two unfiled issues in its Intent cell. Correct survey finding 2 at source in the master plan's Execution preamble. Link this file from the Execution table and the index row. Run `pre-commit run --all-files`. Commit subjects: "Close out zombie repair phase 1." and "Plan the zombie repair push audit." |
-| 2b | low | sonnet | none | Wave 1 and the wave 2 mechanical sweep, **running alone in this worktree before any other step**. Run `pre-commit run --all-files`, then `tox`. Do **not** run `tox -e genprotos` (no proto in range, survey finding 3) or `tools/mermaid-lint.sh` (no mermaid fence in the four touched guide pages, survey finding 4); say in the report that each was skipped and why. Then run `PUSH-AUDIT.md`'s four wave 1 style greps and five wave 2 mechanical commands, substituting `f79a23cd5c^1 f79a23cd5c` for `$RANGE`. Report every command with its literal output, or "no output". Planning already ran the greps clean (survey findings 5 and 6); report what you get regardless, and flag any disagreement with those findings as a finding in itself. If `pre-commit` or `tox` fails, report the failing test names and say whether the range touched the failing module (`git diff --name-only f79a23cd5c^1 f79a23cd5c`). Edit nothing; if a hook rewrites a file, restore it from a copy taken beforehand, never with `git checkout` (it would discard uncommitted work in the worktree). Commit subject: "Record wave 1 of the zombie repair audit." |
+| 2b | low | sonnet | none | Wave 1 and the wave 2 mechanical sweep, **running alone in this worktree before any other step**. Run `pre-commit run --all-files`, then `tox`. Do **not** run `tox -e genprotos` (no proto in range, survey finding 3) or `tools/mermaid-lint.sh` (no mermaid fence in the four touched guide pages, survey finding 4); say in the report that each was skipped and why. Then run `PUSH-AUDIT.md`'s four wave 1 style greps and six wave 2 mechanical commands, substituting `f79a23cd5c^1 f79a23cd5c` for `$RANGE`. The wave 2 block is written as five comment-headed groups but is six commands, because the test-ratio group runs two; it has no dependency-manifest command. Report every command with its literal output, or "no output". Planning already ran the greps clean (survey findings 5 and 6); report what you get regardless, and flag any disagreement with those findings as a finding in itself. If `pre-commit` or `tox` fails, report the failing test names and say whether the range touched the failing module (`git diff --name-only f79a23cd5c^1 f79a23cd5c`). Edit nothing; if a hook rewrites a file, restore it from a copy taken beforehand, never with `git checkout` (it would discard uncommitted work in the worktree). Commit subject: "Record wave 1 of the zombie repair audit." |
 | 2c | high | opus | none | 2a code quality lens, read-only. Apply `PUSH-AUDIT.md`'s 2a brief and its shared blocks to the range. The production surface is about 294 lines across seven modules (survey finding 6); read all of it. Give a verdict on each of: (1) **survey finding 8** -- `_repair_zombies()` ends the pass on `DatabaseUnavailable` where brief 1b said to skip the object and continue. Read the function (`shakenfist/daemons/cluster/scheduled_tasks.py:1643-1703`), its docstring's reasoning about the watchdog and the `_grpc_call` retry budget, and the three tests that pin it. Say whether the divergence is right, and whether ending the pass for *one* type's unreadable object can starve the types after it (`_sweep_object_types` and `_record_sweep_stopped` are the relevant machinery). Reach your own verdict; do not inherit the plan's. (2) The three `zombie_repair_state()` overrides against the base-class contract in `shakenfist/baseobject.py:530-551`: are they three copies of one predicate that wants a helper, or three deliberately separate ones? (3) `if repaired_state in cls.ACTIVE_STATES` as the discriminator for the audit text -- is `STATE_CREATED` in `ACTIVE_STATES` for all three classes, and what does the branch print for a type whose override returns something else? (4) The fail-closed change in `mariadb.py`: are the three direct readers and the one gRPC reader consistent with each other and with the `get_namespace_key_by_name` precedent from #3522 they were modelled on? (5) The `CorruptMappingRule` path, which #4419's body says treats an undecodable rule as present-but-damaged -- confirm that is what the code does and that it is the right answer for a liveness predicate. Return findings with file, line and grade, or "no findings" plus the files read. Commit subject: "Record the zombie repair code quality review." |
 | 2d | medium | sonnet | worktree | 2b test review lens **plus the mutation work of decision 5**. Read-only for the review; the mutation runs edit source, which is why this step gets its own worktree and must not overlap step 2b. First, the review: apply `PUSH-AUDIT.md`'s 2b brief to the range's 25 new test functions, and for each of the master plan's five mission statements say which test would fail if that statement were violated. Then the mutations. Run each one, one at a time, under `timeout` (a hung suite must not outlive the step), with `python -B` or `PYTHONDONTWRITEBYTECODE=1` so a same-size mutant restored within a second cannot leave live bytecode, and **never** concurrently with a `pre-commit` run. Restore each by the inverse edit or from a copy taken beforehand, never with `git checkout`. Re-run the three #4419 recorded, confirming the counts (delete the `NamespaceKey` override: 10 tests; restore `None`-on-`OperationalError` in `_direct_get_namespace_key_attributes`: 4; remove the rotation heal in `NamespaceKey.new()`: 2). Then add four: `TrustedIssuer.zombie_repair_state` and `MappingRule.zombie_repair_state` each made to return `cls.STATE_DELETED` unconditionally, and each made to return `cls.STATE_CREATED` unconditionally. For every mutation report which tests failed by name, or that none did. A mutation nothing catches is a finding, and the always-`created` pair is the one most likely to find a gap. Confirm `git status --short` is empty before you finish. Commit subject: "Record the zombie repair test review." |
 | 2e | medium | sonnet | none | 2c documentation lens, read-only. Apply `PUSH-AUDIT.md`'s 2c brief to the four guide pages the range changed: `docs/operator_guide/database.md`, `docs/operator_guide/authentication.md`, `docs/developer_guide/database_internals.md`, `docs/developer_guide/subsystem_internals.md`. The master plan file is context, not a target (decision 7). The falsifiable question is whether any fact is stated differently on two pages: which object types are repaired forward and which are deleted, which types are exempt from zombie repair entirely (`node` and `namespace`), what happens when the liveness read fails, how many consecutive sweeps confirm a zombie, what heals a stateless key on a creation retry, and what a new object type's author must now decide. Also confirm the two claims phase 1's definition of done made about these pages still hold: `grep -rn "still live for" docs/developer_guide/subsystem_internals.md` returns nothing, and no page still says a zombie is repaired by writing `deleted` without qualification. Check the docstrings the range touched say the same as the pages (`shakenfist/namespace_key.py` `keys_with_attributes`, `shakenfist/namespace.py` `lookup_key`, and `reconcile_orphaned_objects()`). Apply the `plan-phase-references` rule: code and docs cite issue 3836, never this plan or its phases. Return findings, or "no documentation gaps found" plus the pages read. Commit subject: "Record the zombie repair documentation review." |
@@ -285,10 +288,11 @@ planning time.
 - `pre-commit run --all-files` passes in this worktree.
 - `tox` passes, or its failures are reported with the range's
   overlap with each failing module stated.
-- Step 2b's report contains all nine `PUSH-AUDIT.md` commands with
+- Step 2b's report contains all ten `PUSH-AUDIT.md` commands with
   `f79a23cd5c^1 f79a23cd5c` substituted, each with its literal
   output, and states that `genprotos` and `mermaid-lint.sh` were
-  skipped and why.
+  skipped and why. Ten, not the nine this plan first said: see the
+  execution notes.
 - `git diff --stat f79a23cd5c^1 f79a23cd5c` appears in the audit
   record showing 20 files changed, so the range demonstrably was not
   empty.
@@ -335,3 +339,51 @@ closes now or grows a fix pull request, and filing an issue is
 outward-facing and awkward to retract. The audit may proceed through
 2b to 2f without a gate; they are read-only, apart from 2d's mutations
 in their own worktree.
+
+## Execution notes
+
+Executed 2026-11-21 (AEDT).
+
+Gates settled at the back brief, before any step ran: the two issues
+step 2g must file may be filed once the graded findings table has been
+reviewed, and this session may push the branch and open the pull
+request once the audit is complete.
+
+**The plan miscounted the runbook, and step 2b found it.** This plan
+said `PUSH-AUDIT.md`'s wave 2 mechanical sweep is five commands, and
+its definition of done asked for nine commands in total. The sweep is
+written as five comment-headed groups but is six commands -- the
+"new test functions vs files changed" group runs two, a `--stat` and a
+`grep -c` -- so the total is ten. The sweep also has no
+dependency-manifest command; the survey's "no dependency manifest
+changed" was this plan's own addition, and is now labelled as one.
+All three facts are corrected at source above rather than only noted
+here.
+
+### Wave 1 and the mechanical sweep (2b)
+
+Range confirmed non-empty: `git diff --stat f79a23cd5c^1 f79a23cd5c`
+reports `20 files changed, 1879 insertions(+), 44 deletions(-)`.
+
+- `pre-commit run --all-files`: passed, every hook.
+- `tox`: passed. `py3`, `flake8` and `cover` all OK in 278 s. stestr
+  ran 8,028 tests, 7,837 passed, 191 skipped, 0 failed, in each of the
+  two envs that run it. No worker was killed for memory.
+- `tox -e genprotos`: skipped, deliberately. No `.proto` file is in
+  range.
+- `tools/mermaid-lint.sh`: skipped, deliberately. None of the four
+  touched guide pages carries a mermaid fence, so the render has
+  nothing in range to check.
+- The four wave 1 style greps: no output, each.
+- The six wave 2 mechanical commands: no output from the
+  TODO/FIXME/HACK/XXX, the `# noqa`/`# type: ignore`/`pragma: no
+  cover` and the `subprocess`/`os.system`/`shell=True` greps; 25 new
+  test functions; seven documentation files touched, of which three
+  are `docs/plans/` bookkeeping.
+- `git status --short` empty after both the `pre-commit` and the `tox`
+  run. The step edited nothing.
+
+No findings, and no disagreement with the numbers the planning session
+had recorded. The management session reproduced the tox verdict, the
+range stat and the clean tree from the step's own logs rather than
+from its report.
