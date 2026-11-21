@@ -463,6 +463,15 @@ class DatabaseServiceStub:
     GetNamespaceClaims: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceClaimsRequest, _database_pb2.GetNamespaceClaimsReply]
     UpdateNamespaceClaim: _grpc.UnaryUnaryMultiCallable[_database_pb2.UpdateNamespaceClaimRequest, _database_pb2.UpdateNamespaceClaimReply]
     DeleteNamespaceClaim: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteNamespaceClaimRequest, _database_pb2.DeleteNamespaceClaimReply]
+    BookNamespaceClaimHolds: _grpc.UnaryUnaryMultiCallable[_database_pb2.BookNamespaceClaimHoldsRequest, _database_pb2.BookNamespaceClaimHoldsReply]
+    """Shape holds. A hold is a shape a claim has booked onto one node;
+    the rows are the ground truth and scheduler_node_capacity.held_* is
+    derived from them. Booking moves the claim's sum invariant and the
+    named nodes' counters in one transaction, and releasing moves the
+    counters back.
+    """
+    GetNamespaceClaimHolds: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceClaimHoldsRequest, _database_pb2.GetNamespaceClaimHoldsReply]
+    ReleaseNamespaceClaimHolds: _grpc.UnaryUnaryMultiCallable[_database_pb2.ReleaseNamespaceClaimHoldsRequest, _database_pb2.ReleaseNamespaceClaimHoldsReply]
 
 @_typing.type_check_only
 class DatabaseServiceAsyncStub(DatabaseServiceStub):
@@ -899,6 +908,15 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     GetNamespaceClaims: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceClaimsRequest, _database_pb2.GetNamespaceClaimsReply]  # type: ignore[assignment]
     UpdateNamespaceClaim: _aio.UnaryUnaryMultiCallable[_database_pb2.UpdateNamespaceClaimRequest, _database_pb2.UpdateNamespaceClaimReply]  # type: ignore[assignment]
     DeleteNamespaceClaim: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteNamespaceClaimRequest, _database_pb2.DeleteNamespaceClaimReply]  # type: ignore[assignment]
+    BookNamespaceClaimHolds: _aio.UnaryUnaryMultiCallable[_database_pb2.BookNamespaceClaimHoldsRequest, _database_pb2.BookNamespaceClaimHoldsReply]  # type: ignore[assignment]
+    """Shape holds. A hold is a shape a claim has booked onto one node;
+    the rows are the ground truth and scheduler_node_capacity.held_* is
+    derived from them. Booking moves the claim's sum invariant and the
+    named nodes' counters in one transaction, and releasing moves the
+    counters back.
+    """
+    GetNamespaceClaimHolds: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceClaimHoldsRequest, _database_pb2.GetNamespaceClaimHoldsReply]  # type: ignore[assignment]
+    ReleaseNamespaceClaimHolds: _aio.UnaryUnaryMultiCallable[_database_pb2.ReleaseNamespaceClaimHoldsRequest, _database_pb2.ReleaseNamespaceClaimHoldsReply]  # type: ignore[assignment]
 
 class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
     @_abc_1.abstractmethod
@@ -2766,5 +2784,32 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         request: _database_pb2.DeleteNamespaceClaimRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.DeleteNamespaceClaimReply, _abc.Awaitable[_database_pb2.DeleteNamespaceClaimReply]]: ...
+
+    @_abc_1.abstractmethod
+    def BookNamespaceClaimHolds(
+        self,
+        request: _database_pb2.BookNamespaceClaimHoldsRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.BookNamespaceClaimHoldsReply, _abc.Awaitable[_database_pb2.BookNamespaceClaimHoldsReply]]:
+        """Shape holds. A hold is a shape a claim has booked onto one node;
+        the rows are the ground truth and scheduler_node_capacity.held_* is
+        derived from them. Booking moves the claim's sum invariant and the
+        named nodes' counters in one transaction, and releasing moves the
+        counters back.
+        """
+
+    @_abc_1.abstractmethod
+    def GetNamespaceClaimHolds(
+        self,
+        request: _database_pb2.GetNamespaceClaimHoldsRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.GetNamespaceClaimHoldsReply, _abc.Awaitable[_database_pb2.GetNamespaceClaimHoldsReply]]: ...
+
+    @_abc_1.abstractmethod
+    def ReleaseNamespaceClaimHolds(
+        self,
+        request: _database_pb2.ReleaseNamespaceClaimHoldsRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.ReleaseNamespaceClaimHoldsReply, _abc.Awaitable[_database_pb2.ReleaseNamespaceClaimHoldsReply]]: ...
 
 def add_DatabaseServiceServicer_to_server(servicer: DatabaseServiceServicer, server: _typing.Union[_grpc.Server, _aio.Server]) -> None: ...

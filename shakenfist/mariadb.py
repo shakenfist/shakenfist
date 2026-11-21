@@ -28973,6 +28973,12 @@ class SchedulerNodeCapacityRow(TypedDict):
     used_memory_mb: int
     used_disk_gb: int
     expected_demand: float
+    # Room booked on the node by capacity claims and not yet consumed.
+    # Always present: a reply from a daemon that predates the counters
+    # reads as zero, which is also the truth for a node with no holds.
+    held_cpus: int
+    held_memory_mb: int
+    held_disk_gb: int
 
 
 class SchedulerNodeCapacityRead(NamedTuple):
@@ -30509,6 +30515,9 @@ def _direct_get_scheduler_node_capacity() -> SchedulerNodeCapacityRead:
                 'used_memory_mb': int(row.used_memory_mb),
                 'used_disk_gb': int(row.used_disk_gb),
                 'expected_demand': float(row.expected_demand),
+                'held_cpus': int(row.held_cpus),
+                'held_memory_mb': int(row.held_memory_mb),
+                'held_disk_gb': int(row.held_disk_gb),
             }
             for row in rows
         ], degraded=False)
@@ -30704,6 +30713,9 @@ def _grpc_get_scheduler_node_capacity() -> SchedulerNodeCapacityRead:
                 'used_memory_mb': int(row.used_memory_mb),
                 'used_disk_gb': int(row.used_disk_gb),
                 'expected_demand': float(row.expected_demand),
+                'held_cpus': int(row.held_cpus),
+                'held_memory_mb': int(row.held_memory_mb),
+                'held_disk_gb': int(row.held_disk_gb),
             }
             for row in reply.rows
         ], degraded=bool(reply.degraded))
@@ -31759,6 +31771,54 @@ def _direct_update_namespace_claim(
         f'under {_CLAIM_STALE_MAX_ATTEMPTS} attempts, giving up')
     result['refused_reason'] = 'conflict'
     return result
+
+
+def _direct_book_claim_holds(
+    claim_uuid: str, shapes: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Book shapes onto nodes against a claim.
+
+    The wire surface exists before the transaction behind it, so that
+    the servicer, its counter and the generated stubs can be reviewed
+    on their own. Raising rather than returning a refusal is deliberate:
+    a refusal says the guard ran and said no, and nothing here has.
+    """
+    raise NotImplementedError('booking claim holds is not implemented')
+
+
+def _direct_get_namespace_claim_holds(claim_uuid: str) -> list[dict[str, Any]]:
+    """List the hold rows a claim has booked.
+
+    Returns no rows until the read is written, which is what a claim
+    with no holds reports; every hold-reading caller already has to
+    handle that.
+    """
+    return []
+
+
+def _direct_release_claim_holds(
+    claim_uuid: str, hold_uuids: list[str], all_holds: bool = False
+) -> dict[str, Any]:
+    """Release holds a claim has booked, naming them or asking for all.
+
+    ``all_holds`` is how a caller asks for every hold the claim has, and
+    an empty ``hold_uuids`` without it is an error rather than a release
+    of everything. Releasing is destructive -- it gives back room a
+    holder is relying on -- and an empty list is what a caller sends when
+    its own list went missing, so the wide reading of an empty request is
+    the one that cannot be allowed to be the default. The guard lives
+    here rather than in the servicer because the release paths inside the
+    database tier call this function directly and would otherwise bypass
+    it.
+
+    Raises until the release is written, for the reason booking does: a
+    release that returned success without moving the node counters would
+    leave booked room that nothing could account for.
+    """
+    if not hold_uuids and not all_holds:
+        raise ValueError(
+            'release_claim_holds needs hold_uuids or all_holds')
+    raise NotImplementedError('releasing claim holds is not implemented')
 
 
 def _direct_delete_namespace_claim(

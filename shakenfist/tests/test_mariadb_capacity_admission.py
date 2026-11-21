@@ -76,13 +76,15 @@ def _claim_row(uuid=CLAIM1, limit_cpus=16, limit_memory_mb=16384,
 
 def _capacity_row(node_uuid=NODE1, limit_cpus=48, limit_memory_mb=196608,
                   limit_disk_gb=500, used_cpus=6, used_memory_mb=6144,
-                  used_disk_gb=33, expected_demand=8.5):
+                  used_disk_gb=33, expected_demand=8.5, held_cpus=2,
+                  held_memory_mb=2048, held_disk_gb=11):
     return SimpleNamespace(
         node_uuid=node_uuid, limit_cpus=limit_cpus,
         limit_memory_mb=limit_memory_mb, limit_disk_gb=limit_disk_gb,
         used_cpus=used_cpus, used_memory_mb=used_memory_mb,
         used_disk_gb=used_disk_gb, expected_demand=expected_demand,
-        updated_at=None)
+        held_cpus=held_cpus, held_memory_mb=held_memory_mb,
+        held_disk_gb=held_disk_gb, updated_at=None)
 
 
 def _cluster_row(total_cpus=144, claimed_cpus=16, unclaimed_used_cpus=8):
@@ -2246,6 +2248,9 @@ class GetSchedulerNodeCapacityTestCase(base.ShakenFistTestCase):
         'used_memory_mb': 6144,
         'used_disk_gb': 33,
         'expected_demand': 8.5,
+        'held_cpus': 2,
+        'held_memory_mb': 2048,
+        'held_disk_gb': 11,
     }
 
     def _run_direct(self, rows=None, error=None):
@@ -2384,6 +2389,134 @@ class GetSchedulerNodeCapacityTestCase(base.ShakenFistTestCase):
                 mock.patch.object(database_main, 'Counter'):
             monitor = database_main.Monitor('test')
         self.assertIn('get_scheduler_node_capacity', monitor.counters)
+
+    def test_held_counters_survive_the_wire_distinct_from_used(self):
+        # Each counter carries its own value, so a reader that mapped a
+        # held figure onto the wrong field, or onto used_*, is caught.
+        reply = database_pb2.GetSchedulerNodeCapacityReply()
+        reply.rows.add(**self.EXPECTED)
+        with mock.patch('shakenfist.mariadb._get_database_stub',
+                        return_value=mock.MagicMock()), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           return_value=reply):
+            row = mariadb._grpc_get_scheduler_node_capacity().rows[0]
+        self.assertEqual((2, 2048, 11),
+                         (row['held_cpus'], row['held_memory_mb'],
+                          row['held_disk_gb']))
+        self.assertEqual((6, 6144, 33),
+                         (row['used_cpus'], row['used_memory_mb'],
+                          row['used_disk_gb']))
+
+    def test_a_reply_without_held_counters_reads_as_zero(self):
+        # A database daemon that predates the fields sends a row without
+        # them. The client must read that as nothing held rather than
+        # raise, so a rolling upgrade does not break the scheduler.
+        old = {k: v for k, v in self.EXPECTED.items()
+               if not k.startswith('held_')}
+        reply = database_pb2.GetSchedulerNodeCapacityReply()
+        reply.rows.add(**old)
+        with mock.patch('shakenfist.mariadb._get_database_stub',
+                        return_value=mock.MagicMock()), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           return_value=reply):
+            read = mariadb._grpc_get_scheduler_node_capacity()
+        self.assertFalse(read.degraded)
+        row = read.rows[0]
+        self.assertEqual((0, 0, 0),
+                         (row['held_cpus'], row['held_memory_mb'],
+                          row['held_disk_gb']))
+
+    def test_the_hold_rpcs_have_prometheus_counters(self):
+        with mock.patch.object(database_main.daemon.WorkerPoolDaemon,
+                               '__init__', return_value=None), \
+                mock.patch.object(database_main, 'start_http_server'), \
+                mock.patch.object(database_main, 'Gauge'), \
+                mock.patch.object(database_main, 'Counter'):
+            monitor = database_main.Monitor('test')
+        for name in ('book_namespace_claim_holds',
+                     'get_namespace_claim_holds',
+                     'release_namespace_claim_holds'):
+            self.assertIn(name, monitor.counters)
+
+    def test_the_mock_accessor_returns_the_held_counters(self):
+        # The mock's read reply is its seeded dict, so it must carry the
+        # same keys the real accessor does or a test would pass against
+        # fields production lacks.
+        fixture = mock_mariadb_fixture.MockMariaDB.__new__(
+            mock_mariadb_fixture.MockMariaDB)
+        fixture.node_capacity = {}
+        fixture.node_capacity_read_degraded = False
+        fixture.set_node_capacity(str(NODE1), held_cpus=3, held_memory_mb=5,
+                                  held_disk_gb=7)
+        row = fixture._mariadb_get_scheduler_node_capacity().rows[0]
+        self.assertEqual(set(self.EXPECTED), set(row))
+        self.assertEqual((3, 5, 7), (row['held_cpus'], row['held_memory_mb'],
+                                     row['held_disk_gb']))
+
+
+class HoldRpcTestCase(base.ShakenFistTestCase):
+    """The hold RPCs exist on the wire, but nothing behind them does yet."""
+
+    def _servicer(self):
+        servicer = database_main.DatabaseService.__new__(
+            database_main.DatabaseService)
+        servicer.monitor = mock.MagicMock()
+        return servicer
+
+    def test_booking_reports_unimplemented_rather_than_success(self):
+        reply = self._servicer().BookNamespaceClaimHolds(
+            database_pb2.BookNamespaceClaimHoldsRequest(claim_uuid='c'),
+            mock.MagicMock())
+        self.assertFalse(reply.success)
+        self.assertFalse(reply.booked)
+
+    def test_release_reports_unimplemented_rather_than_success(self):
+        # all_holds set, so this reaches the unimplemented body rather
+        # than stopping at the empty-request guard below. Without the
+        # flag this test would pass on the guard and stop saying
+        # anything about the release itself.
+        reply = self._servicer().ReleaseNamespaceClaimHolds(
+            database_pb2.ReleaseNamespaceClaimHoldsRequest(
+                claim_uuid='c', all_holds=True),
+            mock.MagicMock())
+        self.assertFalse(reply.success)
+
+    def test_a_release_naming_nothing_at_all_is_refused(self):
+        # An empty hold_uuids with all_holds unset must not be read as
+        # "release everything": proto3 cannot tell a repeated field left
+        # unset from one explicitly empty, so that sentinel would make a
+        # caller whose list went missing ask for every hold the claim
+        # has, in a request identical to the one it meant to send.
+        reply = self._servicer().ReleaseNamespaceClaimHolds(
+            database_pb2.ReleaseNamespaceClaimHoldsRequest(claim_uuid='c'),
+            mock.MagicMock())
+        self.assertFalse(reply.success)
+        self.assertIn('all_holds', reply.error)
+        self.assertEqual(0, len(reply.released))
+
+    def test_the_release_guard_is_not_only_in_the_servicer(self):
+        # The release paths inside the database tier call the direct
+        # function, so a guard that lived only in the servicer would be
+        # bypassed by exactly the callers that release in bulk.
+        self.assertRaises(
+            ValueError, mariadb._direct_release_claim_holds, 'c', [])
+        self.assertRaises(
+            NotImplementedError, mariadb._direct_release_claim_holds,
+            'c', [], True)
+
+    def test_listing_a_claim_with_no_holds_is_empty(self):
+        reply = self._servicer().GetNamespaceClaimHolds(
+            database_pb2.GetNamespaceClaimHoldsRequest(claim_uuid='c'),
+            mock.MagicMock())
+        self.assertEqual(0, len(reply.holds))
+
+    def test_a_null_node_and_instance_cross_as_empty_strings(self):
+        message = database_main.DatabaseService._hold_message({
+            'uuid': 'h', 'claim_uuid': 'c', 'namespace': 'ns', 'cpus': 1,
+            'memory_mb': 2, 'disk_gb': 3, 'node_uuid': None,
+            'instance_uuid': None, 'created_at': 1.0, 'updated_at': 2.0})
+        self.assertEqual('', message.node_uuid)
+        self.assertEqual('', message.instance_uuid)
 
 
 def _singleton_row(updated_at=1761350400.0, **overrides):

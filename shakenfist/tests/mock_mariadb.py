@@ -2896,7 +2896,8 @@ class MockMariaDB():
     def set_node_capacity(self, node_uuid, limit_cpus=0, limit_memory_mb=0,
                           limit_disk_gb=0, used_cpus=0, used_memory_mb=0,
                           used_disk_gb=0, expected_demand=0.0,
-                          demand_limit=None):
+                          demand_limit=None, held_cpus=0, held_memory_mb=0,
+                          held_disk_gb=0):
         """Seed a scheduler_node_capacity row for a node.
 
         No node has one by default, which is the fail-open case:
@@ -2923,6 +2924,9 @@ class MockMariaDB():
             'used_memory_mb': used_memory_mb,
             'used_disk_gb': used_disk_gb,
             'expected_demand': expected_demand,
+            'held_cpus': held_cpus,
+            'held_memory_mb': held_memory_mb,
+            'held_disk_gb': held_disk_gb,
             'demand_limit': demand_limit,
         }
         return self.node_capacity[str(node_uuid)]

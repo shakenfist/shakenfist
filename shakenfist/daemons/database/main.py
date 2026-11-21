@@ -3265,6 +3265,96 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.DeleteNamespaceClaimReply(
                 success=False, error=str(e))
 
+    @staticmethod
+    def _hold_message(hold: dict[str, Any]) -> database_pb2.NamespaceClaimHold:
+        """Build a hold message, spelling a NULL uuid as an empty string."""
+        return database_pb2.NamespaceClaimHold(
+            uuid=hold['uuid'],
+            claim_uuid=hold['claim_uuid'],
+            namespace=hold['namespace'],
+            cpus=hold['cpus'],
+            memory_mb=hold['memory_mb'],
+            disk_gb=hold['disk_gb'],
+            node_uuid=hold['node_uuid'] or '',
+            instance_uuid=hold['instance_uuid'] or '',
+            created_at=hold['created_at'],
+            updated_at=hold['updated_at'])
+
+    def BookNamespaceClaimHolds(
+        self,
+        request: database_pb2.BookNamespaceClaimHoldsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.BookNamespaceClaimHoldsReply:
+        """Book shapes onto nodes against a claim, all or nothing."""
+        try:
+            self.monitor.counters['book_namespace_claim_holds'].inc()
+            result = mariadb._direct_book_claim_holds(
+                request.claim_uuid,
+                [{
+                    'cpus': shape.cpus,
+                    'memory_mb': shape.memory_mb,
+                    'disk_gb': shape.disk_gb,
+                    'node_uuid': shape.node_uuid,
+                } for shape in request.shapes])
+            reply = database_pb2.BookNamespaceClaimHoldsReply(
+                success=result['success'],
+                error=result['error'],
+                booked=result['booked'],
+                refused_reason=result['refused_reason'])
+            for dimension in result['dimensions']:
+                reply.dimensions.add(**dimension)
+            for hold in result['holds']:
+                reply.holds.append(self._hold_message(hold))
+            return reply
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database BookNamespaceClaimHolds failed', e)
+            return database_pb2.BookNamespaceClaimHoldsReply(
+                success=False, error=str(e))
+
+    def GetNamespaceClaimHolds(
+        self,
+        request: database_pb2.GetNamespaceClaimHoldsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetNamespaceClaimHoldsReply:
+        """List the holds a claim has booked."""
+        try:
+            self.monitor.counters['get_namespace_claim_holds'].inc()
+            return database_pb2.GetNamespaceClaimHoldsReply(holds=[
+                self._hold_message(hold)
+                for hold in mariadb._direct_get_namespace_claim_holds(
+                    request.claim_uuid)])
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetNamespaceClaimHolds failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.GetNamespaceClaimHoldsReply()
+
+    def ReleaseNamespaceClaimHolds(
+        self,
+        request: database_pb2.ReleaseNamespaceClaimHoldsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ReleaseNamespaceClaimHoldsReply:
+        """Release holds a claim has booked and return the node room."""
+        try:
+            self.monitor.counters['release_namespace_claim_holds'].inc()
+            result = mariadb._direct_release_claim_holds(
+                request.claim_uuid, list(request.hold_uuids),
+                all_holds=request.all_holds)
+            reply = database_pb2.ReleaseNamespaceClaimHoldsReply(
+                success=result['success'],
+                error=result['error'],
+                clamped=result['clamped'])
+            for hold in result['released']:
+                reply.released.append(self._hold_message(hold))
+            return reply
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database ReleaseNamespaceClaimHolds failed', e)
+            return database_pb2.ReleaseNamespaceClaimHoldsReply(
+                success=False, error=str(e))
+
     # =========================================================
     # Namespace Operations (MariaDB)
     # =========================================================
@@ -6973,6 +7063,9 @@ class Monitor(daemon.WorkerPoolDaemon):
             'create_namespace_claim', 'get_namespace_claim',
             'get_namespace_claims', 'update_namespace_claim',
             'delete_namespace_claim',
+            # MariaDB namespace claim hold operations
+            'book_namespace_claim_holds', 'get_namespace_claim_holds',
+            'release_namespace_claim_holds',
         ]
         for op in operations:
             self.counters[op] = Counter(
