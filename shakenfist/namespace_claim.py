@@ -74,7 +74,10 @@ class ClaimRefused(Exception):
 
     ``reason`` is one of the refusal reasons the mariadb claim wrappers
     document: 'capacity', 'no_cluster_capacity', 'exists',
-    'below_usage', 'not_found', 'not_active' or 'conflict'.
+    'below_usage', 'not_found', 'not_active' or 'conflict' for the claim
+    itself, and 'claim_capacity' or 'node_capacity' for a booking --
+    which say that the claim would be over its own limits, or that the
+    node chosen for a shape has no room left for it.
     """
 
     def __init__(
@@ -336,6 +339,87 @@ class NamespaceClaim(dbo):
                    'limit_memory_mb': limit_memory_mb,
                    'limit_disk_gb': limit_disk_gb,
                    'expires_in_seconds': expires_in_seconds})
+
+    def book_holds(
+            self, shapes: list[dict[str, int]], scheduler: Any = None
+    ) -> list[mariadb.NamespaceClaimHoldRow]:
+        """Book room inside this claim for a set of shapes, one hold each.
+
+        ``shapes`` is a list of ``{'cpus', 'memory_mb', 'disk_gb'}``
+        requests. Each one is placed on a node by the scheduler and then
+        booked there, so that a later create of that shape has somewhere
+        to go which no other placement can take first.
+
+        The node for each shape is the head of its own ranked candidate
+        list, which is the node the scheduler would have placed it on
+        had it been a create. Taking anything further down the list
+        would leave the bookings arranged against an arithmetic the
+        scheduler did not do, because every shape after the one skipped
+        was ranked as though it were on the node it was charged to.
+
+        Placement is all or nothing and deliberately not translated
+        here. A set the cluster cannot host raises whatever the refusing
+        scheduling stage raises for a single request -- carrying that
+        stage and the refused shape's index in ``shapes`` -- and a
+        caller needs both to say which shape did not fit and why.
+        Collapsing that into a generic refusal would discard the only
+        two facts a caller can act on.
+
+        Raises ClaimRefused when the booking itself is declined: a claim
+        cannot book past its own limits, and a node cannot be booked
+        past the room its placements have left. Those two reasons are
+        not in the API layer's claim refusal table, because nothing a
+        REST caller can reach books a hold yet; whatever adds that route
+        adds them there too.
+        """
+        # Imported here rather than at module scope because the
+        # scheduler reaches instances, which reach artifacts, which
+        # reach namespaces, which reach this module.
+        from shakenfist import scheduler as scheduler_module
+
+        if not shapes:
+            raise ValueError('book_holds() needs at least one shape')
+
+        requested = [
+            {'cpus': int(shape['cpus']),
+             'memory_mb': int(shape['memory_mb']),
+             'disk_gb': int(shape['disk_gb'])}
+            for shape in shapes]
+
+        if scheduler is None:
+            scheduler = scheduler_module.Scheduler()
+        assignment = scheduler.find_candidates_for_shapes(
+            [scheduler_module.PlacementShape(
+                cpus=shape['cpus'], memory_mb=shape['memory_mb'],
+                disk_gb=shape['disk_gb'], affinity={},
+                namespace=self.namespace)
+             for shape in requested],
+            related_objects=[self])
+
+        result = mariadb.book_claim_holds(str(self.uuid), [
+            dict(shape, node_uuid=str(assignment[index][0]))
+            for index, shape in enumerate(requested)])
+
+        if not result['booked']:
+            if not result['success']:
+                raise exceptions.WriteException(
+                    'holds for namespace claim %s could not be written: %s'
+                    % (self.uuid, result['error']))
+            raise ClaimRefused(result['refused_reason'],
+                               dimensions=result['dimensions'])
+
+        self.add_event(
+            EVENT_TYPE_MUTATE, 'booked shape holds',
+            extra={'holds': [
+                {'uuid': hold['uuid'], 'node': hold['node_uuid'],
+                 'cpus': hold['cpus'], 'memory_mb': hold['memory_mb'],
+                 'disk_gb': hold['disk_gb']}
+                for hold in result['holds']]})
+        return result['holds']
+
+    def holds(self) -> list[mariadb.NamespaceClaimHoldRow]:
+        """Every hold booked against this claim, oldest first."""
+        return mariadb.get_namespace_claim_holds(str(self.uuid))
 
     def external_view(
             self, row: Optional[mariadb.NamespaceClaimRow] = None

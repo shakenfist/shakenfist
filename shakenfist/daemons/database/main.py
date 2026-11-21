@@ -3266,7 +3266,9 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 success=False, error=str(e))
 
     @staticmethod
-    def _hold_message(hold: dict[str, Any]) -> database_pb2.NamespaceClaimHold:
+    def _hold_message(
+        hold: mariadb.NamespaceClaimHoldRow
+    ) -> database_pb2.NamespaceClaimHold:
         """Build a hold message, spelling a NULL uuid as an empty string."""
         return database_pb2.NamespaceClaimHold(
             uuid=hold['uuid'],

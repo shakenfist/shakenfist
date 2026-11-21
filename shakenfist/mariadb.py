@@ -31059,6 +31059,20 @@ class _ClaimRowStale(Exception):
     """
 
 
+class _ClaimHoldSumViolated(Exception):
+    """A claim's limits do not cover the holds already booked against it.
+
+    Deliberately not a refusal. A refusal is a guard that ran and said
+    no about something the caller asked for, and this says the row and
+    the hold rows disagree about a fact neither of them should be able
+    to reach: a claim uuid is a fresh uuid4 and so has no holds when it
+    is created, and a claim's limits are only ever changed by a
+    statement that tests this very invariant. So it is reported as a
+    failed write rather than as a capacity decision an operator could
+    act on by asking for less.
+    """
+
+
 def _empty_create_claim_result() -> CreateNamespaceClaimResult:
     """A successful, not-yet-decided claim creation reply."""
     return {
@@ -31365,7 +31379,12 @@ def _direct_create_namespace_claim(
        denial.
     3. The ``INSERT``, with ``used_*`` seeded to the migrated drawdown
        and coverage state 'active'.
-    4. A read-back of the row just inserted, for the reply. A read after
+    4. The claim-side hold invariant as a guarded ``UPDATE`` of the row
+       just inserted, carrying ``limit_* >= sum(this claim's holds)`` as
+       a subquery in its ``WHERE`` (_claim_hold_sum_guard). It cannot
+       refuse a claim created normally; it is here so that the invariant
+       is stated at both of the sites which set a claim's limits.
+    5. A read-back of the row just inserted, for the reply. A read after
        our own write, on a row this transaction holds the lock on, which
        is what the ER_CHECKREAD invariant permits.
 
@@ -31490,7 +31509,29 @@ def _direct_create_namespace_claim(
                 expires_at=_claim_expiry_expression(expires_in_seconds),
                 updated_at=sa.func.now()))
 
-            # (4) Read back what we just wrote, for the reply.
+            # (4) The claim-side hold invariant, in the same subquery
+            # form the booking path uses: limit_* >= the sum of this
+            # claim's holds. It cannot refuse a claim created the way
+            # every caller creates one, because a fresh uuid4 has no
+            # hold rows and COALESCE makes an empty sum zero. It is here
+            # so the invariant is asserted at both of the two sites that
+            # change a claim's limits, rather than only at the one where
+            # it can currently fail -- a later caller that books holds
+            # in this same transaction inherits the guard instead of
+            # having to remember to add it. A miss means a claim uuid
+            # already carries holds, which nothing can produce, so it is
+            # reported as the broken invariant it would be and not as a
+            # capacity refusal an operator could act on.
+            if conn.execute(sa.update(claims).where(sa.and_(
+                    claims.c.uuid == claim_key, *[
+                        _claim_hold_sum_guard(d, claim_key)
+                        for d in CAPACITY_DIMENSIONS])).values(
+                            updated_at=sa.func.now())).rowcount == 0:
+                raise _ClaimHoldSumViolated(
+                    f'namespace claim {claim_uuid} already carries holds '
+                    f'larger than the limits it was created with')
+
+            # (5) Read back what we just wrote, for the reply.
             row = conn.execute(_claim_select().where(
                 claims.c.uuid == claim_key)).first()
             if row is not None:
@@ -31507,6 +31548,11 @@ def _direct_create_namespace_claim(
         if refusal.reason == 'capacity':
             result['dimensions'] = _cluster_capacity_dimensions(
                 refusal.requested, refusal.migrated)
+        return result
+    except _ClaimHoldSumViolated as e:
+        LOG.warning(f'MariaDB create_namespace_claim refused: {e}')
+        result['success'] = False
+        result['error'] = str(e)
         return result
     except (OperationalError, IntegrityError) as e:
         LOG.warning(
@@ -31773,27 +31819,560 @@ def _direct_update_namespace_claim(
     return result
 
 
+# =============================================================================
+# Shape holds (MariaDB)
+#
+# A hold is a shape a claim has booked onto one node: room inside the
+# claim's own limits, promised to a particular node, which no other
+# placement may take. The namespace_claim_holds rows are the ground
+# truth and scheduler_node_capacity.held_* is a per-node fold of them,
+# which is why the reconciler recomputes those counters from these rows
+# rather than adjusting them -- a counter cannot be recomputed from
+# itself.
+#
+# Two invariants, and one of them is the whole reason this code is
+# shaped the way it is:
+#
+# * Per claim, sum(holds) <= limit_*. A claim may not book more than it
+#   promised, which is tested in SQL inside the claim's own transaction
+#   so a concurrent booking cannot slip under it.
+# * Per node, used_* + held_* + request <= limit_*. A booking is guarded
+#   against the node row exactly as an admission is, and for the same
+#   reason: both are drawdowns against one ledger.
+#
+# The canonical write order is unchanged and namespace_claim_holds goes
+# after all three of its elders -- cluster_capacity, then
+# namespace_claims, then scheduler_node_capacity, then the hold rows.
+# That position changes no existing writer's order, so the
+# deadlock-freedom argument for the other three carries over untouched,
+# and it is the order a booking wants anyway: test the claim, charge the
+# nodes, then record what was booked.
+#
+# The claim-side sum is a scalar subquery carried in the WHERE of the
+# claim's own guarded UPDATE, never a SELECT of its own. That is not
+# style. A plain SELECT SUM(...) ahead of the guarded UPDATE is exactly
+# the statement the block comment above _probe_admission_rows() forbids,
+# and it would be the one read in this transaction that cannot be
+# excused as "after our own writes": nothing here holds a lock on a hold
+# row until the final INSERT. A subquery inside the DML is part of the
+# statement that establishes the read view, which is the same ground the
+# admission guard's demand clause against node_metrics stands on.
+# =============================================================================
+
+class NamespaceClaimHoldRow(TypedDict):
+    """One namespace_claim_holds row, as readers of the holds API see it.
+
+    ``node_uuid`` and ``instance_uuid`` are the empty string rather than
+    None when the column is NULL, matching how the rest of this tier's
+    wire surface spells an absent uuid. An empty node is a hold that is
+    owed but currently unplaced; an empty instance is a hold nothing has
+    consumed.
+    """
+
+    uuid: str
+    claim_uuid: str
+    namespace: str
+    cpus: int
+    memory_mb: int
+    disk_gb: int
+    node_uuid: str
+    instance_uuid: str
+    created_at: float
+    updated_at: float
+
+
+class BookClaimHoldsResult(TypedDict):
+    """The reply _direct_book_claim_holds builds.
+
+    ``success`` says the RPC ran; ``booked`` says what it decided. A
+    booking is all or nothing, so ``holds`` is either every row written
+    or empty.
+    """
+
+    success: bool
+    error: str
+    booked: bool
+    refused_reason: str
+    dimensions: list[CapacityDimensionDetailDict]
+    holds: list[NamespaceClaimHoldRow]
+
+
+class _HoldBookingDenied(Exception):
+    """A guarded UPDATE in a booking matched no row, so it must abort.
+
+    Carries the stage that refused ('claim' or 'node') and, for a node
+    refusal, which node's row it was. Raised inside the
+    ``engine.begin()`` block, which rolls the transaction back on the
+    way out; the per-dimension detail is then assembled from a fresh
+    read, exactly as _AdmissionDenied's is.
+
+    The node uuid rides on the exception for the reason
+    _AdmissionDenied's claim uuid does: it is an identity rather than a
+    measurement, the raising branch holds it as a local, and a read
+    after the rollback cannot reconstruct which of several nodes a
+    multi-node booking was refused by.
+    """
+
+    def __init__(self, stage: str, node_uuid: str = '') -> None:
+        super().__init__(stage)
+        self.stage = stage
+        self.node_uuid = node_uuid
+
+
+def _empty_book_holds_result() -> BookClaimHoldsResult:
+    """A successful, not-yet-decided booking reply."""
+    return {
+        'success': True,
+        'error': '',
+        'booked': False,
+        'refused_reason': '',
+        'dimensions': [],
+        'holds': [],
+    }
+
+
+def _claim_hold_sum_guard(
+        dimension: str, claim_key: UUID,
+        requested: int = 0) -> sa.ColumnElement[bool]:
+    """``limit_* >= sum(this claim's holds) + requested``, for one dimension.
+
+    The one rendering of the claim-side invariant, shared by every
+    statement that has to assert it so the two sites cannot drift apart.
+    It is built to be dropped into the WHERE of a guarded UPDATE of the
+    claim's own row and nowhere else -- see the section comment above for
+    why a SELECT of the same sum ahead of that UPDATE is a concurrency
+    defect rather than a tidier spelling.
+
+    The COALESCE is load bearing rather than defensive. SUM over no rows
+    is NULL, ``x >= NULL`` is NULL, and NULL is not true, so without it
+    the first booking against a claim -- and every claim create, which
+    has no holds by construction -- would fail its own guard.
+
+    ``requested`` is what the statement is about to book and is zero for
+    a caller that is only asserting the invariant still holds.
+    """
+    claims = _get_namespace_claims_table()
+    holds = _get_namespace_claim_holds_table()
+    booked = sa.func.coalesce(
+        sa.select(sa.func.sum(holds.c[dimension])).where(
+            holds.c.claim_uuid == claim_key).scalar_subquery(), 0)
+    return claims.c[f'limit_{dimension}'] >= booked + requested
+
+
+def _hold_select() -> sa.Select[Any]:
+    """The projection every hold read returns.
+
+    The timestamps are converted to epoch seconds server side, for the
+    reason _claim_select() does it: they are DATETIME columns written
+    from the server's own clock, and a client that reinterpreted them in
+    its own timezone would publish a booking order that is not the one
+    a release will act on.
+    """
+    holds = _get_namespace_claim_holds_table()
+    return sa.select(
+        holds.c.uuid, holds.c.claim_uuid, holds.c.namespace, holds.c.cpus,
+        holds.c.memory_mb, holds.c.disk_gb, holds.c.node_uuid,
+        holds.c.instance_uuid,
+        sa.func.unix_timestamp(holds.c.created_at).label('created_at'),
+        sa.func.unix_timestamp(holds.c.updated_at).label('updated_at'))
+
+
+def _hold_row_to_dict(row: sa.Row[Any]) -> NamespaceClaimHoldRow:
+    """Convert a _hold_select() row into the dict callers see."""
+    return {
+        'uuid': str(row.uuid),
+        'claim_uuid': str(row.claim_uuid),
+        'namespace': str(row.namespace),
+        'cpus': int(row.cpus),
+        'memory_mb': int(row.memory_mb),
+        'disk_gb': int(row.disk_gb),
+        'node_uuid': str(row.node_uuid) if row.node_uuid else '',
+        'instance_uuid': str(row.instance_uuid) if row.instance_uuid else '',
+        'created_at': float(row.created_at or 0),
+        'updated_at': float(row.updated_at or 0),
+    }
+
+
+def _parse_hold_shapes(
+        shapes: list[dict[str, Any]]
+) -> tuple[list[tuple[UUID, dict[str, int]]], dict[UUID, dict[str, int]]]:
+    """Validate a booking request and total it per node.
+
+    Returns the shapes paired with their parsed node, in the order the
+    caller gave them, and what each node is being asked for. The per
+    node totals are what the node guards test: two shapes of one
+    booking landing on one node spend that node's room once each, so a
+    pair that fits individually and not together has to be refused.
+
+    Raises ValueError for a request this function will not book, which
+    the caller turns into an error rather than a refusal. A shape with
+    no node is a caller defect and not a capacity decision: choosing
+    nodes belongs to the scheduler, above this tier.
+    """
+    if not shapes:
+        # Refused rather than booked as a no-op, for the reason
+        # find_candidates_for_shapes() refuses an empty set: a caller
+        # asking whether a booking fits would read success as "all of
+        # it does".
+        raise ValueError('at least one shape is required')
+
+    parsed: list[tuple[UUID, dict[str, int]]] = []
+    per_node: dict[UUID, dict[str, int]] = {}
+    for index, shape in enumerate(shapes):
+        node_uuid = str(shape.get('node_uuid') or '')
+        if not node_uuid:
+            raise ValueError(f'shape {index} names no node')
+        try:
+            node_key = UUID(node_uuid)
+        except ValueError as e:
+            raise ValueError(f'shape {index} has a malformed node: {e}') from e
+
+        wanted = {d: int(shape.get(d) or 0) for d in CAPACITY_DIMENSIONS}
+        if min(wanted.values()) < 0:
+            raise ValueError(f'shape {index} cannot be negative')
+
+        parsed.append((node_key, wanted))
+        node_total = per_node.setdefault(
+            node_key, {d: 0 for d in CAPACITY_DIMENSIONS})
+        for dimension in CAPACITY_DIMENSIONS:
+            node_total[dimension] += wanted[dimension]
+
+    return parsed, per_node
+
+
+def _hold_denial_dimensions(
+        stage: str, claim_key: UUID, node_uuid: str,
+        requested: dict[str, int]) -> list[CapacityDimensionDetailDict]:
+    """Per-dimension detail for a refused booking, read after the rollback.
+
+    The same shape and the same caveat as _admission_denial_dimensions():
+    MariaDB cannot say which of an UPDATE's WHERE clauses failed and the
+    transaction that knew has been rolled back, so the numbers come from
+    a follow-up read and ``exceeded`` is recomputed from what was read
+    rather than asserted.
+
+    The triple is the guard rearranged into the limit/used/requested
+    shape every other denial detail uses. At the claim stage ``used`` is
+    what the claim has already booked; at the node stage it is
+    ``used_* + held_*``, which is the term the node guard actually
+    tested -- reporting ``used_*`` alone there would describe a refusal
+    that did not happen.
+    """
+    engine = _get_engine()
+    dimensions: list[CapacityDimensionDetailDict] = []
+
+    try:
+        with engine.connect() as conn:
+            if stage == 'claim':
+                claims = _get_namespace_claims_table()
+                holds = _get_namespace_claim_holds_table()
+                claim = conn.execute(sa.select(claims).where(
+                    claims.c.uuid == claim_key)).first()
+                if claim is None:
+                    return dimensions
+                booked = conn.execute(sa.select(*[
+                    sa.func.coalesce(sa.func.sum(holds.c[d]), 0).label(d)
+                    for d in CAPACITY_DIMENSIONS]).where(
+                        holds.c.claim_uuid == claim_key)).first()
+                for dimension in CAPACITY_DIMENSIONS:
+                    dimensions.append(_capacity_dimension(
+                        dimension,
+                        getattr(claim, f'limit_{dimension}'),
+                        getattr(booked, dimension) if booked else 0,
+                        requested[dimension]))
+
+            elif stage == 'node' and node_uuid:
+                capacity = _get_scheduler_node_capacity_table()
+                row = conn.execute(sa.select(capacity).where(
+                    capacity.c.node_uuid == UUID(node_uuid))).first()
+                if row is None:
+                    return dimensions
+                for dimension in CAPACITY_DIMENSIONS:
+                    dimensions.append(_capacity_dimension(
+                        dimension,
+                        getattr(row, f'limit_{dimension}'),
+                        (getattr(row, f'used_{dimension}')
+                         + getattr(row, f'held_{dimension}')),
+                        requested[dimension]))
+    except OperationalError as e:
+        # The detail is diagnostic, not load bearing: the refusal is
+        # already decided and rolled back either way.
+        LOG.warning(f'Could not read hold refusal detail for {stage}: {e}')
+
+    return dimensions
+
+
+def _hold_refusal_reason(stage: str, claim_key: UUID) -> str:
+    """Why a booking's guarded UPDATE matched no row, read after rollback.
+
+    A claim-stage miss has three causes which a caller has to tell
+    apart: the claim is gone, its coverage is no longer active, or the
+    booking would put it over its own limits. The guard cannot say
+    which, so this reads the row back -- and reads it fresh rather than
+    trusting the probe, because what matters is the claim as it now
+    stands after whatever concurrent writer moved it.
+    """
+    if stage != 'claim':
+        return 'node_capacity'
+    row = _read_claim_row(claim_key)
+    if row is None:
+        return 'not_found'
+    if row.state != CLAIM_STATE_ACTIVE:
+        return 'not_active'
+    return 'claim_capacity'
+
+
 def _direct_book_claim_holds(
     claim_uuid: str, shapes: list[dict[str, Any]]
-) -> dict[str, Any]:
-    """Book shapes onto nodes against a claim.
+) -> BookClaimHoldsResult:
+    """Book shapes onto nodes against a claim, all or nothing.
 
-    The wire surface exists before the transaction behind it, so that
-    the servicer, its counter and the generated stubs can be reviewed
-    on their own. Raising rather than returning a refusal is deliberate:
-    a refusal says the guard ran and said no, and nothing here has.
+    One transaction in the canonical order, retried as a whole on
+    transient contention. The steps are:
+
+    1. The claim probe, **outside** the transaction (_read_claim_row),
+       which supplies the namespace the hold rows carry and refuses a
+       claim that is absent or no longer active before anything is
+       written. Racy by construction and bounded in the same way the
+       other probes in this file are: the claim UPDATE below carries
+       the coverage test as well, so a claim that lapses between the
+       probe and the transaction is still refused by SQL, and a claim
+       uuid's namespace never changes.
+    2. The claim's guarded UPDATE, which is therefore the transaction's
+       first statement: ``limit_* >= sum(this claim's holds) +
+       requested`` per dimension, as a scalar subquery inside the WHERE
+       (_claim_hold_sum_guard). Its SET is the row's ``updated_at``
+       alone, because a hold's room is not counted on the claim row --
+       the claim's ``used_*`` is instance usage and a hold is not an
+       instance. The statement is still DML and still takes the claim's
+       row lock first, which is what the ER_CHECKREAD invariant
+       requires and what serialises two bookings of one claim against
+       each other.
+    3. One guarded UPDATE per node, in node-uuid order, incrementing
+       ``held_*`` under ``used_* + held_* + request <= limit_*``. The
+       fixed intra-table order is the discipline the inter-table
+       canonical order buys, for the reason given beside _claim_node():
+       without it two bookings touching the same pair of nodes in
+       opposite orders deadlock instead of queueing.
+    4. The INSERT of one hold row per shape, last in the canonical
+       order, in the order the caller gave the shapes.
+    5. A read-back of the rows just written, for the reply. A read
+       after our own writes, on rows this transaction holds the locks
+       on, which is what the ER_CHECKREAD invariant permits.
+
+    A guarded UPDATE matching no row aborts the whole transaction: a
+    booking is all or nothing, so a refusal moves no counter and writes
+    no row, and the reply names the stage that refused and the
+    dimensions it refused on.
+
+    **A node with no capacity row refuses rather than failing open**,
+    which is deliberately the opposite of what an instance admission
+    does for the same missing row, because the two are not the same bet.
+    Admitting an instance unguarded records where a machine already is,
+    and a guard cannot refuse reality. A booking is a *promise* instead,
+    and granting one against a row nothing has sized yet promises room
+    the cluster may have no way to keep -- the same reasoning that makes
+    a claim create refuse when the cluster singleton is missing. The
+    caller can book again once the reconciler has sized the node.
+
+    Choosing the nodes is **not** this function's job. The caller passes
+    each shape's node, because placement is a scheduler decision made
+    against measurements this tier cannot see, and a booking that chose
+    its own nodes would be a second, disagreeing scheduler.
+
+    Rowcount semantics are the ones
+    _direct_admit_instance_placement()'s docstring records: mysqldb sets
+    CLIENT_FOUND_ROWS, so rowcount is rows *matched*. That is load
+    bearing here -- the claim UPDATE's SET is a timestamp which a
+    re-booking within the same second leaves unchanged, and that must
+    read as "the guard passed" rather than as a refusal.
+
+    Emits no events: the caller emits them from the reply, so
+    sf-database never has to know a claim's event history.
     """
-    raise NotImplementedError('booking claim holds is not implemented')
+    result = _empty_book_holds_result()
+
+    try:
+        claim_key = UUID(claim_uuid)
+    except ValueError as e:
+        LOG.warning(f'book_claim_holds given a malformed uuid: {e}')
+        result['success'] = False
+        result['error'] = f'malformed uuid: {e}'
+        return result
+
+    try:
+        parsed, per_node = _parse_hold_shapes(shapes)
+    except ValueError as e:
+        LOG.warning(f'book_claim_holds given an unbookable request: {e}')
+        result['success'] = False
+        result['error'] = str(e)
+        return result
+
+    requested = {d: sum(wanted[d] for _, wanted in parsed)
+                 for d in CAPACITY_DIMENSIONS}
+
+    engine = _get_engine()
+    claims = _get_namespace_claims_table()
+    capacity = _get_scheduler_node_capacity_table()
+    holds = _get_namespace_claim_holds_table()
+
+    def _book() -> BookClaimHoldsResult:
+        outcome = _empty_book_holds_result()
+
+        # (1) The probe, on its own connection outside the transaction
+        # -- see the block comment above _probe_admission_rows(). Re-run
+        # on every attempt, so a transaction that lost a race re-reads
+        # the world rather than re-deciding on the losing view.
+        current = _read_claim_row(claim_key)
+        if current is None:
+            raise _HoldBookingDenied('claim')
+        if current.state != CLAIM_STATE_ACTIVE:
+            raise _HoldBookingDenied('claim')
+        namespace = str(current.namespace)
+
+        hold_keys = [uuid4() for _ in parsed]
+
+        with engine.begin() as conn:
+            # INVARIANT: the first statement executed on this connection
+            # must be a guarded UPDATE. A plain SELECT here establishes
+            # the transaction's read view early and makes every later
+            # guarded UPDATE against a contended row abort with
+            # ER_CHECKREAD (1020) under innodb_snapshot_isolation, which
+            # is ON by default from MariaDB 11.6.2. The design benchmark
+            # predicted this and a concurrency run against a real
+            # MariaDB reproduced it (46 of 50 concurrent admissions
+            # exhausting the retry budget). The sum of this claim's
+            # holds is therefore a subquery *inside* the UPDATE rather
+            # than a SELECT in front of it. Reads after our own writes
+            # are fine -- we hold those row locks.
+
+            # (2) namespace_claims. The claim is tested, not charged:
+            # held room lives on the node rows and in the hold rows,
+            # and a second copy of it on the claim would be a ledger
+            # that agrees with the first only until the next write.
+            if conn.execute(sa.update(claims).where(sa.and_(
+                    claims.c.uuid == claim_key,
+                    claims.c.state == CLAIM_STATE_ACTIVE, *[
+                        _claim_hold_sum_guard(d, claim_key, requested[d])
+                        for d in CAPACITY_DIMENSIONS])).values(
+                            updated_at=sa.func.now())).rowcount == 0:
+                raise _HoldBookingDenied('claim')
+
+            # (3) scheduler_node_capacity, one row per node, in uuid
+            # order. The guard is the admission guard's own arithmetic
+            # on the other side of the ledger: a booking and a placement
+            # draw down the same node room, so they have to test the
+            # same sum.
+            for node_key in sorted(per_node, key=lambda key: key.int):
+                wanted = per_node[node_key]
+                if conn.execute(sa.update(capacity).where(sa.and_(
+                        capacity.c.node_uuid == node_key, *[
+                            (capacity.c[f'used_{d}'] + capacity.c[f'held_{d}']
+                             + wanted[d] <= capacity.c[f'limit_{d}'])
+                            for d in CAPACITY_DIMENSIONS])).values(
+                                updated_at=sa.func.now(), **{
+                                    f'held_{d}': capacity.c[f'held_{d}']
+                                    + wanted[d]
+                                    for d in CAPACITY_DIMENSIONS
+                                })).rowcount == 0:
+                    raise _HoldBookingDenied('node', str(node_key))
+
+            # (4) namespace_claim_holds, last. The instance uuid is left
+            # NULL: nothing has consumed a hold at the moment it is
+            # booked, and that column is the whole of the consumption
+            # state.
+            conn.execute(sa.insert(holds).values([
+                {
+                    'uuid': hold_key,
+                    'claim_uuid': claim_key,
+                    'namespace': namespace,
+                    'cpus': wanted['cpus'],
+                    'memory_mb': wanted['memory_mb'],
+                    'disk_gb': wanted['disk_gb'],
+                    'node_uuid': node_key,
+                    'instance_uuid': None,
+                    'created_at': sa.func.now(),
+                    'updated_at': sa.func.now(),
+                }
+                for hold_key, (node_key, wanted) in zip(hold_keys, parsed)
+            ]))
+
+            # (5) Read back what we just wrote, for the reply, and
+            # return it in the order the caller asked for rather than
+            # the order the rows come back in.
+            rows = {
+                str(row.uuid): _hold_row_to_dict(row)
+                for row in conn.execute(_hold_select().where(
+                    holds.c.uuid.in_(hold_keys))).fetchall()
+            }
+            outcome['holds'] = [
+                rows[str(key)] for key in hold_keys if str(key) in rows]
+
+        outcome['booked'] = True
+        return outcome
+
+    try:
+        return _retry_transaction(
+            _book, f'book_claim_holds({claim_uuid})')
+    except _HoldBookingDenied as denial:
+        result['refused_reason'] = _hold_refusal_reason(
+            denial.stage, claim_key)
+        result['dimensions'] = _hold_denial_dimensions(
+            denial.stage, claim_key, denial.node_uuid,
+            per_node[UUID(denial.node_uuid)] if denial.node_uuid
+            else requested)
+        # Which node refused is not on the wire -- the reply carries a
+        # stage and its dimensions -- so name it here, because a
+        # multi-node booking's refusal is otherwise unattributable.
+        LOG.with_fields({
+            'claim': claim_uuid, 'stage': denial.stage,
+            'node': denial.node_uuid,
+            'reason': result['refused_reason']}).warning(
+                'Refused a shape hold booking')
+        return result
+    except (OperationalError, IntegrityError) as e:
+        LOG.warning(
+            f'MariaDB book_claim_holds failed for {claim_uuid}: {e}')
+        result['success'] = False
+        result['error'] = f'MariaDB error: {e}'
+        return result
 
 
-def _direct_get_namespace_claim_holds(claim_uuid: str) -> list[dict[str, Any]]:
-    """List the hold rows a claim has booked.
+def _direct_get_namespace_claim_holds(
+        claim_uuid: str) -> list[NamespaceClaimHoldRow]:
+    """Read the hold rows a claim has booked, oldest first.
 
-    Returns no rows until the read is written, which is what a claim
-    with no holds reports; every hold-reading caller already has to
-    handle that.
+    Ordered by ``created_at`` and then uuid, which is the order a shrink
+    reads them in reverse to release the most recently booked first, and
+    a stable order for two holds booked in the same second.
+
+    An empty list means the claim holds nothing. It never means the read
+    failed: a database failure raises, for the reason
+    _direct_get_namespace_claims() records at greater length -- a
+    release path handed an empty list by a database that was merely
+    unwell would conclude there was nothing to give back and move the
+    counters accordingly.
     """
-    return []
+    holds = _get_namespace_claim_holds_table()
+
+    try:
+        claim_key = UUID(claim_uuid)
+    except ValueError as e:
+        LOG.warning(f'get_namespace_claim_holds given a malformed uuid: {e}')
+        return []
+
+    try:
+        engine = _get_engine()
+        with engine.connect() as conn:
+            rows = conn.execute(_hold_select().where(
+                holds.c.claim_uuid == claim_key).order_by(
+                    holds.c.created_at, holds.c.uuid)).fetchall()
+        return [_hold_row_to_dict(row) for row in rows]
+    except OperationalError as e:
+        LOG.warning(f'MariaDB query failed for namespace_claim_holds: {e}')
+        raise exceptions.DatabaseUnavailable(
+            f'holds for namespace claim {claim_uuid} could not be read: '
+            f'{e}') from e
 
 
 def _direct_release_claim_holds(
@@ -32212,6 +32791,82 @@ def _grpc_get_namespace_claims(
     return [_claim_from_proto(claim) for claim in reply.claims]
 
 
+def _hold_from_proto(hold: Any) -> NamespaceClaimHoldRow:
+    """Convert a NamespaceClaimHold proto message into the dict form.
+
+    The two nullable uuids are empty strings on the wire and stay empty
+    strings here, so a caller tests one field rather than two spellings
+    of absent.
+    """
+    return {
+        'uuid': hold.uuid,
+        'claim_uuid': hold.claim_uuid,
+        'namespace': hold.namespace,
+        'cpus': int(hold.cpus),
+        'memory_mb': int(hold.memory_mb),
+        'disk_gb': int(hold.disk_gb),
+        'node_uuid': hold.node_uuid,
+        'instance_uuid': hold.instance_uuid,
+        'created_at': float(hold.created_at),
+        'updated_at': float(hold.updated_at),
+    }
+
+
+def _grpc_book_claim_holds(
+        claim_uuid: str,
+        shapes: list[dict[str, Any]]) -> BookClaimHoldsResult:
+    """Book shapes onto nodes via the database microservice."""
+    result = _empty_book_holds_result()
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.BookNamespaceClaimHoldsRequest(
+            claim_uuid=claim_uuid,
+            shapes=[
+                database_pb2.NamespaceClaimHoldShape(
+                    cpus=int(shape.get('cpus') or 0),
+                    memory_mb=int(shape.get('memory_mb') or 0),
+                    disk_gb=int(shape.get('disk_gb') or 0),
+                    node_uuid=str(shape.get('node_uuid') or ''))
+                for shape in shapes
+            ])
+        reply = _grpc_call(stub.BookNamespaceClaimHolds, request)
+        result['success'] = bool(reply.success)
+        result['error'] = reply.error
+        result['booked'] = bool(reply.booked)
+        result['refused_reason'] = reply.refused_reason
+        result['dimensions'] = [
+            _dimension_from_proto(d) for d in reply.dimensions]
+        result['holds'] = [_hold_from_proto(h) for h in reply.holds]
+        return result
+    except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
+        LOG.error(f'gRPC BookNamespaceClaimHolds failed: {e}')
+        result['success'] = False
+        result['error'] = f'database unavailable: {e}'
+        return result
+
+
+def _grpc_get_namespace_claim_holds(
+        claim_uuid: str) -> list[NamespaceClaimHoldRow]:
+    """List a claim's holds via the database microservice.
+
+    An unreachable database raises rather than returning an empty list,
+    for the reason _grpc_get_namespace_claims() records: a reply whose
+    only payload is a repeated field has nowhere to say "the read
+    failed", so an empty list has to mean "no holds" and nothing else.
+    The servicer holds up the other end of that bargain by setting
+    INTERNAL on a failed read.
+    """
+    stub = _get_database_stub()
+    request = database_pb2.GetNamespaceClaimHoldsRequest(
+        claim_uuid=claim_uuid)
+    try:
+        reply = _grpc_call(stub.GetNamespaceClaimHolds, request)
+    except grpc.RpcError as e:
+        LOG.error(f'gRPC GetNamespaceClaimHolds failed: {e}')
+        raise exceptions.DatabaseUnavailable(str(e)) from e
+    return [_hold_from_proto(hold) for hold in reply.holds]
+
+
 def create_namespace_claim(
         claim_uuid: str, namespace: str, limit_cpus: int,
         limit_memory_mb: int, limit_disk_gb: int,
@@ -32319,3 +32974,48 @@ def get_namespace_claims(
     if _use_database_service():
         return _grpc_get_namespace_claims(namespace, coverage_state)
     return _direct_get_namespace_claims(namespace, coverage_state)
+
+
+def book_claim_holds(
+        claim_uuid: str,
+        shapes: list[dict[str, Any]]) -> BookClaimHoldsResult:
+    """Book one hold per shape against a claim, all or nothing.
+
+    Each shape is ``{'cpus': int, 'memory_mb': int, 'disk_gb': int,
+    'node_uuid': str}`` and the node is required: which node a shape
+    lands on is a scheduler decision, made against measurements this
+    tier cannot see, so this books what it is told to book.
+
+    The booking is guarded on both sides in one transaction -- the
+    claim may not book past its own limits, and no node may be booked
+    past the room it has left once its placements are counted -- and a
+    refusal on either moves no counter and writes no row.
+
+    Returns:
+
+        {'success': bool, 'error': str, 'booked': bool,
+         'refused_reason': '' | 'claim_capacity' | 'node_capacity'
+                              | 'not_found' | 'not_active',
+         'dimensions': [{'dimension': str, 'limit': float, 'used': float,
+                         'requested': float, 'exceeded': bool,
+                         'shortfall': float}, ...],
+         'holds': [{...}, ...]}
+
+    ``success`` says the RPC ran; ``booked`` says what it decided.
+    """
+    if _use_database_service():
+        return _grpc_book_claim_holds(claim_uuid, shapes)
+    return _direct_book_claim_holds(claim_uuid, shapes)
+
+
+def get_namespace_claim_holds(claim_uuid: str) -> list[NamespaceClaimHoldRow]:
+    """Every hold a claim has booked, oldest first.
+
+    An empty list means the claim holds nothing. A failed read raises
+    rather than reading as empty, on both sides of the tier boundary,
+    because a release path cannot tell the two apart and is destructive
+    about the difference.
+    """
+    if _use_database_service():
+        return _grpc_get_namespace_claim_holds(claim_uuid)
+    return _direct_get_namespace_claim_holds(claim_uuid)
