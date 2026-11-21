@@ -22,6 +22,7 @@ two arms apart -- the pull request arm is deliberately narrower than the whole
 code change, and the merge arm must never be.
 """
 
+import ast
 import glob
 import os
 import re
@@ -49,6 +50,20 @@ JOB_SUPPORT_FILES = (
     'tools/ci-install-mariadb.sh',
     'tools/bootstrap-mariadb.sql',
 )
+
+# In-repo modules the live modules import which the filter deliberately does
+# not match, each with the reason. Every other in-repo import must be
+# matched: a shared helper changes what a live test asserts as surely as the
+# test module does.
+DELIBERATELY_UNFILTERED = {
+    # The generic unit test harness. It changes often for reasons unrelated
+    # to MariaDB, and would run the job on most test-touching pull requests.
+    'shakenfist/tests/base.py': 'generic test harness',
+    # Plain constant and exception definitions; a change which alters live
+    # behaviour through one of these also touches mariadb.py or schema/.
+    'shakenfist/constants.py': 'constants',
+    'shakenfist/exceptions.py': 'exception classes',
+}
 
 # The glob the live test script hands stestr, as a shell path rather than as
 # the module regex 'shakenfist\.tests\.test_mariadb_.*_live\.' it is written
@@ -132,6 +147,88 @@ class SchemaEnumWideningSeamsTestCase(base.ShakenFistTestCase):
                 '%s is run by the %s job but is not matched by the %s paths '
                 'filter, so changing it would not run the job'
                 % (path, JOB, FILTER_NAME))
+
+    def _live_module_imports(self):
+        """Every in-repo module a live module imports, as a repository path.
+
+        ``from shakenfist.x import y`` resolves to ``shakenfist/x/y.py`` when
+        that is a module and to ``shakenfist/x.py`` (or its package
+        ``__init__.py``) when ``y`` is a name inside it.
+        """
+        def module_path(dotted):
+            base_path = os.path.join(*dotted.split('.'))
+            for candidate in (base_path + '.py',
+                              os.path.join(base_path, '__init__.py')):
+                if os.path.exists(os.path.join(self.repo_root, candidate)):
+                    return candidate
+            return None
+
+        found = {}
+        for path in glob.glob(os.path.join(self.repo_root, LIVE_MODULE_GLOB)):
+            relative = os.path.relpath(path, self.repo_root)
+            with open(path) as f:
+                tree = ast.parse(f.read(), filename=relative)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.module and \
+                        node.module.split('.')[0] == 'shakenfist':
+                    for alias in node.names:
+                        target = (module_path('%s.%s' % (node.module, alias.name))
+                                  or module_path(node.module))
+                        self.assertIsNotNone(
+                            target, '%s imports %s from %s, which does not '
+                            'resolve to a file' % (relative, alias.name, node.module))
+                        found.setdefault(target, set()).add(relative)
+                elif isinstance(node, ast.Import):
+                    for alias in node.names:
+                        if alias.name.split('.')[0] == 'shakenfist':
+                            target = module_path(alias.name)
+                            self.assertIsNotNone(target, alias.name)
+                            found.setdefault(target, set()).add(relative)
+        return found
+
+    def test_the_filter_matches_every_in_repo_module_the_live_tests_import(self):
+        # A shared helper such as hard_delete_cases.py decides what a live
+        # test asserts. One outside the filter is the silent class this file
+        # exists to close: changing it would not run the tests it changes.
+        patterns = [_as_regex(p) for p in self._filter_patterns()]
+        imports = self._live_module_imports()
+        self.assertIn(
+            'shakenfist/mariadb.py', imports,
+            'The import scrape found no live module importing mariadb.py, '
+            'so it is probably not reading the imports at all')
+        unmatched = sorted(
+            '%s (imported by %s)' % (target, ', '.join(sorted(importers)))
+            for target, importers in imports.items()
+            if target not in DELIBERATELY_UNFILTERED
+            and not any(r.match(target) for r in patterns))
+        self.assertEqual(
+            [], unmatched,
+            'These in-repo modules are imported by live MariaDB tests but '
+            'are not matched by the %s paths filter, so a pull request '
+            'changing one would not run the tests it affects. Add each to '
+            'the filter, or to DELIBERATELY_UNFILTERED with the reason: %s'
+            % (FILTER_NAME, '; '.join(unmatched)))
+
+    def test_every_deliberate_exclusion_is_still_imported(self):
+        # An exclusion for a module nothing imports any more is a stale
+        # reason waiting to excuse something else.
+        imports = self._live_module_imports()
+        stale = sorted(set(DELIBERATELY_UNFILTERED) - set(imports))
+        self.assertEqual(
+            [], stale,
+            'DELIBERATELY_UNFILTERED names modules no live test imports: %s'
+            % ', '.join(stale))
+
+    def test_the_pull_request_run_gates_enqueue(self):
+        # The pull request arm only helps if its result stops the pull
+        # request being enqueued. can_enqueue is what the ruleset requires,
+        # so the job has to be among the things it consumes; otherwise a red
+        # run is a visible signal and nothing more, and the merge group
+        # still ejects the entry (issue #5005).
+        self.assertIn(
+            JOB, self.jobs['can_enqueue']['needs'],
+            'can_enqueue does not need %s, so a failing pull request run of '
+            'it does not block enqueue' % JOB)
 
     def test_check_paths_exports_the_filter(self):
         outputs = self.jobs['check_paths']['outputs']

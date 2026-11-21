@@ -15,6 +15,7 @@ path because tools/ is not a package.
 import importlib.util
 import io
 import os
+from unittest import mock
 
 from shakenfist.tests import base
 
@@ -191,6 +192,21 @@ class ReportTestCase(base.ShakenFistTestCase):
                                   lanes_result='failure', out=io.StringIO()))
         self.assertEqual([report_tool.title_for(report_tool.UNATTRIBUTED)],
                          [title for title, _ in github.created])
+
+    def test_an_unrecognised_lanes_result_is_refused_not_read_as_a_failure(self):
+        # A mis-expanded expression, a typo or a result this tool has no
+        # semantics for would otherwise fall through to failure and file the
+        # unattributed issue. argparse refuses it before anything is asked
+        # of GitHub.
+        for value in ('', 'canceled', 'skipped'):
+            with mock.patch('sys.stderr', new_callable=io.StringIO) as err:
+                with self.assertRaises(SystemExit) as raised:
+                    report_tool.main([
+                        '--repo', 'shakenfist/shakenfist', '--run-id', '100',
+                        '--workflow', 'scheduled-tests.yml', '--caller', CALLER,
+                        '--lanes-result', value])
+            self.assertEqual(2, raised.exception.code, value)
+            self.assertIn('--lanes-result', err.getvalue())
 
     def test_dry_run_writes_nothing(self):
         github = FakeGitHub([_job(UBUNTU, 'failure')])

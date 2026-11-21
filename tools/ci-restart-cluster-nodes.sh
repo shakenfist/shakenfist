@@ -1,9 +1,10 @@
 #!/bin/bash
 
-# Restart every under-cloud test instance after the node lifecycle test,
+# Restart the under-cloud test instances after the node lifecycle test,
 # and wait for ssh to return on each. The lifecycle test deliberately
-# powers off or kills nodes, so every node is power cycled here before
-# CI log gathering fans out over them.
+# powers off or kills nodes, so every node but the primary (where the
+# test itself runs) is power cycled here before CI log gathering fans
+# out over them.
 #
 # We have repeatedly observed nodes fail to return from `reboot --hard`
 # when every instance cycles at once. The failure signature is a VM
@@ -13,8 +14,9 @@
 # including the guest console, and try a full power cycle (poweroff,
 # pause, poweron) before failing.
 #
-# Requires the under-cloud sf-client credentials and the sf{N}_uuid
-# variables from ci-environment.sh, which the caller must have sourced.
+# Requires the under-cloud sf-client credentials and the node variables
+# from ci-environment.sh (see tools/ci-cluster-nodes.sh), which the caller
+# must have sourced.
 #
 # Arguments (positional):
 #   $1  ssh user for the test nodes (default: debian)
@@ -22,29 +24,39 @@
 set -x
 SSH_USER="${1:-debian}"
 
-# The nodes, their under-cloud instances and their addresses, asked of
-# the cluster rather than written down here. The pair of hand-written
-# arrays this replaces was indexed positionally against a hardcoded
-# address list for a topology in another repository (issue #4320); now
-# each node's address arrives attached to its own uuid, so the pairing
-# cannot drift.
+# The nodes, their under-cloud instances and their addresses, read from
+# the cluster build's own list rather than written down here. The pair
+# of hand-written arrays this replaces was indexed positionally against
+# a hardcoded address list for a topology in another repository (issue
+# #4320); now each node's address arrives attached to its own uuid, so
+# the pairing cannot drift. The primary is not listed: the lifecycle
+# test runs on it, so it is never the node the test killed.
+#
+# This script does not run under "set -e", so the helper's refusal has
+# to be checked by hand, and it is checked on its exit status, captured
+# before anything reads its output. Reading it through a pipe or a
+# process substitution would lose that status, and a list which failed
+# part way would power cycle the nodes before the failure and report
+# success for the rest.
+if ! node_list=$(bash "$(dirname "$0")/ci-cluster-nodes.sh"); then
+    echo "ci-restart-cluster-nodes.sh: ci-cluster-nodes.sh could not list" \
+         "the cluster's nodes, so there is nothing safe to restart. Its" \
+         "error is above." >&2
+    exit 1
+fi
+
 addresses=()
 uuids=()
 while read -r name uuid address; do
+    if [ -z "${name}" ] || [ -z "${uuid}" ] || [ -z "${address}" ]; then
+        echo "ci-restart-cluster-nodes.sh: ci-cluster-nodes.sh printed a" \
+             "line without a name, uuid and address: '${name} ${uuid}" \
+             "${address}'" >&2
+        exit 1
+    fi
     addresses+=("${address}")
     uuids+=("${uuid}")
-done < <(bash "$(dirname "$0")/ci-cluster-nodes.sh")
-
-# This script does not run under "set -e", and a process substitution
-# cannot fail the read loop, so the helper's refusal has to be checked.
-# Power cycling nothing and reporting success is the quiet failure the
-# helper exists to prevent.
-if [ "${#uuids[@]}" -eq 0 ]; then
-    echo "ci-restart-cluster-nodes.sh: ci-cluster-nodes.sh listed no" \
-         "cluster nodes, so there is nothing to restart. Its error is" \
-         "above." >&2
-    exit 1
-fi
+done <<< "${node_list}"
 
 # The reboot has to be issued against the under-cloud's API. Don't let
 # one failed reboot abort the rest of the loop -- we want every node

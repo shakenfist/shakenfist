@@ -481,8 +481,14 @@ job.
 [PLAN-transient-capacity-refusals-phase-05-queue-decision.md](../plans/PLAN-transient-capacity-refusals-phase-05-queue-decision.md)'s
 D43 -- "`empty` is a real zero; `absent` and `unparseable` stay
 unknown" -- is the decision this unlocked.
+A file that was read but whose every line was malformed is unknown
+as well -- not a zero -- for the same reason an absent one is, and it
+carries its own `state` of `unparseable` in the machine-readable
+record rather than appearing as an `available` file with a count of
+zero. The prose and the record have to say the same thing, because
+the tooling that reads this consumes the record, not the prose.
 
-There is a fourth state those five do not cover, and it is not a
+There is a further state those five do not cover, and it is not a
 reading of the file at all: a bundle whose suite has no code path that
 could ever write the trace. The Ansible modules lane is six playbooks
 with no Python test harness, so `BaseTestCase.setUp()` never executes
@@ -504,12 +510,6 @@ reading can now exclude by construction what it had to exclude by
 hand. Records at `harvest_version` 1 — everything committed under
 `docs/plans/data/` — predate the field, and a consumer reading those
 has to keep applying the exclusion itself.
-A file that was read but whose every line was malformed is unknown
-as well -- not a zero -- for the same reason an absent one is, and it
-carries its own `state` of `unparseable` in the machine-readable
-record rather than appearing as an `available` file with a count of
-zero. The prose and the record have to say the same thing, because
-the tooling that reads this consumes the record, not the prose.
 
 ### The series record format
 

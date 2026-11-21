@@ -297,14 +297,15 @@ jobs:
       # lives in shakenfist/actions and is consumed unpinned, so a node
       # added there was never chosen and a node renumbered there failed
       # for a reason that said nothing about topology (issue #4320).
-      # tools/ci-cluster-nodes.sh explains how, and exits non-zero
-      # rather than printing a short list.
+      # tools/ci-cluster-nodes.sh explains how. It leaves the primary out,
+      # so the target is never the primary, and exits non-zero rather than
+      # printing a short list -- including when no non-primary node exists.
       - name: Choose a random upload target
         run: |
           set -e -o pipefail
           . ${GITHUB_WORKSPACE}/ci-environment.sh
-          target=$(bash ${GITHUB_WORKSPACE}/shakenfist/tools/ci-cluster-nodes.sh \
-              | shuf -n 1 | cut -d' ' -f3)
+          node_list=$(bash ${GITHUB_WORKSPACE}/shakenfist/tools/ci-cluster-nodes.sh)
+          target=$(echo "${node_list}" | shuf -n 1 | cut -d' ' -f3)
           echo "Uploading the cached image to ${target}"
           echo "UPLOAD_TARGET=${target}" >> $GITHUB_ENV
 
