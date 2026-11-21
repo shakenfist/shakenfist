@@ -14879,6 +14879,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../developer_guide/agent_operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../developer_guide/agent_protocol/" class="md-nav__link">
         
   
@@ -16179,7 +16207,10 @@ request parameters themselves -- <code>deadline_seconds</code>,
 accepts -- see
 <a href="../../developer_guide/api_reference/instances/#bounding-how-long-an-agent-operation-may-take">the API reference</a>.
 This page is about what happens operationally once a request is
-enqueued.</p>
+enqueued. What callers can express -- ordering, and dependencies between
+operations -- is described in
+<a href="../../developer_guide/agent_operations/">the developer guide's agent operations page</a>,
+and is what they will be asking you to tune for.</p>
 <h2 id="one-executor-per-instance">One executor per instance<a class="headerlink" href="#one-executor-per-instance" title="Permanent link">&para;</a></h2>
 <p>The sidechannel daemon runs at most one executor thread per instance
 at a time: its dispatch loop skips any instance that already has a
@@ -16408,16 +16439,16 @@ before it even starts running.</p>
   operation is moved to <code>abort</code> and a <code>runs_after</code> one runs anyway. It
   is counted from the first dispatcher pass which found the operation
   blocked, in wall-clock time, so how often the dispatcher looks does
-  not change it. It is also the ceiling on a per-edge <code>settle_seconds</code>,
+  not change it. It is also the ceiling on a per-edge
+  <a href="../../developer_guide/api_reference/instances/#agentdependency"><code>settle_seconds</code></a>,
   because the dispatcher adds a declared settle to the budget once the
   dependency has been seen to finish: an operation with a settle can
   hold the queue head for the budget plus the settle, and capping the
-  settle at the budget caps that hold at twice it. A caller over the
-  ceiling is refused with a 400 when they ask rather than five minutes
-  later. The wait contains the dependency's
-  own queue time as well as its execution, so a chain several hops deep
-  against a busy instance can legitimately exceed the default. The
-  trade-off is that a blocked operation keeps its place in its
+  settle at the budget caps that hold at twice it. Which edges actually
+  spend the budget, and why an edge between two operations on the same
+  instance does not, are in
+  <a href="../../developer_guide/agent_operations/#what-waiting-for-a-dependency-costs">what waiting for a dependency costs</a>.
+  The trade-off is that a blocked operation keeps its place in its
   instance's strict FIFO queue and holds up everything behind it, so
   raising the option raises how long one caller's blocked chain can
   stall another caller's operations against the same instance. Raise
@@ -16429,11 +16460,6 @@ before it even starts running.</p>
   previously submit, and the OpenAPI document a deployment serves
   changes with it.</li>
 </ul>
-<p>The guarantee that a settle inside that ceiling can always elapse
-  holds for the edge carrying the settle, and only while it is the last
-  thing holding the operation. An operation with another unfinished
-  edge has already spent this budget by the time a long settle elapses,
-  so that edge gives up as soon as it is reached.</p>
 
 
 

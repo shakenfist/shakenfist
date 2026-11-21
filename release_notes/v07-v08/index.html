@@ -14493,6 +14493,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#agent-operations-can-wait-for-each-other" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent operations can wait for each other
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -15303,6 +15314,34 @@
           </ul>
         </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer_guide/agent_operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -16782,6 +16821,17 @@
     <span class="md-ellipsis">
       
         Finished operations are kept for fifteen minutes, errored ones included
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#agent-operations-can-wait-for-each-other" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent operations can wait for each other
       
     </span>
   </a>
@@ -18937,6 +18987,84 @@ for why each type is treated as it is.</p>
   own TTL left, so the 30 second and 300 second tiers share the space rather
   than the shorter tier being emptied first.</li>
 </ul>
+<h2 id="agent-operations-can-wait-for-each-other">Agent operations can wait for each other<a class="headerlink" href="#agent-operations-can-wait-for-each-other" title="Permanent link">&para;</a></h2>
+<p>Agent operations used to be a queue and nothing more. Each instance runs one
+at a time in the order they were created, and each runs whatever the one before
+it did: if a command wrote a file and the next one read it, the second still
+ran after the first had failed, against whatever the guest looked like by
+then. A caller who wanted anything stronger had to await each operation
+itself before submitting the next, which costs a round trip per link and
+cannot be done at all by a caller which is not the one waiting.</p>
+<p>An agent operation may now name other agent operations which already exist,
+in either of two lists:</p>
+<ul>
+<li><code>depends_on</code> is fate sharing. The new operation runs only if the operation
+  it names succeeded. If that operation errored, expired, was aborted or has
+  gone away, the dependent is not run at all: it moves to <code>abort</code>, and its
+  <code>dependency_failure</code> field says which dependency, and in what state, caused
+  that.</li>
+<li><code>runs_after</code> is ordering only. The new operation waits for the named one to
+  finish and then runs, whatever the outcome was. It never aborts anything
+  and never sets <code>dependency_failure</code>.</li>
+</ul>
+<p>An edge may name an operation on a different instance, so one chain can span
+a fleet, and an edge may carry a settle delay for guests which need a moment
+after whatever the dependency changed.</p>
+<p>This is not the same feature as the dependencies between <em>cluster</em>
+operations described elsewhere in these notes, although the vocabulary is
+shared. Those order the work an object's lifecycle enqueues inside the
+cluster and are never declared by a caller. These are declared by the caller
+of <code>agent/execute</code>, <code>agent/put</code> and <code>agent/get</code>, and order the work done
+inside a guest.</p>
+<p><code>abort</code> is a new terminal state, distinct from <code>error</code> (the operation failed)
+and <code>expired</code> (a timing budget ran out). It is written only by a <code>depends_on</code>
+edge, so a client which never declares a dependency will never see one of
+its own operations aborted. What you will see:</p>
+<ul>
+<li>A client which polls an instance's <em>whole</em> operation list, rather than
+  the operations it submitted, may now meet an <code>abort</code> which another
+  caller's chain produced. Check that your code treats it as terminal, as it
+  does <code>error</code> and <code>expired</code>, rather than waiting for it to change. An
+  unrecognised state is worth failing loudly on, not ignoring.</li>
+<li>A dependent still reads as <code>queued</code> for some while after its dependency
+  has failed. The cascade is evaluated when the dependent reaches the head of
+  its instance's queue, not when the failure happens.</li>
+</ul>
+<p>The new parameters are gated behind the <code>agentoperation-dependencies</code>
+capability, which a server advertises once it understands them. A client
+which finds the token missing and was asked to declare an edge raises
+<code>IncapableException</code> rather than sending the request without it, because a
+dropped edge means "run now", which is the opposite of what was asked for.
+The same caveat as for the deadline parameters applies during a rolling
+upgrade of <code>sf-api</code>: the capability list is read once when a client connects,
+so a request sent to a worker which has not yet restarted is refused rather
+than silently losing its edges, and succeeds once the rollout completes.</p>
+<p>There is deliberately no command line way to declare an edge. An edge has to
+name the UUID of an existing operation, and <code>sf-client instance execute</code>
+does not print one, so the API client is the way to build a chain.
+<code>shakenfist_client</code> provides <code>agent_dependency()</code> to build an edge and
+<code>await_agent_chain()</code> to await a chain and be told which link actually broke
+it.</p>
+<p><strong>An operator may need to act on one thing.</strong> A dependent whose dependency
+has not finished holds its instance's queue head, and so everything queued
+behind it, so the time it may spend blocked is bounded by
+<code>AGENT_OPERATION_DEPENDENCY_WAIT</code>. That budget starts when the dispatcher
+first finds the operation blocked, not when its dependency finishes. An edge
+to an operation on the same instance never starts it, because the dependent
+does not reach the head of the queue until its dependency is finished. An
+edge across instances does start it at once, so a chain which crosses
+instances has to fit inside a single budget. A <code>depends_on</code> operation which
+outlasts it is aborted; a <code>runs_after</code> operation runs anyway, so an edge which
+only asked for ordering stops ordering rather than failing. A cluster whose
+users chain slow work across instances may therefore need the option raised,
+at the price of a longer stall for everyone else using the blocked instance.
+See
+<a href="../../operator_guide/agent_operations/#what-to-tune-and-when">what to tune, and when</a>
+for the trade-off.</p>
+<p>The model, with worked examples, is in
+<a href="../../developer_guide/agent_operations/">agent operations</a>. The parameters,
+refusals and objects are in
+<a href="../../developer_guide/api_reference/instances/#declaring-dependencies-between-agent-operations">declaring dependencies between agent operations</a>.</p>
 
 
 

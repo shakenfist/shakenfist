@@ -14875,6 +14875,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../developer_guide/agent_operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../developer_guide/agent_protocol/" class="md-nav__link">
         
   
@@ -16463,8 +16491,16 @@ are in
     <code>docs/operator_guide/agent_operations.md</code> is a tuning and
     enforcement page for operators while the dependency vocabulary is
     an API contract. The example suite is an index section naming
-    sibling repositories, with <code>client-python-k3s</code> first and its
-    rolling update as the worked example. No new CI exercises the
+    sibling repositories, with <code>client-python-k3s</code> first. <em>Amended by
+    phase 4: its rolling update was named here as the worked example,
+    and there is no rolling update.</em> <code>Cluster.update_os()</code> updates
+    every node concurrently through <code>execute_and_await()</code>, and a
+    fleet-wide chain would not fit the wait budget phase 2 shipped
+    anyway, because a link's budget is anchored when that link is
+    first found blocked rather than when its dependency finishes. The
+    example suite survives; the example it was going to be does not,
+    and choosing what replaces it is phase 5's first job. No new CI
+    exercises the
     examples: each example repository has its own. The second example
     is chosen when there is a second feature to exercise, and is filed
     as an issue rather than invented here.</p>
@@ -16485,7 +16521,11 @@ are in
   required by it).</li>
 </ul>
 <h2 id="phases">Phases<a class="headerlink" href="#phases" title="Permanent link">&para;</a></h2>
-<p>Re-cut by phase 0. Two changes from the table this replaces: the
+<p>Re-cut twice. Phase 4's survey split this plan's documentation phase
+from its example-application phase, so documentation is phase 4, the
+<code>client-python-k3s</code> adoption is phase 5 and the push audit is phase 6;
+that row says why. The earlier re-cut was phase 0's, and what follows
+describes it. Two changes from the table it replaced: the
 cross-instance phase is folded into the evaluation phase, because
 decision 10 found that cross-instance edges cost nothing extra at
 evaluation, and the phases after it move up one. Phase 1 also carries
@@ -16527,19 +16567,26 @@ before this repository can emit one (decision 3).</p>
 <tr>
 <td>3</td>
 <td><a href="https://github.com/shakenfist/client-python/blob/develop/docs/plans/PLAN-agent-operation-dependencies-phase-03-client.md">PLAN-agent-operation-dependencies-phase-03-client.md</a> (in shakenfist/client-python, on its <code>develop</code>)</td>
-<td>In progress</td>
+<td>Complete</td>
 <td>client-python: chain pieces, await-the-chain UX, failure reporting from the chain's first failure, and <code>abort</code> in <code>TERMINAL_AGENT_OPERATION_STATES</code>. <strong>That frozenset must gain <code>abort</code> in the same commit as the submission parameters, or before them, never after</strong> -- the phase plan makes it a commit of its own, which is the same single-commit obligation phase 0 found between <code>TERMINAL_STATES</code> and <code>state_targets</code>. The plan file lives in the client repository because the code does, following the deadlines plan phase 6 precedent, and is linked absolutely because a relative link cannot cross repositories. Survey corrections applied at source, because this row was written during phase 2. (a) The await loop is at <code>apiclient.py:1523</code> (the method begins at <code>:1498</code>), not <code>:1443</code>, and it does <strong>not</strong> hang forever: it is bounded by the caller's <code>await_seconds</code> or by <code>_calculate_async_deadline()</code> (-1, 60 or 3600 seconds by async strategy), so an unrecognised <code>abort</code> makes it poll to its deadline and then return the aborted operation with no exception, after which <code>await_agent_command()</code> raises <code>AgentAwaitTimeout</code> about an operation whose timeout was never the problem. A caller is misinformed rather than hung, and the ordering obligation is unchanged. (b) There is a <strong>second</strong> copy of the terminal-failure list with the same omission, and it is in this repository: <code>base.BaseNamespacedTestCase.AGENT_OPERATION_FAILED_STATES</code> at <code>shakenfist/deploy/shakenfist_ci/base.py:1678</code>, read by <code>_await_command()</code> and <code>_await_agentop_complete()</code>. The third copy, in <code>client-python-k3s</code>, already holds <code>abort</code>. (c) The functional test this row assigns to the phase cannot live in the client repository: the suite is <code>shakenfist/deploy/shakenfist_ci/smoke_ci_tests/</code>, and <code>shakenfist/actions</code>'s <code>setup-test-environment</code> checks <code>client-python</code> out at its default branch for every run the client did not trigger, so the test fails here until the client half has merged. The phase is therefore <strong>two pull requests</strong>, client first, in the manner of the deadlines plan phase 6, and this <code>Merged</code> cell takes that phase's <code>&lt;repo&gt; &lt;sha&gt; (#pr)</code> form. The shakenfist half also carries finding (b)'s fix and this close-out. (d) The phase declines CLI <code>--depends-on</code> and <code>--runs-after</code> flags, because <code>sf-client instance execute</code> prints results and never the operation UUID, and exits 1 when an operation has no results yet, which is the state every queued dependent is in; filed as an issue rather than invented. Its contested decision is that the capability gate <strong>raises</strong> where the <code>agentoperation-deadlines</code> gate silently sends nothing, because a dropped ordering edge means "run now" where an omitted deadline only means "server default" -- and that a creating call verifies the edges it sent came back, since an older <code>sf-database</code> drops the fields and answers 200</td>
-<td>—</td>
+<td>shakenfist/client-python <code>a2c9d0d1f4</code> (<a href="https://github.com/shakenfist/client-python/pull/453">#453</a>), shakenfist/shakenfist <code>6dde443468</code> (<a href="https://github.com/shakenfist/shakenfist/pull/4982">#4982</a>)</td>
 </tr>
 <tr>
 <td>4</td>
-<td>—</td>
-<td>Not started</td>
-<td>Documentation and examples (decision 11): a new <code>docs/developer_guide/agent_operations.md</code> for the model, the dependency vocabulary in the API reference, the lazy-cascade and swept-dependency ambiguities written down, the example index, and <code>client-python-k3s</code> adopting dependencies (rolling update as one submitted chain) as the first example application</td>
+<td><a href="../PLAN-agent-operation-dependencies-phase-04-documentation/">PLAN-agent-operation-dependencies-phase-04-documentation.md</a></td>
+<td>In progress</td>
+<td>Documentation (decision 11): the new <code>docs/developer_guide/agent_operations.md</code> for the model, with worked examples and the example index, plus the release note this feature never got. Survey corrections applied at source, because this row was written by phase 0. (a) The dependency vocabulary <strong>is already in the API reference</strong>: <code>docs/developer_guide/api_reference/instances.md:989</code> carries the parameters, the 400 refusals, the capability token, both edge lists' evaluation semantics, <code>dependency_failure</code> with its two non-state sentinels and an <code>agentdependency</code> section, and <code>api_reference/agentoperations.md:7-14</code> carries the view field. Phases 1 and 2 wrote them, so nothing is owed. (b) The lazy-cascade and swept-dependency ambiguities <strong>are already written down</strong>, as two subsections of that same section, so this phase links to them rather than restating them. (c) Four pages already carry dependency facts -- those two plus the dependency-wait tuning at <code>docs/operator_guide/agent_operations.md:255-285</code> and the column shapes at <code>docs/operator_guide/database.md:1652-1680</code> -- which makes assigning each fact one home the design of the phase rather than a formality. (d) <code>client-python-k3s</code> adopting dependencies is <strong>moved to phase 5</strong>, for three independent reasons: the client surface phase 3 added is unreleased (<code>v0.8.4</code> predates it and the plugin floors at <code>shakenfist_client &gt;= 0.7.7</code>), so the work cannot begin; there is no rolling update to adopt edges in, since <code>Cluster.update_os()</code> updates every node concurrently through <code>execute_and_await()</code>; and a fleet-wide chain does not fit the budget this plan shipped. Its contested decision is to document that last point rather than change it: <code>note_dependency_wait_started()</code> anchors a link's wait when that link is first found blocked, which for a chain submitted up front is when it was submitted, so the whole chain must complete inside one <code>AGENT_OPERATION_DEPENDENCY_WAIT</code> and fleet-wide rolling work stays submit-await-submit</td>
 <td>—</td>
 </tr>
 <tr>
 <td>5</td>
+<td>—</td>
+<td>Not started</td>
+<td>The first example application (decision 11 and "decisions already made" 5): <code>client-python-k3s</code> adopting dependency edges, with its plan file in that repository. Re-cut out of phase 4 by that phase's survey. <strong>Gated on a <code>client-python</code> release</strong> carrying phase 3's surface and on the plugin's floor being raised to it. Its first job is to decide what to build, because the worked example this plan assumed -- a rolling update as one submitted chain -- is neither what the plugin does today nor buildable at the default wait budget. The candidate phase 4 found is fate-sharing rather than ordering: <code>execute_and_await()</code> submits its second command to every node whether or not the first succeeded, so a <code>depends_on</code> edge would abort a <code>dist-upgrade</code> whose <code>apt-get update</code> failed instead of running it against a stale index, which is one hop and stays inside the budget</td>
+<td>—</td>
+</tr>
+<tr>
+<td>6</td>
 <td>—</td>
 <td>Not started</td>
 <td>Push audit: runs <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in this plan against <code>develop</code>, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence</td>
@@ -16550,11 +16597,14 @@ before this repository can emit one (decision 3).</p>
 <p>The <code>Merged</code> column records what put each phase on <code>develop</code>: the
 merge commit of its pull request, or an explicit <code>first..last</code> range
 where the phase landed directly. Phase 0 landed as pull request
-<a href="https://github.com/shakenfist/shakenfist/pull/4827">#4827</a>, merge
-commit <code>4c14523a7b</code>, and phase 1 as pull request
-<a href="https://github.com/shakenfist/shakenfist/pull/4885">#4885</a>, merge
-commit <code>e6c0ba95a5</code>; every other cell reads <code>—</code> because nothing
-else has landed yet.</p>
+<a href="https://github.com/shakenfist/shakenfist/pull/4827">#4827</a>, phase 1 as
+<a href="https://github.com/shakenfist/shakenfist/pull/4885">#4885</a> and phase 2
+as <a href="https://github.com/shakenfist/shakenfist/pull/4909">#4909</a>. Phase 3
+landed as two pull requests, so its cell carries both in the
+<code>&lt;repo&gt; &lt;sha&gt; (#pr)</code> form: the client half first, because CI installs
+<code>client-python</code> at its default branch, and this repository's half once
+that had merged. The remaining cells read <code>—</code> because those phases have
+not landed.</p>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <p>Work this plan has deliberately declined or deferred, so that it is
 not lost:</p>

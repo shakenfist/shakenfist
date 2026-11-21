@@ -14941,6 +14941,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../agent_operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../agent_protocol/" class="md-nav__link">
         
   
@@ -16065,12 +16093,14 @@ operations to run on that instance. These operations consist of a series of comm
 which are executed in return, with results for each being gathered as they execute.</p>
 <p>An operation which declared a <code>depends_on</code> edge also carries <code>dependency_failure</code>,
 which is <code>null</code> unless that edge caused it to be aborted. It then holds
-<code>op_type</code>, <code>op_uuid</code> and <code>state</code> for the dependency responsible, where <code>state</code> is
-the dependency's state, the string <code>missing</code> if it no longer exists, or the
-string <code>unreadable</code> if its state could not be read before the wait budget ran
-out. See
+<code>op_type</code>, <code>op_uuid</code> and <code>state</code> for the dependency responsible. <code>state</code> is
+usually one of the dependency's own states, but it is also where the two
+strings <code>missing</code> and <code>unreadable</code> appear, so a client which branches on it
+must expect a value no operation can hold. See
 <a href="/developer_guide/api_reference/instances/#declaring-dependencies-between-agent-operations">declaring dependencies between agent operations</a>
-for when that happens.</p>
+for what each of those means and when it is written, and
+<a href="/developer_guide/agent_operations/">the agent operations page of the developer guide</a>
+for how dependencies and their failures behave as a whole.</p>
 <p>An operation also carries timing fields: <code>deadline</code> and <code>progress_timeout</code> are the
 caller's intent, and <code>last_progress</code>, <code>attempts</code> and <code>expiry_reason</code> are the
 server's bookkeeping. <code>expiry_reason</code> is <code>null</code> unless the operation reached the

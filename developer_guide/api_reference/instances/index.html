@@ -15002,6 +15002,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../agent_operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../agent_protocol/" class="md-nav__link">
         
   
@@ -17163,6 +17191,9 @@ completed one.</p>
 </code></pre></div>
 </details>
 <h3 id="declaring-dependencies-between-agent-operations">Declaring dependencies between agent operations<a class="headerlink" href="#declaring-dependencies-between-agent-operations" title="Permanent link">&para;</a></h3>
+<p>The model these parameters belong to, with worked examples, is in
+<a href="/developer_guide/agent_operations/">the agent operations page of the developer guide</a>;
+what follows is the field-level contract.</p>
 <p>All three creating calls also accept optional <code>depends_on</code> and <code>runs_after</code>
 parameters, each a list of <a href="#agentdependency">agentdependency</a> objects naming
 agent operations which already exist. <code>depends_on</code> declares that the new
@@ -17189,10 +17220,12 @@ dispatched exactly as one without. Otherwise:</p>
   aborted, expired, was deleted or no longer exists moves the operation to the
   <code>abort</code> state without running it, and the operation's <code>dependency_failure</code>
   field says which dependency, and in what state, caused that. The operation is
-  also aborted if the wait outlasts <code>AGENT_OPERATION_DEPENDENCY_WAIT</code> (300
-  seconds by default) rather than holding its instance's queue for however long
-  the dependency takes. That budget covers the operation's whole wait and not
-  each edge's, so for an operation with several edges the dependency named in
+  also aborted if the wait outlasts the operator's dependency wait budget,
+  <code>AGENT_OPERATION_DEPENDENCY_WAIT</code> (see
+  <a href="../../../operator_guide/agent_operations/#what-to-tune-and-when">what to tune, and when</a>),
+  rather than holding its instance's queue for however long the dependency
+  takes. That budget covers the operation's whole wait and not each edge's, so
+  for an operation with several edges the dependency named in
   <code>dependency_failure</code> is whichever one was blocking when the budget ran out,
   which is not necessarily the one which consumed it. A blocked
   operation also remains subject to its own <code>deadline</code>, which is
@@ -17265,12 +17298,12 @@ list. It is a JSON dictionary with the following fields:</p>
   this dependency being evicted to make room -- restarts the delay from the next
   observation, and the wait budget is what bounds how far that can go. The delay
   may not be negative, and may not exceed the operator's dependency wait budget,
-  <code>AGENT_OPERATION_DEPENDENCY_WAIT</code> (300 seconds by default). Within that
-  ceiling a declared delay can always elapse, because the budget is extended by
-  the delay once the dependency has been seen to finish -- which also means a
-  settle delay can hold an operation at the head of its queue for the budget
-  plus the delay, rather than for the budget alone. A request over the ceiling
-  is refused with a 400.</p>
+  <code>AGENT_OPERATION_DEPENDENCY_WAIT</code>. Within that ceiling a declared delay can
+  always elapse, because the budget is extended by the delay once the dependency
+  has been seen to finish; the budget's own value, and what that extension costs
+  the instance's queue, are in
+  <a href="../../../operator_guide/agent_operations/#what-to-tune-and-when">what to tune, and when</a>.
+  A request over the ceiling is refused with a 400.</p>
 <p>That extension applies to the edge being settled, and only for as long as
 it is the last thing holding the operation. An operation with a second
 edge still unfinished when a long settle elapses has already spent its
