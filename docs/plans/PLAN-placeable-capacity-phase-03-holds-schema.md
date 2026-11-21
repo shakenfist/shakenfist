@@ -576,8 +576,8 @@ mocks. *Mitigation:* `D3` states the form and the reason, step
 the original diagnosis, the step asserts the compiled `WHERE`
 contains the subquery through `_compiled()` the way the existing suite asserts
 `ordered_values()`'s compiled order, and the concurrency case is a
-live test against a real MariaDB — the only place it can appear,
-since CI runs 10.11 where `innodb_snapshot_isolation` is off.
+live test against a real MariaDB, which is the only place it can
+appear at all; see the execution notes for what CI actually runs.
 
 **`R5`. The reconciler's hold fold joins on the wrong uuid form
 and silently totals zero.** Pitfall 6 in the existing comment
@@ -699,3 +699,73 @@ expensive to redo:
 ## Results
 
 To be completed as the phase executes.
+
+## Execution notes
+
+**2026-11-21 (AEDT).** The back brief was answered before step 3a
+ran, and all four answers are recorded here because later steps
+depend on them.
+
+1. **The DDL is approved as `D1` specifies it**, including the
+   denormalised `namespace` column and `D2`'s nullable
+   `instance_uuid` as the whole of the consumption state. Two
+   alternatives were put and declined: dropping `namespace`, and
+   carrying an explicit `state` column.
+2. **The sum invariant takes `D3`'s form** -- a correlated scalar
+   subquery in the claim `UPDATE`'s own `WHERE`, with `COALESCE`.
+   The two alternatives put and declined were a
+   `SELECT ... FOR UPDATE` over the hold rows first, which is the
+   shape the `ER_CHECKREAD` invariant forbids, and materialising
+   `held_*` on the claim row, which phase 0's `D8` rejects.
+3. **The live suite runs against both 10.11 and 11.8**, each in a
+   disposable container, never against a real deployment.
+4. **This session may push the branch and open the pull request**
+   once the Definition of done is met.
+
+**`R4` was wrong about CI, and has been corrected.** It said the
+concurrency case could only appear in a local live run "since CI
+runs 10.11 where `innodb_snapshot_isolation` is off". The 10.11
+figure is the *floor* `ensure_schema()` is defended against, and
+the version the cluster functional tests exercise through their
+Debian 12 guest images; the live MariaDB tests are a separate job
+which runs on a `debian-13` runner
+(`.github/workflows/functional-tests.yml:586`, installing the
+distribution's `mariadb-server` through
+`tools/ci-install-mariadb.sh`), so they exercise 11.8 and therefore
+run with `innodb_snapshot_isolation` ON. The comment above
+`EXPECTED_SCHEMA_VERSIONS` (`shakenfist/mariadb.py:695`) says so in
+terms, and the live claims suite's own docstring says the
+`ER_CHECKREAD` invariant "is only observably necessary against a
+server with `innodb_snapshot_isolation` ON (the default from
+MariaDB 11.6.2)" and reports which regime each run used. So `D3`'s
+concurrency behaviour is covered by CI as well as locally. The
+decision to run both versions stands unchanged -- 10.11 is the
+floor the migration has to work on and 11.8 is what CI's live lane
+actually uses -- but it is belt and braces rather than the only way
+to see the failure.
+
+**Step 3a found two registration sites its row did not name**, both
+mandatory, and both named by the comment above
+`EXPECTED_SCHEMA_VERSIONS`: `register_all_tables()` must call the
+new getter or `RegisterAllTablesTestCase` fails, and
+`EXPECTED_TABLE_NAMES` in
+`shakenfist/tests/test_mariadb_schema_concurrency.py` must gain the
+table or two drift guards fail. A schema step's brief in a later
+phase should name all four sites -- the table definition,
+`EXPECTED_SCHEMA_VERSIONS`, `ensure_schema()` and
+`register_all_tables()` -- plus that test constant.
+
+**Step 3a declined `mock_mariadb.py`**, which its row offered
+conditionally, and the reason is right: the only place that mock
+enumerates capacity columns is `set_node_capacity()`, whose dict is
+returned verbatim as the *read reply*, so adding `held_*` there
+before the real accessor returns it would make the mock advertise
+fields production does not have. Step 3b owns that read path and
+adds it in both places at once.
+
+**Carried to steps 3c, 3d and 3f:** the live fixtures do not know
+about the new table. Each of those steps must add
+`_ensure_namespace_claim_holds_schema` to its fixture's ensure list
+and `namespace_claim_holds` to `TEST_TABLES`. That is also where
+the real `CREATE TABLE` first executes against a server, rather
+than being asserted as rendered DDL as step 3a asserts it.
