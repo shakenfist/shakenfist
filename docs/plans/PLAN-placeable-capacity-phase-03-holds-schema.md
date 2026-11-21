@@ -268,8 +268,8 @@ namespace_claim_holds
   disk_gb       BIGINT NOT NULL
   node_uuid     CHAR(32) NULL            -- NULL means displaced
   instance_uuid CHAR(32) NULL            -- the consuming instance
-  created_at    DATETIME NOT NULL
-  updated_at    DATETIME NOT NULL
+  created_at    DATETIME(6) NOT NULL     -- see the execution notes
+  updated_at    DATETIME(6) NOT NULL
   INDEX idx_namespace_claim_holds_claim (claim_uuid)
   INDEX idx_namespace_claim_holds_node  (node_uuid)
   INDEX idx_namespace_claim_holds_instance (instance_uuid)
@@ -293,7 +293,12 @@ Server-side `DATETIME` rather than `object_references`' float
 epochs, because this table is a member of the capacity family and
 follows that family's `cluster_locks` TIMESTAMP idiom: `created_at`
 orders a shrink's releases (`D5`) and `updated_at` is compared
-against the database's `NOW()`, never a per-node clock. Three
+against the database's `NOW()`, never a per-node clock. **Amended
+during step 3d:** both are `DATETIME(6)`, because at whole-second
+precision the ordering `created_at` exists to provide was decided by
+the uuid tie-break whenever two bookings landed in the same second.
+The execution notes carry the three ways that change could have been
+made without taking effect. Three
 indexes because there are exactly three access paths: the sum
 invariant filters by claim, the per-node fold groups by node, and
 phase 4's consumption and release look up by instance.
@@ -865,7 +870,69 @@ tests across every `test_mariadb_*_live` module passed with no
 holds module's 23 tests passed. Both runs report their regime in the
 suite's own output, as the live claims suite does.
 
-**Carried to steps 3d and 3f:** the live fixtures do not know
+**Step 3d, and the one schema change this phase made after its
+gate.** Step 3d found that `D1`'s "most recently booked first" was
+only true to the second: `created_at` was a plain `DATETIME` stamped
+with `NOW()`, so holds booked in the same second tied and the order
+fell back to uuid, which is arbitrary. The agent's first live test
+asserted *which* holds a shrink released and failed on exactly that.
+The operator was asked, because the DDL had been approved at a gate
+and the table had not shipped, and chose microsecond precision: the
+two timestamp columns are now `DATETIME(6)`. `D1`'s DDL above is
+amended accordingly, and `NAMESPACE_CLAIM_HOLDS_VERSION` stays at 1,
+because version 1 has never existed in any database and there is no
+prior shape to migrate from.
+
+The change had three ways to fail silently and all three were checked
+against a real server before it was made:
+1. **The column type alone is a no-op.** `NOW()` inserted into a
+   `DATETIME(6)` column stores `.000000`, verified on 11.8, so the
+   column would advertise precision it never received and the
+   ordering would stay coarse with nothing visible to notice it by.
+   Every statement that stamps a hold uses `NOW(6)` through one
+   helper; the booking INSERT is the only such statement, and the
+   other three capacity tables keep plain `DATETIME` and `NOW()`
+   because nothing orders their rows against each other. A test pins
+   that separation.
+2. **`sa.func.now(6)` does not work.** It renders `now(%s)`, and
+   MariaDB will not take the fractional-seconds precision as a bind
+   parameter, so the fsp has to be a literal.
+3. **`NOW(6)` had to exist on the floor, not only on 11.8.** It does,
+   on 10.11.19, which is what the supported-version comment in
+   `mariadb.py` exists to protect.
+`UNIX_TIMESTAMP()` carries the fraction through, so the published
+`created_at` orders the same way the column does; without that the
+API would have exposed whole seconds for microsecond-ordered rows and
+two readers would have disagreed about which hold is newest.
+`test_the_hold_timestamps_really_carry_microseconds` fails if either
+half of the change is undone.
+
+**How step 3d made the shrink safe, which is a pattern this phase had
+not used before.** The release set must be computed from a probe
+*outside* the transaction, because the hold rows cannot be read inside
+it before the first DML without the `ER_CHECKREAD` exposure `D3`
+avoids. A stale probe sounds unsafe and would be, except that the
+claim `UPDATE`'s own `WHERE` re-validates the probe's *conclusion*
+against committed state: `new_limit >= sum(holds excluding the
+released uuids)`. A booking that lands in the window is inside that
+sum, so the statement matches nothing and the whole attempt
+re-probes. It validates the answer rather than the inputs, which is
+the same property `D3` rests on and the same pattern
+`_direct_update_namespace_claim()` already uses for its limit deltas.
+`_claim_hold_sum_guard()` gained a literal `limit=` for this, which is
+necessary rather than tidy: the statement is changing `limit_*`, and a
+column's new value is not visible in its own `WHERE`.
+
+**A reported test count was wrong, and the real one is 244.** Step
+3d's report put the live suite at 249 tests. `stestr list` over every
+`test_mariadb_*_live` module discovers 244, which is what both of the
+management session's own runs executed with zero skips: 244 passed on
+11.8.9 with `innodb_snapshot_isolation` 1, and 244 passed on 10.11.19
+with it 0. The agent's figure was a miscount, not a set of tests that
+failed to run; it is recorded because a count in a report is not
+evidence and this one was checked.
+
+**Carried to step 3f:** the live fixtures do not know
 about the new table. Each of those steps must add
 `_ensure_namespace_claim_holds_schema` to its fixture's ensure list
 and `namespace_claim_holds` to `TEST_TABLES`. That is also where
