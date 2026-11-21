@@ -43,7 +43,8 @@ class WorkerPoolHighIOGateTestCase(base.ShakenFistTestCase):
             mock.patch(
                 'shakenfist.daemons.daemon.mariadb.dequeue_work_items',
                 return_value=[]) as mock_dequeue:
-            self.assertFalse(d.dequeue_job(None))
+            self.assertEqual(daemon.DequeueOutcome.NOTHING_ELIGIBLE,
+                             d.dequeue_job(None))
 
         self.assertEqual(1, mock_dequeue.call_count)
         return mock_dequeue.call_args[0][0]

@@ -1432,14 +1432,30 @@ class MockMariaDB():
             # does too.
             self._trace(f'MockMariaDB.reserve_address({key}): redelivered')
             return True
-        if existing and not (
-                evict_halo and
-                existing.reservation_type == ReservationType.DELETION_HALO):
+        if existing and not self._halo_is_takeable(existing, evict_halo):
             self._trace(f'MockMariaDB.reserve_address({key}): already exists')
             return False
         self.ipam_reservations[key] = reservation
         self._trace(f'MockMariaDB.reserve_address({key}): success')
         return True
+
+    @staticmethod
+    def _halo_is_takeable(existing: IPAMReservation,
+                          evict_halo: bool) -> bool:
+        """Mirrors which halos _direct_reserve_address() takes over.
+
+        evict_halo takes over any deletion halo; an *expired* one is taken
+        over by anybody, because the halo period is how long a released
+        address is kept out of random allocation (issue #4175). The cutoff
+        is read from config the way the direct path reads it, so a test
+        which moves time.time() moves both.
+        """
+        if existing.reservation_type != ReservationType.DELETION_HALO:
+            return False
+        if evict_halo:
+            return True
+        return (existing.reserved_at
+                < time.time() - config.IP_DELETION_HALO_DURATION)
 
     def _mariadb_release_address(self, ipam_uuid: str, address: str,
                                  halo_reservation: IPAMReservation,

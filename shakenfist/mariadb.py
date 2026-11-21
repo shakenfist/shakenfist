@@ -7592,14 +7592,31 @@ def _direct_reserve_address(reservation: IPAMReservation,
     Uses INSERT with the unique constraint on (ipam_uuid, address) to ensure
     atomicity. If the address is already reserved, IntegrityError is raised
     and we return False -- unless the committed row is this very reservation
-    re-sent (see _reservation_already_inserted), or evict_halo is set and the
-    existing reservation is a deletion-halo, in which case a guarded UPDATE
-    takes the halo over. The UPDATE's WHERE clause requires the row still be
-    a deletion-halo, so a concurrent real reservation is never overwritten.
+    re-sent (see _reservation_already_inserted), or the existing reservation
+    is a deletion-halo this caller may take over, in which case a guarded
+    UPDATE takes it over. The UPDATE's WHERE clause requires the row still
+    be a deletion-halo, so a concurrent real reservation is never
+    overwritten.
+
+    Two kinds of halo may be taken over. evict_halo takes over any of them,
+    which is what an explicit reservation of a named address asks for. And
+    an *expired* halo -- one whose reserved_at is further back than
+    IP_DELETION_HALO_DURATION -- is taken over by anybody, because the halo
+    period is exactly how long a released address is kept out of random
+    allocation, and once it has passed the row describes a free address
+    rather than a reserved one. The cutoff is read here rather than passed
+    in, so the halo period has one authority and the wire format does not
+    carry an expiry a caller could disagree about.
+
+    Taking an expired halo over in the statement which was going to run
+    anyway is what lets IPAM.reserve() stop deleting expired halos before
+    every attempt: that sweep cost a write RPC per attempt, inside a linear
+    scan which can make hundreds of them for one allocation (issue #4175).
 
     Args:
         reservation: The IPAMReservation to store.
-        evict_halo: Allow taking over a deletion-halo reservation.
+        evict_halo: Allow taking over a deletion-halo reservation which has
+            not expired.
 
     Returns:
         True if the reservation was created, or was already there exactly as
@@ -7608,6 +7625,10 @@ def _direct_reserve_address(reservation: IPAMReservation,
     """
     engine = _get_engine()
     table = _get_ipam_reservations_table()
+
+    # One instant for both the read below and the guarded UPDATE, so a row
+    # cannot be expired for one and fresh for the other.
+    halo_cutoff = time.time() - config.IP_DELETION_HALO_DURATION
 
     try:
         with engine.connect() as conn:
@@ -7633,9 +7654,29 @@ def _direct_reserve_address(reservation: IPAMReservation,
         # leaves this one reserved with nothing holding it, and an explicit
         # reserve reports a conflict for a reservation the caller owns
         # (issue #4987).
-        if _reservation_already_inserted(engine, table, reservation):
+        #
+        # The same read answers both questions asked of the committed row:
+        # whether it is this reservation, and whether it is a halo this
+        # caller may take over. The guarded UPDATE below is the authority
+        # on the second -- what is decided here only avoids issuing an
+        # UPDATE which could not match, which is the common case on a
+        # random allocation walking addresses that are genuinely in use.
+        read_ok, existing = _read_reservation_row(engine, table, reservation)
+        if not read_ok:
+            # An unreadable row cannot be told from a fresh halo, so only
+            # the caller which asked to evict any halo goes on. The UPDATE
+            # is guarded either way.
+            if not evict_halo:
+                return False
+        elif existing is None:
+            # The row the INSERT collided with has gone, so there is
+            # nothing to take over and the UPDATE would match nothing.
+            return False
+        elif _is_same_reservation(existing, reservation):
             return True
-        if not evict_halo:
+        elif existing.reservation_type != ReservationType.DELETION_HALO:
+            return False
+        elif not evict_halo and existing.reserved_at >= halo_cutoff:
             return False
     except OperationalError as e:
         LOG.warning(f'MariaDB reserve failed for {reservation.ipam_uuid}/'
@@ -7644,12 +7685,21 @@ def _direct_reserve_address(reservation: IPAMReservation,
 
     try:
         with engine.connect() as conn:
+            halo_conditions = [
+                table.c.ipam_uuid == reservation.ipam_uuid,
+                table.c.address == str(reservation.address),
+                table.c.reservation_type == ReservationType.DELETION_HALO
+            ]
+            if not evict_halo:
+                # Without permission to evict a live halo, only an expired
+                # one may be taken, and the condition belongs in the WHERE
+                # rather than only in the pre-check above: a release which
+                # lands in between re-halos the row with a fresh
+                # reserved_at, and that row must not be stolen.
+                halo_conditions.append(table.c.reserved_at < halo_cutoff)
+
             update_stmt = sa.update(table).where(
-                sa.and_(
-                    table.c.ipam_uuid == reservation.ipam_uuid,
-                    table.c.address == str(reservation.address),
-                    table.c.reservation_type == ReservationType.DELETION_HALO
-                )
+                sa.and_(*halo_conditions)
             ).values(
                 reservation_type=reservation.reservation_type,
                 user_type=reservation.user_type,
@@ -7677,16 +7727,31 @@ def _reservation_already_inserted(
     idempotent for a retried RPC. False means the address is held by
     something else, which is the genuine refusal.
 
-    Every stored column is compared, and reserved_at is what makes the
-    comparison tight: it is the reserving caller's own time.time(), so only
-    another delivery of that same call carries it. Two callers reserving
-    one address for one user are still told apart.
+    What makes a row this very reservation is in _is_same_reservation().
 
     A read which fails answers False, because that is what this function's
     caller answers an outage with throughout -- a refusal, leaking the
     address rather than handing a committed one to a second user. Raising
     here instead would make the same outage raise or return depending on
-    which statement it landed on.
+    which statement it landed on. _direct_reserve_address() needs the two
+    cases apart and so calls the pair below directly.
+    """
+    read_ok, row = _read_reservation_row(engine, table, reservation)
+    if not read_ok or row is None:
+        return False
+    return _is_same_reservation(row, reservation)
+
+
+def _read_reservation_row(
+        engine: Any, table: sa.Table,
+        reservation: IPAMReservation) -> tuple[bool, Optional[Any]]:
+    """Read the committed row for a reservation's (ipam_uuid, address).
+
+    Returns (read_ok, row). read_ok is False when the read itself failed,
+    which is a different thing from there being no row: a caller deciding
+    whether it may take a deletion halo over has to tell "there is no halo"
+    from "I could not look", and answering both with None had the guarded
+    UPDATE skipped during an outage rather than attempted (issue #4175).
     """
     try:
         with engine.connect() as conn:
@@ -7696,11 +7761,19 @@ def _reservation_already_inserted(
     except OperationalError as e:
         LOG.warning(f'MariaDB read failed for refused reservation '
                     f'{reservation.ipam_uuid}/{reservation.address}: {e}')
-        return False
+        return False, None
 
-    if row is None:
-        return False
+    return True, row
 
+
+def _is_same_reservation(row: Any, reservation: IPAMReservation) -> bool:
+    """Whether a committed row is this very reservation re-sent.
+
+    Every stored column is compared, and reserved_at is what makes the
+    comparison tight: it is the reserving caller's own time.time(), so only
+    another delivery of that same call carries it. Two callers reserving
+    one address for one user are still told apart.
+    """
     # The column hands back a uuid.UUID while the model carries a string,
     # so the comparison is on the undashed hex both spellings reduce to.
     def _hex(value: Any) -> Optional[str]:
@@ -11608,6 +11681,33 @@ def _direct_get_stale_transcoded_blob_uuids(idle_seconds: float) -> list[str]:
         return []
 
 
+def _direct_get_blob_uuids_with_info() -> Optional[list[str]]:
+    """Get the UUIDs of blobs whose attributes already carry image info.
+
+    An attributes row is created with an empty info dict and filled in
+    the first time the blob is observed, so JSON_LENGTH tells the two
+    apart. A row which does not exist at all is absent from the result,
+    which is what the caller needs: absence means "hydrate it", and a
+    blob with no attributes row has no info either.
+
+    Returns:
+        List of blob UUID strings which have image info, or None if the
+        query failed (distinct from [] which means no blob has any).
+    """
+    engine = _get_engine()
+    table = _get_blob_attributes_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = sa.select(table.c.uuid).where(
+                sa.func.json_length(table.c.info) > 0)
+            result = conn.execute(stmt)
+            return [str(row.uuid) for row in result]
+    except OperationalError as e:
+        LOG.warning(f'MariaDB query for blobs with image info failed: {e}')
+        return None
+
+
 # =============================================================================
 # Blob Attributes gRPC Client Functions
 # These call the database microservice for blob attribute operations.
@@ -11742,6 +11842,21 @@ def _grpc_get_stale_transcoded_blob_uuids(idle_seconds: float) -> list[str]:
         return []
 
 
+def _grpc_get_blob_uuids_with_info() -> Optional[list[str]]:
+    """Get the UUIDs of blobs which have image info via the microservice.
+
+    Returns None on error (distinct from [] for no matches).
+    """
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetBlobUuidsWithInfoRequest()
+        reply = _grpc_call(stub.GetBlobUuidsWithInfo, request)
+        return list(reply.uuids)
+    except grpc.RpcError as e:
+        _log_failed_read('GetBlobUuidsWithInfo', e)
+        return None
+
+
 # =============================================================================
 # Blob Attributes Public API Functions
 # =============================================================================
@@ -11862,6 +11977,24 @@ def get_stale_transcoded_blob_uuids(idle_seconds: float) -> list[str]:
     if _use_database_service():
         return _grpc_get_stale_transcoded_blob_uuids(idle_seconds)
     return _direct_get_stale_transcoded_blob_uuids(idle_seconds)
+
+
+def get_blob_uuids_with_info() -> Optional[list[str]]:
+    """Get the UUIDs of blobs whose attributes already carry image info.
+
+    observe_local_blobs() asks this once per pass rather than hydrating
+    a blob per local file to find out whether it still needs a
+    ``qemu-img info`` backfill (issue 4965).
+
+    Returns:
+        List of blob UUID strings which have image info, or None if the
+        query failed (distinct from [] which means no blob has any). The
+        caller decides what a failed read means; it must not be
+        flattened here.
+    """
+    if _use_database_service():
+        return _grpc_get_blob_uuids_with_info()
+    return _direct_get_blob_uuids_with_info()
 
 
 # =============================================================================

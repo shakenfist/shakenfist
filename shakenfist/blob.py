@@ -399,10 +399,22 @@ class Blob(dbo):
         """
         if not already_recorded:
             self.record_usage()
+        self.record_location(location, self.uuid)
+
+    @staticmethod
+    def record_location(location: str, blob_uuid: Union[str, uuid.UUID]) -> None:
+        """Record the blob location reference, refreshing its last_active.
+
+        The reference row is keyed by the blob's uuid alone, so this does
+        not need a hydrated blob. observe_local_blobs() calls it directly
+        for a blob whose location is already recorded and whose image
+        info is already backfilled, because then there is nothing left
+        for the object to answer (issue 4965).
+        """
         mariadb.record_relationship(
             ObjectType.NODE, location,
             RelationshipType.BLOB_LOCATION, None,
-            ObjectType.BLOB, self.uuid)
+            ObjectType.BLOB, blob_uuid)
 
     def remove_location(self, location: str) -> None:
         """Remove the record that this blob is present on the given node."""
@@ -1401,6 +1413,10 @@ def observe_local_blobs() -> int:
     every local blob kept unreferenced replicated blobs from ever reaching
     the reaper's grace period (issue 4440).
 
+    The pass costs three batched reads and no per-blob read at all for a
+    blob which is already recorded here and already carries image info,
+    which in steady state is every blob on the node (issue 4965).
+
     Returns:
         int: The number of blobs observed.
     """
@@ -1442,6 +1458,35 @@ def observe_local_blobs() -> int:
         return 0
     created_blob_uuids = set(created)
 
+    # One read per pass rather than one per blob, for the same reason as
+    # the two reads above. With the state supplied, the only thing
+    # observe() does which needs the hydrated object is the
+    # qemu-img info backfill, and in steady state that was backfilled
+    # the first time the blob was seen -- so the hydration below existed
+    # to ask "does this blob have info yet?" once per blob, per pass,
+    # forever, which made the cleaner's GetBlob (and GetBlobAttributes)
+    # rate a function of how many blobs a node stores rather than of any
+    # workload (issue 4965).
+    #
+    # A failed read is collapsed into "no blob has info", which is a
+    # decision: it hydrates every local blob exactly as this pass did
+    # before, so an outage costs reads rather than a missed backfill.
+    # Both shapes of failure are handled, like the location read above:
+    # None for a read the wrapper reported, and DatabaseUnavailable for
+    # one it raised after spending its retry budget.
+    try:
+        with_info = mariadb.get_blob_uuids_with_info()
+    except DatabaseUnavailable as e:
+        LOG.with_fields({'error': str(e)}).warning(
+            'Could not read which blobs carry image info, hydrating '
+            'every local blob this pass')
+        with_info = []
+    if with_info is None:
+        LOG.warning('Could not read which blobs carry image info, '
+                    'hydrating every local blob this pass')
+        with_info = []
+    blob_uuids_with_info = set(with_info)
+
     observed_count = 0
     try:
         p = pathlib.Path(blob_path)
@@ -1461,6 +1506,19 @@ def observe_local_blobs() -> int:
             # Checked before the hydration below, so a blob which is
             # not in created costs nothing at all this pass.
             if blob_uuid not in created_blob_uuids:
+                continue
+
+            # The common path, and the whole point of the three batched
+            # reads above: a blob whose location is already recorded and
+            # whose info is already backfilled has nothing left for
+            # observe() to do but refresh the reference, which is keyed
+            # by uuid. A blob which is not recorded yet still needs the
+            # object, because a new location counts as usage and
+            # record_usage() stamps the attributes row.
+            if (blob_uuid in recorded
+                    and blob_uuid in blob_uuids_with_info):
+                Blob.record_location(config.NODE_NAME, blob_uuid)
+                observed_count += 1
                 continue
 
             b = Blob.from_db(blob_uuid, suppress_failure_audit=True)

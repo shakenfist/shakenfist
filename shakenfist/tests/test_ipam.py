@@ -5,6 +5,7 @@ from unittest import mock
 
 from shakenfist import exceptions
 from shakenfist import ipam
+from shakenfist.config import config
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
@@ -196,6 +197,108 @@ class IPAMTestCase(base.ShakenFistTestCase):
         self.assertTrue(
             ipm.reserve('192.168.1.10', (ObjectType.INSTANCE, TEST_USER_UUID),
                         ReservationType.INSTANCE, '', evict_halo=True))
+        self.assertEqual(
+            ReservationType.INSTANCE,
+            ipm.get_reservation('192.168.1.10').reservation_type)
+
+    def _counting_sweep(self):
+        """Count release_haloed_addresses calls, keeping its behaviour.
+
+        MockMariaDB has already patched it; this patches over the top with
+        the same implementation so the sweep still happens.
+        """
+        return mock.patch(
+            'shakenfist.mariadb.release_haloed_addresses',
+            side_effect=self.mock_mariadb._mariadb_release_haloed_addresses)
+
+    def test_reserve_does_not_sweep_the_haloed_addresses(self):
+        # Issue #4175: reserve() used to delete every expired halo on the
+        # IPAM before each attempt, which is a write RPC on the hot path
+        # of an operation that does not need one.
+        ipam_uuid = str(uuid.uuid4())
+        ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24')
+
+        with self._counting_sweep() as swept:
+            self.assertTrue(
+                ipm.reserve('192.168.1.10',
+                            (ObjectType.INSTANCE, TEST_USER_UUID),
+                            ReservationType.INSTANCE, ''))
+            # And a refused one does not sweep either, which is the case
+            # the allocation loop below makes hundreds of.
+            self.assertFalse(
+                ipm.reserve('192.168.1.10',
+                            (ObjectType.INSTANCE, str(uuid.uuid4())),
+                            ReservationType.INSTANCE, ''))
+        self.assertEqual(0, swept.call_count)
+
+    def test_a_random_allocation_sweeps_once_however_many_attempts(self):
+        # The multiplier the issue measured: reserve_random_free_address()
+        # tries five random addresses and then walks the netblock, and
+        # every attempt used to pay a halo DELETE -- on the order of 250
+        # of them for one allocation on a congested /24. The sweep is
+        # worth doing once, because an expired halo still occupies a row
+        # that in_use counts.
+        ipam_uuid = str(uuid.uuid4())
+        ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24')
+
+        # Fill the network, leaving one address free, so the allocation
+        # has to walk the whole block to find it.
+        free = '192.168.1.254'
+        for idx in range(2, 255):
+            addr = f'192.168.1.{idx}'
+            if addr == free:
+                continue
+            self.assertTrue(
+                ipm.reserve(addr, (ObjectType.INSTANCE, TEST_USER_UUID),
+                            ReservationType.INSTANCE, ''))
+
+        with self._counting_sweep() as swept:
+            self.assertEqual(
+                free,
+                ipm.reserve_random_free_address(
+                    (ObjectType.INSTANCE, TEST_USER_UUID),
+                    ReservationType.FLOATING, ''))
+        self.assertEqual(1, swept.call_count)
+
+    def test_reserve_takes_over_an_expired_halo(self):
+        # An expired halo is a free address which still has a row, and the
+        # reserve statement takes it over rather than a sweep deleting it
+        # first.
+        ipam_uuid = str(uuid.uuid4())
+        ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24')
+
+        self.assertTrue(
+            ipm.reserve('192.168.1.10', (ObjectType.INSTANCE, TEST_USER_UUID),
+                        ReservationType.INSTANCE, ''))
+        with mock.patch('time.time',
+                        return_value=time.time() - config.IP_DELETION_HALO_DURATION - 1):
+            self.assertTrue(ipm.release('192.168.1.10'))
+
+        # A random allocation may have it, with no evict_halo anywhere.
+        self.assertTrue(
+            ipm.reserve('192.168.1.10',
+                        (ObjectType.INSTANCE, str(uuid.uuid4())),
+                        ReservationType.INSTANCE, ''))
+        self.assertEqual(
+            ReservationType.INSTANCE,
+            ipm.get_reservation('192.168.1.10').reservation_type)
+
+    def test_reserve_takes_over_an_expired_halo_in_memory(self):
+        # The in-memory store answers a reserve the way the stored one
+        # does, or every test which reaches IPAM through it proves the
+        # wrong thing.
+        ipam_uuid = str(uuid.uuid4())
+        ipm = ipam.IPAM.new(ipam_uuid, None, ipam_uuid, '192.168.1.0/24',
+                            in_memory_only=True)
+
+        with mock.patch('time.time',
+                        return_value=time.time() - config.IP_DELETION_HALO_DURATION - 1):
+            self.assertTrue(
+                ipm.reserve('192.168.1.10', None,
+                            ReservationType.DELETION_HALO, ''))
+        self.assertTrue(
+            ipm.reserve('192.168.1.10', (ObjectType.INSTANCE, TEST_USER_UUID),
+                        ReservationType.INSTANCE, ''))
         self.assertEqual(
             ReservationType.INSTANCE,
             ipm.get_reservation('192.168.1.10').reservation_type)

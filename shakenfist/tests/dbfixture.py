@@ -33,6 +33,42 @@ for _mariadb_type, _sqlite_type in _SQLITE_TYPE_SHIMS.items():
         lambda type_, compiler, _rendered=_sqlite_type, **kw: _rendered)
 
 
+def snapshot_table_state() -> dict:
+    """Every mariadb global which holds a table definition.
+
+    The table caches and the MetaData they are defined in have to be
+    saved and restored together: a cache pointing into one MetaData
+    while mariadb._metadata is another is the state in which
+    register_all_tables() returns tables that _get_metadata() cannot
+    see, and a walk of the schema comes back empty. Any test which
+    reaches a table getter outside MariaDBTableFixture should take this
+    snapshot and restore it, rather than listing the globals it thinks
+    it touches -- register_all_tables() touches all of them.
+    """
+    saved = {
+        name: getattr(mariadb, name)
+        for name in dir(mariadb)
+        # The table *caches*, not the _get_*_table functions which
+        # populate them -- hence the callable() test.
+        if (name.startswith('_') and name.endswith('_table')
+            and not callable(getattr(mariadb, name)))}
+    saved['_metadata'] = mariadb._metadata
+    return saved
+
+
+def reset_table_state(saved: dict) -> None:
+    """Clear every global in a snapshot, so the next getter rebuilds."""
+    for name in saved:
+        if name != '_metadata':
+            setattr(mariadb, name, None)
+    mariadb._metadata = None
+
+
+def restore_table_state(saved: dict) -> None:
+    for name, value in saved.items():
+        setattr(mariadb, name, value)
+
+
 class MariaDBTableFixture:
     """Give a test its own sqlite engine built from mariadb's own metadata.
 
@@ -54,24 +90,32 @@ class MariaDBTableFixture:
     def setUp(self):
         super().setUp()
 
-        self._saved_mariadb_state = {
-            name: getattr(mariadb, name)
-            for name in dir(mariadb)
-            # The table *caches*, not the _get_*_table functions which
-            # populate them -- hence the callable() test.
-            if (name.startswith('_') and name.endswith('_table')
-                and not callable(getattr(mariadb, name)))}
-        self._saved_mariadb_state['_metadata'] = mariadb._metadata
+        self._saved_mariadb_state = snapshot_table_state()
         self.addCleanup(self._restore_mariadb_state)
+
+        # The caches and the metadata are cleared here rather than in
+        # build_engine(), so that a test which reaches a table getter
+        # without building an engine -- one driving a failure path with a
+        # mocked engine, say -- still gets a private MetaData. Restoring
+        # a cache cannot undo a table *definition*: a getter which ran
+        # against the outer MetaData leaves the table defined in it
+        # while the restore puts the cache back to None, and the next
+        # register_all_tables() in that worker dies on "Table
+        # 'blob_attributes' is already defined for this MetaData
+        # instance". That reached a pull request as an order-dependent
+        # failure in an unrelated test module (issue #4965).
+        self._reset_mariadb_tables()
 
         self.mariadb_config = mock.patch(
             'shakenfist.mariadb.config', mock.MagicMock())
         self.mariadb_config.start()
         self.addCleanup(self.mariadb_config.stop)
 
+    def _reset_mariadb_tables(self):
+        reset_table_state(self._saved_mariadb_state)
+
     def _restore_mariadb_state(self):
-        for name, value in self._saved_mariadb_state.items():
-            setattr(mariadb, name, value)
+        restore_table_state(self._saved_mariadb_state)
 
     def build_engine(self, table_getters, json_shims=False,
                      autoincrement_bigint_keys=False):
@@ -89,10 +133,9 @@ class MariaDBTableFixture:
         a key is narrowed to Integer on this test's private copy of the
         table. Every other column keeps its production type.
         """
-        for name in self._saved_mariadb_state:
-            if name != '_metadata':
-                setattr(mariadb, name, None)
-        mariadb._metadata = None
+        # Idempotent with the reset in setUp(): a test which builds two
+        # engines gets a fresh MetaData for each.
+        self._reset_mariadb_tables()
 
         engine = sa.create_engine('sqlite:///:memory:')
         if json_shims:

@@ -24,6 +24,8 @@ from shakenfist.tests import base
 from shakenfist.tests import dbfixture
 
 
+HALO_DURATION = 300
+
 IPAM_UUID = uuid.UUID('11111111-1111-4111-8111-111111111111')
 INSTANCE_UUID = '22222222-2222-4222-8222-222222222222'
 OTHER_INSTANCE_UUID = '33333333-3333-4333-8333-333333333333'
@@ -58,6 +60,10 @@ class ReserveAddressTestCase(dbfixture.MariaDBTableFixture,
             patcher = mock.patch(target, return_value=value)
             patcher.start()
             self.addCleanup(patcher.stop)
+
+        # dbfixture replaces mariadb.config with a bare MagicMock, and the
+        # halo expiry cutoff is arithmetic on this value.
+        mariadb.config.IP_DELETION_HALO_DURATION = HALO_DURATION
 
     def _rows(self):
         with self.engine.connect() as conn:
@@ -127,14 +133,122 @@ class ReserveAddressTestCase(dbfixture.MariaDBTableFixture,
         self.assertEqual(ReservationType.INSTANCE,
                          self._rows()[0].reservation_type)
 
-    def test_a_halo_is_not_evicted_without_permission(self):
-        # A floor: the idempotency re-read must not let a halo through
-        # the plain path, which answers a refusal.
+    def test_a_live_halo_is_not_evicted_without_permission(self):
+        # A floor: the idempotency re-read must not let a live halo
+        # through the plain path, which answers a refusal. This is what
+        # the halo is *for*, so it is the one case the expiry takeover
+        # below must leave alone.
         halo = _reservation(reservation_type=ReservationType.DELETION_HALO,
                             comment=None)
         self.assertTrue(mariadb._direct_reserve_address(halo))
         self.assertFalse(mariadb._direct_reserve_address(_reservation()))
         self.assertEqual(ReservationType.DELETION_HALO,
+                         self._rows()[0].reservation_type)
+
+    def test_an_expired_halo_is_taken_over_without_permission(self):
+        # Issue #4175: an expired halo is a free address which still has
+        # a row, so the reserve statement takes it over. That is what
+        # replaces deleting every expired halo on the IPAM before each
+        # reservation attempt.
+        halo = _reservation(
+            reservation_type=ReservationType.DELETION_HALO, comment=None,
+            reserved_at=time.time() - HALO_DURATION - 1)
+        self.assertTrue(mariadb._direct_reserve_address(halo))
+        self.assertTrue(mariadb._direct_reserve_address(_reservation()))
+        row = self._rows()[0]
+        self.assertEqual(1, len(self._rows()))
+        self.assertEqual(ReservationType.INSTANCE, row.reservation_type)
+        self.assertEqual(INSTANCE_UUID, str(row.user_uuid))
+
+    def test_a_halo_one_second_from_expiry_is_still_refused(self):
+        # The boundary, so that "expired" cannot drift into "nearly".
+        halo = _reservation(
+            reservation_type=ReservationType.DELETION_HALO, comment=None,
+            reserved_at=time.time() - HALO_DURATION + 1)
+        self.assertTrue(mariadb._direct_reserve_address(halo))
+        self.assertFalse(mariadb._direct_reserve_address(_reservation()))
+        self.assertEqual(ReservationType.DELETION_HALO,
+                         self._rows()[0].reservation_type)
+
+    def test_an_expired_halo_does_not_let_a_real_reservation_go(self):
+        # A floor: expiry applies to halos only. A reservation held by
+        # someone else is refused however old it is.
+        self.assertTrue(mariadb._direct_reserve_address(
+            _reservation(reserved_at=time.time() - HALO_DURATION * 10)))
+        self.assertFalse(mariadb._direct_reserve_address(
+            _reservation(user_uuid=OTHER_INSTANCE_UUID)))
+        self.assertEqual(INSTANCE_UUID, str(self._rows()[0].user_uuid))
+
+    def test_a_halo_re_haloed_after_the_read_is_not_stolen(self):
+        # The pre-check reads the row, and a release landing between that
+        # read and the UPDATE re-halos it with a fresh reserved_at. The
+        # expiry therefore has to be in the UPDATE's WHERE clause as well,
+        # or the takeover would steal a halo which is live again.
+        halo = _reservation(reservation_type=ReservationType.DELETION_HALO,
+                            comment=None)
+        self.assertTrue(mariadb._direct_reserve_address(halo))
+
+        stale_read = mock.MagicMock()
+        stale_read.reservation_type = ReservationType.DELETION_HALO
+        stale_read.reserved_at = time.time() - HALO_DURATION - 1
+        with mock.patch.object(mariadb, '_read_reservation_row',
+                               return_value=(True, stale_read)):
+            self.assertFalse(mariadb._direct_reserve_address(_reservation()))
+        self.assertEqual(ReservationType.DELETION_HALO,
+                         self._rows()[0].reservation_type)
+
+    def test_an_address_in_use_issues_no_update(self):
+        # The pre-check is there so that the common refusal -- a random
+        # allocation walking addresses which are genuinely reserved --
+        # costs the INSERT and the re-read, and not a third statement
+        # which could not have matched (issue #4175).
+        #
+        # The row is older than the halo period, which is what a standing
+        # instance's address looks like. Only its *type* stops the
+        # takeover, so this is the case where the type pre-check is the
+        # one thing keeping the UPDATE off the wire.
+        self.assertTrue(mariadb._direct_reserve_address(
+            _reservation(reserved_at=time.time() - HALO_DURATION * 10)))
+
+        statements = []
+
+        def record(conn, cursor, statement, parameters, context, executemany):
+            statements.append(statement)
+
+        sa.event.listen(self.engine, 'before_cursor_execute', record)
+        self.addCleanup(sa.event.remove, self.engine,
+                        'before_cursor_execute', record)
+        self.assertFalse(mariadb._direct_reserve_address(
+            _reservation(user_uuid=OTHER_INSTANCE_UUID)))
+        self.assertEqual(
+            [], [s for s in statements if s.lstrip().upper().startswith('UPDATE')])
+
+    def test_an_unreadable_row_refuses_rather_than_taking_a_halo(self):
+        # The read which decides whether a halo may be taken can fail. It
+        # cannot then tell a live halo from an expired one, so a caller
+        # without evict_halo is refused rather than guessing.
+        halo = _reservation(
+            reservation_type=ReservationType.DELETION_HALO, comment=None,
+            reserved_at=time.time() - HALO_DURATION - 1)
+        self.assertTrue(mariadb._direct_reserve_address(halo))
+        with mock.patch.object(mariadb, '_read_reservation_row',
+                               return_value=(False, None)):
+            self.assertFalse(mariadb._direct_reserve_address(_reservation()))
+        self.assertEqual(ReservationType.DELETION_HALO,
+                         self._rows()[0].reservation_type)
+
+    def test_an_unreadable_row_still_lets_evict_halo_try(self):
+        # ... while the caller which asked to evict any halo still issues
+        # the guarded UPDATE, which is safe on its own WHERE clause. This
+        # is the behaviour the pre-check must not quietly remove.
+        halo = _reservation(reservation_type=ReservationType.DELETION_HALO,
+                            comment=None)
+        self.assertTrue(mariadb._direct_reserve_address(halo))
+        with mock.patch.object(mariadb, '_read_reservation_row',
+                               return_value=(False, None)):
+            self.assertTrue(mariadb._direct_reserve_address(
+                _reservation(), evict_halo=True))
+        self.assertEqual(ReservationType.INSTANCE,
                          self._rows()[0].reservation_type)
 
 

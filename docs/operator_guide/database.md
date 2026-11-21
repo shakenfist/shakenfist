@@ -2193,6 +2193,11 @@ allocation. This provides:
   only guards against *random* reallocation: a reservation explicitly
   requesting a haloed address (for example an instance create with a static
   `address=`) atomically takes the halo over
+- **Expiry in the reserving statement**: once a halo is older than
+  `IP_DELETION_HALO_DURATION` any reservation takes it over, done by the same
+  statement which was going to do the reserving. An expired halo is therefore
+  a free address which still has a row, and is reaped as a row by the
+  allocation loop rather than before every reservation attempt
 - **Idempotent for a re-sent request**: a database call whose reply is lost is
   re-sent, so a reserve whose commit landed can arrive a second time and be
   refused by its own row. That is answered as success rather than as "address
@@ -2249,7 +2254,8 @@ IPAM supports several reservation types:
 
 A `deletion-halo` entry is evicted by a request which names that specific
 address, since the halo only exists to keep an address out of *random*
-allocation for a while. A `manual` reservation is not: it is held for
+allocation for a while, and by any request at all once it is older than
+`IP_DELETION_HALO_DURATION`. A `manual` reservation is not: it is held for
 something Shaken Fist does not manage, so a request to reserve or allocate
 that address is refused rather than granted, and only an explicit
 `DELETE /networks/{network_ref}/addresses/{address}` releases it.
