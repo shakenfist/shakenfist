@@ -387,3 +387,241 @@ No findings, and no disagreement with the numbers the planning session
 had recorded. The management session reproduced the tox verdict, the
 range stat and the clean tree from the step's own logs rather than
 from its report.
+
+## Findings
+
+Twenty-one findings pooled from four lenses, graded blocking, advisory
+or predating. **None blocking. No critical or high security finding.**
+Every finding below was reproduced by the management session against
+the tree before it was recorded; where a lens's citation was wrong,
+the corrected one is given here.
+
+### Security (2d)
+
+- **S1, medium.** `_heal_missing_state()`
+  (`shakenfist/namespace_key.py:273-285`, called from `:230` and
+  `:265`) branches on `self.state.value is not None`, and `get_state()`
+  returns `None` both for an absent state row and for a failed read.
+  `mariadb.get_state_checked()` exists for exactly this distinction and
+  its own docstring warns that "a caller which acts irreversibly on
+  absence cannot use" `get_state()`. This caller acts on absence.
+  `NamespaceKey.from_db_by_name()` applies no state filter, so the
+  rotation path can hold a soft-deleted key; during a read blip the
+  heal writes `initial` then `created` over it, and the "objects do not
+  undelete" guard (`shakenfist/baseobject.py:720`) compares the same
+  misread value, so it does not fire. In the same window the second
+  write can instead raise `InvalidStateException` or
+  `StateWriteFailed` out of a rotation that has already replaced the
+  secret, so the caller never learns the new one. Fix: read through
+  `get_state_checked()` and skip the heal when the read failed, and
+  contain both writes.
+- **S2, low.** `hard_delete_objects_per_call()`
+  (`shakenfist/mariadb_hard_delete.py:676-683`) ignores each delete's
+  return value, so on a torn legacy hard delete the state row can go
+  while the static and attributes rows stay. That already
+  authenticated, so this change does not create the exposure -- but it
+  removes the backstop, because such a row used to be marked deleted
+  within the hour and is now repaired to `created` and kept. Only on an
+  sf-database predating the batch RPC.
+- **S3, low.** The three servicers' catch-alls
+  (`shakenfist/daemons/database/main.py:4225`, `:4395`, `:4625`) put
+  `str(e)` in the reply details, and the new `DatabaseUnavailable`
+  messages carry the SQL statement and the bound uuid. Cluster-internal,
+  no key material. The mapping-rule servicer already declines to do
+  this for `CorruptMappingRule` for the same reason.
+- **S6, low.** The override docstrings name the federated exchange's
+  issuer listing without noting that the login endpoint
+  (`external_api/auth.py:3225`) additionally filters on
+  `ACTIVE_STATES`. Accurate for `issuer_claiming_url()`, overstated for
+  the login path. Documentation accuracy only.
+
+Clean, and checked rather than assumed: no input makes a liveness
+predicate return `deleted` for an object its read path honours (the key
+readers use an inner join to the attributes table, so "attributes row
+exists" is exactly the question they ask); an expired key repaired to
+`created` is picked up by `reap_expired_namespace_keys()`, which reads
+`ACTIVE_STATES = {initial, created}`, so no expired credential is
+resurrected; `POST /auth` and token validation do not call the changed
+readers at all; a client cannot nominate a zombie, and
+`_ZOMBIE_CANDIDATES` is replaced each pass rather than accumulated; and
+no added log line, audit event or state message can carry key material.
+
+**One unrecorded hole was fixed by this change.**
+`issuer_claiming_url()` is the duplicate-URL guard on issuer creation,
+and a read failure used to make an existing issuer's `issuer_url` read
+as `None`, so the guard could pass and leave two issuers claiming one
+`iss`. It now fails closed.
+
+### Code quality (2a)
+
+- **C1, advisory** (`shakenfist/daemons/cluster/scheduled_tasks.py`,
+  the `_repair_zombies` False path). The liveness stop calls
+  `_record_sweep_stopped()` but never touches
+  `SWEEP_WORK_LIST_FAILURE_STREAK`. The work-list read for that type
+  *succeeded* -- that is how the zombies were found -- so
+  `_record_sweep_read()` (`:300-303`) has just reset that type's streak
+  to zero. A pass can therefore repair nothing, hour after hour, with
+  the gauge reading zero: the precise silence that gauge exists to
+  break. Fix: account the False path against the streak, or add a
+  sibling counter.
+- **C2, advisory** (`:1657`). `sorted(confirmed)` has no per-object
+  resume, so a liveness read that keeps failing on the lexically first
+  zombie blocks every later zombie *of that type* indefinitely. The
+  docstring's "they are all still in `_ZOMBIE_CANDIDATES`, so the next
+  pass retries them" does not mention that progress is gated on the
+  first one recovering. Untested.
+- **C3, advisory** (`:1664`). A liveness failure that is neither
+  `DatabaseUnavailable` nor `CorruptMappingRule` -- a Pydantic
+  `ValidationError` from a NULL column, say -- is swallowed by
+  `ignore_exception()`, and the object stays a candidate forever: one
+  traceback per hour per object, no metric, no bound.
+- **C4, advisory** (`shakenfist/mariadb.py:16679`). The rewritten
+  `get_mapping_rule_attributes` docstring documents
+  `DatabaseUnavailable` but not `CorruptMappingRule`, which both layers
+  raise.
+- **C5, low.** A corrupt mapping rule now persists indefinitely, with
+  one audit event and a log line as the only notice.
+- **C9, advisory.** `test_a_slow_type_cannot_starve_the_types_behind_it`
+  (`shakenfist/tests/test_daemon_cluster_scheduled_tasks.py:3162`)
+  injects `DatabaseUnavailable` into the *work-list* read, not the
+  liveness read, so the test whose name promises this coverage is not
+  the one providing it. The coverage does exist, in
+  `_assert_pass_stopped_on` inside
+  `test_unreadable_liveness_writes_nothing_and_retries` and
+  `test_mariadb_error_on_key_liveness_read_writes_nothing`.
+
+The divergence from phase 1's brief 1b (this plan's survey finding 8)
+was judged correct, independently of this plan's own view.
+`DatabaseUnavailable` out of these readers is tier-wide by
+construction: the direct path raises it only from `OperationalError` on
+connect or execute, and the gRPC path only after `_grpc_call` has
+exhausted its retry budget. "Skip this object and continue" would
+re-pay a full connect-or-retry budget per remaining zombie and per
+remaining type inside one job whose watchdog is petted only between
+jobs, and would emit a traceback per zombie. **No type starves:**
+`_record_sweep_stopped()` (`:240-246`) sets the resume marker to the
+type *after* the one that stopped the pass, and `_sweep_object_types()`
+rotates to it, so a type whose liveness read keeps failing is visited
+last each pass and every other type is reached. The worst case is a
+bounded one-pass delay.
+
+Also clean: `STATE_CREATED` is in `ACTIVE_STATES` for all three
+classes, and `deleted` is in no registered class's, so the audit-text
+branch cannot mis-describe a repair; the three overrides are
+deliberately separate rather than a helper wanting extraction; the
+fail-closed change completes the set rather than leaving two types
+asymmetric, matching the #3522 precedent; and the `CorruptMappingRule`
+arm returning `created` is right, because readers already report such a
+rule as `unusable` and `deleted` would free its name and hard delete it
+with nobody told.
+
+### Tests (2b)
+
+- **T1, advisory** (`shakenfist/tests/test_mariadb_orphans.py:361`).
+  `test_zombie_repair_state_overrides_are_pinned` asserts the set of
+  types that *override* `zombie_repair_state()`. A newly registered
+  object type with no override leaves that set unchanged, so the test
+  passes and its failure message is never shown. The master plan's
+  mission statement 3 claimed this test makes the next author decide;
+  it does not, and that statement has been corrected at source. Fix:
+  pin the registered non-excluded type list as well, so adding any type
+  breaks the test.
+- **T2, advisory.** No test drives a raising `_direct_get_*_attributes`
+  through its servicer to `INTERNAL` and back out as
+  `DatabaseUnavailable`; the round trip is covered only in pieces.
+- **T3, advisory.** Mutation (a) is caught for two independent reasons,
+  so its count of ten overstates how many distinct checks guard it.
+- **T4, advisory.** No functional test in `cluster_ci_tests` exercises
+  zombie repair end to end; it is covered at mocked boundaries only.
+  The reconciler tests mock at `mariadb.get_*_attributes` and let the
+  real overrides run, which is a reasonable boundary.
+
+Mission statement 5 is about documentation and no test could cover it;
+that is inherent, not a finding.
+
+### Documentation (2c)
+
+- **D1, advisory**
+  (`docs/developer_guide/subsystem_internals.md:366`). "zombie repair
+  marks the static row deleted and then hydrates it through
+  `get_object_class()` to collect it", unqualified, two lines above the
+  same paragraph's statement that three types are not repaired to
+  `deleted`. This is the one definition-of-done item this phase failed.
+- **D2, advisory**
+  (`docs/developer_guide/database_internals.md:799-801`). Says a failed
+  liveness read "writes nothing and ends the pass" but not that the
+  zombie is retried on the next pass, which
+  `docs/operator_guide/database.md:1534` does say.
+- **Declined.** `docs/operator_guide/authentication.md:22` says a
+  zombie key "which is still live is repaired to `created`, never
+  deleted". Strictly, a key with no attributes row is still deleted,
+  but "still live" carries that qualification and `database.md` states
+  it precisely. Not worth a change.
+
+Otherwise the four pages agree with each other and with the docstrings
+on every fact checked: which types are repaired forward, which are
+exempt (`node` and `namespace`, matching
+`ZOMBIE_REPAIR_EXCLUDED_TYPES`), what a failed liveness read does, the
+two-consecutive-sweeps rule, the creation-retry heal, and what a new
+type's author must decide. No plan-reference violations: code and docs
+cite issue 3836 only.
+
+### Predating
+
+Recorded, not scored against this range. Two are filed as issues; the
+rest are noted.
+
+- The direct point and by-name readers for trusted issuers and mapping
+  rules still return `None` or `[]` on `OperationalError`
+  (`shakenfist/mariadb.py:15307`, `:15331`, `:16028`, `:16054`,
+  `:16074`) while their gRPC twins raise. This is the same defect class
+  the phase fixed for the attributes readers, and it sits on
+  `from_db_by_name()` -- the read path the liveness predicates cite.
+  #3373's scope is the gRPC wrappers, so it does not cover these.
+  Filed as [#5017](https://github.com/shakenfist/shakenfist/issues/5017).
+- `_as_uuid` is triplicated (`namespace_key.py:43`,
+  `trusted_issuer.py:51`, `mapping_rule.py:64`).
+- `mariadb.py` is 31,480 lines and `scheduled_tasks.py` 1,939; both are
+  past the 1,500-line mark at which the size rule asks for a stated
+  reason, and this range grew both (+41, +118).
+- `get_stateless_object_uuids` is unpaginated.
+- The gRPC issuer and rule attribute readers already raised
+  `DatabaseUnavailable` before this range; only the key one changed.
+
+## Disposition
+
+Per decision 8 the audit fixes nothing: findings land as their own pull
+request once this phase has merged, and that pull request records this
+phase's merge commit.
+
+| Finding | Grade | Disposition |
+|---------|-------|-------------|
+| S1 heal conflates absent with unreadable | medium | Follow-up pull request, first |
+| C1 liveness stop invisible to the streak gauge | advisory | Follow-up pull request |
+| T1 pinned test does not pin what was claimed | advisory | Follow-up pull request; master plan corrected at source here |
+| D1 unqualified "marks the static row deleted" | advisory | Follow-up pull request |
+| D2 missing retry clause | advisory | Follow-up pull request |
+| C4 docstring omits `CorruptMappingRule` | advisory | Follow-up pull request |
+| S6 override docstrings overstate the login path | low | Follow-up pull request |
+| C2 no per-object resume | advisory | Follow-up pull request, with a test |
+| C3 unbounded swallowing of other errors | advisory | Follow-up pull request, with a test |
+| C9 starvation test injects the wrong path | advisory | Follow-up pull request: rename, or cover the path the name promises |
+| T2 no servicer round-trip test | advisory | Follow-up pull request |
+| T4 no functional coverage | advisory | Noted; a functional test for an hourly sweep is its own piece of work |
+| S2 torn-hard-delete backstop | low | Noted; fold into [#5015](https://github.com/shakenfist/shakenfist/issues/5015) |
+| S3 `set_details` carries SQL text | low | Follow-up pull request |
+| C5 corrupt rule persists | low | Noted; visible as `unusable`, which is the intended behaviour |
+| T3 mutation count overstates guards | advisory | Noted, no action |
+| Direct readers conflate absent/unreadable | predating | [#5017](https://github.com/shakenfist/shakenfist/issues/5017) |
+| `_as_uuid` triplicated | predating | Noted |
+| File sizes past the stated-reason mark | predating | Noted |
+| `get_stateless_object_uuids` unpaginated | predating | Noted |
+| gRPC issuer/rule readers already raised | predating | No action; context only |
+
+Issues filed by this phase:
+[#5015](https://github.com/shakenfist/shakenfist/issues/5015) (no alert
+when a namespace has no usable key),
+[#5016](https://github.com/shakenfist/shakenfist/issues/5016) (retire
+the legacy `namespace_attributes.keys` column), and
+[#5017](https://github.com/shakenfist/shakenfist/issues/5017). The
+master plan's Future work entries now point at each.

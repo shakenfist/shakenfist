@@ -162,8 +162,16 @@ live. Concretely, when this plan is done:
    get the same treatment issue 3522 gave `get_namespace_key_by_name()`.
 3. The decision lives in one place per type, on the object class, so
    the reconciler stays type-agnostic. A pinned test names the types
-   that override it, so whoever adds the next object type with a
-   by-name read path that ignores state is made to decide.
+   that override it, so changing that set is deliberate.
+
+   As built, this is narrower than it was first written. The pinned
+   test asserts the set of *overriding* types, so it fires when an
+   override is added or removed -- but a newly registered object type
+   with no override leaves that set unchanged and the test green. The
+   push audit found this: the author of the next type whose read path
+   ignores state is not in fact made to decide. The gap is recorded as
+   a finding of the push-audit phase and is fixed in that phase's
+   follow-up pull request.
 4. Retrying a key creation heals the key rather than freezing it
    stateless: `NamespaceKey.new()`'s rotation path writes the missing
    state when the existing key has none.
@@ -283,7 +291,7 @@ other push-audit phase in this repository.
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 1. Repair live zombies forward | This file, "Phase 1" below | Complete | f79a23cd5c (#4419) |
-| 2. Push audit | [PLAN-zombie-repair-live-credentials-phase-02-push-audit.md](PLAN-zombie-repair-live-credentials-phase-02-push-audit.md) | In progress | — |
+| 2. Push audit | [PLAN-zombie-repair-live-credentials-phase-02-push-audit.md](PLAN-zombie-repair-live-credentials-phase-02-push-audit.md) | Complete | — |
 
 ### Phase 1: repair live zombies forward
 
@@ -518,6 +526,53 @@ sentence, and this phase then closes itself out per the
 Before the audit, file the follow-up issue from open question 3
 (detect a namespace with no usable key) and link it under Future
 work.
+
+#### Audit of phase 1
+
+Run on 2026-11-21 over `f79a23cd5c^1..f79a23cd5c` (#4419), one range
+and one pass, through wave 1, the mechanical sweep and the four
+judgment lenses. Wave 1 is clean: `pre-commit` passes, `tox` passes
+with 8,028 tests and no failures, and the ten range commands are
+empty or benign. **No blocking finding, and no critical or high
+security finding**, so the phase closes here and the advisory
+findings land as their own pull request.
+
+The audit's most serious finding is that `_heal_missing_state()`, the
+function this plan added to heal a key on creation retry, decides
+"this key has no state row" from `get_state()`, which returns `None`
+both for an absent row and for a failed read. The plan exists to stop
+"unreadable" reading as "absent", and its own new function does
+exactly that. During a read blip it can write `initial` then `created`
+over a soft-deleted key -- the "objects do not undelete" guard
+compares the same misread value and does not fire -- or raise out of
+an already-successful rotation, losing the new secret. `mariadb.py`
+already has `get_state_checked()` for precisely this distinction, and
+its docstring warns against the pattern. Graded medium: it needs a
+read failure concurrent with a rotation of a soft-deleted key.
+
+Two findings bear on this plan's own claims. The pinned override test
+does not make the author of a new object type decide, which falsified
+mission statement 3 above and is corrected there. And the liveness
+stop never accounts against the sweep's failure-streak gauge -- worse,
+the work-list read succeeded on that pass, so the gauge was just reset
+to zero -- which means a reconciler repairing nothing hour after hour
+publishes zero failures, the exact silence those gauges exist to
+break.
+
+Three positives are worth recording. The divergence from brief 1b was
+independently judged correct: `DatabaseUnavailable` from these readers
+is tier-wide by construction, and the resume marker moves to the type
+after the one that stopped, so no object type starves. The four new
+mutations this phase added -- forcing the `TrustedIssuer` and
+`MappingRule` overrides to each state unconditionally -- were all
+caught, so phase 1's coverage is better than its own definition of
+done demonstrated. And the fail-closed change fixed an unrecorded
+hole: the issuer duplicate-URL guard used to read an existing issuer's
+`issuer_url` as `None` during a blip, so two issuers could end up
+claiming one `iss`.
+
+Findings, grades and dispositions are in
+[the phase plan](PLAN-zombie-repair-live-credentials-phase-02-push-audit.md).
 
 <!-- shared-block: plan-push-audit-phase v3 -->
 Push audit phase (shared block; do not edit -- the canonical
@@ -993,17 +1048,23 @@ chosen to defer to here, so that we do not forget them.
   mapping rule in one transaction, through one RPC per type. This
   removes the window instead of making it harmless.
 - **A namespace with no usable key** (open question 3). This is a
-  health signal for `system` above all. It is filed as its own issue
-  in phase 2.
+  health signal for `system` above all. Filed as
+  [#5015](https://github.com/shakenfist/shakenfist/issues/5015).
 - **The legacy `namespace_attributes.keys` column.** #3836 also points
   out that this column still holds live key material nobody reads, and
   that the auth-federation plan's open question 7 resolved every part
   of "when is it retired" except the retirement itself. It is
-  unrelated to the reconciler and is not taken up here. If no issue
-  tracks it, phase 2 files one.
+  unrelated to the reconciler and is not taken up here. Filed as
+  [#5016](https://github.com/shakenfist/shakenfist/issues/5016).
 - **Fail-closed reads more broadly.** Step 1a fixes three readers
   because this plan depends on them. #3373 tracks the same
-  absent-versus-unreadable conflation across the rest of `mariadb.py`.
+  absent-versus-unreadable conflation across the rest of `mariadb.py`,
+  but its scope is the gRPC client wrappers. The push audit found the
+  direct point and by-name readers for trusted issuers and mapping
+  rules still conflate the two, which matters because
+  `from_db_by_name()` is the read path the liveness predicates cite.
+  Filed as
+  [#5017](https://github.com/shakenfist/shakenfist/issues/5017).
 
 ### Bugs fixed during this work
 
