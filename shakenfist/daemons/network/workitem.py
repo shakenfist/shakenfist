@@ -469,15 +469,7 @@ class Job(util_concurrency.Job):
                                 util_concurrency.set_thread_name('idle')
                                 LOG.debug('This network thread is now idle')
                                 was_previously_idle = True
-                            # Sleep the backoff interval in short chunks so
-                            # shutdown stays responsive even at the cap.
-                            remaining = poll_backoff.next_empty_interval()
-                            while (remaining > 0
-                                   and daemon.check_abort_path(
-                                       self.abort_path)):
-                                chunk = min(0.2, remaining)
-                                time.sleep(chunk)
-                                remaining -= chunk
+                            self._idle(poll_backoff.next_empty_interval())
                             continue
 
                         poll_backoff.reset()
@@ -529,6 +521,20 @@ class Job(util_concurrency.Job):
                         # even when a batch is large.
                         if not daemon.check_abort_path(self.abort_path):
                             break
+                except DatabaseCallFailed as e:
+                    # Only the Dequeue reaches here: a refusal while
+                    # routing is handled per item above. The tier is up
+                    # and refused the call, which is usually permanent
+                    # for it (an oversized Dequeue reply is
+                    # RESOURCE_EXHAUSTED every time), so pausing as for an
+                    # outage would reissue it every five seconds forever
+                    # and log the wrong cause. Back off as for an empty
+                    # queue instead, as sf-queues' loop does. This clause
+                    # must stay above the next.
+                    LOG.with_fields({'error': str(e)}).warning(
+                        'Database refused a network work dequeue, backing '
+                        'off')
+                    self._idle(poll_backoff.next_empty_interval())
                 except DatabaseUnavailable:
                     # The database will come back; pause dispatch rather
                     # than letting this thread die and churn through
@@ -542,6 +548,15 @@ class Job(util_concurrency.Job):
         finally:
             self._stop_workers(stop_workers, worker_threads)
             self._release_claims(unrouted, worker_queues)
+
+    def _idle(self, interval):
+        """Sleep for interval in short chunks, so shutdown stays responsive
+        even at the backoff cap."""
+        remaining = interval
+        while remaining > 0 and daemon.check_abort_path(self.abort_path):
+            chunk = min(0.2, remaining)
+            time.sleep(chunk)
+            remaining -= chunk
 
     @staticmethod
     def _skip_unroutable(jobname, e, unrouted):

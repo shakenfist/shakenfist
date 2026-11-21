@@ -950,7 +950,7 @@ class DispatcherStopTest(base.ShakenFistTestCase):
         op_class.from_db.side_effect = load or self.load
         with mock.patch.object(workitem, 'config') as mock_config, \
                 mock.patch.object(workitem, 'mariadb') as mock_mariadb, \
-                mock.patch.object(workitem, 'time'), \
+                mock.patch.object(workitem, 'time') as mock_time, \
                 mock.patch.object(workitem, 'util_concurrency'), \
                 mock.patch.object(workitem, 'get_object_class',
                                   return_value=op_class):
@@ -974,6 +974,7 @@ class DispatcherStopTest(base.ShakenFistTestCase):
                     int(c.args[1])
                     for c in mock_mariadb.resolve_work_item.call_args_list)
                 self.dequeues = mock_mariadb.dequeue_work_items.call_count
+                self.sleeps = [c.args[0] for c in mock_time.sleep.call_args_list]
 
     def live_workers(self):
         return [t for t in threading.enumerate()
@@ -1205,3 +1206,30 @@ class DispatcherStopTest(base.ShakenFistTestCase):
         self.run_dispatcher(dequeue, fake_execute, load=load)
         self.assertEqual(['op-0', 'op-1'], executed)
         self.assertEqual([], self.released)
+
+    def test_a_refused_dequeue_backs_off_rather_than_pausing(self):
+        # A refused Dequeue is not an outage: the tier is up, and pausing
+        # for one reissued the identical call every five seconds forever.
+        # It backs off along the empty-queue ladder instead, growing while
+        # the refusal persists, and in short chunks so that shutdown is not
+        # held up. Two refusals, so the second interval is longer than one
+        # chunk.
+        from shakenfist.daemons.daemon import IdlePollBackoff
+        ladder = IdlePollBackoff()
+        expected = [ladder.next_empty_interval() for _ in range(2)]
+        self.assertGreater(expected[1], 0.2)
+
+        def dequeue(queue_names, limit):
+            dequeue.calls += 1
+            if dequeue.calls <= 2:
+                raise exceptions.DatabaseCallFailed(
+                    'refused', grpc.StatusCode.RESOURCE_EXHAUSTED)
+            self.abort()
+            return []
+        dequeue.calls = 0
+
+        self.run_dispatcher(dequeue, mock.MagicMock())
+        self.assertEqual(3, self.dequeues)
+        self.assertNotIn(5, self.sleeps)
+        self.assertTrue(all(s <= 0.2 for s in self.sleeps), self.sleeps)
+        self.assertAlmostEqual(sum(expected), sum(self.sleeps))

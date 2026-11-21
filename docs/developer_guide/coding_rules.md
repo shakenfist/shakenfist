@@ -382,16 +382,19 @@ due so it sorts first next cycle -- will retry a refused call forever and
 starve everything queued behind it. Catch `DatabaseCallFailed` by name ahead
 of such a handler and treat it as a per-item failure: skip the item, count it
 failed, or log it and carry on. The network dispatcher's routing loop, its
-`_release_claims()`, `_run_due_scheduled_jobs()`,
+Dequeue, its `_release_claims()`, `_run_due_scheduled_jobs()`,
 `_grpc_hard_delete_objects()` and sf-queues' main loop all do, and each has a
 test raising `DatabaseCallFailed` beside the one raising `DatabaseUnavailable`.
-sf-queues' loop is the one to study for the shape that is easy to miss: its
-outage handler waits until the tier is healthy, and a tier which refused a
-call *is* healthy, so the wait returned at once and the loop reissued the same
-Dequeue with no sleep. A refusal there backs off as an empty queue does.
+The two Dequeue loops are the ones to study for the shape that is easy to
+miss. sf-queues' outage handler waits until the tier is healthy, and a tier
+which refused a call *is* healthy, so the wait returned at once and the loop
+reissued the same Dequeue with no sleep. sf-net's paused five seconds and
+reissued it, which looks like a bound and is not one. A refusal in either now
+backs off as an empty queue does.
 
-What needs the clause is an *unbounded* retry of the same work. A retry with a
-bound of its own does not: sf-queues' `Job.execute()` leaves a refused item
+What needs the clause is an *unbounded* retry of the same work, and a sleep
+between attempts does not bound it: ask what stops the retry, not how often it
+runs. A retry with a bound of its own does not need the clause: sf-queues' `Job.execute()` leaves a refused item
 claimed, so the stuck-row reaper retries it and errors it after
 `CLUSTER_OP_MAX_ATTEMPTS`, and a one-shot worker holds nothing up while it
 waits. `ClusterLock.__enter__` likewise retries a refused acquire only until

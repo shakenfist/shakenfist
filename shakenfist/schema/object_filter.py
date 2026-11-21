@@ -14,13 +14,16 @@ class ObjectFilterCriteria(BaseModel):
     Represents optional filtering constraints for finding artifacts, instances,
     or networks. ``None`` on any field means "do not filter on this field".
 
-    An empty list on ``states`` behaves the same as ``None`` at the MariaDB
-    layer, but the distinction is kept at the API so a caller can express
-    "no matching states" deliberately in future if needed.
+    An empty list on ``states`` means the same as ``None``: do not filter
+    on state. The gRPC wire format cannot carry the difference (an empty
+    repeated field is indistinguishable from an unset one), so
+    ``criteria_to_proto()`` and ``criteria_from_proto()`` in mariadb.py
+    collapse ``[]`` to ``None``. A future "match no states" would need its
+    own field or a sentinel value, not an empty list.
 
     Attributes:
-        states: List of state values to match. ``None`` = no state filter;
-            ``[]`` = no matching states (explicit empty list).
+        states: List of state values to match. ``None`` or ``[]`` = no
+            state filter.
         namespace: Namespace to filter by. ``None`` = no namespace filter.
         name: Object name to filter by. ``None`` = no name filter.
         network_uuid: Foreign-key filter for the ``network_interfaces``

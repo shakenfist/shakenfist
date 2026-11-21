@@ -418,11 +418,14 @@ Most write RPCs report failure in-band (`success=False` with an
 callers were written against the old sentinels and were checked:
 `resolve_work_item()` used to log and continue, and now leaves the item
 claimed for the stuck-row reaper, which both dispatchers' workers
-already handle; `dequeue_work_items()` used to answer `[]`, and
-sf-queues' main loop now backs off on a refusal rather than spinning on
-it. The surviving `except grpc.RpcError` clauses are reachable only for
-`UNIMPLEMENTED`, so one which has no mixed-version fallback is dead code
-rather than a deliberate swallow.
+already handle; `dequeue_work_items()` used to answer `[]`, and both of
+its callers -- sf-queues' main loop and the network dispatcher -- now
+back off on a refusal as for an empty queue, rather than treating it as
+an outage and reissuing the same Dequeue forever. The surviving
+`except grpc.RpcError` clauses are reachable only for `UNIMPLEMENTED`,
+so one which has no mixed-version fallback is dead code rather than a
+deliberate swallow; issue 5019 tracks narrowing them so the two can be
+told apart.
 
 The servicer has the matching obligation. A reply whose only payload is
 a `repeated` field has nowhere to say "the read failed", so

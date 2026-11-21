@@ -9,6 +9,8 @@ sleep or the wake path. See issue #3943.
 
 from unittest import mock
 
+import grpc
+
 from shakenfist import exceptions
 from shakenfist.daemons import daemon
 from shakenfist.daemons.queues import main as queues_main
@@ -108,7 +110,8 @@ class QueuesBackoffTestCase(base.ShakenFistTestCase):
         # to be healthy returns at once, and the loop used to reissue the
         # same Dequeue with no sleep. A refusal backs off like an empty
         # queue instead, and the backoff keeps growing while it persists.
-        refused = exceptions.DatabaseCallFailed('refused', code='RESOURCE_EXHAUSTED')
+        refused = exceptions.DatabaseCallFailed(
+            'refused', code=grpc.StatusCode.RESOURCE_EXHAUSTED)
         idle_calls = self._run_schedule(m, [refused] * 3)
         self.assertEqual([0.2, 0.4, 0.8], idle_calls)
         # Only the startup and periodic third party checks wait for

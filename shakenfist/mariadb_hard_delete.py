@@ -572,7 +572,16 @@ def _grpc_hard_delete_objects(object_type: ObjectType,
         )
         reply = mariadb._grpc_call(stub.HardDeleteObjects, request)
         return list(reply.deleted_uuids)
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
+        # Every non-retryable code but UNIMPLEMENTED arrives as a
+        # DatabaseCallFailed rather than an RpcError (issue 3373), and
+        # both answer code() the same way. None is still the right answer
+        # for a failure: this is a write, so None means "nothing was
+        # deleted" and cannot be mistaken for an absence. Propagated as
+        # the DatabaseUnavailable it subclasses, a DatabaseCallFailed put
+        # the batch back at the head of its type's deque in the
+        # deleted-object drain, which then never refilled that type or
+        # got past the batch.
         if e.code() == grpc.StatusCode.UNIMPLEMENTED:
             _HARD_DELETE_BATCH_UNAVAILABLE_UNTIL = (
                 time.monotonic() + HARD_DELETE_BATCH_RECHECK_SECONDS)
@@ -583,18 +592,6 @@ def _grpc_hard_delete_objects(object_type: ObjectType,
             raise exceptions.HardDeleteBatchUnavailable(
                 'HardDeleteObjects is not implemented by this database '
                 'service')
-        LOG.error(
-            f'gRPC HardDeleteObjects failed for {len(object_uuids)} '
-            f'{object_type} objects: {e}')
-        return None
-    except exceptions.DatabaseCallFailed as e:
-        # Every non-retryable code but UNIMPLEMENTED arrives here rather
-        # than as an RpcError (issue 3373). None is still the right
-        # answer for it: this is a write, so None means "nothing was
-        # deleted" and cannot be mistaken for an absence. Propagated as
-        # the DatabaseUnavailable it subclasses, it put the batch back
-        # at the head of its type's deque in the deleted-object drain,
-        # which then never refilled that type or got past the batch.
         LOG.error(
             f'gRPC HardDeleteObjects failed for {len(object_uuids)} '
             f'{object_type} objects: {e}')

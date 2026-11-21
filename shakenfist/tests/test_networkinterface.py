@@ -1,6 +1,7 @@
 import uuid
 from unittest import mock
 
+from shakenfist import exceptions
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import SFConfig
 from shakenfist.network import network
@@ -39,6 +40,27 @@ class NetworkInterfaceTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb.find_network_interfaces',
                 return_value=MARIADB_ALL_INTERFACES)
     def test_ni_iterator_mocking(self, mock_find_nis):
+        self.assertEqual(2, len(list(NetworkInterfaces([]))))
+
+    @mock.patch('shakenfist.mariadb._grpc_find_network_interfaces',
+                return_value=MARIADB_ALL_INTERFACES)
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=True)
+    def test_a_namespaced_iterator_is_refused_not_widened(
+            self, _mock_uds, mock_grpc):
+        # The iterator puts its namespace into the criteria for every
+        # type, and network_interfaces has no namespace column. Before
+        # issue 4947 the field was ignored and every namespace's
+        # interfaces came back; now the find refuses, before the RPC.
+        # In a daemon the refusal escapes as an unhandled exception.
+        self.assertRaises(
+            exceptions.UnservableFilterCriteria,
+            list, NetworkInterfaces([], namespace='tenant-a'))
+        mock_grpc.assert_not_called()
+
+        # The control: 'system' and no namespace both mean unscoped, and
+        # put no namespace into the criteria.
+        self.assertEqual(
+            2, len(list(NetworkInterfaces([], namespace='system'))))
         self.assertEqual(2, len(list(NetworkInterfaces([]))))
 
 
