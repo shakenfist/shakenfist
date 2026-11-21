@@ -17606,7 +17606,9 @@
   comes from the same mirror. A digest which cannot be read lets the fetch go
   ahead unchecked, recorded as a <code>fetched image had no published checksum to
   verify against</code> audit event: that event is the one to alert on for
-  a mirror known to publish digests. See
+  a mirror known to publish digests. Setting the new
+  <code>REQUIRE_IMAGE_CHECKSUM</code> (default <code>False</code>) refuses such a fetch instead,
+  for an operator whose configured mirrors are known to publish digests. See
   <a href="/operator_guide/artifacts/#verifying-a-download-against-the-mirror">verifying a download against the mirror</a>.</li>
 <li>When you refer to an artifact by name, and there is more than one match then
   the match in your local namespace (if any) is now preferred instead of returning
