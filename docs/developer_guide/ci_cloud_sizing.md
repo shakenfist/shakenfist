@@ -481,6 +481,29 @@ job.
 [PLAN-transient-capacity-refusals-phase-05-queue-decision.md](../plans/PLAN-transient-capacity-refusals-phase-05-queue-decision.md)'s
 D43 -- "`empty` is a real zero; `absent` and `unparseable` stay
 unknown" -- is the decision this unlocked.
+
+There is a fourth state those five do not cover, and it is not a
+reading of the file at all: a bundle whose suite has no code path that
+could ever write the trace. The Ansible modules lane is six playbooks
+with no Python test harness, so `BaseTestCase.setUp()` never executes
+for it and `ensure_capacity_wait_trace()` never runs; 25 of 25 such
+bundles read `absent`, and none `empty`, on both sides of #4337.
+Counted as `absent` those 25 put one real window's unknown fraction at
+28.4% rather than 2.1%, past the readability ceiling its decision rule
+had pre-registered — so the window would have had to be declared a
+collection defect rather than read, and the exclusion had to be made
+by hand in a scratchpad gather script instead (#4403, #4438).
+
+`tools/ci_headroom_harvest.py` now answers that question in the
+record. `BUNDLE_TOPOLOGIES` answers "does this bundle carry a headroom
+series?"; `wait_capable` answers "is this bundle a unit of a
+capacity-wait reading at all?", with `wait_incapable_reason` carrying
+the why. The wait-capable set is a strict subset, and the field has no
+default, so a lane added to the table has to decide which it is. A
+reading can now exclude by construction what it had to exclude by
+hand. Records at `harvest_version` 1 — everything committed under
+`docs/plans/data/` — predate the field, and a consumer reading those
+has to keep applying the exclusion itself.
 A file that was read but whose every line was malformed is unknown
 as well -- not a zero -- for the same reason an absent one is, and it
 carries its own `state` of `unparseable` in the machine-readable

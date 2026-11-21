@@ -35,7 +35,10 @@ was checked against a real artifact rather than reasoned about:
   shakenfist/actions change that instruments it (#4377), carried a real
   series from 2026-10-01 until it left the merge queue, and a harvest over
   the window before that reads ``series_present`` false there -- an
-  expected absence, not a probe failure. 'Node lifecycle' is skipped by
+  expected absence, not a probe failure. It banks a headroom series and
+  cannot ever bank a capacity-wait trace, which is a different question
+  and now has its own answer in the record: see ``wait_capable`` and
+  ``WAIT_INCAPABLE_BUNDLES``. 'Node lifecycle' is skipped by
   name rather than recorded as missing data, should a window reaching back
   to when it ran on merge be harvested. See ``UNINSTRUMENTED_BUNDLES``
   below.
@@ -97,7 +100,7 @@ DEFAULT_WORKFLOW = 'functional-tests.yml'
 # reasons -- this one when the harvest's framing of a job changes, that one
 # when the measurement itself does -- and a consumer which conflated them
 # would be unable to say which half it could not read.
-HARVEST_VERSION = 1
+HARVEST_VERSION = 2
 
 # Where inside the *inner* zip the probe's traces live. The bundle is built
 # by scp'ing the whole of /srv/ci/traces/ off the cluster primary, so these
@@ -130,8 +133,17 @@ MAX_MEMBER_BYTES = 256 * 1024 * 1024
 BUNDLE_PREFIX = 'bundle-'
 
 
+# wait_capable deliberately has no default. BUNDLE_TOPOLOGIES answers
+# "does this bundle carry a headroom series?" and was also used to answer
+# "is this bundle a unit of a capacity-wait reading?". Those are different
+# questions, the wait-capable set is a strict subset, and the tool had no
+# way to say so -- so a reading which told `absent` from `empty` correctly
+# still counted a bundle which could never be anything but `absent` as an
+# unknown (#4403, #4438). Having no default means a new lane cannot be
+# added here without someone deciding which it is, which is the half of
+# #4403 that was about silence rather than about one bundle.
 BundleKind = collections.namedtuple(
-    'BundleKind', ['job', 'topology', 'job_prefix'])
+    'BundleKind', ['job', 'topology', 'job_prefix', 'wait_capable'])
 
 
 # The artifact-name table, sourced from the lanes in
@@ -185,20 +197,46 @@ BundleKind = collections.namedtuple(
 # costs the ability to re-derive a decision from the runs it was made on.
 BUNDLE_TOPOLOGIES = {
     'bundle-shakenfist-full-debian-13-slim-primary': BundleKind(
-        'Debian 13 cluster', 'slim-primary', 'Debian 13 cluster (collection)'),
+        'Debian 13 cluster', 'slim-primary', 'Debian 13 cluster (collection)',
+        True),
     'bundle-shakenfist-full-debian-12-slim-primary': BundleKind(
-        'Debian 12 cluster', 'slim-primary', 'Debian 12 cluster (collection)'),
+        'Debian 12 cluster', 'slim-primary', 'Debian 12 cluster (collection)',
+        True),
     'bundle-shakenfist-full-ubuntu-2404-slim-primary': BundleKind(
         'Ubuntu 24.04 cluster', 'slim-primary',
-        'Ubuntu 24.04 cluster (collection)'),
+        'Ubuntu 24.04 cluster (collection)', True),
     'bundle-shakenfist-full-guests': BundleKind(
-        'Guests', 'slim-primary', 'Guests (collection)'),
+        'Guests', 'slim-primary', 'Guests (collection)', True),
     'bundle-shakenfist-full-debian-13-slim-tier': BundleKind(
-        'Debian 13 tier', 'slim-tier', 'Debian 13 tier (collection)'),
+        'Debian 13 tier', 'slim-tier', 'Debian 13 tier (collection)',
+        True),
     'bundle-shakenfist-full-debian-12-slim-tier': BundleKind(
-        'Debian 12 tier', 'slim-tier', 'Debian 12 tier (collection)'),
+        'Debian 12 tier', 'slim-tier', 'Debian 12 tier (collection)',
+        True),
     'bundle-shakenfist-full-ansible-modules': BundleKind(
-        'Ansible modules', 'slim-primary', 'Ansible modules (collection)'),
+        'Ansible modules', 'slim-primary', 'Ansible modules (collection)',
+        False),
+}
+
+
+# Why each wait-incapable bundle is one. Keyed by artifact name, so the
+# reason reaches the record rather than living only in a comment, and held
+# to BUNDLE_TOPOLOGIES by test_ci_headroom_harvest.py: every bundle marked
+# wait_capable False has an entry here, and every entry here names a
+# bundle which exists and is marked False.
+#
+# This is not #4377, which was the gate problem keeping the probe from
+# running for the Ansible modules lane at all; that is fixed and the lane
+# banks a headroom series. This is a different kind of thing: even with
+# the probe running exactly as intended, the suite has no code path which
+# could ever write a capacity-wait trace. The plumbing works, for
+# something it was never able to measure.
+WAIT_INCAPABLE_BUNDLES = {
+    'bundle-shakenfist-full-ansible-modules': (
+        'the Ansible modules suite is six Ansible playbooks '
+        '(shakenfist/deploy/ansible_module_ci/001.yml..006.yml) with no '
+        'Python test harness, so shakenfist_ci.base.BaseTestCase.setUp(), '
+        'where ensure_capacity_wait_trace() runs, never executes for it'),
 }
 
 
@@ -713,6 +751,14 @@ def bundle_record(github, run, artifact, kind, jobs, cache_dir, report,
     record['topology'] = kind.topology
     record['topology_source'] = 'artifact-name-table'
     record['topology_table_says'] = kind.topology
+    # Whether this bundle is a unit of a capacity-wait reading at all, as
+    # distinct from whether its wait trace happens to be absent. A reading
+    # which cannot tell those apart has to count a structurally
+    # unmeasurable bundle as an unknown (#4403, #4438), and the exclusion
+    # then has to be made by hand outside the tool.
+    record['wait_capable'] = kind.wait_capable
+    record['wait_incapable_reason'] = WAIT_INCAPABLE_BUNDLES.get(
+        artifact.get('name'))
     record['label'] = None
     record['series_present'] = False
     record['census_present'] = False
