@@ -401,7 +401,7 @@ landed reads `—`. Phases that land in client-python record
 | 0. Decisions and the live-memory baseline | [PLAN-placeable-capacity-phase-00-decisions.md](PLAN-placeable-capacity-phase-00-decisions.md) | Complete | `ab19cf67e7` (#4822) |
 | 1. Extract the shared set-placement core | [PLAN-placeable-capacity-phase-01-placement-core.md](PLAN-placeable-capacity-phase-01-placement-core.md) | Complete | `d20a7d7516` (#4835) |
 | 2. The placement dry run (`C`) | [PLAN-placeable-capacity-phase-02-dry-run.md](PLAN-placeable-capacity-phase-02-dry-run.md) | Complete | `e02a35e514` (#4850); review round `1d1e5df2aa` (#4860); client-python `4ff8a7d` (#448) |
-| 3. Shape holds: schema and the node guard (`A`) | PLAN-placeable-capacity-phase-03-holds-schema.md (to be written) | Not started | — |
+| 3. Shape holds: schema and the node guard (`A`) | [PLAN-placeable-capacity-phase-03-holds-schema.md](PLAN-placeable-capacity-phase-03-holds-schema.md) | In progress | — |
 | 4. Shape holds: consumption, release and displacement | PLAN-placeable-capacity-phase-04-holds-lifecycle.md (to be written) | Not started | — |
 | 5. The refusal contract | PLAN-placeable-capacity-phase-05-refusal-contract.md (to be written) | Not started | — |
 | 6. Client, modules and documentation | PLAN-placeable-capacity-phase-06-client-docs.md (to be written) | Not started | — |
@@ -477,9 +477,19 @@ before either admission change.
 - **Phase 4** is the hold lifecycle: implicit best-fit and explicit
   consumption (`G3`), holds that return on delete for the claim's
   life, re-placement in the same transaction or displacement when a
-  node leaves service (`D8`), and ground-truth overbooking. A
-  displaced hold defends no slot, which is why phase 0's `D15` has
-  it reported rather than quietly retained as an aggregate.
+  node leaves service (the brief's `D8`), and ground-truth
+  overbooking. A displaced hold defends no slot, which is why phase
+  0's `D15` has it reported rather than quietly retained as an
+  aggregate. **Prerequisite, found by phase 3's survey (its `R3`):**
+  phase 4 is what makes holds reachable, by advertising `A`'s
+  capability, and a refusal caused by another namespace's hold is
+  not transient — no retry clears it until the claim releases it.
+  `capacity_guard` is in `TRANSIENT_CAPACITY_STAGES` today, and the
+  comment there already says that a denial which stops meaning
+  "momentary shortage" must be split out of that set rather than
+  silently inheriting it. So the split lands no later than the
+  capability: either phase 4 carries it, or phases 4 and 5 swap.
+  That choice is this plan's and is not yet made.
 - **Phase 5** gives claim refusals the `stage`/`transient`/
   `Retry-After` contract (no open issue; see `S1`), adds the
   held-create refusal fields (`G7`), and states the split of claim
@@ -584,9 +594,18 @@ to do about.
 ### Phase 3: shape holds — schema and the node guard (`A`)
 
 Add a claim's ability to carry shapes and book them onto nodes. The
-schema decision (`Q4`) is the per-node held column beside `used_*`:
-its shape, its reconciler recomputation from hold rows, and how
-claim migration carries bookings. The node guard becomes `used +
+schema decision (`Q4`) is answered by phase 0's `D8`: hold rows in
+a table of their own are the ground truth, and the per-node held
+dimension is three columns on **`scheduler_node_capacity`**, beside
+*that* table's `used_*` — not on `namespace_claims`, whose counters
+are namespace-denominated and node-independent and so cannot carry
+a per-node quantity. This section used to say "the per-node held
+column beside `used_*`" without naming the table, which left a
+reading that cannot be guarded in SQL; phase 3's survey (`F2`)
+corrected it here. What phase 3 owns is that column's reconciler
+recomputation from hold rows, how claim migration carries bookings
+(it carries none), the node guard, and the release paths that
+belong to a claim's own lifecycle. The node guard becomes `used +
 held + request <= limit` for every create (`G6`), a consuming
 create excluding its own hold in the same statement; this is the
 node guard's switch, kept apart from `CLAIM_ENFORCEMENT_HARD`. Claim
@@ -594,6 +613,14 @@ limits are validated, at creation and update, to be at least the sum
 of the claim's holds. The claim branch of
 `admit_instance_placement()` is otherwise unchanged, since holds sit
 inside `claimed`.
+
+Phase 3 ships no API surface and advertises no capability: `G5`
+allows one capability string for `A`, and `A` is not usable until a
+create can consume a hold, so the token is phase 4's. Nothing a
+REST caller can reach writes a hold row in phase 3's release, which
+is deliberate — every arithmetic change phase 3 makes to the guard
+every instance create passes through is a no-op in production until
+phase 4 lands. See that phase plan's `D6`.
 
 ### Phase 4: shape holds — consumption, release and displacement
 
@@ -767,6 +794,18 @@ stale (see the Prompt).
   `D10` found 10 post-change refusals in standing `ucs-lab-*`
   namespaces and no record of who creates them; worth knowing before
   the design is called "every caller".
+- **The disk ledger in the placement pre-filter.**
+  `_has_sufficient_disk()` reads no capacity row: it tests
+  filesystem free space, and neither `used_disk_gb` nor (after phase
+  3) `held_disk_gb` appears in the pre-filter, so a node's booked
+  and committed disk is invisible until the admission guard refuses
+  it and the create walks to the next candidate. The cost is a
+  wasted admission attempt per candidate rather than a spurious
+  refusal. Phase 3 declined to close it (its `D11`): adding a ledger
+  term there changes behaviour for every create in the cluster, held
+  or not, on the stage that produced the largest single family of
+  refusals in placeable-claims phase 5a's reading, and it should be
+  decided with a measurement rather than on the way past.
 - **Affinity across a set's own members.** Phase 1's `D6` charges
   capacity across a multiset but leaves the hard affinity filter
   and the scorer blind to the set's tentatively placed members,
