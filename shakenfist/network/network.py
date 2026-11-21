@@ -61,6 +61,15 @@ LOG, _ = logs.setup(__name__)
 # visits, so a deleted network does not linger.
 DHCP_PROBE_FAILURE_REPORTED: set[str] = set()
 
+# Networks whose DHCP readiness probe has run and been answered, and
+# which have not been seen unanswered since. The positive half of the
+# set above: without it nothing recorded that a probe had run at all,
+# so a probe which never ran -- an is_okay() gate which stopped
+# reaching it, a network refreshed inside the maintain pass's skip
+# window -- was indistinguishable from a healthy one (issue #4977).
+# Pruned by maintain.forget_unvisited_quiesces() for the same reason.
+DHCP_PROBE_SERVING_REPORTED: set[str] = set()
+
 
 class Network(dbowo):
     object_type = ObjectType.NETWORK
@@ -953,10 +962,34 @@ class Network(dbowo):
             DHCP_PROBE_FAILURE_REPORTED.discard(str(self.uuid))
 
         if not is_serving:
+            # A fresh not-answering episode, so the next answered probe
+            # is worth saying again.
+            DHCP_PROBE_SERVING_REPORTED.discard(str(self.uuid))
             self.add_event(
                 EVENT_TYPE_STATUS,
                 'dnsmasq is running but not answering DHCP')
-        return is_serving
+            return False
+
+        # Say that the probe ran and was answered. Nothing did, so
+        # "healthy" and "never probed" looked identical on the network,
+        # and the CI assertion that a maintenance pass finds dnsmasq
+        # serving could only wait out its window and pass (issue #4977).
+        #
+        # Once per episode rather than once per pass, for the reason the
+        # could-not-check event above is: this is a durable row per
+        # network, and one every thirty seconds for the life of a healthy
+        # network tells nobody what the first did not. Marked only once
+        # the event is written, so a database blip retries next pass
+        # instead of losing it for the whole episode.
+        #
+        # A network which was already reported serving, had an episode of
+        # could-not-check, and is answering again says nothing here: the
+        # recovery event above is that transition, and a second event
+        # beside it would be noise.
+        if str(self.uuid) not in DHCP_PROBE_SERVING_REPORTED:
+            self.add_event(EVENT_TYPE_STATUS, 'dnsmasq is answering DHCP')
+            DHCP_PROBE_SERVING_REPORTED.add(str(self.uuid))
+        return True
 
     def remove_dhcp_lease(self, ipv4, macaddr):
         """Enqueue a remove_dhcp_lease NetMacaddrIPOp for this network.
