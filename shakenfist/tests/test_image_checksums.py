@@ -1,7 +1,7 @@
 # Copyright 2026 Michael Still and contributors
 """An image checksum which is fetched and then thrown away.
 
-`_resolve_cirros()` fetched the mirror's digest file, logged what it
+The cirros resolver fetched the mirror's digest file, logged what it
 found, and then returned the URL either way -- the branch which chose
 between them had the same expression on both sides. `http_fetch()`
 meanwhile computed an md5 of the download and never used it. So a
@@ -442,7 +442,7 @@ class CachedBlobPathTestCase(base.ShakenFistTestCase):
             'http://example.com/image.qcow2', 'sha256', '1' * 64)
 
         with mock.patch.object(images, '_resolve_image',
-                               return_value=resolved):
+                               return_value=resolved) as mock_resolve:
             with mock.patch.object(images.blob.Blob, 'from_db',
                                    return_value=mock.MagicMock()):
                 with mock.patch.object(
@@ -462,6 +462,272 @@ class CachedBlobPathTestCase(base.ShakenFistTestCase):
         mock_blob_get.assert_called_once()
         self.assertTrue(
             mock_blob_get.call_args[0][0].startswith(images.BLOB_URL))
+        # And the digest is not merely dropped on this path, it is
+        # never resolved: the resolver is what costs the mirror round
+        # trips (issue 4976).
+        mock_resolve.assert_not_called()
+
+
+class ResolutionOrderingTestCase(base.ShakenFistTestCase):
+    """What the mirror is asked for, before the cache has been consulted.
+
+    transfer_image() resolved the source URL -- version listing for a
+    bare `cirros`, then up to two digest files -- before it decided
+    whether the cluster's own copy would do, so the `cached_only`
+    fallback which exists *because* the mirror is unreachable paid for
+    those round trips and threw the answers away (issue 4976).
+    """
+
+    LISTING = ('''<html><body>
+    <a href="0.4.0/">0.4.0/</a>
+    <a href="0.6.3/">0.6.3/</a>
+    </body></html>''')
+
+    def setUp(self):
+        super().setUp()
+        self.requested = []
+
+    def _fake_get(self, url, *args, **kwargs):
+        url = str(url)
+        self.requested.append(url)
+        if url.endswith('SHA256SUMS'):
+            return _response(200, SHA256SUMS)
+        if url.endswith('MD5SUMS'):
+            return _response(200, MD5SUMS)
+        return _response(200, self.LISTING)
+
+    def _helper(self, source_url, index=1):
+        helper = images.ImageFetchHelper.__new__(images.ImageFetchHelper)
+        helper.objects = []
+        helper.instance = None
+        helper.artifact = mock.MagicMock()
+        helper.artifact.source_url = source_url
+        helper.artifact.most_recent_index = {
+            'index': index, 'blob_uuid': 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff'}
+        if index == 0:
+            helper.artifact.most_recent_index = {'index': 0}
+        return helper
+
+    def test_cached_only_asks_the_mirror_for_nothing(self):
+        """The whole point of the degraded path.
+
+        A bare `cirros` is the worst case: a version listing plus a
+        digest file, three mirror round trips before the cached copy
+        the caller asked for is even looked at.
+        """
+        helper = self._helper('cirros')
+        cached = mock.MagicMock()
+
+        with mock.patch('shakenfist.images.requests.get',
+                        side_effect=self._fake_get):
+            with mock.patch.object(images.blob.Blob, 'from_db',
+                                   return_value=cached):
+                with mock.patch.object(
+                        helper, '_open_connection',
+                        side_effect=AssertionError(
+                            'the source must not be consulted')):
+                    with mock.patch.object(
+                            helper, '_blob_get') as mock_blob_get:
+                        with mock.patch(
+                                'shakenfist.images.add_event_multi'):
+                            helper.transfer_image(cached_only=True)
+
+        self.assertEqual([], self.requested)
+        mock_blob_get.assert_called_once()
+
+    def test_cached_only_survives_an_unreachable_mirror(self):
+        """The case the fallback exists for, which it could not serve.
+
+        A bare `cirros` resolved its version from the mirror's listing,
+        with no timeout and no error handling, before the cache was
+        consulted. So when the mirror was down -- the one condition
+        under which artifact_fetch_op falls back to the cached copy at
+        all -- the fallback raised the connection error on its way in,
+        and the artifact errored with "the cached version was not
+        usable" while a perfectly good cached version sat there.
+        """
+        helper = self._helper('cirros')
+        cached = mock.MagicMock()
+
+        with mock.patch('shakenfist.images.requests.get',
+                        side_effect=requests.exceptions.ConnectionError(
+                            'Name or service not known')):
+            with mock.patch.object(images.blob.Blob, 'from_db',
+                                   return_value=cached):
+                with mock.patch.object(
+                        helper, '_blob_get') as mock_blob_get:
+                    with mock.patch('shakenfist.images.add_event_multi'):
+                        helper.transfer_image(cached_only=True)
+
+        mock_blob_get.assert_called_once()
+        self.assertTrue(
+            mock_blob_get.call_args[0][0].startswith(images.BLOB_URL))
+
+    def test_cached_only_with_nothing_cached_asks_for_nothing_either(self):
+        # The raise is what the caller handles; it must not cost three
+        # fetches to get to it.
+        helper = self._helper('cirros', index=0)
+        with mock.patch('shakenfist.images.requests.get',
+                        side_effect=self._fake_get):
+            with mock.patch('shakenfist.images.add_event_multi'):
+                self.assertRaises(
+                    exceptions.BlobMissing, helper.transfer_image,
+                    cached_only=True)
+        self.assertEqual([], self.requested)
+
+    def test_a_fresh_cached_copy_does_not_resolve_the_digest(self):
+        """The staleness check needs the URL, not the digest.
+
+        A pinned `cirros` expands for free, so what is being asserted
+        here is that the digest files -- which the cluster copy can
+        never be checked against -- are not fetched when the cached
+        copy turns out to be current.
+        """
+        helper = self._helper('cirros:0.6.3')
+        cached = mock.MagicMock()
+        cached.modified = 'the-timestamp'
+        cached.size = 1234
+        resp = mock.MagicMock()
+        resp.headers = {'Last-Modified': 'the-timestamp',
+                        'Content-Length': '1234'}
+
+        with mock.patch('shakenfist.images.requests.get',
+                        side_effect=self._fake_get):
+            with mock.patch.object(images.blob.Blob, 'from_db',
+                                   return_value=cached):
+                with mock.patch.object(
+                        images.blob.Blob, 'normalize_timestamp',
+                        side_effect=lambda v: v):
+                    with mock.patch.object(
+                            helper, '_open_connection',
+                            return_value=resp) as mock_open:
+                        with mock.patch.object(
+                                helper, '_blob_get') as mock_blob_get:
+                            with mock.patch(
+                                    'shakenfist.images.add_event_multi'):
+                                helper.transfer_image()
+
+        self.assertEqual([], self.requested)
+        mock_open.assert_called_once_with(
+            'https://download.cirros-cloud.net/0.6.3/'
+            'cirros-0.6.3-x86_64-disk.img')
+        mock_blob_get.assert_called_once()
+
+    def test_a_mirror_fetch_still_resolves_the_digest(self):
+        """The fix must not turn verification off.
+
+        Nothing is cached, so this is a mirror fetch and the published
+        digest is exactly what it is for.
+        """
+        helper = self._helper('cirros:0.6.3', index=0)
+
+        with mock.patch('shakenfist.images.requests.get',
+                        side_effect=self._fake_get):
+            with mock.patch.object(
+                    helper, '_http_get_inner') as mock_http_get:
+                with mock.patch('shakenfist.images.add_event_multi'):
+                    helper.transfer_image()
+
+        self.assertEqual(
+            ['https://download.cirros-cloud.net/0.6.3/SHA256SUMS'],
+            self.requested)
+        mock_http_get.assert_called_once_with(images.ResolvedImage(
+            'https://download.cirros-cloud.net/0.6.3/'
+            'cirros-0.6.3-x86_64-disk.img', 'sha256', '1' * 64))
+
+    def test_a_stale_cached_copy_reads_the_listing_once(self):
+        """Both halves need the expansion, and it is paid for once.
+
+        The staleness check expands the URL to ask the mirror about it,
+        finds the cached copy stale, and the fetch which follows reuses
+        that expansion rather than reading the version listing a second
+        time.
+        """
+        helper = self._helper('cirros')
+        cached = mock.MagicMock()
+        cached.modified = 'old'
+        cached.size = 1234
+        resp = mock.MagicMock()
+        resp.headers = {'Last-Modified': 'new', 'Content-Length': '2345'}
+
+        with mock.patch('shakenfist.images.requests.get',
+                        side_effect=self._fake_get):
+            with mock.patch.object(images.blob.Blob, 'from_db',
+                                   return_value=cached):
+                with mock.patch.object(
+                        images.blob.Blob, 'normalize_timestamp',
+                        side_effect=lambda v: v):
+                    with mock.patch.object(
+                            helper, '_open_connection', return_value=resp):
+                        with mock.patch.object(
+                                helper, '_http_get_inner') as mock_http_get:
+                            with mock.patch(
+                                    'shakenfist.images.add_event_multi'):
+                                helper.transfer_image()
+
+        self.assertEqual(
+            ['https://download.cirros-cloud.net/',
+             'https://download.cirros-cloud.net/0.6.3/SHA256SUMS'],
+            self.requested)
+        mock_http_get.assert_called_once_with(images.ResolvedImage(
+            'https://download.cirros-cloud.net/0.6.3/'
+            'cirros-0.6.3-x86_64-disk.img', 'sha256', '1' * 64))
+
+    def test_a_blob_source_url_resolves_nothing(self):
+        helper = self._helper(images.BLOB_URL + 'a-blob-uuid')
+        with mock.patch('shakenfist.images.requests.get',
+                        side_effect=self._fake_get):
+            with mock.patch.object(helper, '_blob_get') as mock_blob_get:
+                with mock.patch('shakenfist.images.add_event_multi'):
+                    helper.transfer_image()
+
+        self.assertEqual([], self.requested)
+        mock_blob_get.assert_called_once_with(
+            images.BLOB_URL + 'a-blob-uuid')
+
+
+class ExpandImageUrlTestCase(base.ShakenFistTestCase):
+    """Expansion is the cheap half, and stays that way."""
+
+    def test_a_plain_url_expands_to_itself(self):
+        expanded = images._expand_image_url('https://example.com/i.qcow2')
+        self.assertEqual(
+            images.ExpandedImage('https://example.com/i.qcow2'), expanded)
+
+    def test_a_shakenfist_shortcut_fetches_nothing(self):
+        with mock.patch('shakenfist.images.requests.get',
+                        side_effect=AssertionError('no fetch')):
+            expanded = images._expand_image_url('debian:12')
+        self.assertEqual(
+            'https://images.shakenfist.com/debian:12/latest.qcow2',
+            expanded.url)
+        # No vernum, so _resolve_image() has no digest to go looking
+        # for either.
+        self.assertIsNone(expanded.vernum)
+
+    def test_a_pinned_cirros_fetches_nothing(self):
+        with mock.patch('shakenfist.images.requests.get',
+                        side_effect=AssertionError('no fetch')):
+            expanded = images._expand_image_url('cirros:0.6.3')
+        self.assertEqual(
+            'https://download.cirros-cloud.net/0.6.3/'
+            'cirros-0.6.3-x86_64-disk.img', expanded.url)
+        self.assertEqual('0.6.3', expanded.vernum)
+
+    def test_a_bare_cirros_reads_only_the_listing(self):
+        requested = []
+
+        def _get(url, *args, **kwargs):
+            requested.append(str(url))
+            return _response(
+                200, '<a href="0.6.3/">0.6.3/</a>')
+
+        with mock.patch('shakenfist.images.requests.get', side_effect=_get):
+            expanded = images._expand_image_url('cirros')
+
+        self.assertEqual(
+            ['https://download.cirros-cloud.net/'], requested)
+        self.assertEqual('0.6.3', expanded.vernum)
 
 
 class FetchedImageEventTestCase(base.ShakenFistTestCase):
