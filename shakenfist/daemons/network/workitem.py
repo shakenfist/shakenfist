@@ -6,20 +6,23 @@ import zlib
 
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
 from shakenfist.daemons.daemon import IdlePollBackoff
 from shakenfist import mariadb
+from shakenfist.exceptions import DatabaseCallFailed
 from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import StateWriteFailed
 from shakenfist.config import config
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import DEPENDENCY_DEFER_BUDGET
+from shakenfist.operations.baseoperation import DEPENDENCY_FAILED_STATES
+from shakenfist.operations.baseoperation import DEPENDENCY_PENDING_STATES
 from shakenfist.operations.baseoperation import get_all_network_queues
 from shakenfist.operations.baseoperation import get_node_network_queues
+from shakenfist.schema.operations.baseclusteroperation import TERMINAL_OPERATION_STATES
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import exceptions as util_exceptions
 
@@ -360,6 +363,14 @@ class Job(util_concurrency.Job):
                     released.append(jobname)
                 else:
                     not_released.append(jobname)
+            except DatabaseCallFailed as e:
+                # The tier answered and refused this one call, which
+                # says nothing about the next claim, and failed without
+                # spending a retry budget. Caught by name because it is
+                # a DatabaseUnavailable, which would stop the release.
+                util_exceptions.ignore_exception(
+                    f'releasing the claim on network work item {jobname}', e)
+                not_released.append(jobname)
             except DatabaseUnavailable:
                 # Each call has already waited out its retries, so do not
                 # make the rest wait in turn and delay the restart.
@@ -482,19 +493,20 @@ class Job(util_concurrency.Job):
                             routed = self._route_item(
                                 queue_name, jobname, workitem, batch_size,
                                 worker_count)
+                        except DatabaseCallFailed as e:
+                            # The tier answered with a failure, which is
+                            # usually permanent for this item: pausing
+                            # would retry it forever and dispatch nothing
+                            # behind it, so it is skipped like any other
+                            # error. This clause must stay above the next.
+                            self._skip_unroutable(jobname, e, unrouted)
+                            continue
                         except DatabaseUnavailable:
+                            # An unreachable tier pauses dispatch below,
+                            # with this item still first in unrouted.
                             raise
                         except Exception as e:
-                            # Skip an item which cannot be loaded or routed,
-                            # and leave it claimed: the stuck-row reaper
-                            # retries it, and errors it after
-                            # CLUSTER_OP_MAX_ATTEMPTS. Letting this end the
-                            # dispatcher would hand the claim back on the way
-                            # out, so the next dispatcher would claim it first
-                            # and end too.
-                            util_exceptions.ignore_exception(
-                                f'routing network work item {jobname}', e)
-                            unrouted.popleft()
+                            self._skip_unroutable(jobname, e, unrouted)
                             continue
 
                         if not routed:
@@ -531,6 +543,19 @@ class Job(util_concurrency.Job):
             self._stop_workers(stop_workers, worker_threads)
             self._release_claims(unrouted, worker_queues)
 
+    @staticmethod
+    def _skip_unroutable(jobname, e, unrouted):
+        """Skip the item at the head of unrouted, leaving it claimed.
+
+        The stuck-row reaper retries it, and errors it after
+        CLUSTER_OP_MAX_ATTEMPTS. Letting the error end the dispatcher
+        would hand the claim back on the way out, so the next dispatcher
+        would claim it first and end too.
+        """
+        util_exceptions.ignore_exception(
+            f'routing network work item {jobname}', e)
+        unrouted.popleft()
+
     def _cluster_operation_execute(self, queue_name, op, batch_size,
                                    defer_delays):
         # Executing is deliberately not here. An op dequeued in executing
@@ -538,14 +563,8 @@ class Job(util_concurrency.Job):
         # because the survivor failed, deferred or died; running it now is
         # the only way it reaches a real outcome. See property (3) of the
         # safety invariant above.
-        terminal_states = {
-            BaseClusterOperation.STATE_ABORT,
-            BaseClusterOperation.STATE_COMPLETE,
-            dbo.STATE_DELETED,
-            dbo.STATE_ERROR,
-        }
         state = op.state
-        if state.value in terminal_states:
+        if state.value in TERMINAL_OPERATION_STATES:
             op.add_event(
                 EVENT_TYPE_AUDIT,
                 f'skipping op already in terminal state {state.value}')
@@ -563,22 +582,25 @@ class Job(util_concurrency.Job):
         for dep in op.depends_on:
             dep_op = get_object_class(dep['op_type']).from_db(dep['op_uuid'])
             if not dep_op:
+                # None here is an absent dependency and nothing else. A
+                # read which failed raises DatabaseUnavailable out of
+                # from_db() rather than answering None (issue 3373), and
+                # the worker loop above leaves the work item claimed for
+                # the stuck-row reaper when it does -- so a database
+                # blip no longer cancels every dependent whose edge it
+                # happened to interrupt, irreversibly, for a dependency
+                # which was alive (issue 4910).
                 op.cancel_for_missing_dependency(dep)
                 self._drop_defer_entry(str(op.uuid), defer_delays)
                 return
 
             dep_op_state = dep_op.state.value
-            if dep_op_state in [BaseClusterOperation.STATE_ERROR,
-                                BaseClusterOperation.STATE_DELETED,
-                                BaseClusterOperation.STATE_ABORT]:
+            if dep_op_state in DEPENDENCY_FAILED_STATES:
                 op.abort_for_unsuitable_dependency(dep_op)
                 self._drop_defer_entry(str(op.uuid), defer_delays)
                 return
 
-            if dep_op_state in [BaseClusterOperation.STATE_INITIAL,
-                                BaseClusterOperation.STATE_QUEUED,
-                                BaseClusterOperation.STATE_PREFLIGHT,
-                                BaseClusterOperation.STATE_EXECUTING]:
+            if dep_op_state in DEPENDENCY_PENDING_STATES:
                 # A dependency which never goes terminal must not park us
                 # forever (issue 3992) -- give up loudly once the defer
                 # budget is exhausted. The budget is checked against the
@@ -593,13 +615,32 @@ class Job(util_concurrency.Job):
                 self._apply_defer(op, waiting_on=[dep_op], defer_delays=defer_delays)
                 return
 
+            if dep_op_state != BaseClusterOperation.STATE_COMPLETE:
+                # Named, rather than reached by falling off the end of
+                # this loop body. The two tuples above do enumerate the
+                # whole of BaseClusterOperation's vocabulary, and a
+                # derived test holds them to it, but falling through
+                # would let a state added later satisfy a fate-sharing
+                # edge silently -- the one direction this edge must
+                # never fail in. An unknown state waits instead,
+                # bounded by the same defer budget as a pending one
+                # (issue 4910).
+                if op.current_defer_count >= DEPENDENCY_DEFER_BUDGET:
+                    op.abandon_dependency_wait(dep_op)
+                    self._drop_defer_entry(str(op.uuid), defer_delays)
+                    return
+
+                self._apply_defer(op, waiting_on=[dep_op], defer_delays=defer_delays)
+                return
+
         # Ensure that we are running after any runs_after requirements.
         for dep in op.runs_after:
             dep_op = get_object_class(dep['op_type']).from_db(dep['op_uuid'])
             if not dep_op:
                 # Not fatal because otherwise a missing cluster operation
                 # could cause the entire cluster to stop being able to manage
-                # a given object.
+                # a given object. Absent, not unreadable: see the
+                # depends_on walk above.
                 op.add_event(
                     EVENT_TYPE_AUDIT,
                     'warning, runs_after dependency is missing',
@@ -610,10 +651,7 @@ class Job(util_concurrency.Job):
                 continue
 
             dep_op_state = dep_op.state.value
-            if dep_op_state in [BaseClusterOperation.STATE_INITIAL,
-                                BaseClusterOperation.STATE_QUEUED,
-                                BaseClusterOperation.STATE_PREFLIGHT,
-                                BaseClusterOperation.STATE_EXECUTING]:
+            if dep_op_state in DEPENDENCY_PENDING_STATES:
                 # runs_after is an ordering hint, and a missing dependency
                 # already warns and continues rather than making the object
                 # unmanageable -- treat an exhausted defer budget the same
@@ -631,6 +669,28 @@ class Job(util_concurrency.Job):
                     continue
 
                 # Dependency not yet ready, we should defer
+                self._apply_defer(op, waiting_on=[dep_op], defer_delays=defer_delays)
+                return
+
+            if dep_op_state not in TERMINAL_OPERATION_STATES:
+                # The depends_on walk's guard, for the same reason: this
+                # edge says "not before", so a state which cannot be
+                # shown to have finished has not earned a dispatch.
+                # Warned past once the budget is spent, as everything
+                # else in this walk is (issue 4910).
+                if op.current_defer_count >= DEPENDENCY_DEFER_BUDGET:
+                    op.add_event(
+                        EVENT_TYPE_AUDIT,
+                        'warning, gave up waiting for an unknown '
+                        'runs_after dependency state',
+                        extra={
+                            'dep_object_type': dep_op.object_type,
+                            'dep_object_uuid': str(dep_op.uuid),
+                            'dep_object_state': dep_op_state,
+                            'defer_count': op.current_defer_count
+                        })
+                    continue
+
                 self._apply_defer(op, waiting_on=[dep_op], defer_delays=defer_delays)
                 return
 

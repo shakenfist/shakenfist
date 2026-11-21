@@ -218,6 +218,17 @@ class Monitor(daemon.WorkerPoolDaemon):
                 else:
                     self.idle(poll_backoff.next_empty_interval())
 
+            except exceptions.DatabaseCallFailed as e:
+                # The tier answered, and refused the call: it is up, so
+                # _block_until_healthy() below would return at once and
+                # this loop would reissue the same call with no sleep. A
+                # refusal is usually permanent for that call (an
+                # oversized Dequeue reply is RESOURCE_EXHAUSTED every
+                # time), so back off exactly as for an empty queue
+                # rather than spinning on it.
+                LOG.with_fields({'error': str(e)}).warning(
+                    'Database refused a queue processing call, backing off')
+                self.idle(poll_backoff.next_empty_interval())
             except exceptions.DatabaseUnavailable:
                 # Not an error to be ignored noisily: the database will
                 # come back, and _block_until_healthy() knows how to wait

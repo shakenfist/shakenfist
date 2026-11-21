@@ -7,6 +7,7 @@ from shakenfist_utilities import logs  # noreorder
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.network import network
 from shakenfist.network import interface
@@ -47,18 +48,26 @@ def _network_floating_gateways():
     scale with node count times network count (issue 3976) -- the same
     per-object access shape issue 3655 removed for reservations.
 
-    Returns None when the RPC failed: an sf-database from before this
-    RPC answers UNIMPLEMENTED for the length of a mixed version window,
-    which is not retryable. The caller then falls back to per-network
+    Returns None when the tier answered and the call failed. An
+    sf-database from before this RPC answers UNIMPLEMENTED for the
+    length of a mixed version window, which arrives as a grpc.RpcError;
+    every other non-retryable status arrives as DatabaseCallFailed. The
+    one which matters is RESOURCE_EXHAUSTED: this reply grows with the
+    cluster, and outgrowing the message limit is the realistic way this
+    read fails (the #3638 shape). Each falls back to per-network
     attribute reads -- the old shape at the old cost, not a wrong
-    answer. An unreachable database tier is different and propagates
-    as DatabaseUnavailable, aborting the sweep, because every read
-    after this one would fail the same way.
+    answer, since each of those reads raises rather than answering
+    absent if it fails in turn.
+
+    An unreachable database tier is different and propagates as
+    DatabaseUnavailable, aborting the sweep, because every read after
+    this one would fail the same way. DatabaseCallFailed subclasses it,
+    so it is caught by name first.
     """
     global _bulk_gateway_read_failing
     try:
         gateways = mariadb.get_network_floating_gateways()
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
         if not _bulk_gateway_read_failing:
             _bulk_gateway_read_failing = True
             LOG.warning(

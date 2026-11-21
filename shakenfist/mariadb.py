@@ -947,8 +947,13 @@ def _grpc_call(
     the database-tier rolling restart (#3430).
 
     Once retries are exhausted, raises exceptions.DatabaseUnavailable
-    rather than the underlying RpcError; non-retryable RpcErrors are
-    raised as-is on the first attempt.
+    rather than the underlying RpcError. A non-retryable RpcError fails
+    on the first attempt and raises exceptions.DatabaseCallFailed (a
+    DatabaseUnavailable subclass) for the same reason -- a call which
+    failed must not reach a wrapper that reports it as a missing
+    object. UNIMPLEMENTED is the exception and is raised as-is, because
+    it is a mixed-version answer the wrappers test for rather than a
+    failure.
 
     The method parameter is a bound method on the stub (e.g.
     stub.GetNode). On retry we must re-resolve the method from a
@@ -1043,7 +1048,25 @@ def _grpc_call(
             except grpc.RpcError as e:
                 last_error = e
                 if e.code() not in retryable_codes:
-                    raise
+                    if e.code() == grpc.StatusCode.UNIMPLEMENTED:
+                        # The one non-retryable code the wrappers below
+                        # are entitled to read: it is how an sf-database
+                        # older than an RPC answers, and the wrappers
+                        # with a mixed-version fallback test for it.
+                        raise
+                    # Every other non-retryable code means the call
+                    # failed, not that the object is absent, so it must
+                    # not reach a wrapper which would translate it into
+                    # None/False/[] (issue 3373). RESOURCE_EXHAUSTED is
+                    # the sharpest case: a reply which did not fit the
+                    # message limit would otherwise read as an empty
+                    # list.
+                    failed = (
+                        f'gRPC {method_name or "call"} failed: '
+                        f'{_describe_rpc_error(e)}')
+                    LOG.error(failed)
+                    raise exceptions.DatabaseCallFailed(
+                        failed, code=e.code()) from e
                 if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
                     # Each of these burned the full GRPC_TIMEOUT before failing;
                     # cap them separately so the fast-failing UNAVAILABLE budget
@@ -1902,6 +1925,101 @@ def _ensure_native_enum_columns(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
+# The one criteria field which is not a column on the per-type table:
+# it is served from object_states, which every filterable type has a
+# row in, so every type can serve it. Every other field is checked.
+_CRITERIA_FIELDS_SERVED_ELSEWHERE = frozenset({'states'})
+
+
+def _reject_unservable_criteria(
+        table: sa.Table,
+        object_type: ObjectType,
+        criteria: ObjectFilterCriteria) -> None:
+    """Refuse a filter the target table cannot serve.
+
+    Derived from the table rather than from a second list of which
+    fields each type honours, and from the criteria model rather than
+    from a list of its fields, so there is nothing to keep in step: a
+    column added to a type starts being filterable, and a field added
+    to ObjectFilterCriteria is unservable everywhere until some table
+    has a column of that name.
+
+    This replaces a docstring asking each caller to remember to strip
+    the fields its table lacks. Forgetting silently dropped the filter
+    and answered with every row the remaining filters admitted, which
+    for ``namespace`` is every namespace's rows -- how a scoping
+    mistake becomes a disclosure -- or raised AttributeError from
+    ``table.c`` on whichever path first passed the field (issue 4947).
+    """
+    unservable = [
+        field for field in type(criteria).model_fields
+        if field not in _CRITERIA_FIELDS_SERVED_ELSEWHERE
+        and getattr(criteria, field) is not None and field not in table.c
+    ]
+    if unservable:
+        raise exceptions.UnservableFilterCriteria(
+            f'{object_type} cannot be filtered on '
+            f'{", ".join(unservable)}: the {table.name} table has no such '
+            f'column')
+
+
+def criteria_to_proto(
+        criteria: ObjectFilterCriteria) -> database_pb2.ObjectFilterCriteria:
+    """Carry every set criteria field onto the wire.
+
+    The four _grpc_find_* wrappers each used to copy the fields they
+    thought their table honoured, so a field missing from that copy
+    was dropped before the request was sent and the query widened
+    silently. Iterating the criteria model leaves nothing to copy, and
+    a field the wire message has no slot for is refused rather than
+    dropped (issue 4947).
+    """
+    proto = database_pb2.ObjectFilterCriteria()
+    carried = proto.DESCRIPTOR.fields_by_name
+    for field in type(criteria).model_fields:
+        value = getattr(criteria, field)
+        if value is None:
+            continue
+        if field not in carried:
+            raise exceptions.UnservableFilterCriteria(
+                f'cannot filter on {field}: the database service\'s '
+                f'ObjectFilterCriteria message has no such field')
+        if carried[field].is_repeated:
+            getattr(proto, field).extend(value)
+        else:
+            setattr(proto, field, str(value))
+    return proto
+
+
+def criteria_from_proto(
+        proto: database_pb2.ObjectFilterCriteria) -> ObjectFilterCriteria:
+    """Read every set field of a wire criteria, the inverse of the above.
+
+    Three of the four Find* servicers used to read only ``states``,
+    ``namespace`` and ``name``, so a foreign-key filter a client sent
+    them was ignored and every row the rest admitted came back; the
+    refusal never saw the field to refuse it. Reading every set field
+    leaves nothing to copy. A field set on the wire which the model
+    has no slot for is refused: pydantic would otherwise ignore it,
+    which is the same widening one step later (issue 4947).
+
+    An empty ``states`` is read as None, its wire meaning of "do not
+    filter".
+    """
+    model_fields = ObjectFilterCriteria.model_fields
+    values: dict[str, Any] = {}
+    # ListFields() yields only the fields which are set, and omits an
+    # empty repeated field, which is exactly "do not filter".
+    for descriptor, value in proto.ListFields():
+        field = descriptor.name
+        if field not in model_fields:
+            raise exceptions.UnservableFilterCriteria(
+                f'cannot filter on {field}: ObjectFilterCriteria has no '
+                f'such field')
+        values[field] = list(value) if descriptor.is_repeated else value
+    return ObjectFilterCriteria(**values)
+
+
 def _build_object_filter_query(
         table: sa.Table,
         object_type: ObjectType,
@@ -1915,16 +2033,17 @@ def _build_object_filter_query(
           ON s.object_uuid = <table>.uuid
          AND s.object_type = <object_type>
         WHERE (optional) s.state_value IN criteria.states
-          AND (optional) <table>.namespace    = criteria.namespace
-          AND (optional) <table>.name         = criteria.name
-          AND (optional) <table>.network_uuid = criteria.network_uuid
-          AND (optional) <table>.instance_uuid = criteria.instance_uuid
+          AND (optional) <table>.<field> = criteria.<field>, for every
+              other criteria field which is set
 
     ``criteria.states`` of ``None`` or ``[]`` skips the state filter.
-    Any scalar filter of ``None`` skips that filter. Callers are
-    responsible for stripping fields that do not exist on the target
-    table (e.g. ``name``/``namespace`` on ``network_interfaces``).
+    Any scalar filter of ``None`` skips that filter. A scalar filter
+    which is set but has no column on the target table is refused by
+    _reject_unservable_criteria() rather than dropped, so a caller
+    cannot be answered a query it did not ask.
     """
+    _reject_unservable_criteria(table, object_type, criteria)
+
     states_table = _get_object_states_table()
     # ``object_states.object_uuid`` is a VARCHAR object key, dashed for
     # every type which reaches this query (its width is
@@ -1944,23 +2063,24 @@ def _build_object_filter_query(
     if criteria.states:
         stmt = stmt.where(
             states_table.c.state_value.in_(criteria.states))
-    if criteria.namespace is not None:
-        stmt = stmt.where(table.c.namespace == criteria.namespace)
-    if criteria.name is not None:
-        stmt = stmt.where(table.c.name == criteria.name)
-    if criteria.network_uuid is not None:
-        # Convert string UUIDs to uuid.UUID objects when the column is a
-        # uuid_column_type() (CHAR(32)) column, whose bind processor
-        # expects objects with a .hex attribute rather than plain strings.
-        net_uuid: UUID | str = criteria.network_uuid
-        if isinstance(net_uuid, str):
-            net_uuid = UUID(net_uuid)
-        stmt = stmt.where(table.c.network_uuid == net_uuid)
-    if criteria.instance_uuid is not None:
-        inst_uuid: UUID | str = criteria.instance_uuid
-        if isinstance(inst_uuid, str):
-            inst_uuid = UUID(inst_uuid)
-        stmt = stmt.where(table.c.instance_uuid == inst_uuid)
+    # Every other field is an equality test on the column of the same
+    # name, applied by iterating the model rather than by a list of the
+    # fields someone remembered: a field which passed the refusal above
+    # has a column, and naming five of them here dropped any sixth from
+    # the WHERE clause, answering with more rows than were asked for
+    # (issue 4947).
+    for field in type(criteria).model_fields:
+        if field in _CRITERIA_FIELDS_SERVED_ELSEWHERE:
+            continue
+        value = getattr(criteria, field)
+        if value is None:
+            continue
+        column = table.c[field]
+        # A uuid_column_type() (CHAR(32)) column's bind processor
+        # expects an object with a .hex attribute, not a plain string.
+        if isinstance(column.type, sa.Uuid) and isinstance(value, str):
+            value = UUID(value)
+        stmt = stmt.where(column == value)
     return stmt
 
 
@@ -4953,7 +5073,11 @@ def _grpc_get_state_checked(
             update_time=reply.update_time,
             message=reply.message if reply.message else None
         )
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
+        # Reporting a failed read as (False, None) is this wrapper's
+        # whole purpose, so it catches the DatabaseCallFailed a failed
+        # call now raises as well as the UNIMPLEMENTED which still
+        # arrives as an RpcError (issue 3373).
         LOG.error(
             f'gRPC GetObjectState failed for {object_type}/{object_uuid}: {e}')
         return False, None
@@ -4996,19 +5120,23 @@ def _grpc_delete_state(object_type: ObjectType, object_uuid: str) -> bool:
         return False
 
 
-def _log_failed_read(rpc: str, error: grpc.RpcError, target: str = '') -> None:
+def _log_failed_read(
+        rpc: str, error: BaseException, target: str = '') -> None:
     """Log a list-shaped read which did not happen, naming why when we can.
 
-    The wrappers which use this all collapse an RpcError to a
-    failed-read return of None. That is right for the transient codes
-    and for RESOURCE_EXHAUSTED -- the oversized reply of #3638 -- but
-    it folds INVALID_ARGUMENT in with them, and the servicers now set
-    that status when they are handed an object type they cannot
-    resolve. Such a request is a caller bug or a proto_id version skew,
-    not a database problem, and left unnamed it surfaces as a 503
-    telling an operator to retry something that will never succeed, or
-    as a sweep failure streak that never clears while somebody looks
-    for a database fault that does not exist.
+    The wrappers which use this all collapse a failed call to a
+    failed-read return of None. The error is either a grpc.RpcError
+    (UNIMPLEMENTED, the one code the wrappers still see directly) or
+    the DatabaseCallFailed _grpc_call raises for every other
+    non-retryable code; both answer code(). That is right for the
+    transient codes and for RESOURCE_EXHAUSTED -- the oversized reply
+    of #3638 -- but it folds INVALID_ARGUMENT in with them, and the
+    servicers now set that status when they are handed an object type
+    they cannot resolve. Such a request is a caller bug or a proto_id
+    version skew, not a database problem, and left unnamed it surfaces
+    as a 503 telling an operator to retry something that will never
+    succeed, or as a sweep failure streak that never clears while
+    somebody looks for a database fault that does not exist.
 
     The return value is deliberately unchanged: a caller which could
     not read the list is in the same position either way, and there are
@@ -5042,7 +5170,7 @@ def _grpc_get_objects_by_state(object_type: ObjectType,
         )
         reply = _grpc_call(stub.GetObjectsByState, request)
         return list(reply.object_uuids)
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
         _log_failed_read('GetObjectsByState', e, target=str(object_type))
         return None
 
@@ -5082,7 +5210,7 @@ def _grpc_get_objects_by_state_page(object_type: ObjectType,
             return ObjectsByStatePage(uuids=uuids, more_available=False)
         return ObjectsByStatePage(
             uuids=uuids, more_available=bool(reply.more_available))
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
         _log_failed_read('GetObjectsByState', e, target=str(object_type))
         return None
 
@@ -5105,7 +5233,7 @@ def _grpc_count_objects_by_state(object_type: ObjectType,
         )
         reply = _grpc_call(stub.CountObjectsByState, request)
         return int(reply.count)
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
         _log_failed_read('CountObjectsByState', e, target=str(object_type))
         return None
 
@@ -6273,7 +6401,9 @@ def _grpc_has_pending_cluster_operation_target(
         reply = _grpc_call(
             stub.HasPendingClusterOperationTarget, request)
         return bool(reply.pending)
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
+        # True is the deliberate fail-safe for a read which did not
+        # happen, whatever stopped it (issue 3373).
         LOG.error(
             f'gRPC HasPendingClusterOperationTarget failed for '
             f'{target_object_type}/{target_uuid}: {e}')
@@ -10020,7 +10150,7 @@ def _grpc_get_references_from(
                 last_active=ref.last_active
             ))
         return refs
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
         _log_failed_read('GetReferencesFrom', e, target=str(source_uuid))
         return None
 
@@ -11226,7 +11356,9 @@ def _grpc_delete_blob_transfers_for_blob(blob_uuid: str) -> int:
         )
         reply = _grpc_call(stub.DeleteBlobTransfersForBlob, request)
         return int(reply.count)
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
+        # -1 is not a possible count, so this already reports a failed
+        # call rather than faking one (issue 3373).
         LOG.error(f'gRPC DeleteBlobTransfersForBlob failed: {e}')
         return -1
 
@@ -13445,7 +13577,9 @@ def _grpc_get_all_node_daemon_states(
             )
             for d in reply.data
         ]
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
+        # None is "the read failed", distinct from the empty list which
+        # means this node has registered no daemons (issue 3373).
         LOG.error(
             f'gRPC GetAllNodeDaemonStates failed for {node_uuid}: {e}')
         return None
@@ -17362,15 +17496,8 @@ def _grpc_find_artifacts(
     """Find artifacts matching criteria via the database microservice."""
     try:
         stub = _get_database_stub()
-        proto_criteria = database_pb2.ObjectFilterCriteria(
-            states=criteria.states if criteria.states is not None else []
-        )
-        if criteria.namespace is not None:
-            proto_criteria.namespace = criteria.namespace
-        if criteria.name is not None:
-            proto_criteria.name = criteria.name
         request = database_pb2.FindArtifactsRequest(
-            criteria=proto_criteria)
+            criteria=criteria_to_proto(criteria))
         reply = _grpc_call(stub.FindArtifacts, request)
         return [
             ArtifactData(
@@ -17689,12 +17816,20 @@ def find_artifacts(
         criteria: ObjectFilterCriteria) -> list[ArtifactData]:
     """Find artifacts matching the given filter criteria.
 
+    A criteria field this table has no column for is refused rather
+    than ignored, here as well as in the query builder, so that a
+    caller is told locally instead of being handed a failed database
+    call from the servicer (issue 4947).
+
     Args:
         criteria: Filter criteria (states, namespace, name).
 
     Returns:
         List of matching ArtifactData objects.
     """
+    _reject_unservable_criteria(
+        _get_artifacts_table(), ObjectType.ARTIFACT, criteria)
+
     if _use_database_service():
         return _grpc_find_artifacts(criteria)
     return _direct_find_artifacts(criteria)
@@ -18578,27 +18713,18 @@ def _direct_find_network_interfaces(
     """Find NetworkInterface records matching the given filter criteria.
 
     Joins ``network_interfaces`` to ``object_states`` and applies the
-    optional state filter from ``criteria``. The ``namespace`` and
-    ``name`` filters are silently ignored because the
-    ``network_interfaces`` table has neither column. The
-    ``network_uuid`` and ``instance_uuid`` filters ARE honoured —
-    they correspond to indexed columns on the same table. On
-    ``OperationalError`` logs the full criteria at WARNING level and
-    returns an empty list.
+    optional state filter from ``criteria``. The ``network_uuid`` and
+    ``instance_uuid`` filters are honoured — they correspond to indexed
+    columns on the same table. The ``namespace`` and ``name`` filters
+    are *refused*, because this table has neither column: they used to
+    be stripped here, which answered a namespace-scoped query with
+    every namespace's interfaces (issue 4947). On ``OperationalError``
+    logs the full criteria at WARNING level and returns an empty list.
     """
     engine = _get_engine()
     table = _get_network_interfaces_table()
-    # network_interfaces has no namespace or name column; strip both
-    # before building the query to avoid WHERE clauses that would error.
-    safe_criteria = ObjectFilterCriteria(
-        states=criteria.states,
-        namespace=None,
-        name=None,
-        network_uuid=criteria.network_uuid,
-        instance_uuid=criteria.instance_uuid,
-    )
     stmt = _build_object_filter_query(
-        table, ObjectType.INTERFACE, safe_criteria)
+        table, ObjectType.INTERFACE, criteria)
     # Order by the per-instance interface index so callers iterate
     # interfaces in user-specified order. Without this MariaDB returns
     # rows in an unspecified order, which makes ``Instance.interfaces``
@@ -18946,19 +19072,8 @@ def _grpc_find_network_interfaces(
     microservice."""
     try:
         stub = _get_database_stub()
-        proto_criteria = database_pb2.ObjectFilterCriteria(
-            states=criteria.states if criteria.states is not None else []
-        )
-        if criteria.namespace is not None:
-            proto_criteria.namespace = criteria.namespace
-        if criteria.name is not None:
-            proto_criteria.name = criteria.name
-        if criteria.network_uuid is not None:
-            proto_criteria.network_uuid = criteria.network_uuid
-        if criteria.instance_uuid is not None:
-            proto_criteria.instance_uuid = criteria.instance_uuid
         request = database_pb2.FindNetworkInterfacesRequest(
-            criteria=proto_criteria)
+            criteria=criteria_to_proto(criteria))
         reply = _grpc_call(stub.FindNetworkInterfaces, request)
         return [
             NetworkInterfaceData(
@@ -19200,15 +19315,20 @@ def find_network_interfaces(
         criteria: ObjectFilterCriteria) -> list[NetworkInterfaceData]:
     """Find NetworkInterface records matching the given filter criteria.
 
+    The namespace and name fields exist on the shared criteria shape
+    but not on this table, and are refused rather than ignored: see
+    find_artifacts().
+
     Args:
-        criteria: Filter criteria (states). The namespace and name
-            fields are accepted for proto-shape consistency but are
-            silently ignored because network_interfaces has neither
-            column.
+        criteria: Filter criteria (states, network_uuid,
+            instance_uuid).
 
     Returns:
         List of matching NetworkInterfaceData objects.
     """
+    _reject_unservable_criteria(
+        _get_network_interfaces_table(), ObjectType.INTERFACE, criteria)
+
     if _use_database_service():
         return _grpc_find_network_interfaces(criteria)
     return _direct_find_network_interfaces(criteria)
@@ -20396,15 +20516,8 @@ def _grpc_find_networks(
     """Find networks matching criteria via the database microservice."""
     try:
         stub = _get_database_stub()
-        proto_criteria = database_pb2.ObjectFilterCriteria(
-            states=criteria.states if criteria.states is not None else []
-        )
-        if criteria.namespace is not None:
-            proto_criteria.namespace = criteria.namespace
-        if criteria.name is not None:
-            proto_criteria.name = criteria.name
         request = database_pb2.FindNetworksRequest(
-            criteria=proto_criteria)
+            criteria=criteria_to_proto(criteria))
         reply = _grpc_call(stub.FindNetworks, request)
         return [
             NetworkData(
@@ -20634,12 +20747,18 @@ def find_networks(
         criteria: ObjectFilterCriteria) -> list[NetworkData]:
     """Find networks matching the given filter criteria.
 
+    A criteria field this table has no column for is refused rather
+    than ignored: see find_artifacts().
+
     Args:
         criteria: Filter criteria (states, namespace, name).
 
     Returns:
         List of matching NetworkData objects.
     """
+    _reject_unservable_criteria(
+        _get_networks_table(), ObjectType.NETWORK, criteria)
+
     if _use_database_service():
         return _grpc_find_networks(criteria)
     return _direct_find_networks(criteria)
@@ -22480,15 +22599,8 @@ def _grpc_find_instances(
     """Find instances matching criteria via the database microservice."""
     try:
         stub = _get_database_stub()
-        proto_criteria = database_pb2.ObjectFilterCriteria(
-            states=criteria.states if criteria.states is not None else []
-        )
-        if criteria.namespace is not None:
-            proto_criteria.namespace = criteria.namespace
-        if criteria.name is not None:
-            proto_criteria.name = criteria.name
         request = database_pb2.FindInstancesRequest(
-            criteria=proto_criteria)
+            criteria=criteria_to_proto(criteria))
         reply = _grpc_call(stub.FindInstances, request)
         results = []
         for d in reply.instances:
@@ -22723,7 +22835,9 @@ def _grpc_is_vsock_cid_in_use(cid: int) -> bool:
         request = database_pb2.IsVsockCidInUseRequest(cid=cid)
         reply = _grpc_call(stub.IsVsockCidInUse, request)
         return bool(reply.in_use)
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
+        # The fail-safe in the docstring is for a read which did not
+        # happen, whatever stopped it (issue 3373).
         LOG.error(
             f'gRPC IsVsockCidInUse failed for CID {cid}: {e} '
             f'(returning in_use=True as fail-safe)')
@@ -22757,15 +22871,14 @@ def get_instance(
         inst_uuid: The UUID of the Instance.
         strict: If True, skip the object cache (which only ever holds
             hits, so skipping it never masks a real row) and re-raise a
-            caught gRPC or MariaDB error as DatabaseUnavailable rather
-            than reporting it as a miss. This is for callers which
-            delete things when an instance is absent, such as the
-            cleaner before it deletes an unknown domain and its disks:
-            today a non-retryable RpcError or OperationalError reads
-            exactly like "no such instance", which is unsafe for a
-            caller about to act on that absence.
-            Issue #3373 may later make this the default and remove the
-            keyword.
+            caught MariaDB error, or the UNIMPLEMENTED RpcError which is
+            the one code _grpc_call still lets through, as
+            DatabaseUnavailable rather than reporting it as a miss. This
+            is for callers which delete things when an instance is
+            absent, such as the cleaner before it deletes an unknown
+            domain and its disks. Every other failed gRPC call raises
+            either way (issue 3373); see "strict" in
+            docs/developer_guide/database_internals.md.
 
     Returns:
         An InstanceData object, or None if not found.
@@ -22798,12 +22911,18 @@ def find_instances(
         criteria: ObjectFilterCriteria) -> list[InstanceData]:
     """Find instances matching the given filter criteria.
 
+    A criteria field this table has no column for is refused rather
+    than ignored: see find_artifacts().
+
     Args:
         criteria: Filter criteria (states, namespace, name).
 
     Returns:
         List of matching InstanceData objects.
     """
+    _reject_unservable_criteria(
+        _get_instances_table(), ObjectType.INSTANCE, criteria)
+
     if _use_database_service():
         return _grpc_find_instances(criteria)
     return _direct_find_instances(criteria)
@@ -23960,7 +24079,9 @@ def _grpc_create_and_enqueue_cluster_operation(
         reply = _grpc_call(
             stub.CreateAndEnqueueClusterOperation, request)
         return bool(reply.success), reply.error
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
+        # This wrapper answers (did not succeed, why), which is exactly
+        # what a failed call is, so it keeps answering it (issue 3373).
         LOG.warning(
             f'gRPC CreateAndEnqueueClusterOperation failed for '
             f'{op_uuid}: {e}')
@@ -27207,7 +27328,7 @@ def _grpc_get_stateless_object_uuids(
         )
         reply = _grpc_call(stub.GetStatelessObjectUuids, request)
         return list(reply.object_uuids)
-    except grpc.RpcError as e:
+    except (grpc.RpcError, exceptions.DatabaseCallFailed) as e:
         _log_failed_read('GetStatelessObjectUuids', e, target=str(object_type))
         return None
 

@@ -89,7 +89,7 @@ class RpcTimingScopeTestCase(base.ShakenFistTestCase):
 
         with mariadb.rpc_timing_scope(self.sweep, 'blob'):
             self.assertRaises(
-                FakeRpcError,
+                exceptions.DatabaseCallFailed,
                 mariadb._grpc_call, method, mock.MagicMock())
 
         self.assertEqual(

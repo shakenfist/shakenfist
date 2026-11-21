@@ -56,7 +56,7 @@ class DependencyWaitDeferTest(base.ShakenFistTestCase):
 
     def _run_defer(self, defer_count, dep_kind,
                    dep_state=BaseClusterOperation.STATE_QUEUED,
-                   dep_missing=False,
+                   dep_missing=False, dep_error=None,
                    op_state=BaseClusterOperation.STATE_QUEUED):
         mock_op = mock.MagicMock()
         mock_op.state.value = op_state
@@ -72,7 +72,11 @@ class DependencyWaitDeferTest(base.ShakenFistTestCase):
         op_class = mock.MagicMock()
         op_class.from_db.return_value = mock_op
         dep_class = mock.MagicMock()
-        dep_class.from_db.return_value = None if dep_missing else mock_dep_op
+        if dep_error is not None:
+            dep_class.from_db.side_effect = dep_error
+        else:
+            dep_class.from_db.return_value = (
+                None if dep_missing else mock_dep_op)
         classes = {'node_inst_netdesc_op': op_class, 'net_op': dep_class}
 
         job = workitem.Job.__new__(workitem.Job)
@@ -174,6 +178,77 @@ class DependencyWaitDeferTest(base.ShakenFistTestCase):
             {'op_type': 'net_op', 'op_uuid': DEP_UUID})
         mock_op.defer.assert_not_called()
         mock_op.execute.assert_not_called()
+
+    def test_a_failed_dependency_read_does_not_cancel(self):
+        """Issue 4910: from_db() answers None for an absent dependency
+        and raises for a read which did not happen, so a database blip
+        during the walk must not cancel the dependent for a dependency
+        which is alive. Letting it out is the hold: execute() leaves the
+        work item claimed for the stuck-row reaper."""
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            self._run_defer, 0, 'depends_on',
+            dep_error=exceptions.DatabaseUnavailable('tier is down'))
+
+    def test_a_failed_runs_after_read_does_not_warn_past(self):
+        self.assertRaises(
+            exceptions.DatabaseCallFailed,
+            self._run_defer, 0, 'runs_after',
+            dep_error=exceptions.DatabaseCallFailed('servicer raised'))
+
+    def test_an_unknown_depends_on_state_defers(self):
+        """Issue 4910: a state in neither the failed nor the pending
+        tuple used to fall off the end of the loop body and satisfy the
+        edge, which is the one direction a fate-sharing edge must never
+        fail in."""
+        mock_op, mock_dep_op = self._run_defer(
+            0, 'depends_on', dep_state='invented-later')
+
+        mock_op.defer.assert_called_once_with(
+            waiting_on=[mock_dep_op], delay=workitem.INITIAL_DEFER_DELAY)
+        mock_op.execute.assert_not_called()
+        mock_op.abort_for_unsuitable_dependency.assert_not_called()
+        mock_op.cancel_for_missing_dependency.assert_not_called()
+
+    def test_an_unknown_depends_on_state_past_the_budget_gives_up(self):
+        mock_op, mock_dep_op = self._run_defer(
+            DEPENDENCY_DEFER_BUDGET, 'depends_on',
+            dep_state='invented-later')
+
+        mock_op.abandon_dependency_wait.assert_called_once_with(mock_dep_op)
+        mock_op.defer.assert_not_called()
+        mock_op.execute.assert_not_called()
+
+    def test_an_unknown_runs_after_state_defers(self):
+        mock_op, mock_dep_op = self._run_defer(
+            0, 'runs_after', dep_state='invented-later')
+
+        mock_op.defer.assert_called_once_with(
+            waiting_on=[mock_dep_op], delay=workitem.INITIAL_DEFER_DELAY)
+        mock_op.execute.assert_not_called()
+
+    def test_an_unknown_runs_after_state_past_the_budget_warns(self):
+        # Ordering only, so it warns and runs, as a missing runs_after
+        # dependency and an exhausted pending wait both do.
+        mock_op, _ = self._run_defer(
+            DEPENDENCY_DEFER_BUDGET, 'runs_after',
+            dep_state='invented-later')
+
+        mock_op.defer.assert_not_called()
+        mock_op.execute.assert_called_once()
+        messages = [c.args[1] for c in mock_op.add_event.call_args_list]
+        self.assertIn(
+            'warning, gave up waiting for an unknown runs_after '
+            'dependency state', messages)
+
+    def test_a_complete_depends_on_dependency_still_runs(self):
+        # The negative control for the arm above: the one state which
+        # satisfies the edge still satisfies it.
+        mock_op, _ = self._run_defer(
+            0, 'depends_on', dep_state=BaseClusterOperation.STATE_COMPLETE)
+
+        mock_op.defer.assert_not_called()
+        mock_op.execute.assert_called_once()
 
     def test_operation_which_has_run_is_skipped_before_its_dependencies(self):
         """A work item the stuck-row reaper re-queued after its op

@@ -350,6 +350,22 @@ class GrpcWrapperTestCase(base.ShakenFistTestCase):
             self.assertIsNone(result, code)
             mock_log.error.assert_called_once()
 
+    @mock.patch('shakenfist.mariadb_hard_delete.LOG')
+    def test_a_refused_call_is_a_failed_call(self, mock_log):
+        # The shape _grpc_call actually raises for every non-retryable
+        # code but UNIMPLEMENTED (issue 3373). Escaping as the
+        # DatabaseUnavailable it subclasses, it put the batch back at the
+        # head of the deleted-object drain, which never got past it.
+        for code in (grpc.StatusCode.INTERNAL,
+                     grpc.StatusCode.INVALID_ARGUMENT,
+                     grpc.StatusCode.RESOURCE_EXHAUSTED):
+            mock_log.reset_mock()
+            result, _ = self._call(
+                ObjectType.NET_OP, _uuids(1), FINAL_STATES, 1000.0, False,
+                side_effect=exceptions.DatabaseCallFailed('refused', code))
+            self.assertIsNone(result, code)
+            mock_log.error.assert_called_once()
+
 
 class DirectTransactionTestCase(base.ShakenFistTestCase):
     """What the transaction runs, in what order, against a mocked engine."""
