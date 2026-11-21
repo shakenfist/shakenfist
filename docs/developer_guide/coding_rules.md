@@ -371,7 +371,20 @@ clauses and turned into the `None`/`False`/`[]` they use for a missing object.
 Code which is meant to ride out a database that cannot answer catches
 `DatabaseUnavailable` explicitly and says so; `Daemon.check_daemon_state()` and
 `ClusterLock.__enter__` are the examples to copy, and because
-`DatabaseCallFailed` is a subclass they need no second clause.
+`DatabaseCallFailed` is a subclass they need no second clause *for safety*.
+
+They may need one for progress. `DatabaseUnavailable` is transient and
+tier-wide; `DatabaseCallFailed` is usually permanent and specific to the one
+call. A handler which answers the first by pausing and retrying the *same*
+work -- a dispatcher which sleeps with the item still at the head of its
+queue, a drain which puts the batch back where it was, a scheduled job left
+due so it sorts first next cycle -- will retry a refused call forever and
+starve everything queued behind it. Catch `DatabaseCallFailed` by name ahead
+of such a handler and treat it as a per-item failure: skip the item, count it
+failed, or log it and carry on. The network dispatcher's routing loop, its
+`_release_claims()`, `_run_due_scheduled_jobs()` and
+`_grpc_hard_delete_objects()` all do, and each has a test raising
+`DatabaseCallFailed` beside the one raising `DatabaseUnavailable`.
 
 `UNIMPLEMENTED` is the one status code still handed to the wrappers as an
 `RpcError`, because it is how an sf-database older than an RPC answers and the

@@ -8,6 +8,8 @@ import threading
 import time as real_time
 from unittest import mock
 
+import grpc
+
 from shakenfist import exceptions
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.operations.baseoperation import BaseClusterOperation
@@ -1066,6 +1068,20 @@ class DispatcherStopTest(base.ShakenFistTestCase):
         self.assertEqual(['0', '2'], released)
         self.assertEqual(['1'], not_released)
 
+    def test_a_refused_release_does_not_stop_the_rest(self):
+        # DatabaseCallFailed is a DatabaseUnavailable, but it means the
+        # tier answered and refused this one call, so the rest are tried.
+        def clear(row):
+            if row == 1:
+                raise exceptions.DatabaseCallFailed(
+                    'refused', grpc.StatusCode.INTERNAL)
+            return True
+
+        attempted, released, not_released = self.release(clear, 3)
+        self.assertEqual([0, 1, 2], attempted)
+        self.assertEqual(['0', '2'], released)
+        self.assertEqual(['1'], not_released)
+
     def test_a_database_outage_stops_the_release_at_once(self):
         # Each call has already waited out its retries; the rest are left
         # for sf-net's next start or the reaper rather than waited on too.
@@ -1140,6 +1156,21 @@ class DispatcherStopTest(base.ShakenFistTestCase):
         def load(op_uuid):
             if op_uuid == 'op-0':
                 raise ValueError('unloadable')
+            return self.load(op_uuid)
+
+        self.assert_poison_item_left_claimed(load)
+
+    def test_an_item_whose_load_the_tier_refused_does_not_stall_dispatch(
+            self):
+        # DatabaseCallFailed is a DatabaseUnavailable, and an outage pauses
+        # dispatch with the item still first in line (the test below). A
+        # call the tier answered with a failure is usually permanent for
+        # that item, so pausing on it would retry it forever and dispatch
+        # nothing queued behind it. It is skipped like any unloadable item.
+        def load(op_uuid):
+            if op_uuid == 'op-0':
+                raise exceptions.DatabaseCallFailed(
+                    'refused', grpc.StatusCode.INVALID_ARGUMENT)
             return self.load(op_uuid)
 
         self.assert_poison_item_left_claimed(load)

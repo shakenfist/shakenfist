@@ -26,6 +26,7 @@ from unittest import mock
 import grpc
 
 from shakenfist.daemons.database import main as daemons_database_main
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.protos import database_pb2
 from shakenfist.schema.object_types import ObjectType
@@ -481,6 +482,39 @@ class FindObjectsFailedReadTestCase(base.ShakenFistTestCase):
             context.set_code.assert_not_called()
             context.set_details.assert_not_called()
             self.assertEqual([], list(getattr(reply, field)))
+
+    def test_a_refused_filter_is_invalid_argument_not_internal(self):
+        # A criteria field the table cannot serve is a caller bug, and
+        # no retry can fix it. INTERNAL would reach an API caller as a
+        # 503 asking them to retry (issue 4947).
+        for handler, helper, field in self.HANDLERS:
+            context = mock.MagicMock()
+            with mock.patch(
+                    f'shakenfist.mariadb.{helper}',
+                    side_effect=exceptions.UnservableFilterCriteria(
+                        'no such column')):
+                reply = getattr(self.servicer, handler)(
+                    self._request(handler), context)
+
+            context.set_code.assert_called_once_with(
+                grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details.assert_called_once_with('no such column')
+            self.assertEqual([], list(getattr(reply, field)))
+
+    def test_a_namespace_sent_to_find_network_interfaces_is_refused(self):
+        # The real path rather than a mocked refusal: an sf-api from
+        # before issue 4947 still sends a namespace here, and used to be
+        # answered with every namespace's interfaces.
+        context = mock.MagicMock()
+        request = database_pb2.FindNetworkInterfacesRequest(
+            criteria=database_pb2.ObjectFilterCriteria(
+                states=['created'], namespace='tenant-a'))
+        with mock.patch('shakenfist.mariadb._get_engine'):
+            reply = self.servicer.FindNetworkInterfaces(request, context)
+
+        context.set_code.assert_called_once_with(
+            grpc.StatusCode.INVALID_ARGUMENT)
+        self.assertEqual([], list(reply.network_interfaces))
 
 
 class GetBlobUuidsWithInfoFailedReadTestCase(base.ShakenFistTestCase):

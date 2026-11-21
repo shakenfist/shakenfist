@@ -587,6 +587,18 @@ def _grpc_hard_delete_objects(object_type: ObjectType,
             f'gRPC HardDeleteObjects failed for {len(object_uuids)} '
             f'{object_type} objects: {e}')
         return None
+    except exceptions.DatabaseCallFailed as e:
+        # Every non-retryable code but UNIMPLEMENTED arrives here rather
+        # than as an RpcError (issue 3373). None is still the right
+        # answer for it: this is a write, so None means "nothing was
+        # deleted" and cannot be mistaken for an absence. Propagated as
+        # the DatabaseUnavailable it subclasses, it put the batch back
+        # at the head of its type's deque in the deleted-object drain,
+        # which then never refilled that type or got past the batch.
+        LOG.error(
+            f'gRPC HardDeleteObjects failed for {len(object_uuids)} '
+            f'{object_type} objects: {e}')
+        return None
 
 
 def hard_delete_objects(object_type: ObjectType,

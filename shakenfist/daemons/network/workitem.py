@@ -13,6 +13,7 @@ from shakenfist.constants import get_object_class
 from shakenfist.daemons import daemon
 from shakenfist.daemons.daemon import IdlePollBackoff
 from shakenfist import mariadb
+from shakenfist.exceptions import DatabaseCallFailed
 from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import StateWriteFailed
 from shakenfist.config import config
@@ -20,10 +21,9 @@ from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import DEPENDENCY_DEFER_BUDGET
 from shakenfist.operations.baseoperation import DEPENDENCY_FAILED_STATES
 from shakenfist.operations.baseoperation import DEPENDENCY_PENDING_STATES
-from shakenfist.schema.operations.baseclusteroperation import \
-    TERMINAL_OPERATION_STATES
 from shakenfist.operations.baseoperation import get_all_network_queues
 from shakenfist.operations.baseoperation import get_node_network_queues
+from shakenfist.schema.operations.baseclusteroperation import TERMINAL_OPERATION_STATES
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import exceptions as util_exceptions
 
@@ -364,6 +364,14 @@ class Job(util_concurrency.Job):
                     released.append(jobname)
                 else:
                     not_released.append(jobname)
+            except DatabaseCallFailed as e:
+                # The tier answered and refused this one call, which
+                # says nothing about the next claim, and failed without
+                # spending a retry budget. Caught by name because it is
+                # a DatabaseUnavailable, which would stop the release.
+                util_exceptions.ignore_exception(
+                    f'releasing the claim on network work item {jobname}', e)
+                not_released.append(jobname)
             except DatabaseUnavailable:
                 # Each call has already waited out its retries, so do not
                 # make the rest wait in turn and delay the restart.
@@ -486,9 +494,18 @@ class Job(util_concurrency.Job):
                             routed = self._route_item(
                                 queue_name, jobname, workitem, batch_size,
                                 worker_count)
-                        except DatabaseUnavailable:
-                            raise
                         except Exception as e:
+                            # An unreachable tier pauses dispatch below,
+                            # with this item still first in unrouted. A
+                            # call the tier answered with a failure is
+                            # different: DatabaseCallFailed is usually
+                            # permanent for this item, so pausing would
+                            # retry it forever and dispatch nothing behind
+                            # it. It is skipped like any other error.
+                            if (isinstance(e, DatabaseUnavailable)
+                                    and not isinstance(
+                                        e, DatabaseCallFailed)):
+                                raise
                             # Skip an item which cannot be loaded or routed,
                             # and leave it claimed: the stuck-row reaper
                             # retries it, and errors it after

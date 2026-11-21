@@ -405,6 +405,22 @@ non-retryable and so becomes a `DatabaseCallFailed` client-side. This
 matters because it is the failure mode where sf-database itself is
 healthy and answering, so nothing else in the stack notices.
 
+That narrows what `mariadb.get_instance(uuid, strict=True)` buys. Over
+gRPC a failed call now raises whether or not `strict` is passed, so a
+non-strict caller which was written against "never raises, answers
+`None` on any failure" needs a `DatabaseUnavailable` handler like every
+other caller. `strict` still does two things. It skips the object
+cache, which only ever holds hits, so the answer is a fresh read rather
+than one which may predate a delete. And on the direct MariaDB path --
+sf-database's own servicer, and any node which talks to MariaDB itself
+-- it is still the only thing that turns an `OperationalError` into
+`DatabaseUnavailable` rather than a miss. The `GetInstance` servicer
+passes it for exactly that reason. So pass `strict=True` whenever the
+caller acts on absence (the cleaner deleting an unknown domain's disks
+is the case it was written for); a caller which only displays or
+iterates the answer can leave it off and still never mistake a failed
+call for a missing instance.
+
 `get_active_blob_uuids()` and `get_node_blob_uuids()` are the exceptions
 to the "wrappers translate to not found" rule: they *raise*
 `DatabaseUnavailable` rather than returning

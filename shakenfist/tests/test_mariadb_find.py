@@ -15,10 +15,12 @@
 #   deletion of host network devices
 
 import collections
+from typing import Optional
 from unittest import mock
 import uuid
 
 import grpc
+import pydantic
 from sqlalchemy.exc import DataError
 from sqlalchemy.exc import OperationalError
 
@@ -1037,6 +1039,72 @@ class FindNetworkInterfacesPublicTestCase(base.ShakenFistTestCase):
             exceptions.UnservableFilterCriteria,
             mariadb.find_artifacts,
             ObjectFilterCriteria(network_uuid=str(NETWORK_UUID)))
+
+
+# A criteria field no per-type table has a column for, standing in for
+# a field added to ObjectFilterCriteria after the refusal was written.
+_CriteriaWithANewField = pydantic.create_model(
+    '_CriteriaWithANewField', __base__=ObjectFilterCriteria,
+    colour=(Optional[str], None))
+
+
+class UnservableCriteriaEveryFinderTestCase(base.ShakenFistTestCase):
+    """The refusal holds for every find_* and every criteria field.
+
+    Issue 4947 was found on find_network_interfaces, but the shape --
+    a field set on the criteria and silently not applied -- is open to
+    any finder whose table lacks a column some field names. These hold
+    the rule for all four, and hold it to the criteria model itself, so
+    a field added to ObjectFilterCriteria cannot be dropped by a finder
+    nobody thought to update.
+    """
+
+    FINDERS = [
+        ('find_artifacts', '_grpc_find_artifacts'),
+        ('find_instances', '_grpc_find_instances'),
+        ('find_networks', '_grpc_find_networks'),
+        ('find_network_interfaces', '_grpc_find_network_interfaces'),
+    ]
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch('shakenfist.mariadb.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+        uds = mock.patch(
+            'shakenfist.mariadb._use_database_service', return_value=True)
+        uds.start()
+        self.addCleanup(uds.stop)
+
+    def _assert_refused(self, finder, grpc_name, criteria):
+        with mock.patch(f'shakenfist.mariadb.{grpc_name}') as mock_grpc:
+            self.assertRaises(
+                exceptions.UnservableFilterCriteria,
+                getattr(mariadb, finder), criteria)
+            mock_grpc.assert_not_called()
+
+    def test_a_field_added_to_the_criteria_model_is_refused_everywhere(self):
+        for finder, grpc_name in self.FINDERS:
+            with self.subTest(finder=finder):
+                self._assert_refused(
+                    finder, grpc_name, _CriteriaWithANewField(colour='red'))
+
+    def test_the_foreign_key_filters_are_refused_off_their_table(self):
+        for finder, grpc_name in self.FINDERS[:3]:
+            for field in ('network_uuid', 'instance_uuid'):
+                with self.subTest(finder=finder, field=field):
+                    self._assert_refused(
+                        finder, grpc_name,
+                        ObjectFilterCriteria(**{field: str(NETWORK_UUID)}))
+
+    def test_states_is_servable_by_every_finder(self):
+        for finder, grpc_name in self.FINDERS:
+            with self.subTest(finder=finder), \
+                    mock.patch(f'shakenfist.mariadb.{grpc_name}',
+                               return_value=[]) as mock_grpc:
+                getattr(mariadb, finder)(
+                    ObjectFilterCriteria(states=['created']))
+                mock_grpc.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

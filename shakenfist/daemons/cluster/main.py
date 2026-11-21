@@ -1173,12 +1173,27 @@ class Monitor(daemon.Daemon):
         raising job never reached _schedule_next_run() so it stays due
         and retries on the next 60 second cycle, exactly as it would
         under run_pending().
+
+        DatabaseCallFailed is the exception. It means the tier answered
+        and refused one call, which is usually permanent for that call
+        and says nothing about the next job's. Propagating it would
+        leave the failing job due, so it would sort first and end every
+        batch, and no other maintenance job -- the stuck-row reaper
+        included -- would run again (issue 3373). It is logged and the
+        batch continues; the job stays due, as above, and fails fast.
+        An unreachable tier still ends the batch, since every job after
+        would spend a whole retry budget learning the same thing.
         """
         for job in sorted(schedule.jobs):
             if not job.should_run:
                 continue
             self._maintenance_checkpoint()
-            ret = job.run()
+            try:
+                ret = job.run()
+            except exceptions.DatabaseCallFailed as e:
+                util_exceptions.ignore_exception(
+                    f'scheduled maintenance job {job}', e)
+                continue
             if isinstance(ret, schedule.CancelJob) or ret is schedule.CancelJob:
                 schedule.cancel_job(job)
         self.pet_watchdog()

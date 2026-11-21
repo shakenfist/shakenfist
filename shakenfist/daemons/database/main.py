@@ -3515,6 +3515,14 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     self._ni_to_proto(d)
                     for d in nis
                 ])
+        except exceptions.UnservableFilterCriteria as e:
+            # A caller bug which no retry can fix, and the one failure
+            # here which is not the tier's: INTERNAL would reach an
+            # API caller as a 503 asking them to retry (issue 4947).
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details(str(e))
+            return database_pb2.FindNetworkInterfacesReply(
+                network_interfaces=[])
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database FindNetworkInterfaces failed', e)
@@ -3844,6 +3852,13 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     self._network_to_proto(d)
                     for d in networks
                 ])
+        except exceptions.UnservableFilterCriteria as e:
+            # A caller bug which no retry can fix, and the one failure
+            # here which is not the tier's: INTERNAL would reach an
+            # API caller as a 503 asking them to retry (issue 4947).
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details(str(e))
+            return database_pb2.FindNetworksReply(networks=[])
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database FindNetworks failed', e)
@@ -5049,6 +5064,13 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     for a in all_artifacts
                 ]
             )
+        except exceptions.UnservableFilterCriteria as e:
+            # A caller bug which no retry can fix, and the one failure
+            # here which is not the tier's: INTERNAL would reach an
+            # API caller as a 503 asking them to retry (issue 4947).
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details(str(e))
+            return database_pb2.FindArtifactsReply(artifacts=[])
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database FindArtifacts failed', e)
@@ -5390,6 +5412,13 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     self._instance_to_proto(d)
                     for d in all_data
                 ])
+        except exceptions.UnservableFilterCriteria as e:
+            # A caller bug which no retry can fix, and the one failure
+            # here which is not the tier's: INTERNAL would reach an
+            # API caller as a 503 asking them to retry (issue 4947).
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details(str(e))
+            return database_pb2.FindInstancesReply(instances=[])
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database FindInstances failed', e)

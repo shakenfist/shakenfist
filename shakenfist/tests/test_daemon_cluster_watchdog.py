@@ -9,6 +9,9 @@
 import threading
 from unittest import mock
 
+import grpc
+
+from shakenfist import exceptions
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.daemons.cluster import main as cluster_main
 from shakenfist.tests import base
@@ -161,4 +164,36 @@ class ScheduledJobWatchdogTestCase(base.ShakenFistTestCase):
         with mock.patch.object(cluster_main.schedule, 'jobs',
                                [raises, after]):
             self.assertRaises(RuntimeError, m._run_due_scheduled_jobs)
+        after.run.assert_not_called()
+
+    def test_a_failed_database_call_does_not_skip_the_rest(self):
+        # DatabaseCallFailed is usually permanent for the call which
+        # raised it. The raising job stays due and sorts first, so
+        # propagating it would end every batch at that job and no other
+        # maintenance job would run again (issue 3373).
+        ran = []
+        raises = self._fake_job(True, ran)
+        raises.run.side_effect = exceptions.DatabaseCallFailed(
+            'refused', grpc.StatusCode.INTERNAL)
+        after = self._fake_job(True, ran)
+
+        m = self._make_monitor()
+        with mock.patch.object(cluster_main.schedule, 'jobs',
+                               [raises, after]):
+            m._run_due_scheduled_jobs()
+        self.assertEqual([after], ran)
+
+    def test_an_unreachable_database_still_skips_the_rest(self):
+        # The negative control: every job after would spend a whole
+        # retry budget against a tier which has just failed one.
+        ran = []
+        raises = self._fake_job(True, ran)
+        raises.run.side_effect = exceptions.DatabaseUnavailable('gone')
+        after = self._fake_job(True, ran)
+
+        m = self._make_monitor()
+        with mock.patch.object(cluster_main.schedule, 'jobs',
+                               [raises, after]):
+            self.assertRaises(
+                exceptions.DatabaseUnavailable, m._run_due_scheduled_jobs)
         after.run.assert_not_called()

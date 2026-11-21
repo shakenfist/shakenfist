@@ -1924,12 +1924,10 @@ def _ensure_native_enum_columns(engine: sa.Engine) -> dict[str, Any]:
     }
 
 
-# The scalar criteria fields, each of which is a column on some
-# per-type table and not on others. ``states`` is not here: it is
-# served from object_states, which every filterable type has a row in,
-# so it is the one field every type can serve.
-_CRITERIA_SCALAR_FIELDS = ('namespace', 'name', 'network_uuid',
-                           'instance_uuid')
+# The one criteria field which is not a column on the per-type table:
+# it is served from object_states, which every filterable type has a
+# row in, so every type can serve it. Every other field is checked.
+_CRITERIA_FIELDS_SERVED_ELSEWHERE = frozenset({'states'})
 
 
 def _reject_unservable_criteria(
@@ -1939,7 +1937,8 @@ def _reject_unservable_criteria(
     """Refuse a filter the target table cannot serve.
 
     Derived from the table rather than from a second list of which
-    fields each type honours, so there is nothing to keep in step: a
+    fields each type honours, and from the criteria model rather than
+    from a list of its fields, so there is nothing to keep in step: a
     column added to a type starts being filterable, and a field added
     to ObjectFilterCriteria is unservable everywhere until some table
     has a column of that name.
@@ -1952,8 +1951,9 @@ def _reject_unservable_criteria(
     ``table.c`` on whichever path first passed the field (issue 4947).
     """
     unservable = [
-        field for field in _CRITERIA_SCALAR_FIELDS
-        if getattr(criteria, field) is not None and field not in table.c
+        field for field in type(criteria).model_fields
+        if field not in _CRITERIA_FIELDS_SERVED_ELSEWHERE
+        and getattr(criteria, field) is not None and field not in table.c
     ]
     if unservable:
         raise exceptions.UnservableFilterCriteria(
@@ -5070,15 +5070,15 @@ def _log_failed_read(
     failed-read return of None. The error is either a grpc.RpcError
     (UNIMPLEMENTED, the one code the wrappers still see directly) or
     the DatabaseCallFailed _grpc_call raises for every other
-    non-retryable code; both answer code(). That is right for the transient codes
-    and for RESOURCE_EXHAUSTED -- the oversized reply of #3638 -- but
-    it folds INVALID_ARGUMENT in with them, and the servicers now set
-    that status when they are handed an object type they cannot
-    resolve. Such a request is a caller bug or a proto_id version skew,
-    not a database problem, and left unnamed it surfaces as a 503
-    telling an operator to retry something that will never succeed, or
-    as a sweep failure streak that never clears while somebody looks
-    for a database fault that does not exist.
+    non-retryable code; both answer code(). That is right for the
+    transient codes and for RESOURCE_EXHAUSTED -- the oversized reply
+    of #3638 -- but it folds INVALID_ARGUMENT in with them, and the
+    servicers now set that status when they are handed an object type
+    they cannot resolve. Such a request is a caller bug or a proto_id
+    version skew, not a database problem, and left unnamed it surfaces
+    as a 503 telling an operator to retry something that will never
+    succeed, or as a sweep failure streak that never clears while
+    somebody looks for a database fault that does not exist.
 
     The return value is deliberately unchanged: a caller which could
     not read the list is in the same position either way, and there are
@@ -22592,15 +22592,14 @@ def get_instance(
         inst_uuid: The UUID of the Instance.
         strict: If True, skip the object cache (which only ever holds
             hits, so skipping it never masks a real row) and re-raise a
-            caught gRPC or MariaDB error as DatabaseUnavailable rather
-            than reporting it as a miss. This is for callers which
-            delete things when an instance is absent, such as the
-            cleaner before it deletes an unknown domain and its disks:
-            today a non-retryable RpcError or OperationalError reads
-            exactly like "no such instance", which is unsafe for a
-            caller about to act on that absence.
-            Issue #3373 may later make this the default and remove the
-            keyword.
+            caught MariaDB error, or the UNIMPLEMENTED RpcError which is
+            the one code _grpc_call still lets through, as
+            DatabaseUnavailable rather than reporting it as a miss. This
+            is for callers which delete things when an instance is
+            absent, such as the cleaner before it deletes an unknown
+            domain and its disks. Every other failed gRPC call raises
+            either way (issue 3373); see "strict" in
+            docs/developer_guide/database_internals.md.
 
     Returns:
         An InstanceData object, or None if not found.

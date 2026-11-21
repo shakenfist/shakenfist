@@ -13,8 +13,7 @@ from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import DEPENDENCY_DEFER_BUDGET
 from shakenfist.operations.baseoperation import DEPENDENCY_FAILED_STATES
 from shakenfist.operations.baseoperation import DEPENDENCY_PENDING_STATES
-from shakenfist.schema.operations.baseclusteroperation import \
-    TERMINAL_OPERATION_STATES
+from shakenfist.schema.operations.baseclusteroperation import TERMINAL_OPERATION_STATES
 from shakenfist.util import concurrency as util_concurrency
 
 

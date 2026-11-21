@@ -81,12 +81,23 @@ class DependencyStateClassificationTestCase(base.ShakenFistTestCase):
     warning (issue 4910).
     """
 
+    @staticmethod
+    def _vocabulary():
+        # Every state a transition leaves from or arrives at. Today each
+        # target is also a key, but a state reachable only as a target
+        # is one an operation can hold, so it is counted either way.
+        vocabulary = set()
+        for source, targets in BaseClusterOperation.state_targets.items():
+            vocabulary.add(source)
+            vocabulary.update(targets or ())
+        vocabulary.discard(None)
+        return vocabulary
+
     def test_every_cluster_operation_state_is_classified(self):
         classified = (set(DEPENDENCY_FAILED_STATES)
                       | set(DEPENDENCY_PENDING_STATES)
                       | {BaseClusterOperation.STATE_COMPLETE})
-        vocabulary = {state for state in BaseClusterOperation.state_targets
-                      if state is not None}
+        vocabulary = self._vocabulary()
 
         self.assertEqual(
             set(), vocabulary - classified,
@@ -110,8 +121,7 @@ class DependencyStateClassificationTestCase(base.ShakenFistTestCase):
         classified = (set(DEPENDENCY_FAILED_STATES)
                       | set(DEPENDENCY_PENDING_STATES)
                       | {BaseClusterOperation.STATE_COMPLETE})
-        vocabulary = {state for state in BaseClusterOperation.state_targets
-                      if state is not None}
+        vocabulary = self._vocabulary()
 
         self.assertEqual(
             {BaseClusterOperation.STATE_INITIAL,

@@ -2792,7 +2792,8 @@ def handle_database_unavailable(func):
             LOG.with_fields({
                 'method': flask.request.method,
                 'path': flask.request.path,
-                'grpc_status_code': code.name if code else None,
+                'grpc_status_code': (
+                    getattr(code, 'name', str(code)) if code else None),
                 'error': str(e)}).error(
                 'Database unavailable while handling API request')
             return sf_api.error(503, 'database unavailable, please retry',
