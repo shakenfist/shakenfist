@@ -1107,6 +1107,93 @@ class UnservableCriteriaEveryFinderTestCase(base.ShakenFistTestCase):
                 mock_grpc.assert_called_once()
 
 
+# Criteria fields which are columns on the artifacts table but not among
+# the five fields ObjectFilterCriteria had when the builder was written,
+# standing in for a field added later which some table can serve.
+_CriteriaWithAServableNewField = pydantic.create_model(
+    '_CriteriaWithAServableNewField', __base__=ObjectFilterCriteria,
+    source_url=(Optional[str], None), uuid=(Optional[str], None))
+
+
+class CriteriaAppliedByDerivationTestCase(base.ShakenFistTestCase):
+    """Every criteria field which is set is applied, on every path.
+
+    Issue 4947 had two halves. A field with no column on the target
+    table is refused (UnservableCriteriaEveryFinderTestCase). A field
+    which has one must then be applied, and three places used to name
+    the fields they applied: the query builder, the four gRPC client
+    wrappers and the four Find* servicers. A field missing from any of
+    those copies was dropped, and the query answered with more rows than
+    it asked for. These hold each place to the criteria model instead.
+    """
+
+    def _where(self, criteria):
+        stmt = mariadb._build_object_filter_query(
+            mariadb._get_artifacts_table(), mariadb.ObjectType.ARTIFACT,
+            criteria)
+        return str(stmt.whereclause.compile(
+            compile_kwargs={'literal_binds': False}))
+
+    def test_a_servable_field_added_to_the_model_reaches_the_where_clause(self):
+        where = self._where(_CriteriaWithAServableNewField(
+            source_url='https://example.com/a', uuid=str(uuid.uuid4())))
+        self.assertIn('artifacts.source_url', where)
+        self.assertIn('artifacts.uuid', where)
+
+    def test_every_criteria_field_reaches_the_where_clause(self):
+        # The interfaces table has a column for every scalar field but
+        # namespace and name, and artifacts for those two, so between
+        # them every field the model has is applied somewhere.
+        ni = mariadb._build_object_filter_query(
+            mariadb._get_network_interfaces_table(),
+            mariadb.ObjectType.INTERFACE,
+            ObjectFilterCriteria(
+                states=['created'], network_uuid=str(NETWORK_UUID),
+                instance_uuid=str(uuid.uuid4())))
+        rendered = str(ni.whereclause.compile(
+            compile_kwargs={'literal_binds': False}))
+        rendered += self._where(
+            ObjectFilterCriteria(namespace='tenant-a', name='a'))
+        for field in ObjectFilterCriteria.model_fields:
+            column = 'state_value' if field == 'states' else field
+            with self.subTest(field=field):
+                self.assertIn(f'.{column}', rendered)
+
+    def test_the_wire_message_carries_every_criteria_field(self):
+        # criteria_to_proto() refuses a field the wire has no slot for,
+        # and criteria_from_proto() one the model has no slot for, so a
+        # mismatch is loud either way. This makes it a test failure
+        # rather than a runtime refusal.
+        from shakenfist.protos import database_pb2
+        self.assertEqual(
+            set(ObjectFilterCriteria.model_fields),
+            set(database_pb2.ObjectFilterCriteria.DESCRIPTOR.fields_by_name))
+
+    def test_every_field_survives_the_round_trip(self):
+        criteria = ObjectFilterCriteria(
+            states=['created', 'error'], namespace='tenant-a', name='eth0',
+            network_uuid=str(NETWORK_UUID), instance_uuid=str(uuid.uuid4()))
+        for field in ObjectFilterCriteria.model_fields:
+            with self.subTest(field=field):
+                self.assertIsNotNone(getattr(criteria, field))
+        self.assertEqual(
+            criteria,
+            mariadb.criteria_from_proto(mariadb.criteria_to_proto(criteria)))
+
+    def test_an_unset_criteria_round_trips_unset(self):
+        # Empty states is "do not filter" on the wire, and comes back as
+        # None rather than as "match no states".
+        self.assertEqual(
+            ObjectFilterCriteria(),
+            mariadb.criteria_from_proto(
+                mariadb.criteria_to_proto(ObjectFilterCriteria(states=[]))))
+
+    def test_a_field_the_wire_cannot_carry_is_refused(self):
+        self.assertRaises(
+            exceptions.UnservableFilterCriteria,
+            mariadb.criteria_to_proto, _CriteriaWithANewField(colour='red'))
+
+
 # ---------------------------------------------------------------------------
 # gRPC wrapper — proto conversion smoke test
 # ---------------------------------------------------------------------------

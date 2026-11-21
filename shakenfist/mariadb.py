@@ -1962,6 +1962,63 @@ def _reject_unservable_criteria(
             f'column')
 
 
+def criteria_to_proto(
+        criteria: ObjectFilterCriteria) -> database_pb2.ObjectFilterCriteria:
+    """Carry every set criteria field onto the wire.
+
+    The four _grpc_find_* wrappers each used to copy the fields they
+    thought their table honoured, so a field missing from that copy
+    was dropped before the request was sent and the query widened
+    silently. Iterating the criteria model leaves nothing to copy, and
+    a field the wire message has no slot for is refused rather than
+    dropped (issue 4947).
+    """
+    proto = database_pb2.ObjectFilterCriteria()
+    carried = proto.DESCRIPTOR.fields_by_name
+    for field in type(criteria).model_fields:
+        value = getattr(criteria, field)
+        if value is None:
+            continue
+        if field not in carried:
+            raise exceptions.UnservableFilterCriteria(
+                f'cannot filter on {field}: the database service\'s '
+                f'ObjectFilterCriteria message has no such field')
+        if carried[field].is_repeated:
+            getattr(proto, field).extend(value)
+        else:
+            setattr(proto, field, str(value))
+    return proto
+
+
+def criteria_from_proto(
+        proto: database_pb2.ObjectFilterCriteria) -> ObjectFilterCriteria:
+    """Read every set field of a wire criteria, the inverse of the above.
+
+    Three of the four Find* servicers used to read only ``states``,
+    ``namespace`` and ``name``, so a foreign-key filter a client sent
+    them was ignored and every row the rest admitted came back; the
+    refusal never saw the field to refuse it. Reading every set field
+    leaves nothing to copy. A field set on the wire which the model
+    has no slot for is refused: pydantic would otherwise ignore it,
+    which is the same widening one step later (issue 4947).
+
+    An empty ``states`` is read as None, its wire meaning of "do not
+    filter".
+    """
+    model_fields = ObjectFilterCriteria.model_fields
+    values: dict[str, Any] = {}
+    # ListFields() yields only the fields which are set, and omits an
+    # empty repeated field, which is exactly "do not filter".
+    for descriptor, value in proto.ListFields():
+        field = descriptor.name
+        if field not in model_fields:
+            raise exceptions.UnservableFilterCriteria(
+                f'cannot filter on {field}: ObjectFilterCriteria has no '
+                f'such field')
+        values[field] = list(value) if descriptor.is_repeated else value
+    return ObjectFilterCriteria(**values)
+
+
 def _build_object_filter_query(
         table: sa.Table,
         object_type: ObjectType,
@@ -1975,10 +2032,8 @@ def _build_object_filter_query(
           ON s.object_uuid = <table>.uuid
          AND s.object_type = <object_type>
         WHERE (optional) s.state_value IN criteria.states
-          AND (optional) <table>.namespace    = criteria.namespace
-          AND (optional) <table>.name         = criteria.name
-          AND (optional) <table>.network_uuid = criteria.network_uuid
-          AND (optional) <table>.instance_uuid = criteria.instance_uuid
+          AND (optional) <table>.<field> = criteria.<field>, for every
+              other criteria field which is set
 
     ``criteria.states`` of ``None`` or ``[]`` skips the state filter.
     Any scalar filter of ``None`` skips that filter. A scalar filter
@@ -2007,23 +2062,24 @@ def _build_object_filter_query(
     if criteria.states:
         stmt = stmt.where(
             states_table.c.state_value.in_(criteria.states))
-    if criteria.namespace is not None:
-        stmt = stmt.where(table.c.namespace == criteria.namespace)
-    if criteria.name is not None:
-        stmt = stmt.where(table.c.name == criteria.name)
-    if criteria.network_uuid is not None:
-        # Convert string UUIDs to uuid.UUID objects when the column is a
-        # uuid_column_type() (CHAR(32)) column, whose bind processor
-        # expects objects with a .hex attribute rather than plain strings.
-        net_uuid: UUID | str = criteria.network_uuid
-        if isinstance(net_uuid, str):
-            net_uuid = UUID(net_uuid)
-        stmt = stmt.where(table.c.network_uuid == net_uuid)
-    if criteria.instance_uuid is not None:
-        inst_uuid: UUID | str = criteria.instance_uuid
-        if isinstance(inst_uuid, str):
-            inst_uuid = UUID(inst_uuid)
-        stmt = stmt.where(table.c.instance_uuid == inst_uuid)
+    # Every other field is an equality test on the column of the same
+    # name, applied by iterating the model rather than by a list of the
+    # fields someone remembered: a field which passed the refusal above
+    # has a column, and naming five of them here dropped any sixth from
+    # the WHERE clause, answering with more rows than were asked for
+    # (issue 4947).
+    for field in type(criteria).model_fields:
+        if field in _CRITERIA_FIELDS_SERVED_ELSEWHERE:
+            continue
+        value = getattr(criteria, field)
+        if value is None:
+            continue
+        column = table.c[field]
+        # A uuid_column_type() (CHAR(32)) column's bind processor
+        # expects an object with a .hex attribute, not a plain string.
+        if isinstance(column.type, sa.Uuid) and isinstance(value, str):
+            value = UUID(value)
+        stmt = stmt.where(column == value)
     return stmt
 
 
@@ -17438,15 +17494,8 @@ def _grpc_find_artifacts(
     """Find artifacts matching criteria via the database microservice."""
     try:
         stub = _get_database_stub()
-        proto_criteria = database_pb2.ObjectFilterCriteria(
-            states=criteria.states if criteria.states is not None else []
-        )
-        if criteria.namespace is not None:
-            proto_criteria.namespace = criteria.namespace
-        if criteria.name is not None:
-            proto_criteria.name = criteria.name
         request = database_pb2.FindArtifactsRequest(
-            criteria=proto_criteria)
+            criteria=criteria_to_proto(criteria))
         reply = _grpc_call(stub.FindArtifacts, request)
         return [
             ArtifactData(
@@ -18777,19 +18826,8 @@ def _grpc_find_network_interfaces(
     microservice."""
     try:
         stub = _get_database_stub()
-        proto_criteria = database_pb2.ObjectFilterCriteria(
-            states=criteria.states if criteria.states is not None else []
-        )
-        if criteria.namespace is not None:
-            proto_criteria.namespace = criteria.namespace
-        if criteria.name is not None:
-            proto_criteria.name = criteria.name
-        if criteria.network_uuid is not None:
-            proto_criteria.network_uuid = criteria.network_uuid
-        if criteria.instance_uuid is not None:
-            proto_criteria.instance_uuid = criteria.instance_uuid
         request = database_pb2.FindNetworkInterfacesRequest(
-            criteria=proto_criteria)
+            criteria=criteria_to_proto(criteria))
         reply = _grpc_call(stub.FindNetworkInterfaces, request)
         return [
             NetworkInterfaceData(
@@ -20223,15 +20261,8 @@ def _grpc_find_networks(
     """Find networks matching criteria via the database microservice."""
     try:
         stub = _get_database_stub()
-        proto_criteria = database_pb2.ObjectFilterCriteria(
-            states=criteria.states if criteria.states is not None else []
-        )
-        if criteria.namespace is not None:
-            proto_criteria.namespace = criteria.namespace
-        if criteria.name is not None:
-            proto_criteria.name = criteria.name
         request = database_pb2.FindNetworksRequest(
-            criteria=proto_criteria)
+            criteria=criteria_to_proto(criteria))
         reply = _grpc_call(stub.FindNetworks, request)
         return [
             NetworkData(
@@ -22313,15 +22344,8 @@ def _grpc_find_instances(
     """Find instances matching criteria via the database microservice."""
     try:
         stub = _get_database_stub()
-        proto_criteria = database_pb2.ObjectFilterCriteria(
-            states=criteria.states if criteria.states is not None else []
-        )
-        if criteria.namespace is not None:
-            proto_criteria.namespace = criteria.namespace
-        if criteria.name is not None:
-            proto_criteria.name = criteria.name
         request = database_pb2.FindInstancesRequest(
-            criteria=proto_criteria)
+            criteria=criteria_to_proto(criteria))
         reply = _grpc_call(stub.FindInstances, request)
         results = []
         for d in reply.instances:

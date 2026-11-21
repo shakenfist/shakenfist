@@ -509,12 +509,37 @@ class FindObjectsFailedReadTestCase(base.ShakenFistTestCase):
         request = database_pb2.FindNetworkInterfacesRequest(
             criteria=database_pb2.ObjectFilterCriteria(
                 states=['created'], namespace='tenant-a'))
-        with mock.patch('shakenfist.mariadb._get_engine'):
+        with mock.patch('shakenfist.mariadb._get_engine') as mock_engine:
             reply = self.servicer.FindNetworkInterfaces(request, context)
 
         context.set_code.assert_called_once_with(
             grpc.StatusCode.INVALID_ARGUMENT)
         self.assertEqual([], list(reply.network_interfaces))
+        mock_engine.return_value.connect.assert_not_called()
+
+    def test_a_foreign_key_sent_to_the_other_finders_is_refused(self):
+        # The real path for the other three handlers. Each used to read
+        # only states, namespace and name off the wire, so a client
+        # sending network_uuid or instance_uuid had the filter dropped at
+        # the tier boundary and got every row the rest admitted. The
+        # refusal never saw the field, so it could not refuse it.
+        for handler, _helper, field in self.HANDLERS[:3]:
+            for fk in ('network_uuid', 'instance_uuid'):
+                with self.subTest(handler=handler, field=fk):
+                    context = mock.MagicMock()
+                    request = getattr(database_pb2, f'{handler}Request')(
+                        criteria=database_pb2.ObjectFilterCriteria(
+                            states=['created'],
+                            **{fk: '6f1c1e4a-35f8-4d4b-9a3c-1d1c4b9f5e10'}))
+                    with mock.patch(
+                            'shakenfist.mariadb._get_engine') as mock_engine:
+                        reply = getattr(self.servicer, handler)(
+                            request, context)
+
+                    context.set_code.assert_called_once_with(
+                        grpc.StatusCode.INVALID_ARGUMENT)
+                    self.assertEqual([], list(getattr(reply, field)))
+                    mock_engine.return_value.connect.assert_not_called()
 
 
 class GetBlobUuidsWithInfoFailedReadTestCase(base.ShakenFistTestCase):

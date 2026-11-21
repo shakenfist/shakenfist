@@ -2782,6 +2782,18 @@ def handle_database_unavailable(func):
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
+        except exceptions.UnservableFilterCriteria as e:
+            # A find asked for a filter its table cannot serve. That is
+            # a caller bug which no retry fixes, so it is a 400 rather
+            # than a 503 or an unqualified 500, matching the database
+            # servicer's INVALID_ARGUMENT for the same refusal. No
+            # handler can produce it today; this is where one would.
+            LOG.with_fields({
+                'method': flask.request.method,
+                'path': flask.request.path,
+                'error': str(e)}).warning(
+                'Refused a filter its table cannot serve')
+            return sf_api.error(400, str(e), suppress_traceback=True)
         except exceptions.DatabaseUnavailable as e:
             # The status code is only present on the DatabaseCallFailed
             # subclass, where the tier answered and refused. Logging it

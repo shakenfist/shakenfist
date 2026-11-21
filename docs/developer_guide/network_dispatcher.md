@@ -76,7 +76,7 @@ seconds. The defer cycle is:
 6. When all dependencies are satisfied the op executes normally and its map
    entry is dropped.
 
-Each of the three ways a dependency ends an op in steps 3 and 4 also calls the
+Each of the three ways a dependency ends an op in steps 3, 4 and 5 also calls the
 op's `_dependency_failed()` hook, provided the op is still `queued` and so has
 never run. Ending the op alone tells a client watching its target nothing, so
 an op class whose targets would be left half-built overrides the hook.

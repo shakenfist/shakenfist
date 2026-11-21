@@ -392,6 +392,38 @@ loop treats it as unhealthy and waits, and (since #3638) the cleaner's
 `_maintain_blobs()` and the cluster daemon's `_cluster_wide_cleanup()`
 and sweep helpers skip the affected work for the pass.
 
+Raising `DatabaseCallFailed` changed every wrapper at once: each
+`except grpc.RpcError` clause which used to turn a refused call into a
+sentinel now sees only `UNIMPLEMENTED`, and the refusal propagates to
+the caller instead. Eleven wrappers whose sentinel is distinguishable
+from an answer catch `DatabaseCallFailed` to keep it (see
+[coding rules](coding_rules.md)); the rest propagate. The blast radius
+is what the servicer can actually answer with, which today is:
+
+* `INTERNAL`, from the handlers which catch an unexpected exception and
+  set it -- the `Find*`, `Get*` and list readers chiefly, about eighty
+  sites;
+* `INVALID_ARGUMENT`, from about a dozen handlers which validate their
+  request (an unknown object type, an empty state list, a filter its
+  table cannot serve);
+* `ABORTED`, from `HardDeleteObjects` alone;
+* `UNKNOWN`, from any handler which lets an exception escape rather
+  than setting a status; and
+* `RESOURCE_EXHAUSTED`, from any RPC whose reply outgrows the 32 MiB
+  client receive limit in `util/grpc_channel.py` -- a list reader or a
+  Dequeue over a large backlog, as in issue 3638.
+
+Most write RPCs report failure in-band (`success=False` with an
+`error`) rather than as a status code, so they are unaffected. Two
+callers were written against the old sentinels and were checked:
+`resolve_work_item()` used to log and continue, and now leaves the item
+claimed for the stuck-row reaper, which both dispatchers' workers
+already handle; `dequeue_work_items()` used to answer `[]`, and
+sf-queues' main loop now backs off on a refusal rather than spinning on
+it. The surviving `except grpc.RpcError` clauses are reachable only for
+`UNIMPLEMENTED`, so one which has no mixed-version fallback is dead code
+rather than a deliberate swallow.
+
 The servicer has the matching obligation. A reply whose only payload is
 a `repeated` field has nowhere to say "the read failed", so
 `GetObjectsByState`, `GetStatelessObjectUuids` and `GetReferencesFrom`

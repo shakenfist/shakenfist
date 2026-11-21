@@ -66,7 +66,6 @@ from shakenfist.schema.network_data import NetworkData
 from shakenfist.schema.network_interface_data import NetworkInterfaceData
 from shakenfist.schema.node_attributes import NodeAttributesData
 from shakenfist.schema.node_data import NodeData
-from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.upload import UploadData
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import json as util_json
@@ -3494,21 +3493,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Find NetworkInterface records matching filter criteria from MariaDB."""
         try:
             self.monitor.counters['find_network_interfaces'].inc()
-            criteria = ObjectFilterCriteria(
-                states=list(request.criteria.states) or None,
-                namespace=(
-                    request.criteria.namespace
-                    if request.criteria.HasField('namespace') else None),
-                name=(
-                    request.criteria.name
-                    if request.criteria.HasField('name') else None),
-                network_uuid=(
-                    request.criteria.network_uuid
-                    if request.criteria.HasField('network_uuid') else None),
-                instance_uuid=(
-                    request.criteria.instance_uuid
-                    if request.criteria.HasField('instance_uuid') else None),
-            )
+            criteria = mariadb.criteria_from_proto(request.criteria)
             nis = mariadb._direct_find_network_interfaces(criteria)
             return database_pb2.FindNetworkInterfacesReply(
                 network_interfaces=[
@@ -3837,15 +3822,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Find Network records matching filter criteria from MariaDB."""
         try:
             self.monitor.counters['find_networks'].inc()
-            criteria = ObjectFilterCriteria(
-                states=list(request.criteria.states) or None,
-                namespace=(
-                    request.criteria.namespace
-                    if request.criteria.HasField('namespace') else None),
-                name=(
-                    request.criteria.name
-                    if request.criteria.HasField('name') else None),
-            )
+            criteria = mariadb.criteria_from_proto(request.criteria)
             networks = mariadb._direct_find_networks(criteria)
             return database_pb2.FindNetworksReply(
                 networks=[
@@ -5041,15 +5018,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Find artifact records matching filter criteria from MariaDB."""
         try:
             self.monitor.counters['find_artifacts'].inc()
-            criteria = ObjectFilterCriteria(
-                states=list(request.criteria.states) or None,
-                namespace=(
-                    request.criteria.namespace
-                    if request.criteria.HasField('namespace') else None),
-                name=(
-                    request.criteria.name
-                    if request.criteria.HasField('name') else None),
-            )
+            criteria = mariadb.criteria_from_proto(request.criteria)
             all_artifacts = mariadb._direct_find_artifacts(criteria)
             return database_pb2.FindArtifactsReply(
                 artifacts=[
@@ -5397,15 +5366,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Find Instance records matching filter criteria from MariaDB."""
         try:
             self.monitor.counters['find_instances'].inc()
-            criteria = ObjectFilterCriteria(
-                states=list(request.criteria.states) or None,
-                namespace=(
-                    request.criteria.namespace
-                    if request.criteria.HasField('namespace') else None),
-                name=(
-                    request.criteria.name
-                    if request.criteria.HasField('name') else None),
-            )
+            criteria = mariadb.criteria_from_proto(request.criteria)
             all_data = mariadb._direct_find_instances(criteria)
             return database_pb2.FindInstancesReply(
                 instances=[

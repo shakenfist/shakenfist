@@ -238,6 +238,12 @@ query with more rows than it asked for — a namespace-scoped interface query wi
 interfaces — which is how a scoping mistake becomes a disclosure (issue 4947). The check is derived from
 the table's own columns, so there is no second list of honoured fields to keep in step.
 
+The same holds on the way through. The query builder applies every criteria field which is set by iterating
+the model, the gRPC client and the `Find*` servicers carry every field by iterating the wire message, and a
+test holds the wire message and the model to the same field set, so a field cannot be dropped at any of
+those three places either. The database service answers a refused filter with `INVALID_ARGUMENT`, and the
+REST API answers one with a 400 rather than a 500 or a 503: it is a caller bug, and no retry fixes it.
+
 Only `states` is servable for every filterable type, because it is read from `object_states` rather than
 from the per-type table. The two FK filter fields `network_uuid` and `instance_uuid` are servable for
 `network_interfaces`, and they are how `Network.networkinterfaces` and `Instance.interfaces` resolve their

@@ -6,7 +6,6 @@ import zlib
 
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import get_object_class
@@ -494,28 +493,20 @@ class Job(util_concurrency.Job):
                             routed = self._route_item(
                                 queue_name, jobname, workitem, batch_size,
                                 worker_count)
-                        except Exception as e:
+                        except DatabaseCallFailed as e:
+                            # The tier answered with a failure, which is
+                            # usually permanent for this item: pausing
+                            # would retry it forever and dispatch nothing
+                            # behind it, so it is skipped like any other
+                            # error. This clause must stay above the next.
+                            self._skip_unroutable(jobname, e, unrouted)
+                            continue
+                        except DatabaseUnavailable:
                             # An unreachable tier pauses dispatch below,
-                            # with this item still first in unrouted. A
-                            # call the tier answered with a failure is
-                            # different: DatabaseCallFailed is usually
-                            # permanent for this item, so pausing would
-                            # retry it forever and dispatch nothing behind
-                            # it. It is skipped like any other error.
-                            if (isinstance(e, DatabaseUnavailable)
-                                    and not isinstance(
-                                        e, DatabaseCallFailed)):
-                                raise
-                            # Skip an item which cannot be loaded or routed,
-                            # and leave it claimed: the stuck-row reaper
-                            # retries it, and errors it after
-                            # CLUSTER_OP_MAX_ATTEMPTS. Letting this end the
-                            # dispatcher would hand the claim back on the way
-                            # out, so the next dispatcher would claim it first
-                            # and end too.
-                            util_exceptions.ignore_exception(
-                                f'routing network work item {jobname}', e)
-                            unrouted.popleft()
+                            # with this item still first in unrouted.
+                            raise
+                        except Exception as e:
+                            self._skip_unroutable(jobname, e, unrouted)
                             continue
 
                         if not routed:
@@ -552,6 +543,19 @@ class Job(util_concurrency.Job):
             self._stop_workers(stop_workers, worker_threads)
             self._release_claims(unrouted, worker_queues)
 
+    @staticmethod
+    def _skip_unroutable(jobname, e, unrouted):
+        """Skip the item at the head of unrouted, leaving it claimed.
+
+        The stuck-row reaper retries it, and errors it after
+        CLUSTER_OP_MAX_ATTEMPTS. Letting the error end the dispatcher
+        would hand the claim back on the way out, so the next dispatcher
+        would claim it first and end too.
+        """
+        util_exceptions.ignore_exception(
+            f'routing network work item {jobname}', e)
+        unrouted.popleft()
+
     def _cluster_operation_execute(self, queue_name, op, batch_size,
                                    defer_delays):
         # Executing is deliberately not here. An op dequeued in executing
@@ -559,14 +563,8 @@ class Job(util_concurrency.Job):
         # because the survivor failed, deferred or died; running it now is
         # the only way it reaches a real outcome. See property (3) of the
         # safety invariant above.
-        terminal_states = {
-            BaseClusterOperation.STATE_ABORT,
-            BaseClusterOperation.STATE_COMPLETE,
-            dbo.STATE_DELETED,
-            dbo.STATE_ERROR,
-        }
         state = op.state
-        if state.value in terminal_states:
+        if state.value in TERMINAL_OPERATION_STATES:
             op.add_event(
                 EVENT_TYPE_AUDIT,
                 f'skipping op already in terminal state {state.value}')
