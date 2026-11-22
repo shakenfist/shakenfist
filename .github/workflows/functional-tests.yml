@@ -81,6 +81,7 @@ jobs:
     outputs:
       code_changed: ${{ steps.filter.outputs.code || 'true' }}
       plans_changed: ${{ steps.filter.outputs.plans || 'true' }}
+      live_mariadb_changed: ${{ steps.live_filter.outputs.live_mariadb || 'true' }}
     steps:
       - uses: actions/checkout@v7
         if: github.event_name != 'workflow_dispatch'
@@ -132,6 +133,45 @@ jobs:
             # than the runner minutes.
             plans:
               - 'docs/plans/**'
+
+      # A second paths-filter step, not another filter in the one above,
+      # because predicate-quantifier is a step-level input and the step
+      # above needs 'every' for its "everything except docs" filter. Under
+      # 'every' a file must match ALL of a filter's patterns, so a
+      # multi-pattern filter there matches nothing at all -- the trap the
+      # 'plans' comment above describes. This step takes the default
+      # quantifier, where any one pattern matching is enough, which is the
+      # correct semantics for "did the change touch what the live MariaDB
+      # tests cover?".
+      #
+      # What it covers is the subject of
+      # shakenfist/tests/test_mariadb_*_live.py: the migration machinery and
+      # EXPECTED_SCHEMA_VERSIONS in shakenfist/mariadb.py, the table shapes
+      # under shakenfist/schema/, the live modules themselves, the
+      # test-support modules they import (hard_delete_cases.py decides what
+      # the hard delete live test asserts), the object modules a live test
+      # drives directly (network/interface.py's NetworkInterface is what the
+      # device index live test exercises), and the three tools files the
+      # job runs. shakenfist/tests/test_schema_enum_widening_seams.py holds
+      # the list to that set -- including every in-repo module a live module
+      # imports, bar a short named list of deliberate exclusions -- so a new
+      # live module or shared helper cannot land outside the filter.
+      - uses: dorny/paths-filter@v4
+        id: live_filter
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          base: ${{ github.event.merge_group.base_sha || 'develop' }}
+          filters: |
+            live_mariadb:
+              - 'shakenfist/mariadb.py'
+              - 'shakenfist/mariadb_*.py'
+              - 'shakenfist/schema/**'
+              - 'shakenfist/tests/test_mariadb_*_live.py'
+              - 'shakenfist/tests/hard_delete_cases.py'
+              - 'shakenfist/network/interface.py'
+              - 'tools/ci-enum-widening-test.sh'
+              - 'tools/ci-install-mariadb.sh'
+              - 'tools/bootstrap-mariadb.sql'
 
       # A superseded merge group run cancels itself here, before any of its
       # jobs enter the merge-group-keyed concurrency groups below. Without
@@ -568,9 +608,29 @@ jobs:
   # values become writable. Gated by can_merge.
   schema_enum_widening:
     name: "Schema ENUM widening"
+    # On merge_group and workflow_dispatch this runs for any code change, as
+    # it always has. It also runs on a pull request whose diff touches what
+    # the live modules cover, which is narrower on purpose: the job
+    # apt-installs a real MariaDB server, so paying for it on every pull
+    # request is not the trade, and paying for it on none of them was not
+    # either. #4954 added a UNIQUE constraint over a column a pre-existing
+    # live test drops to roll its table back, its pull request CI was green,
+    # and the merge group then failed in this job -- ejecting the entry,
+    # cancelling every functional lane in the group, and sending the pull
+    # request back for a fixup it could have had before review (issue
+    # #5005). A migration is MariaDB DDL, so the sqlite trick #4897 used for
+    # the batch hard delete cannot stand in: sqlite neither runs ALTER TABLE
+    # ... ADD CONSTRAINT nor has the information_schema those tests probe.
+    #
+    # The merge_group arm deliberately does not consult live_mariadb_changed.
+    # The merge gate must not get narrower than the whole code change, and
+    # can_merge excuses a skipped dependency only when check_paths found no
+    # code at all.
     if: >-
-      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch')
-      && needs.check_paths.outputs.code_changed != 'false'
+      ((github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch')
+      && needs.check_paths.outputs.code_changed != 'false')
+      || (github.event_name == 'pull_request'
+      && needs.check_paths.outputs.live_mariadb_changed == 'true')
     needs: [check_paths]
     # Carries a size element because the conductor falls back to xs
     # (1 vCPU / 2048 MB, no swap) when the labels name none. This job
@@ -666,6 +726,12 @@ jobs:
       - check_paths
       - credential_scan
       - issue_link_check
+      # Skipped on a pull request which does not touch what the live
+      # MariaDB tests cover, and the outcome check below counts skipped as
+      # success. Without it here the job's pull request run could go red
+      # and still be enqueued, and the merge group would eject it -- the
+      # outcome that run exists to prevent (issue #5005).
+      - schema_enum_widening
     if: always() && github.event_name != 'merge_group'
     permissions:
       actions: read

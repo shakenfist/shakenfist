@@ -126,7 +126,7 @@ output, minus the two path fields above.
 
 | Field | Meaning |
 |---|---|
-| `harvest_version` | Schema version of the framing fields (currently 1). |
+| `harvest_version` | Schema version of the framing fields. Every file here is **1**; the tool now emits **2**, which adds the two `wait_capable` fields below. |
 | `repo`, `run_id`, `run_attempt`, `run_url` | The merge run. |
 | `head_sha`, `run_created_at`, `run_conclusion` | Which tree, when, and how the whole run ended. |
 | `artifact_id`, `artifact_name` | The bundle this record was computed from. |
@@ -136,6 +136,7 @@ output, minus the two path fields above.
 | `topology` | `slim-primary` or `slim-tier`, from D17's explicit artifact-name table. |
 | `topology_source`, `topology_table_says`, `label` | How the topology was established, and what the series' own label said. |
 | `series_present`, `census_present`, `absent_reason` | Whether the bundle carried each file, and why not. |
+| `wait_capable`, `wait_incapable_reason` | From `harvest_version` 2 only, so **absent from every file here**: whether this bundle's suite could ever write a capacity-wait trace, as distinct from whether it did. A capacity-wait reading over these records must still exclude `bundle-shakenfist-full-ansible-modules` itself -- see [the capacity-wait trace](../../../developer_guide/ci_cloud_sizing.md#a-third-file-the-capacity-wait-trace---waits). |
 | `summary` | The report record, or `null` when there was no series. |
 
 Inside `summary`:

@@ -355,6 +355,60 @@ class ClassificationTestCase(HarvestTestCase):
         self.assertEqual('Ansible modules', kind.job)
         self.assertEqual('Ansible modules (collection)', kind.job_prefix)
 
+    def test_the_ansible_modules_bundle_cannot_carry_a_wait_trace(self):
+        # It banks a headroom series and can never bank a capacity-wait
+        # trace: the suite is six Ansible playbooks with no Python test
+        # harness, so BaseTestCase.setUp(), where
+        # ensure_capacity_wait_trace() runs, never executes. Empirically 25
+        # of 25 such bundles read absent and none empty, on both sides of
+        # #4337. Counting them as unknowns instead put one real window's
+        # unknown fraction at 28.4% rather than 2.1% -- past the
+        # readability ceiling its decision rule had pre-registered
+        # (#4403, #4438).
+        _, kind = harvest.classify_artifact(ANSIBLE_BUNDLE)
+        self.assertFalse(kind.wait_capable)
+
+    def test_every_other_instrumented_bundle_is_wait_capable(self):
+        for name, kind in harvest.BUNDLE_TOPOLOGIES.items():
+            if name == ANSIBLE_BUNDLE:
+                continue
+            self.assertTrue(
+                kind.wait_capable,
+                '%s is marked as unable to carry a capacity-wait trace. If '
+                'that is right it needs a WAIT_INCAPABLE_BUNDLES entry '
+                'saying why; if not, it is a measurement being discarded.'
+                % name)
+
+    def test_every_wait_incapable_bundle_says_why(self):
+        # Both directions, because either half going stale is silent: a
+        # bundle marked incapable with no reason leaves a reading unable to
+        # say what it excluded, and a reason naming a bundle which is gone
+        # or has become capable is a stale exclusion nothing would catch.
+        for name, kind in harvest.BUNDLE_TOPOLOGIES.items():
+            if not kind.wait_capable:
+                self.assertIn(
+                    name, harvest.WAIT_INCAPABLE_BUNDLES,
+                    '%s is marked wait_capable False with no reason' % name)
+        for name in harvest.WAIT_INCAPABLE_BUNDLES:
+            self.assertIn(
+                name, harvest.BUNDLE_TOPOLOGIES,
+                'WAIT_INCAPABLE_BUNDLES names %s, which is not a bundle '
+                'this tool harvests' % name)
+            self.assertFalse(
+                harvest.BUNDLE_TOPOLOGIES[name].wait_capable,
+                'WAIT_INCAPABLE_BUNDLES explains %s, which is marked '
+                'wait_capable True' % name)
+            self.assertTrue(
+                harvest.WAIT_INCAPABLE_BUNDLES[name].strip(),
+                '%s has an empty reason' % name)
+
+    def test_a_bundle_kind_must_state_whether_it_is_wait_capable(self):
+        # No default on the field, deliberately: a new lane added to
+        # BUNDLE_TOPOLOGIES has to decide, which is the half of #4403 that
+        # was about silence rather than about one bundle.
+        self.assertRaises(
+            TypeError, harvest.BundleKind, 'A job', 'slim-primary', 'A job (x)')
+
     def test_the_ansible_modules_prefix_finds_both_reported_job_names(self):
         # Real runs have reported this job both as the caller alone and as
         # '<caller> / <called job>'. The prefix comes from the table rather
@@ -472,6 +526,26 @@ class RecordTestCase(HarvestTestCase):
         self.assertIsNone(record['absent_reason'])
         self.assertEqual(report.RECORD_VERSION, record['summary']['record_version'])
         self.assertEqual(3, record['summary']['series']['samples_usable'])
+        self.assertTrue(record['wait_capable'])
+        self.assertIsNone(record['wait_incapable_reason'])
+
+    def test_a_wait_incapable_record_carries_the_reason(self):
+        # The exclusion a capacity-wait reading has to make, made by the
+        # tool rather than by hand in a scratchpad gather script. The
+        # record says the bundle is not a unit of such a reading at all,
+        # which is a different fact from its wait trace being absent
+        # (#4403, #4438).
+        github = self._github({ANSIBLE_BUNDLE: instrumented_members()}, jobs=[
+            {'name': 'Ansible modules (collection) / Smoke tests (collection)',
+             'conclusion': 'success'}])
+        _, lines = self._harvest(github)
+        record = json.loads(lines[0])
+        self.assertFalse(record['wait_capable'])
+        self.assertIn(
+            'ensure_capacity_wait_trace', record['wait_incapable_reason'])
+        # Still a harvested record with a real headroom series: the two
+        # questions are independent, which is the point.
+        self.assertTrue(record['series_present'])
 
     def test_the_job_conclusion_is_the_jobs_not_the_runs(self):
         # The claim this dataset exists to test is that utilisation explains

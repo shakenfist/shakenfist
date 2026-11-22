@@ -16,8 +16,10 @@
 # not only that one, because standing up MariaDB is the expensive part
 # and any test which needs a real server belongs behind the same
 # setup. The script and its workflow job keep their ENUM widening
-# names so the required status check does not change; rename both
-# together if that stops being worth it.
+# names because the job, the can_enqueue and can_merge gates and
+# shakenfist/tests/test_schema_enum_widening_seams.py name each other;
+# the job is required through those gates' needs, not as a protected
+# context of its own. Rename them together if that stops being worth it.
 #
 # Usage:
 #
