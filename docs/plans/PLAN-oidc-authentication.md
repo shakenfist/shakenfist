@@ -881,28 +881,35 @@ Scope boundaries:
     "extend five current ones", and it should be planned at
     that size.
 
-    Two of the three audiences are largely served already.
-    The architects' view the question names — the trust
-    model, why service-account credentials were kept, why
+    One of the three audiences is served already. The
+    architects' view the question names — the trust model,
+    why service-account credentials were kept, why
     authorisation stays in Shaken Fist — is covered by the
     glossary and by the developer guide's federated identity
-    section. The users' view exists except for the login
-    flow that does not exist yet, which is not a
-    documentation gap.
+    section.
+
+    The users' view was complete only because the login flow
+    did not exist. Phase 7 shipped it, in `client-python`,
+    which documents it there; this repository's user guide
+    does not mention logging in at all. That became a gap the
+    moment phase 7 landed, and it is a small one: a pointer,
+    not a second walkthrough.
 
     The operators' half is what is genuinely missing, and
     specifically the worked examples. The guides name
     Authentik as a supported issuer but do not walk an
-    operator through configuring one, and Keycloak appears
-    in the documentation only as an example of a service
-    likely to present a private CA certificate
-    (`docs/operator_guide/authentication.md:384`).
+    operator through configuring one, and Keycloak appears in
+    the operator guide only in passing -- as a service likely
+    to present a private CA certificate, and as the provider
+    whose issuer URL carries no trailing slash
+    (`docs/operator_guide/authentication.md:277`, `:766`).
     End-to-end worked examples for both, including how a
     group claim reaches a namespace grant, remain to be
-    written — and they are the part that cannot be written
-    until open questions 13 and 14 are settled, because what
-    an operator configures depends on which of the two
-    session shapes is chosen.
+    written — and they could not be written until open
+    questions 13 and 14 were settled, because what an
+    operator configures depends on which of the two session
+    shapes is chosen. Both are settled, and phase 8 is
+    planned against them.
 
 13. **Direct-bearer or exchange-based human sessions?**
     This plan's central unresolved question, and the one
@@ -1400,7 +1407,7 @@ not land anywhere else.
 | 5. Admin as a claim | shakenfist | TBD | Abandoned | — |
 | 6. Serving namespace key metadata (#3672) | shakenfist, client-python | [PLAN-oidc-authentication-phase-06-key-metadata.md](PLAN-oidc-authentication-phase-06-key-metadata.md) | Complete | shakenfist `e37a8f8931` (#4975), `683b591c6b` (#4979); client-python `1bd5d3c` (#454). The second shakenfist pull request carries review rounds two and three, which arrived while the first was already in the merge queue |
 | 7. Interactive CLI flows, the credential set and the token cache | client-python | [PLAN-oidc-authentication-phase-07-client-flows.md](https://github.com/shakenfist/client-python/blob/9fa1ff244970fed548dfefe5142a7a516f48abc3/docs/plans/PLAN-oidc-authentication-phase-07-client-flows.md) (in shakenfist/client-python) | Complete | client-python `9fa1ff2449` (#456) |
-| 8. Worked operator examples for Keycloak and Authentik | shakenfist | TBD | Not started | — |
+| 8. Worked operator examples for Keycloak and Authentik | shakenfist | [PLAN-oidc-authentication-phase-08-worked-examples.md](PLAN-oidc-authentication-phase-08-worked-examples.md) | Proposed | — |
 | 9. Functional coverage against a containerised IdP | shakenfist | TBD | Not started | — |
 | 10. Push audit | shakenfist | PLAN-oidc-authentication-phase-10-push-audit.md | Not started | — |
 
@@ -1615,24 +1622,39 @@ therefore resolved by an explicit current-namespace
 selection, which that phase's plan decides.
 
 **Phase 8 — worked operator examples.** Care is needed about
-what is genuinely new here. The operator guide already has
-an issuer-configuration section and a worked GitHub Actions
-example (`docs/operator_guide/authentication.md:203`), and
-Authentik is named in both the operator and developer guides
-as a supported source for the *workload exchange*
-(`docs/operator_guide/authentication.md:143-144`,
-`docs/developer_guide/authentication.md:429`). Keycloak
-appears in the documentation exactly once, as an example of
-a service likely to present a private CA certificate
-(`docs/operator_guide/authentication.md:384`), and nothing
-in the tree exercises it. So what this phase owes is: a
-first end-to-end walkthrough of configuring either provider,
-for a *human* login rather than a workload exchange, for
-both Keycloak and Authentik, including how a group claim
-reaches a namespace grant. Questions 13 and 14 are settled,
-so the session shape the walkthrough documents is known: an
-exchange which mints one namespace key per namespace the
-person is entitled to.
+what is genuinely new here, and less of it is new than this
+paragraph used to say. Phases 3 and 4 wrote the generic
+human-login operator documentation: discovery and when it
+must succeed, updating an issuer, the login metadata
+endpoint, what a login mints, and the warning that a login
+verifies the `client_id` and not the `audience`
+(`docs/operator_guide/authentication.md:240-558`). Authentik
+is named in the glossary and the developer guides as a
+supported source for the *workload exchange*
+(`docs/glossary.md:131`,
+`docs/developer_guide/authentication.md:23`), and phase 3
+added Keycloak- and Authentik-shaped fixtures to the
+discovery tests, because their issuer URLs differ in the
+one way that breaks discovery
+(`shakenfist/tests/test_oidc_discovery.py:27-30`).
+
+So what this phase owes is narrower on mechanics and
+undiminished on specifics: nothing anywhere tells an
+operator which buttons to press at either provider. A first
+end-to-end walkthrough of configuring each, for a *human*
+login rather than a workload exchange, including how a group
+claim reaches a namespace grant. Questions 13 and 14 are
+settled, so the session shape the walkthrough documents is
+known: an exchange which mints one namespace key per
+namespace the person is entitled to.
+
+That last requirement turned out to be unbuildable as the
+tree stands, which the phase's planning survey found and
+which reshaped the phase. A `groups` claim is an array in
+both providers, and claim matching refuses any claim value
+which is not a string -- so the binding the operator guide
+advises cannot fire. The phase therefore carries a change to
+claim matching as well as the documentation.
 
 **Phase 9 — functional coverage against a containerised
 IdP.** The federation exchange already has functional
