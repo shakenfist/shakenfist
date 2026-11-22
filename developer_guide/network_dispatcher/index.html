@@ -17219,11 +17219,26 @@ seconds. The defer cycle is:</p>
 <li>If a dependency no longer exists the op goes to <code>error</code>
    (<code>cancel_for_missing_dependency()</code>); if it is in <code>error</code>, <code>deleted</code>, or
    <code>abort</code> the op goes to <code>abort</code> (<code>abort_for_unsuitable_dependency()</code>).
-   In both cases, as for an abandoned wait, the op's map entry is dropped.</li>
+   In both cases, as for an abandoned wait, the op's map entry is dropped.
+   "No longer exists" means exactly that: <code>from_db()</code> answers <code>None</code> only
+   for an absent object, and raises <code>DatabaseUnavailable</code> for a read which
+   did not happen (issue 3373), which leaves the work item claimed for the
+   stuck-row reaper rather than cancelling the dependent for a dependency
+   which is alive.</li>
+<li>A dependency in any other state -- one added to the vocabulary after
+   this walk was written -- is <em>held</em>, bounded by the same defer budget,
+   rather than treated as finished. <code>complete</code> is the only state which
+   satisfies a <code>depends_on</code> edge and the walk names it, because falling
+   through to satisfied is the one direction a fate-sharing edge must never
+   fail in. Both dispatchers classify against <code>DEPENDENCY_FAILED_STATES</code>
+   and <code>DEPENDENCY_PENDING_STATES</code> in
+   <code>shakenfist/operations/baseoperation.py</code>, and a derived test holds those
+   two tuples to <code>BaseClusterOperation.state_targets</code>, so a state added
+   later fails a test rather than silently permitting a dispatch.</li>
 <li>When all dependencies are satisfied the op executes normally and its map
    entry is dropped.</li>
 </ol>
-<p>Each of the three ways a dependency ends an op in steps 3 and 4 also calls the
+<p>Each of the three ways a dependency ends an op in steps 3, 4 and 5 also calls the
 op's <code>_dependency_failed()</code> hook, provided the op is still <code>queued</code> and so has
 never run. Ending the op alone tells a client watching its target nothing, so
 an op class whose targets would be left half-built overrides the hook.

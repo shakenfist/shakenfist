@@ -16471,10 +16471,11 @@ today.</p>
 and filtering them in Python. Every <code>find_artifacts</code>, <code>find_instances</code>, <code>find_networks</code>, and
 <code>find_network_interfaces</code> call in <code>shakenfist/mariadb.py</code> JOINs the per-type static-values table to
 <code>object_states</code> and applies the caller's state, namespace, name and FK predicates directly in the WHERE
-clause. The two FK fields (<code>network_uuid</code>, <code>instance_uuid</code>) on <code>ObjectFilterCriteria</code> are honoured only
+clause. The two FK fields (<code>network_uuid</code>, <code>instance_uuid</code>) on <code>ObjectFilterCriteria</code> are servable only
 by <code>find_network_interfaces</code>, which is what makes <code>Network.networkinterfaces</code> and <code>Instance.interfaces</code>
 query-backed properties returning hydrated <code>NetworkInterface</code> objects rather than the cached UUID lists
-they used to be.</p>
+they used to be. A criteria field the target table has no column for is refused rather than dropped --
+see "SQL Filter Pushdown" in <a href="../../operator_guide/database/"><code>database.md</code></a> for why.</p>
 <p>The composite index <code>idx_object_states_type_state</code> on <code>(object_type, state_value)</code> covers the JOIN condition
 that is present in every query. Per-type <code>name</code> and <code>namespace</code> single-column indexes on the artifact,
 instance, and network tables cover the optional equality predicates. This keeps the common REST-layer calls
@@ -16619,17 +16620,56 @@ attempts (<code>wait_for_ready</code> is deliberately left at the default of Fal
 a wedged subchannel fails fast into this retry path instead of parking the
 caller). Once those retries are exhausted, <code>_grpc_call()</code> raises
 <code>shakenfist.exceptions.DatabaseUnavailable</code> rather than the underlying
-RpcError. The client wrappers in <code>mariadb.py</code> translate non-retryable
-RpcErrors into "object not found" return values (<code>None</code>/<code>False</code>/<code>[]</code>), but
-<code>DatabaseUnavailable</code> is deliberately not an RpcError subclass and
-propagates through them: an unreachable database must not be
-indistinguishable from a missing object. The few hot paths that
-intentionally tolerate an unreachable database catch it explicitly --
+RpcError. A non-retryable status code fails on the first attempt and
+raises <code>exceptions.DatabaseCallFailed</code>, a subclass of the same
+exception, for the same reason: the client wrappers in <code>mariadb.py</code>
+translate an <code>RpcError</code> into "object not found" return values
+(<code>None</code>/<code>False</code>/<code>[]</code>), and neither exception is an RpcError subclass, so
+neither can be reported as a missing object. <code>UNIMPLEMENTED</code> is the
+exception and still reaches the wrappers as an <code>RpcError</code>, because it is
+how an sf-database older than an RPC answers and the wrappers with a
+mixed-version fallback test for it. The few hot paths that
+intentionally tolerate a database which cannot answer catch
+<code>DatabaseUnavailable</code> explicitly, which covers both --
 <code>Daemon.check_daemon_state()</code> skips the check, <code>ClusterLock.__enter__</code>
 keeps retrying inside the caller's timeout, the queues daemon's health
 loop treats it as unhealthy and waits, and (since #3638) the cleaner's
 <code>_maintain_blobs()</code> and the cluster daemon's <code>_cluster_wide_cleanup()</code>
 and sweep helpers skip the affected work for the pass.</p>
+<p>Raising <code>DatabaseCallFailed</code> changed every wrapper at once: each
+<code>except grpc.RpcError</code> clause which used to turn a refused call into a
+sentinel now sees only <code>UNIMPLEMENTED</code>, and the refusal propagates to
+the caller instead. Eleven wrappers whose sentinel is distinguishable
+from an answer catch <code>DatabaseCallFailed</code> to keep it (see
+<a href="../coding_rules/">coding rules</a>); the rest propagate. The blast radius
+is what the servicer can actually answer with, which today is:</p>
+<ul>
+<li><code>INTERNAL</code>, from the handlers which catch an unexpected exception and
+  set it -- the <code>Find*</code>, <code>Get*</code> and list readers chiefly, about eighty
+  sites;</li>
+<li><code>INVALID_ARGUMENT</code>, from about a dozen handlers which validate their
+  request (an unknown object type, an empty state list, a filter its
+  table cannot serve);</li>
+<li><code>ABORTED</code>, from <code>HardDeleteObjects</code> alone;</li>
+<li><code>UNKNOWN</code>, from any handler which lets an exception escape rather
+  than setting a status; and</li>
+<li><code>RESOURCE_EXHAUSTED</code>, from any RPC whose reply outgrows the 32 MiB
+  client receive limit in <code>util/grpc_channel.py</code> -- a list reader or a
+  Dequeue over a large backlog, as in issue 3638.</li>
+</ul>
+<p>Most write RPCs report failure in-band (<code>success=False</code> with an
+<code>error</code>) rather than as a status code, so they are unaffected. Two
+callers were written against the old sentinels and were checked:
+<code>resolve_work_item()</code> used to log and continue, and now leaves the item
+claimed for the stuck-row reaper, which both dispatchers' workers
+already handle; <code>dequeue_work_items()</code> used to answer <code>[]</code>, and both of
+its callers -- sf-queues' main loop and the network dispatcher -- now
+back off on a refusal as for an empty queue, rather than treating it as
+an outage and reissuing the same Dequeue forever. The surviving
+<code>except grpc.RpcError</code> clauses are reachable only for <code>UNIMPLEMENTED</code>,
+so one which has no mixed-version fallback is dead code rather than a
+deliberate swallow; issue 5019 tracks narrowing them so the two can be
+told apart.</p>
 <p>The servicer has the matching obligation. A reply whose only payload is
 a <code>repeated</code> field has nowhere to say "the read failed", so
 <code>GetObjectsByState</code>, <code>GetStatelessObjectUuids</code> and <code>GetReferencesFrom</code>
@@ -16639,9 +16679,24 @@ accessor returns <code>None</code>
 timeout, deadlock) they set <code>UNAVAILABLE</code> on the status, which
 <code>_grpc_call</code> retries and then surfaces as <code>DatabaseUnavailable</code>. An
 unexpected exception in the handler sets <code>INTERNAL</code>, which is
-non-retryable and so becomes a <code>None</code> return client-side. This matters
-because it is the failure mode where sf-database itself is healthy and
-answering, so nothing else in the stack notices.</p>
+non-retryable and so becomes a <code>DatabaseCallFailed</code> client-side. This
+matters because it is the failure mode where sf-database itself is
+healthy and answering, so nothing else in the stack notices.</p>
+<p>That narrows what <code>mariadb.get_instance(uuid, strict=True)</code> buys. Over
+gRPC a failed call now raises whether or not <code>strict</code> is passed, so a
+non-strict caller which was written against "never raises, answers
+<code>None</code> on any failure" needs a <code>DatabaseUnavailable</code> handler like every
+other caller. <code>strict</code> still does two things. It skips the object
+cache, which only ever holds hits, so the answer is a fresh read rather
+than one which may predate a delete. And on the direct MariaDB path --
+sf-database's own servicer, and any node which talks to MariaDB itself
+-- it is still the only thing that turns an <code>OperationalError</code> into
+<code>DatabaseUnavailable</code> rather than a miss. The <code>GetInstance</code> servicer
+passes it for exactly that reason. So pass <code>strict=True</code> whenever the
+caller acts on absence (the cleaner deleting an unknown domain's disks
+is the case it was written for); a caller which only displays or
+iterates the answer can leave it off and still never mistake a failed
+call for a missing instance.</p>
 <p><code>get_active_blob_uuids()</code> and <code>get_node_blob_uuids()</code> are the exceptions
 to the "wrappers translate to not found" rule: they <em>raise</em>
 <code>DatabaseUnavailable</code> rather than returning

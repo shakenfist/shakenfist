@@ -17931,15 +17931,24 @@ to the appropriate <code>find_*</code> primitive, so both state and namespace re
 <code>namespace_or_shared_filter</code> which must JOIN the <code>artifact_attributes</code> table to check the <code>shared</code> flag —
 should pass a callable to the <code>filters=</code> argument of the iterator, or call <code>.filter([predicate])</code> on the
 class. These predicates execute in Python after the indexed SQL scan returns its rows.</p>
-<p><strong>NetworkInterface special case.</strong>
-The <code>network_interfaces</code> table has no <code>namespace</code> or <code>name</code> column. <code>find_network_interfaces</code> therefore
-strips both fields from the criteria before building the query; they are silently ignored. State pushdown
-still works. The two FK filter fields <code>network_uuid</code> and <code>instance_uuid</code> <em>are</em> honoured — they map to
-indexed columns on the <code>network_interfaces</code> table, and they are how <code>Network.networkinterfaces</code> and
-<code>Instance.interfaces</code> resolve their per-parent NI list (those properties
-return hydrated <code>NetworkInterface</code> objects rather than the cached UUID list that used to live on the
-attribute table). The other <code>find_*</code> helpers leave the FK fields at their default of <code>None</code> because the
-underlying tables have no matching column.</p>
+<p><strong>A criteria field a table cannot serve is refused.</strong>
+Every scalar field on <code>ObjectFilterCriteria</code> is a column on some per-type table and not on others:
+<code>network_interfaces</code> has no <code>namespace</code> or <code>name</code> column, and <code>artifacts</code> has no <code>network_uuid</code>. Setting a
+field the target table has no column for raises <code>exceptions.UnservableFilterCriteria</code>, in the <code>find_*</code>
+helper and again in the query builder, rather than dropping the field. Dropping it answered a narrower
+query with more rows than it asked for — a namespace-scoped interface query with every namespace's
+interfaces — which is how a scoping mistake becomes a disclosure (issue 4947). The check is derived from
+the table's own columns, so there is no second list of honoured fields to keep in step.</p>
+<p>The same holds on the way through. The query builder applies every criteria field which is set by iterating
+the model, the gRPC client and the <code>Find*</code> servicers carry every field by iterating the wire message, and a
+test holds the wire message and the model to the same field set, so a field cannot be dropped at any of
+those three places either. The database service answers a refused filter with <code>INVALID_ARGUMENT</code>, and the
+REST API answers one with a 400 rather than a 500 or a 503: it is a caller bug, and no retry fixes it.</p>
+<p>Only <code>states</code> is servable for every filterable type, because it is read from <code>object_states</code> rather than
+from the per-type table. The two FK filter fields <code>network_uuid</code> and <code>instance_uuid</code> are servable for
+<code>network_interfaces</code>, and they are how <code>Network.networkinterfaces</code> and <code>Instance.interfaces</code> resolve their
+per-parent NI list (those properties return hydrated <code>NetworkInterface</code> objects rather than the cached UUID
+list that used to live on the attribute table).</p>
 <p>Adding a namespace to this type is deferred until a caller needs one, and no production call site filters
 interfaces by namespace today — the dnsmasq DHCP path reaches an interface through its owning network, not
 through a namespace-scoped query. When such a caller appears there are two ways to land it. A JOIN through
@@ -17947,8 +17956,9 @@ through a namespace-scoped query. When such a caller appears there are two ways 
 object stays the single source of the answer; a <code>namespace</code> column on <code>network_interfaces</code> would read the
 same way as the other three types and index as cheaply, but it denormalises an answer the owner already
 holds and goes stale if a network is ever reassigned. The JOIN is the safer default. Either lands as a
-one-line change: <code>find_network_interfaces</code> already accepts the field and discards it, so enabling it is a
-matter of building the clause rather than changing the criteria shape.</p>
+one-line change: the criteria shape already carries the field, so enabling it is a matter of giving the
+table the column (or the query the JOIN), after which the refusal above stops firing for it by
+construction.</p>
 <p><strong>Example.</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist</span><span class="w"> </span><span class="kn">import</span> <span class="n">mariadb</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist.schema.object_filter</span><span class="w"> </span><span class="kn">import</span> <span class="n">ObjectFilterCriteria</span>

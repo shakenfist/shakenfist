@@ -16388,19 +16388,56 @@ scheduled tasks is the shared answer: a failed read returns <code>None</code>, i
 into <code>cluster_sweep_work_list_failure_streak</code>, and is logged as a skipped pass.
 The general form: <strong>silence is not success, and an empty result set is not the
 absence of an answer.</strong></p>
-<p>One trap when handling this deliberately: a failed read from the <code>mariadb</code>
-client arrives in <em>two</em> shapes. The client wrappers map <code>grpc.RpcError</code> to a
-<code>None</code>/<code>False</code>/<code>[]</code> return, but <code>_grpc_call()</code> raises
-<code>exceptions.DatabaseUnavailable</code> once its retry budget is spent, and that is
-deliberately not an <code>RpcError</code> subclass (issue 3373), so it propagates through
-the wrapper untouched. Handling only the return value covers the oversized-reply
-case and misses the tier outage -- which is the more likely reason a read fails,
-and the condition an alert on the streak most needs to see. Cover both, and
-prove it with a test that sets <code>side_effect = DatabaseUnavailable(...)</code> rather
-than a <code>None</code> return. Code which is meant to ride out an unreachable
-database catches <code>DatabaseUnavailable</code> explicitly and says so;
-<code>Daemon.check_daemon_state()</code> and <code>ClusterLock.__enter__</code> are the
-examples to copy.</p>
+<p>A failed read from the <code>mariadb</code> client therefore arrives as an <em>exception</em>,
+not as a return value. <code>_grpc_call()</code> raises <code>exceptions.DatabaseUnavailable</code>
+once its retry budget is spent, and <code>exceptions.DatabaseCallFailed</code> (a subclass
+of it) for a non-retryable status code -- <code>INTERNAL</code>, <code>INVALID_ARGUMENT</code>,
+<code>RESOURCE_EXHAUSTED</code> and the rest. Neither is a <code>grpc.RpcError</code> subclass
+(issue 3373), so neither can be caught by the wrappers' <code>except grpc.RpcError</code>
+clauses and turned into the <code>None</code>/<code>False</code>/<code>[]</code> they use for a missing object.
+Code which is meant to ride out a database that cannot answer catches
+<code>DatabaseUnavailable</code> explicitly and says so; <code>Daemon.check_daemon_state()</code> and
+<code>ClusterLock.__enter__</code> are the examples to copy, and because
+<code>DatabaseCallFailed</code> is a subclass they need no second clause <em>for safety</em>.</p>
+<p>They may need one for progress. <code>DatabaseUnavailable</code> is transient and
+tier-wide; <code>DatabaseCallFailed</code> is usually permanent and specific to the one
+call. A handler which answers the first by pausing and retrying the <em>same</em>
+work -- a dispatcher which sleeps with the item still at the head of its
+queue, a drain which puts the batch back where it was, a scheduled job left
+due so it sorts first next cycle -- will retry a refused call forever and
+starve everything queued behind it. Catch <code>DatabaseCallFailed</code> by name ahead
+of such a handler and treat it as a per-item failure: skip the item, count it
+failed, or log it and carry on. The network dispatcher's routing loop, its
+Dequeue, its <code>_release_claims()</code>, <code>_run_due_scheduled_jobs()</code>,
+<code>_grpc_hard_delete_objects()</code> and sf-queues' main loop all do, and each has a
+test raising <code>DatabaseCallFailed</code> beside the one raising <code>DatabaseUnavailable</code>.
+The two Dequeue loops are the ones to study for the shape that is easy to
+miss. sf-queues' outage handler waits until the tier is healthy, and a tier
+which refused a call <em>is</em> healthy, so the wait returned at once and the loop
+reissued the same Dequeue with no sleep. sf-net's paused five seconds and
+reissued it, which looks like a bound and is not one. A refusal in either now
+backs off as an empty queue does.</p>
+<p>What needs the clause is an <em>unbounded</em> retry of the same work, and a sleep
+between attempts does not bound it: ask what stops the retry, not how often it
+runs. A retry with a bound of its own does not need the clause: sf-queues' <code>Job.execute()</code> leaves a refused item
+claimed, so the stuck-row reaper retries it and errors it after
+<code>CLUSTER_OP_MAX_ATTEMPTS</code>, and a one-shot worker holds nothing up while it
+waits. <code>ClusterLock.__enter__</code> likewise retries a refused acquire only until
+its caller's timeout, sleeping between attempts. Each still fails closed, and
+each stops.</p>
+<p><code>UNIMPLEMENTED</code> is the one status code still handed to the wrappers as an
+<code>RpcError</code>, because it is how an sf-database older than an RPC answers and the
+wrappers with a mixed-version fallback test for it.</p>
+<p>So a <code>None</code>/<code>False</code>/<code>[]</code> return from a wrapper now means one of two things: a
+genuinely absent object, or a failed read from one of the eleven wrappers which
+report a failed read <em>distinguishably</em> and catch <code>DatabaseCallFailed</code> to keep
+doing so -- <code>get_state_checked()</code>'s <code>(False, None)</code>, the <code>None</code>-rather-than-<code>[]</code>
+list readers behind <code>_log_failed_read()</code>, and the documented fail-safes such as
+<code>_grpc_is_vsock_cid_in_use()</code>. If you add a wrapper to that set, say in a
+comment why its sentinel cannot be confused with an answer. If you cannot say
+that, let the exception propagate. Prove either shape with a test that sets
+<code>side_effect = DatabaseUnavailable(...)</code> or <code>DatabaseCallFailed(...)</code> rather
+than a <code>None</code> return.</p>
 <p>Having covered both, do not then treat them alike inside a loop. The two shapes
 differ in blast radius. A <code>None</code> return is per-reply, so the next object type is
 still worth reading. A <code>DatabaseUnavailable</code> is tier-wide: every remaining read
