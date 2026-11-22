@@ -16655,6 +16655,23 @@ call site, so the pair exists rather than a flag on one accessor. See the
 shape a new accessor should have, and
 <a href="../../plans/PLAN-grpc-bounded-replies/"><code>PLAN-grpc-bounded-replies.md</code></a>
 for the reply-size work this came out of.</p>
+<p>The credential readers are the other exception, and there the reason
+is authentication rather than deletion. A read which decides whether a
+caller authenticates must not answer "no such issuer" when what
+happened is "we could not look": once that is a login refused for a
+reason nothing in the response or the audit trail records, and once it
+is a licence for orphan reconciliation to repair a live credential to
+<code>deleted</code>, because the liveness predicates cite these reads as their
+authority. So they raise instead of returning <code>None</code> or <code>[]</code>:
+<code>get_namespace_key_by_name()</code> and <code>find_namespace_keys()</code> (issue
+3522), the three <code>*_attributes</code> readers for keys, issuers and rules
+(issue 3836), and every read of a trusted issuer or mapping rule --
+by uuid, by name, by namespace and the full listings (issue 5017,
+which closed the last direct accessors in the family whose gRPC twin
+already raised). The REST layer answers 503 for all of them via
+<code>handle_database_unavailable</code>. <code>get_namespace_key()</code>, the point read
+by uuid, is the one credential read still collapsing a failure into
+<code>None</code> on both backends; it is part of issue 3373's remaining sweep.</p>
 <p>The object iterators are the widest consumer of all this, and they
 propagate. <code>DatabaseBackedObjectIterator._find()</code> catches nothing:
 a <code>DatabaseUnavailable</code> raised part way through <code>Blobs()</code>, <code>IPAMs()</code>
