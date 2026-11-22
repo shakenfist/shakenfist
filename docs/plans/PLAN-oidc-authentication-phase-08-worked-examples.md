@@ -1042,3 +1042,565 @@ cache, which costs nothing and saves a pull in 8g.
 * The row names `shakenfist/tests/files/idp/keycloak-*.json`
   with "two files per flow". It is two files in total, not four:
   the flows agree, as recorded above.
+
+### Step 8b — Authentik, observed
+
+Produced against a real Authentik run in Docker on the development
+host, loopback only, and removed afterwards. Every claim below was
+read off a token, a document or a server log line, not remembered.
+Nothing was committed; the two artefacts are left uncommitted for the
+management session.
+
+**Images and version.** `ghcr.io/goauthentik/server:2026.8.6`, digest
+`sha256:da89d8338a3b1889800eb033fd61f8d43f7aa9a1c5a042cb5e03d891b1f0c56c`,
+image created 2026-11-20. `GET /api/v3/admin/version/` reports
+`{"version_current": "2026.8.6", ...}` and the server's first log line
+is:
+
+```
+"event": "authentik is starting", "version": "2026.8.6"
+```
+
+That is the string the walkthrough should name. The two supporting
+containers are `docker.io/library/postgres:16.16-alpine` and
+`docker.io/library/redis:7.4.12-alpine`.
+
+Authentik is **two** containers from the same image, `server` and
+`worker`, plus those two. The `server` container applies the
+migrations on first boot and that boot is slow -- it was waited for by
+polling `/-/health/ready/` until it answered, not by sleeping.
+
+#### Three things the containers needed that are easy to get wrong
+
+**1. TLS is already there, and it is the wrong certificate.** Unlike
+the other provider, Authentik needs no certificate supplied to serve
+https: it generates one on first boot and listens on 9443 with it.
+
+```
+subject=O=authentik, CN=authentik default certificate
+issuer=O=authentik, CN=authentik default certificate
+```
+
+That is enough for a capture made with `curl -k`. It is **not** enough
+for a cluster, and the failure is worth stating because it is not the
+one an operator expects. The certificate carries **no
+subjectAltName**, so Python's TLS refuses it by hostname even when it
+is itself the trust anchor. Pointing `FEDERATION_JWKS_CA_BUNDLE` at
+that very certificate and calling `oidc_discovery.fetch()` gave:
+
+```
+OIDCDiscoveryFailed: could not fetch
+https://localhost:9443/application/o/sf/.well-known/openid-configuration:
+SSLError: ... [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed:
+Hostname mismatch, certificate is not valid for 'localhost'.
+```
+
+"Trusting the certificate" does not fix this; only replacing it does.
+A certificate with a SAN was generated, uploaded as a keypair
+(`POST /api/v3/crypto/certificatekeypairs/` with `certificate_data`
+and `key_data`), and set as the brand's **Web certificate**
+(`PATCH /api/v3/core/brands/<uuid>/` with `web_certificate`). The
+running server picked it up within seconds with no restart. With that
+done, `oidc_discovery.fetch()` on the live provider **succeeded**:
+
+```
+ACCEPTED. members: 5
+  issuer = https://localhost:9443/application/o/sf/
+  authorization_endpoint = https://localhost:9443/application/o/authorize/
+  token_endpoint = https://localhost:9443/application/o/token/
+  device_authorization_endpoint = https://localhost:9443/application/o/device/
+  jwks_uri = https://localhost:9443/application/o/sf/jwks/
+```
+
+So the discovery half of this phase is proved against the live
+provider and not only against the fixture. The lab's certificate was
+made the same way step 8a's was, with
+`-addext 'subjectAltName=DNS:localhost,IP:127.0.0.1'`.
+
+**2. The bootstrap variables create an API token as well as a
+password.** `AUTHENTIK_BOOTSTRAP_PASSWORD`,
+`AUTHENTIK_BOOTSTRAP_TOKEN` and `AUTHENTIK_BOOTSTRAP_EMAIL` are read
+on first boot. The token is what makes the whole configuration
+scriptable -- it is a bearer token for `/api/v3/` from the first
+second, with no initial-setup flow to click through. This is the
+single biggest difference from the other provider's setup, where an
+admin password grant has to be exchanged for a token first.
+
+**3. The issuer URL is decided by the request's `Host` header**, not
+by a configuration setting. There is no `KC_HOSTNAME` equivalent here:
+the document fetched through `localhost:9443` names
+`https://localhost:9443/...` as its issuer. An operator behind a
+reverse proxy therefore gets the issuer their proxy presents, which is
+right, but it also means a capture taken through the wrong name is
+silently wrong.
+
+#### The containers
+
+Throwaway credentials were generated with `openssl rand -hex` into an
+environment file outside the repository and are not recorded here or
+anywhere in the tree.
+
+```bash
+docker network create sf-idp-net
+
+docker run -d --name sf-idp-postgres --network sf-idp-net \
+  -e POSTGRES_USER=authentik -e POSTGRES_DB=authentik \
+  -e POSTGRES_PASSWORD="${PG_PASS}" \
+  docker.io/library/postgres:16.16-alpine
+
+docker run -d --name sf-idp-redis --network sf-idp-net \
+  docker.io/library/redis:7.4.12-alpine
+
+# the same environment for both authentik containers
+#   AUTHENTIK_SECRET_KEY, AUTHENTIK_POSTGRESQL__{HOST,USER,NAME,PASSWORD},
+#   AUTHENTIK_REDIS__HOST, AUTHENTIK_BOOTSTRAP_{PASSWORD,TOKEN,EMAIL}
+docker run -d --name sf-idp-authentik-server --network sf-idp-net \
+  -p 127.0.0.1:9443:9443 "${common_env[@]}" \
+  ghcr.io/goauthentik/server:2026.8.6 server
+
+docker run -d --name sf-idp-authentik-worker --network sf-idp-net \
+  "${common_env[@]}" ghcr.io/goauthentik/server:2026.8.6 worker
+```
+
+Only 9443 is published, and only on loopback. Readiness was waited for
+with `until curl -ksf https://127.0.0.1:9443/-/health/ready/`.
+
+#### The administrative steps, in order
+
+Every step was done through the API with the bootstrap token so that
+it is reproducible; the admin interface path is given beside each one,
+because that is what the walkthrough will describe.
+
+1. **Create the group** `sf-admins`.
+   Interface: *Directory* -> *Groups* -> *Create*.
+   `POST /api/v3/core/groups/` with `{"name": "sf-admins"}` -> 201.
+   The group's **name** is what reaches the token; there is no path
+   and no uuid in the claim.
+
+2. **Create the person and put them in the group in one call.**
+   Interface: *Directory* -> *Users* -> *Create*.
+   `POST /api/v3/core/users/` -> 201 with `username`, `name`,
+   `email`, `"is_active": true`, `"type": "internal"` and
+   `"groups": ["<group uuid>"]`.
+
+3. **Set their password.**
+   Interface: the user's *...* menu -> *Set password*.
+   `POST /api/v3/core/users/<pk>/set_password/` -> 204.
+
+4. **Create the OAuth2/OpenID provider.** Interface: *Applications*
+   -> *Providers* -> *Create* -> *OAuth2/OpenID Provider*.
+   `POST /api/v3/providers/oauth2/` -> 201 with:
+
+   ```json
+   {
+     "name": "shakenfist",
+     "authorization_flow": "<default-provider-authorization-implicit-consent>",
+     "invalidation_flow": "<default-provider-invalidation-flow>",
+     "client_type": "public",
+     "client_id": "shakenfist",
+     "grant_types": ["authorization_code", "refresh_token",
+                     "urn:ietf:params:oauth:grant-type:device_code"],
+     "include_claims_in_id_token": true,
+     "signing_key": "<a certificate keypair uuid>",
+     "sub_mode": "hashed_user_id",
+     "issuer_mode": "per_provider",
+     "redirect_uris": [{"matching_mode": "regex",
+                        "url": "http://127\\.0\\.0\\.1:[0-9]+/",
+                        "redirect_uri_type": "authorization"}],
+     "property_mappings": ["<openid>", "<profile>", "<email>"]
+   }
+   ```
+
+   `authorization_flow` and `invalidation_flow` are **required** and
+   have no defaults; the two built-in flows above are what a stock
+   install ships. `signing_key` has no default either, and without one
+   there is nothing to sign an RS256 identity token with. The
+   self-signed certificate Authentik generates on first boot is a
+   perfectly good signing key even though it is a poor web
+   certificate, and that is what was used.
+
+   The three settings whose API default is **not** what a working
+   configuration needs, observed by creating a second provider with
+   none of them set:
+
+   | Field | API default | What it needs to be |
+   |---|---|---|
+   | `grant_types` | `[]` | must list the device code grant |
+   | `property_mappings` | `[]` | must include `profile` for `groups` |
+   | `signing_key` | `null` | a certificate keypair |
+
+   `include_claims_in_id_token` defaults to `true`, which is the one
+   that matters most and the one that is already right. `sub_mode` and
+   `issuer_mode` default to `hashed_user_id` and `per_provider`, both
+   of which are what is wanted.
+
+5. **Create the application** and bind the provider.
+   Interface: *Applications* -> *Applications* -> *Create*.
+   `POST /api/v3/core/applications/` with
+   `{"name": "Shaken Fist", "slug": "sf", "provider": <pk>}` -> 201.
+   **The slug is the issuer URL's last path element.** The slugs
+   `authorize`, `token`, `device`, `userinfo`, `introspect` and
+   `revoke` are reserved, because the global endpoints live at those
+   paths.
+
+#### Getting a `groups` claim into the ID token
+
+**The default OpenID `profile` mapping carries it. No custom scope
+mapping was needed.** This is the opposite of the other provider,
+which ships no group claim at all.
+
+`GET /api/v3/propertymappings/provider/scope/<profile uuid>/` returns,
+verbatim, the shipped expression:
+
+```python
+avatar = request.user.avatar
+return delete_none_values({
+    "name": request.user.name,
+    "given_name": ak_obj_attr(request.user, "given_name", "name"),
+    "family_name": ak_obj_attr(request.user, "family_name"),
+    "preferred_username": request.user.username,
+    "nickname": request.user.username,
+    "groups": [group.name for group in request.user.groups.all()],
+    # Only expose URL-based avatars: generated avatars are inline base64
+    # SVG data URIs, which would bloat the ID/access token for every
+    # user without a real avatar URL (OIDC expects a URL here).
+    "picture": avatar if avatar and not avatar.startswith("data:") else None,
+})
+```
+
+`[group.name for group in request.user.groups.all()]` is the whole of
+it: **group names, as a JSON array, with no path and no uuid**. A real
+identity token carried `"groups": ["sf-admins"]`.
+
+Two conditions have to hold as well as the mapping being assigned, and
+both were checked by driving real logins:
+
+**The provider's *Include claims in id_token* must be on.** It is on
+by default. When it is off, the scope mappings' claims are served from
+`/userinfo` and from the access token but not from the identity token,
+which is the only token Shaken Fist ever sees.
+
+**The `profile` scope must actually be granted**, which decides what
+the issuer's `oidc_scopes` has to be. Four requests, same provider,
+same person:
+
+| Requested scope | Granted scope | `groups` claim |
+|---|---|---|
+| `openid profile email` | `profile email openid` | `["sf-admins"]` |
+| `openid profile` | `profile openid` | `["sf-admins"]` |
+| `openid` | `openid` | **absent** |
+| *(no scope parameter at all)* | `profile email openid` | `["sf-admins"]` |
+
+So `oidc_scopes` must be at least **`openid profile`**. The last row
+is Authentik's documented behaviour -- a request naming no scopes is
+treated as requesting every scope the provider has configured -- and
+it is a trap of its own, because it makes a hand-rolled test pass
+while the real client, which always names its scopes, fails.
+
+Unlike the other provider, `groups` is not a scope here and asking for
+one would be wrong: the claim rides on `profile`.
+
+#### The device flow, and what survey finding 5 got right
+
+**Finding 5 held, and the evidence is stronger than the finding
+claims.** It said Authentik advertises `device_authorization_endpoint`
+whether or not a brand device-code flow exists. Both states were
+captured.
+
+**Before any brand flow was configured** (`flow_device_code` is `null`
+on a stock default brand, confirmed by reading
+`GET /api/v3/core/brands/`), the discovery document carried:
+
+```
+"device_authorization_endpoint": "https://localhost:9443/application/o/device/"
+"grant_types_supported": [..., "urn:ietf:params:oauth:grant-type:device_code"]
+```
+
+A device login was then driven by hand, and it fails in the worst
+possible way -- not at the first step, but at the person's browser,
+after they have already typed their password:
+
+1. `POST /application/o/device/` answers **200** with a real
+   `device_code`, `user_code`, `verification_uri` and
+   `verification_uri_complete`. Nothing here hints at a problem.
+2. The person opens `verification_uri_complete`. Unauthenticated, it
+   **302**s to the brand's authentication flow, so they log in
+   normally.
+3. Back at `/device?code=<user_code>`, authenticated, it answers a
+   bare **404 with an empty body**. No message, no error page content.
+   The server log says what the browser does not:
+
+   ```
+   "event": "Brand has no device code flow configured",
+   "logger": "authentik.providers.oauth2.views.device_init",
+   "status": 404
+   ```
+
+4. The client's token poll keeps answering `authorization_pending`
+   until the code expires. The default `expires_in` is **60 seconds**,
+   so the whole thing is over in a minute with nothing said.
+
+**After configuring the brand flow**, the same login completed. Two
+API calls:
+
+```bash
+# a flow with the stage configuration designation, and no stages at all
+POST /api/v3/flows/instances/
+  {"name": "default-device-code-flow", "title": "Device code flow",
+   "slug": "default-device-code-flow", "designation": "stage_configuration",
+   "authentication": "require_authenticated"}
+
+# point the default brand at it
+PATCH /api/v3/core/brands/<uuid>/ {"flow_device_code": "<flow uuid>"}
+```
+
+Interface: *Flows and Stages* -> *Flows* -> *Create*, then *System* ->
+*Brands* -> edit the default brand -> *Default code flow*. The flow
+was created with **no stages bound to it** and that is enough; nothing
+had to be added to it.
+
+**And here is the part that makes the caveat worth documenting: the
+discovery document did not change by one byte.** The capture taken
+before the brand flow existed and the capture taken after are
+identical -- same 2188 bytes, same members, compared as parsed JSON
+and found equal. Nothing a relying party can read distinguishes a
+working Authentik from a broken one. That is a stronger statement than
+"the endpoint is advertised anyway", and it is what the operator guide
+should say.
+
+A third state was captured for the same reason. A provider created
+with the API's default `grant_types` of `[]` -- no device grant at all
+-- still produced a discovery document advertising
+`device_authorization_endpoint` **and** listing the device grant in
+`grant_types_supported`. So that member is static per provider too,
+and cannot be used as a second opinion. The device endpoint's refusal
+for such a provider is actively misleading:
+
+```json
+{"error": "invalid_client", "error_description": "Client authentication failed (e.g., unknown client, no client authentication included, or unsupported authentication method)"}
+```
+
+(HTTP 400.) Nothing in that says "the device grant is not enabled on
+this provider", and it arrives at the *client*, not the person. The
+equivalent message at the other provider names the actual cause.
+
+So there are **two** independent switches, either of which breaks a
+device login while discovery looks perfect: the provider's
+`grant_types`, and the brand's `flow_device_code`. The walkthrough has
+to name both.
+
+#### Both logins, completed
+
+Both flows were driven end to end against the real server, through
+Authentik's flow executor API (`/api/v3/flows/executor/<slug>/`), which
+is what the browser interface itself posts to.
+
+**Device code.** Worked, once the brand flow existed. From a browser
+with no session, which is the real case:
+
+```
+POST /application/o/device/                       -> 200, user_code + URIs
+GET  /device?code=<user_code>                     -> 302 /flows/-/default/authentication/?next=...
+     (the person logs in: identification, then password)
+GET  /device?code=<user_code>                     -> 302 /if/flow/<authorization flow>/?code=<user_code>
+     stage: ak-provider-oauth2-device-code-finish  (one button)
+POST /application/o/token/ grant_type=...device_code -> 200 with an id_token
+```
+
+Two things to tell a person. The code is **pre-filled** when they use
+`verification_uri_complete`, so the code-entry stage never appears --
+but the brand flow is still what makes the route exist, which is why
+it cannot be skipped. And there is a **confirmation stage they must
+press**, `ak-provider-oauth2-device-code-finish`, even though the
+provider's authorization flow was the *implicit consent* one. It is
+the device grant's own step, not the consent setting, which is exactly
+the same shape the other provider has.
+
+**Authorization code with PKCE.** Worked, with an S256 challenge, no
+client secret, and a loopback redirect on an ephemeral port:
+
+```bash
+GET /application/o/authorize/?response_type=code&client_id=shakenfist
+    &redirect_uri=http://127.0.0.1:45678/&state=...
+    &code_challenge=...&code_challenge_method=S256&scope=openid+profile+email
+# -> 302 http://127.0.0.1:45678/?code=...&state=...
+POST /application/o/token/ grant_type=authorization_code
+    client_id=shakenfist code=... redirect_uri=http://127.0.0.1:45678/
+    code_verifier=...
+# -> 200 with an id_token
+```
+
+No consent page on this flow. The redirect carries `code` and `state`
+and **no `iss` parameter**, which the other provider does send.
+
+**What Authentik accepts for a wildcard port.** This is a real
+walkthrough question and the answer is not the obvious one.
+`redirect_uris` is a list of objects, not of strings:
+
+```json
+[{"matching_mode": "regex",
+  "url": "http://127\\.0\\.0\\.1:[0-9]+/",
+  "redirect_uri_type": "authorization"}]
+```
+
+`matching_mode` is `strict` or `regex`. A `regex` entry is what
+matches an ephemeral port; it was proved against two different ports,
+45678 and 51237, both of which completed.
+
+The trap is that the other provider's form, `http://127.0.0.1:*/`,
+is **accepted by the API as a `strict` entry and then matches
+nothing**. With it configured, the authorization request answers
+**400** with an HTML error page -- correctly not a redirect, since the
+redirect URI is the thing in doubt -- and the log says:
+
+```
+"cause": "redirect_uri_no_match",
+"event": "The request fails due to a missing, invalid, or mismatching redirection URI (redirect_uri)."
+```
+
+Note also that the regex is a regex: the literal dots have to be
+escaped or they match any character. Authentik's own documentation
+says so and it is easy to copy a Keycloak-shaped value straight past
+it.
+
+**The two flows produce the same claim set.** Compared member by
+member: identical keys, and identical values for everything except
+`auth_time`, `exp`, `iat`, `jti` and `sid`, which are per-token by
+construction. `aud`, `acr`, `amr`, `iss` and `groups` are the same. So
+one fixture is enough, and it was taken from the device flow, as step
+8a's was.
+
+#### What the artefacts say
+
+Left uncommitted in the worktree:
+
+* `shakenfist/tests/files/idp/authentik-discovery.json`
+* `shakenfist/tests/files/idp/authentik-id-token-claims.json`
+
+The discovery document is 26 members, 2188 bytes as served -- a third
+of the other provider's, and well under
+`FEDERATION_DISCOVERY_MAX_BYTES`. The only difference between the
+committed file and the bytes the server sent is JSON whitespace:
+`json.dump(..., indent=2)` preserving the served key order. Facts
+taken from it:
+
+* `"issuer": "https://localhost:9443/application/o/sf/"` -- **with a
+  trailing slash**, and that string is what `issuer_url` must be,
+  character for character. Confirmed from the committed file and
+  confirmed again by `oidc_discovery.fetch()` accepting the live
+  document for exactly that issuer. `discovery_url()` strips the one
+  slash and fetches
+  `.../application/o/sf/.well-known/openid-configuration`, which is
+  the path Authentik serves.
+* The issuer's path ends in the **application** slug, not the
+  provider's name. The endpoints do not: `authorization_endpoint`,
+  `token_endpoint`, `device_authorization_endpoint`,
+  `userinfo_endpoint`, `introspection_endpoint` and
+  `revocation_endpoint` are all global paths under
+  `/application/o/`. Only `jwks_uri` and `end_session_endpoint` carry
+  the slug. So an operator reading the document cannot tell which
+  application an endpoint belongs to, and the issuer is the only thing
+  that is per-application.
+* `jwks_uri` and all three login endpoints are `https`.
+* **`grep -c device_authorization_endpoint` on this file is 1.** There
+  is no `mtls_endpoint_aliases` member, so the count differs from the
+  other provider's fixture, which is 2. Neither count is a safe test;
+  read the top-level key with `json`.
+* `token_endpoint_auth_methods_supported` is `["client_secret_post",
+  "client_secret_basic"]` and does **not** include `none`, even though
+  this provider is a public client and its token requests carry no
+  secret and succeed. The member is static; do not read anything into
+  it.
+* `scopes_supported` is `["openid", "email", "profile"]`, which *is*
+  derived from the provider's assigned mappings -- the probe provider
+  with no mappings published `["openid"]` alone.
+* `claims_supported` lists `groups`, which is the one place in the
+  document where the group claim is visible at all.
+
+The claim set is the decoded payload of a real identity token. Only
+one member identified the lab person rather than already naming an
+invented placeholder, and it was replaced:
+
+| Member | Value in the fixture | Why |
+|---|---|---|
+| `sub` | `00000000-0000-0000-0000-000000000000` | was a hash of the user id; mirrors step 8a |
+| `email` | `person@example.com` | as emitted; the lab person was created with step 8a's placeholder |
+| `preferred_username` | `person` | as emitted |
+| `nickname` | `person` | as emitted; Authentik copies the username |
+| `name` | `Example Person` | as emitted |
+| `given_name` | `Example Person` | as emitted -- see below |
+
+`given_name` is deliberately **not** `Example`, which is what the
+other provider's fixture carries. Authentik's shipped expression is
+`ak_obj_attr(request.user, "given_name", "name")`, so with no
+`given_name` attribute set on the person it falls back to the full
+name; and `family_name` is absent entirely, because the expression
+wraps everything in `delete_none_values()`. Writing `Example` and
+`Person` into the fixture would have made the two files read alike at
+the cost of hiding a real difference between the providers.
+
+Everything else is as emitted, including:
+
+```json
+{"aud": "shakenfist", "typ": absent, "azp": absent,
+ "iss": "https://localhost:9443/application/o/sf/",
+ "groups": ["sf-admins"],
+ "acr": "goauthentik.io/providers/oauth2/default", "amr": ["pwd"],
+ "email_verified": false,
+ "exp": 1795318462, "iat": 1795314862, "auth_time": 1795314861}
+```
+
+Four things in there are evidence for claims the operator guide makes
+or will make:
+
+* `aud` is the **client id**, a bare string and not a list, exactly as
+  the other provider emits it. The `client_id`-versus-`audience`
+  warning box is confirmed against a second real provider.
+* `groups` is a **JSON array** for a person in exactly one group. Both
+  providers agree, which is survey finding 1 as both of them actually
+  behave.
+* There is **no `azp` and no `typ`**. The other provider sends both,
+  and step 8a kept them in its fixture deliberately. A test written
+  against the Keycloak fixture that asserts on `typ: "ID"` will not
+  port to this one.
+* `email_verified` is **`false`**, because nothing verified it. It is
+  as emitted and was not touched.
+
+No signed JWT was written anywhere in the tree. The raw tokens stayed
+in the scratch directory and went with it.
+
+#### Teardown
+
+```bash
+docker rm -f sf-idp-authentik-server sf-idp-authentik-worker \
+             sf-idp-postgres sf-idp-redis
+docker network rm sf-idp-net
+```
+
+Nothing is left running. The three images remain in the host's local
+cache, which costs nothing and saves a pull in 8g.
+
+#### Things the plan's row said that did not hold
+
+* "It needs TLS for the same reason step 8a did." True in the end but
+  not in the way the row means: Authentik serves https out of the box,
+  so `curl -k` captures work immediately and no certificate has to be
+  supplied for *this* step. What the certificate is needed for is a
+  cluster, because the built-in one has no subjectAltName and
+  `FEDERATION_JWKS_CA_BUNDLE` cannot rescue a hostname mismatch. That
+  distinction is worth the walkthrough's time; the row's version is
+  not.
+* "the default OpenID `profile` mapping, or a custom scope mapping if
+  that is what it takes -- record which". The default mapping, with no
+  change. The thing that actually needs recording is not the mapping
+  but the **scope**: `oidc_scopes` must include `profile` or the claim
+  is absent, and that is the Authentik analogue of the other
+  provider's optional-scope trap.
+* "Configure a device-code flow at the **brand**, which is not the
+  default". Correct, and it is only half the configuration -- the
+  provider's `grant_types` must list the device grant too, and its API
+  default is the empty list. The row names one switch where there are
+  two.
+* The row implies a `groups` claim might need work. It needs none. The
+  work on this provider is in the three fields whose API defaults are
+  empty, and in the redirect URI's matching mode.

@@ -1,0 +1,23 @@
+{
+  "iss": "https://localhost:9443/application/o/sf/",
+  "sub": "00000000-0000-0000-0000-000000000000",
+  "aud": "shakenfist",
+  "exp": 1795318462,
+  "iat": 1795314862,
+  "auth_time": 1795314861,
+  "acr": "goauthentik.io/providers/oauth2/default",
+  "amr": [
+    "pwd"
+  ],
+  "sid": "5e2885a110f8a77f76ea470932c4d235294f6d2a1e5773d7f3ad9250ef6165b4",
+  "jti": "XuEdGTVrASGthxTOOuzWrTIdz8mpXkiPpEfz0Xuy",
+  "email": "person@example.com",
+  "email_verified": false,
+  "name": "Example Person",
+  "given_name": "Example Person",
+  "preferred_username": "person",
+  "nickname": "person",
+  "groups": [
+    "sf-admins"
+  ]
+}
