@@ -4267,7 +4267,16 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetNamespaceKeyAttributes failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            # Deliberately not str(e). These readers raise
+            # DatabaseUnavailable with the SQLAlchemy error in the
+            # message, which carries the statement text and the bound
+            # uuid, and this detail string travels back to the client
+            # and into its own exception message, its logs and any
+            # event it writes. The exception is logged above, on the
+            # node that can act on it. The damaged-rule arm in
+            # GetMappingRuleAttributes declines to do this for the same
+            # reason.
+            context.set_details('namespace key attributes could not be read')
             return database_pb2.GetNamespaceKeyAttributesReply(found=False)
 
     def UpdateNamespaceKeyAttributes(
@@ -4437,7 +4446,16 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetTrustedIssuerAttributes failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            # Deliberately not str(e). These readers raise
+            # DatabaseUnavailable with the SQLAlchemy error in the
+            # message, which carries the statement text and the bound
+            # uuid, and this detail string travels back to the client
+            # and into its own exception message, its logs and any
+            # event it writes. The exception is logged above, on the
+            # node that can act on it. The damaged-rule arm in
+            # GetMappingRuleAttributes declines to do this for the same
+            # reason.
+            context.set_details('trusted issuer attributes could not be read')
             return database_pb2.GetTrustedIssuerAttributesReply(found=False)
 
     def UpdateTrustedIssuerAttributes(
@@ -4666,7 +4684,15 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetMappingRuleAttributes failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            # Deliberately not str(e). These readers raise
+            # DatabaseUnavailable with the SQLAlchemy error in the
+            # message, which carries the statement text and the bound
+            # uuid, and this detail string travels back to the client
+            # and into its own exception message, its logs and any
+            # event it writes. The exception is logged above, on the
+            # node that can act on it. The damaged-rule arm above
+            # declines to do this for the same reason.
+            context.set_details('mapping rule attributes could not be read')
             return database_pb2.GetMappingRuleAttributesReply(found=False)
 
     def UpdateMappingRuleAttributes(

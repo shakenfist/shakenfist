@@ -16999,7 +16999,11 @@ def get_mapping_rule_attributes(
     """Get a MappingRule's mutable attributes.
 
     Returns None if the row does not exist. Raises DatabaseUnavailable
-    when the database cannot be read.
+    when the database cannot be read, and CorruptMappingRule when the
+    row exists but will not decode -- a present and damaged rule, which
+    is a different answer from an absent one and from an unreadable
+    database. Both paths raise both: the direct one from its decoders,
+    the gRPC one from the reply's corrupt flag.
     """
     if _use_database_service():
         return _grpc_get_mapping_rule_attributes(rule_uuid)

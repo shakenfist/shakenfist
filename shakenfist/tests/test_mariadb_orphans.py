@@ -358,6 +358,24 @@ class OrphanQueryTestCase(
             'or the orphan reconciler silently skips it in both directions '
             '(issues 3588, 3788)')
 
+    # Every object type the reconciler will repair. Pinned as well as
+    # the overriding set below, because the overriding set alone does
+    # not make a new type's author decide anything: a type registered
+    # with no override leaves that set unchanged, and so passes a test
+    # whose failure message is the only place the decision is written
+    # down. This is the assertion that actually stops a new type being
+    # repaired to deleted by default without anyone having thought
+    # about it.
+    REPAIRABLE_OBJECT_TYPES = {
+        'agentoperation', 'artifact', 'artifact_fetch_op', 'blob', 'dhcp',
+        'imgcache_op', 'instance', 'interface', 'ipam', 'mapping_rule',
+        'namespace_claim', 'namespace_key', 'net_iface_ip_op',
+        'net_iface_op', 'net_ip_op', 'net_macaddr_ip_op', 'net_op',
+        'network', 'node_aop_op', 'node_blob_op', 'node_inst_net_iface_op',
+        'node_inst_netdesc_op', 'node_inst_op', 'node_inst_snap_op',
+        'node_net_op', 'trusted_issuer', 'upload',
+    }
+
     def test_zombie_repair_state_overrides_are_pinned(self):
         # Registering a type above makes the reconciler repair its
         # zombies, which by default means marking them deleted. That is
@@ -367,13 +385,28 @@ class OrphanQueryTestCase(
         # destroyed live credentials (issue 3836). Pin the set, so that
         # adding a type -- or an override -- is a decision someone made.
         default = DatabaseBackedObject.zombie_repair_state.__func__
+        repairable = set()
         overriding = set()
         for objtype in mariadb.ORPHAN_RECONCILABLE_OBJECT_TYPES:
             if objtype in scheduled_tasks.ZOMBIE_REPAIR_EXCLUDED_TYPES:
                 continue
+            repairable.add(objtype)
             cls = constants.get_object_class(objtype)
             if cls.zombie_repair_state.__func__ is not default:
                 overriding.add(objtype)
+
+        self.assertEqual(
+            self.REPAIRABLE_OBJECT_TYPES, repairable,
+            'the set of object types the orphan reconciler repairs '
+            'changed. A type here with no zombie_repair_state() override '
+            'has its zombies marked deleted. Decide whether any of this '
+            'type\'s read paths honours an object with no state row -- a '
+            'by-name lookup or a listing which does not check state, or '
+            'which rejects only deleted. If one does, marking it deleted '
+            'destroys live objects, which is what issue 3836 was: '
+            'override zombie_repair_state() to return a live state when '
+            'the object would be honoured. Then add the type here either '
+            'way, because that is the record that the question was asked')
 
         self.assertEqual(
             {'namespace_key', 'trusted_issuer', 'mapping_rule'},

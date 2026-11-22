@@ -364,15 +364,19 @@ cluster capacity nothing can release.
 
 A new object type has to join more registries than is obvious. Both
 `mariadb._STATIC_TABLE_GETTERS` and `constants.OBJECT_NAMES_TO_CLASSES`
-are load bearing for the orphan reconciler: zombie repair marks the
-static row deleted and then hydrates it through `get_object_class()` to
-collect it, so registering only the first trades one leak for another.
+are load bearing for the orphan reconciler: zombie repair writes the
+state the type's `zombie_repair_state()` returns — `deleted` for every
+type that does not override it — and then hydrates the row through
+`get_object_class()` to collect it, so registering only the first
+trades one leak for another.
 `NAMESPACE_KEY` missing from the first is issue 3588. A new type must
 also decide its `zombie_repair_state()`: the default repairs a stateless
 row to `deleted`, which is wrong for anything that works without a
 state row. `test_zombie_repair_state_overrides_are_pinned` in
-`test_mariadb_orphans.py` names the overriding types, so adding one
-means updating it deliberately.
+`test_mariadb_orphans.py` pins both the types which override it and
+the whole set of types the reconciler repairs, so registering a type
+fails that test whether or not it overrides anything — which is what
+makes the decision someone's rather than the default's.
 
 ### The peak high-water mark
 

@@ -590,33 +590,35 @@ rest are noted.
 
 ## Disposition
 
-Per decision 8 the audit fixes nothing: findings land as their own pull
-request once this phase has merged, and that pull request records this
-phase's merge commit.
+Per decision 8 the audit fixed nothing: the findings landed as their
+own pull request once this phase had merged, and that pull request
+records this phase's merge commit (`b0af1770ff`, #5018). The
+disposition column below says what became of each finding, with the
+outcome column added by that pull request.
 
-| Finding | Grade | Disposition |
-|---------|-------|-------------|
-| S1 heal conflates absent with unreadable | medium | Follow-up pull request, first |
-| C1 liveness stop invisible to the streak gauge | advisory | Follow-up pull request |
-| T1 pinned test does not pin what was claimed | advisory | Follow-up pull request; master plan corrected at source here |
-| D1 unqualified "marks the static row deleted" | advisory | Follow-up pull request |
-| D2 missing retry clause | advisory | Follow-up pull request |
-| C4 docstring omits `CorruptMappingRule` | advisory | Follow-up pull request |
-| S6 override docstrings overstate the login path | low | Follow-up pull request |
-| C2 no per-object resume | advisory | Follow-up pull request, with a test |
-| C3 unbounded swallowing of other errors | advisory | Follow-up pull request, with a test |
-| C9 starvation test injects the wrong path | advisory | Follow-up pull request: rename, or cover the path the name promises |
-| T2 no servicer round-trip test | advisory | Follow-up pull request |
-| T4 no functional coverage | advisory | Noted; a functional test for an hourly sweep is its own piece of work |
-| S2 torn-hard-delete backstop | low | Noted; fold into [#5015](https://github.com/shakenfist/shakenfist/issues/5015) |
-| S3 `set_details` carries SQL text | low | Follow-up pull request |
-| C5 corrupt rule persists | low | Noted; visible as `unusable`, which is the intended behaviour |
-| T3 mutation count overstates guards | advisory | Noted, no action |
-| Direct readers conflate absent/unreadable | predating | [#5017](https://github.com/shakenfist/shakenfist/issues/5017) |
-| `_as_uuid` triplicated | predating | Noted |
-| File sizes past the stated-reason mark | predating | Noted |
-| `get_stateless_object_uuids` unpaginated | predating | Noted |
-| gRPC issuer/rule readers already raised | predating | No action; context only |
+| Finding | Grade | Disposition | Outcome |
+|---------|-------|-------------|---------|
+| S1 heal conflates absent with unreadable | medium | Follow-up pull request, first | Fixed: reads through `get_state_checked()`, skips the heal on a failed read, and contains both writes |
+| C1 liveness stop invisible to the streak gauge | advisory | Follow-up pull request | Fixed: its own streak gauge, since the work-list streak had just been reset by the read that found the zombies |
+| T1 pinned test does not pin what was claimed | advisory | Follow-up pull request; master plan corrected at source here | Fixed: the set of repairable types is pinned as well as the overriding set |
+| D1 unqualified "marks the static row deleted" | advisory | Follow-up pull request | Fixed |
+| D2 missing retry clause | advisory | Follow-up pull request | Fixed, with the two resume markers and the new metrics |
+| C4 docstring omits `CorruptMappingRule` | advisory | Follow-up pull request | Fixed |
+| S6 override docstrings overstate the login path | low | Follow-up pull request | Fixed |
+| C2 no per-object resume | advisory | Follow-up pull request, with a test | Fixed: repairs resume after the zombie that stopped the last pass |
+| C3 unbounded swallowing of other errors | advisory | Follow-up pull request, with a test | Fixed: counted by object type rather than only logged |
+| C9 starvation test injects the wrong path | advisory | Follow-up pull request: rename, or cover the path the name promises | Fixed: renamed for the path it drives, and the liveness path now has the test its old name promised |
+| T2 no servicer round-trip test | advisory | Follow-up pull request | Fixed: a real in-process servicer, for all three readers |
+| T4 no functional coverage | advisory | Noted; a functional test for an hourly sweep is its own piece of work | Not done |
+| S2 torn-hard-delete backstop | low | Noted; fold into [#5015](https://github.com/shakenfist/shakenfist/issues/5015) | Not done |
+| S3 `set_details` carries SQL text | low | Follow-up pull request | Fixed, for all three attributes servicers |
+| C5 corrupt rule persists | low | Noted; visible as `unusable`, which is the intended behaviour | Not done |
+| T3 mutation count overstates guards | advisory | Noted, no action | Not done |
+| Direct readers conflate absent/unreadable | predating | [#5017](https://github.com/shakenfist/shakenfist/issues/5017) | Issue filed |
+| `_as_uuid` triplicated | predating | Noted | Not done |
+| File sizes past the stated-reason mark | predating | Noted | Not done |
+| `get_stateless_object_uuids` unpaginated | predating | Noted | Not done |
+| gRPC issuer/rule readers already raised | predating | No action; context only | Not done |
 
 Issues filed by this phase:
 [#5015](https://github.com/shakenfist/shakenfist/issues/5015) (no alert

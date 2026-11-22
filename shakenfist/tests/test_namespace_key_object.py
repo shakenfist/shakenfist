@@ -4,6 +4,7 @@
 # behaviour-preservation tests for the old JSON column implementation
 # live in test_namespace_keys.py and are deliberately left alone.
 import base64
+import contextlib
 import json
 from unittest import mock
 
@@ -170,6 +171,16 @@ class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
             base64.b64decode(
                 self._attributes(loser).key.get_secret_value())))
 
+    def _stored_state(self, key):
+        """The state value in the store, not through a patched reader.
+
+        The read failure tests patch the state readers, so the object's
+        own state property cannot be used to assert what was written.
+        """
+        row = self.mock_mariadb.mariadb_states.get(
+            f'{key.object_type}/{key.uuid}')
+        return row['state_value'] if row else None
+
     def _drop_state(self, key):
         self.mock_mariadb.mariadb_states.pop(
             f'{key.object_type}/{key.uuid}', None)
@@ -205,6 +216,122 @@ class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
         self.assertEqual(
             [], [c for c in mock_add_event.call_args_list
                  if c.args[0] == EVENT_TYPE_AUDIT])
+
+    def test_an_unreadable_state_does_not_heal_a_deleted_key(self):
+        """A read failure must not read as "this key has no state row".
+
+        from_db_by_name() applies no state filter, so a revoked key
+        reaches the heal. If a failed read were taken for absence the
+        heal would write initial over deleted, and the key an operator
+        revoked would authenticate again with a secret this very call
+        has just minted.
+        """
+        first = NamespaceKey.new('banana', 'deploy', 'sekrit')
+        first.state = NamespaceKey.STATE_DELETED
+
+        # What a read failure looks like from here: get_state() cannot
+        # say why it has no state to offer, and get_state_checked() can.
+        # The row itself is untouched and still says deleted.
+        with mock.patch('shakenfist.mariadb.get_state', return_value=None), \
+                mock.patch('shakenfist.mariadb.get_state_checked',
+                           return_value=(False, None)), \
+                mock.patch.object(NamespaceKey, 'add_event') as mock_add_event, \
+                mock.patch('shakenfist.mariadb.set_state',
+                           wraps=self.mock_mariadb._mariadb_set_state) as spy:
+            NamespaceKey.new('banana', 'deploy', 'different')
+
+        spy.assert_not_called()
+        self.assertEqual(NamespaceKey.STATE_DELETED, self._stored_state(first))
+        self.assertEqual(
+            [], [c for c in mock_add_event.call_args_list
+                 if c.args[0] == EVENT_TYPE_AUDIT])
+
+    def test_a_failed_heal_write_does_not_escape_the_rotation(self):
+        """The secret is already replaced, so the heal may not raise.
+
+        rotate() runs before the heal. A heal which threw would leave
+        the stored hash and nonce rotated with the caller never told
+        the new secret, so the key would authenticate with a value
+        nobody holds.
+        """
+        first = NamespaceKey.new('banana', 'deploy', 'sekrit')
+        self._drop_state(first)
+
+        with mock.patch('shakenfist.mariadb.set_state', return_value=False):
+            second = NamespaceKey.new('banana', 'deploy', 'different')
+
+        self.assertIsNotNone(second.minted_nonce)
+        self.assertEqual(self._attributes(second).nonce.get_secret_value(),
+                         second.minted_nonce.get_secret_value())
+
+    def test_a_key_left_in_initial_is_healed_the_rest_of_the_way(self):
+        """A heal which wrote initial and then failed is finished later.
+
+        Containing the writes makes this state reachable, so the heal
+        has to treat initial as unfinished rather than as a state which
+        means "leave this key alone".
+        """
+        first = NamespaceKey.new('banana', 'deploy', 'sekrit')
+        self._drop_state(first)
+        first.state = NamespaceKey.STATE_INITIAL
+
+        with mock.patch.object(NamespaceKey, 'add_event') as mock_add_event:
+            second = NamespaceKey.new('banana', 'deploy', 'different')
+
+        self.assertEqual(NamespaceKey.STATE_CREATED, second.state.value)
+        # The key did have a state row, so the audit record must not
+        # say it had none.
+        audits = [c.args[1] for c in mock_add_event.call_args_list
+                  if c.args[0] == EVENT_TYPE_AUDIT]
+        self.assertEqual(
+            ['rotation finished repairing a key which an earlier repair '
+             'left in initial'], audits)
+
+    def _assert_heal_failure_is_contained(self, expected, **patches):
+        """Rotate a stateless key with the given mariadb calls patched.
+
+        Asserts that the rotation still hands back the nonce it minted,
+        which is the whole of what the caller cannot afford to lose,
+        and whether the failure reached the catch-all. A tier outage is
+        expected and gets a warning; only something nobody anticipated
+        should be recorded as an exception.
+        """
+        first = NamespaceKey.new('banana', 'deploy', 'sekrit')
+        self._drop_state(first)
+
+        with contextlib.ExitStack() as stack:
+            for name, side_effect in patches.items():
+                stack.enter_context(mock.patch(
+                    f'shakenfist.mariadb.{name}', side_effect=side_effect))
+            mock_ignore = stack.enter_context(mock.patch(
+                'shakenfist.util.exceptions.ignore_exception'))
+            second = NamespaceKey.new('banana', 'deploy', 'different')
+
+        self.assertIsNotNone(second.minted_nonce)
+        self.assertEqual(self._attributes(second).nonce.get_secret_value(),
+                         second.minted_nonce.get_secret_value())
+        self.assertEqual(not expected, mock_ignore.called)
+        return second
+
+    def test_an_unavailable_tier_on_the_heal_read_does_not_escape(self):
+        """DatabaseUnavailable is not an RpcError, so nothing below catches it.
+
+        The gRPC wrappers map RpcError to a return value and let
+        DatabaseUnavailable through on purpose (issue 3373), which is
+        the shape a tier outage takes on every sf-api worker.
+        """
+        self._assert_heal_failure_is_contained(
+            True, get_state_checked=exceptions.DatabaseUnavailable('tier gone'))
+
+    def test_an_unavailable_tier_on_the_heal_write_does_not_escape(self):
+        second = self._assert_heal_failure_is_contained(
+            True, set_state=exceptions.DatabaseUnavailable('tier gone'))
+        self.assertIsNone(self._stored_state(second))
+
+    def test_an_unexpected_heal_failure_does_not_escape(self):
+        """The catch-all, not the list of expected exceptions, is the guard."""
+        self._assert_heal_failure_is_contained(
+            False, get_state_checked=RuntimeError('something nobody expected'))
 
     def test_the_race_fallback_heals_a_stateless_key(self):
         winner = NamespaceKey.new('banana', 'deploy', 'sekrit')
