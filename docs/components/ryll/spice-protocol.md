@@ -766,3 +766,20 @@ PageUp, PageDown) require the E0 extended prefix to distinguish them from
 their numpad equivalents. These are encoded in the u32 scancode field as
 `(scancode << 8) | 0xE0`, matching spice-gtk's `spice_make_scancode()`.
 The mapping table uses the 0x1xx convention internally (bit 8 set = extended).
+
+## Reference source trees
+
+When implementing a protocol detail, these local trees are the
+references to read rather than guess from. They are checkouts on the
+development host, not dependencies of the build.
+
+| Source | Path | Use for |
+|--------|------|---------|
+| Kerbside Python proxy | `shakenfist/kerbside/` | Protocol docs in that repository's `docs/`, packet parsing in `kerbside/spiceprotocol/packets/`, reference test client in `testclient/ryll/` |
+| SPICE protocol headers | `/srv/src-reference/spice/spice-protocol/` | Canonical enum definitions, message structures, capability flags |
+| SPICE common library | `/srv/src-reference/spice/spice-common/` | Shared marshalling code used by both server and client |
+| SPICE GTK client | `/srv/src-reference/spice/spice-gtk/` | Reference client implementation (C/GTK) |
+| spice-html5 | `/srv/src-reference/spice/spice-html5/` | JavaScript SPICE client (useful for LZ/GLZ decompressor reference) |
+| virt-viewer | `/srv/src-reference/spice/virt-viewer/` | The standard SPICE client, .vv file handling |
+| QEMU | `/srv/src-reference/qemu/qemu/` | Server-side SPICE implementation in `ui/spice-*` |
+| Linux kernel | `/srv/src-reference/torvalds/linux/` | QXL driver in `drivers/gpu/drm/qxl/` |

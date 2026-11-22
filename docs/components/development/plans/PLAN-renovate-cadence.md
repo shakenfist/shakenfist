@@ -725,11 +725,11 @@ have to find this list first.
    `renovate.json` against the template, so changing the template's
    copy fails nobody. One thing the survey found that is *not* in
    this phase's scope: a criterion requiring the shellcheck-py rule
-   in every repository using the hook is recorded against an
-   unwritten `PLAN-renovate-shellcheck-audit`, in the operator's
-   `plan-blockers` notes rather than in this repository. If it
-   lands after this phase it must read the preset form too, for the
-   reason decision 1 gives; Future work now says so.
+   in every repository using the hook. When this was written it was
+   recorded only in the operator's `plan-blockers` notes; it is now
+   `docs/plans/PLAN-renovate-shellcheck-audit.md`, written on
+   2026-11-21, and it reads the preset form too, for the reason
+   decision 1 gives. Future work has the rest.
 
 **Blast radius.** This phase changes no criterion's requirements ---
 it only widens what satisfies two of them --- so it newly fails no
@@ -2644,13 +2644,24 @@ chosen to defer to here, so that we do not forget them.
   pre-commit --- but that plan should record the trade as its own,
   since it is the change that causes it.
 * A criterion requiring the `shellcheck-py/shellcheck-py`
-  versioning rule, rather than merely permitting it, is recorded
-  against an unwritten `PLAN-renovate-shellcheck-audit`. If it is
-  written after phase 1 it must accept the rule reached through
+  versioning rule, rather than merely permitting it, is now
+  `docs/plans/PLAN-renovate-shellcheck-audit.md`, written on
+  2026-11-21. It accepts the rule reached through
   `local>shakenfist/development:renovate-fleet` as well as a local
   copy, for the same reason phase 1's decision 1 gives: a criterion
   that reads only the local file holds the fleet to a line the
-  policy has moved out of.
+  policy has moved out of -- and with only `development` on the
+  preset today, a local-file-only check would fail 23 repositories
+  rather than the four it does. That plan deliberately lands before
+  this plan's phase 3 rather than after it, because the sweep gives
+  all four failing repositories the rule as a side effect and a
+  criterion that has only ever passed has never been shown to fail;
+  its decision 4 argues the case. The other half of what was
+  recorded against it -- a test that the rule is identical in
+  `renovate.json` and the template -- is discharged rather than
+  deferred: phase 1 left one copy of the rule, in the preset, and
+  `test_the_template_holds_nothing_but_the_extend` holds the
+  template to carrying nothing to compare.
 * Promoting lockstep groups into the preset, which is what
   [development#88](https://github.com/shakenfist/development/issues/88)
   ultimately asks for. A group that appears in more than one
