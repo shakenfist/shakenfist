@@ -460,6 +460,107 @@ class FetchUsageTestCase(base.ShakenFistTestCase):
              (3, 2560, 30)}, usage)
 
 
+class FetchHeldTestCase(base.ShakenFistTestCase):
+    """_reconcile_fetch_held() statement shape and row folding.
+
+    The arithmetic these assertions stand in for is proven against a
+    real server in test_mariadb_capacity_reconcile_live.py, which is
+    the only place a join that matches nothing can be told from one
+    that matches: a mocked connection returns the rows the test handed
+    it whatever the join says. What they catch is somebody editing the
+    statement into a shape that quietly loses one of its properties.
+    """
+
+    def _statement(self):
+        conn = mock.MagicMock()
+        conn.execute.return_value.fetchall.return_value = []
+        mariadb._reconcile_fetch_held(conn)
+        stmt, params = conn.execute.call_args.args
+        return str(stmt), params
+
+    def test_the_residue_is_the_hold_less_the_consuming_request(self):
+        text, _ = self._statement()
+        # A consumption charges the instance's request to used_*, so
+        # what a hold still contributes is the difference. Summing the
+        # hold's whole size instead would count a consumed booking
+        # twice over, once in each counter.
+        self.assertIn('SUM(GREATEST(0, h.cpus - COALESCE(i.cpus, 0)))', text)
+        self.assertIn(
+            'SUM(GREATEST(0, h.memory_mb - COALESCE(i.memory, 0)))', text)
+        self.assertIn(
+            'SUM(GREATEST(0, h.disk_gb - COALESCE(d.disk_gb, 0)))', text)
+        # LEFT, so an unconsumed hold's residue is its whole size out
+        # of that same expression rather than a second case.
+        self.assertIn('LEFT JOIN instances i\n        ON i.uuid = '
+                      'h.instance_uuid', text)
+
+    def test_an_over_consuming_hold_can_not_cancel_another_booking(self):
+        text, _ = self._statement()
+        # The clamp is per hold rather than per node. Clamping the
+        # total would let one instance that consumed more than was
+        # booked for it eat a different claim's booking on the same
+        # node, and a negative residue would also subtract back out
+        # room used_* has already counted in full.
+        self.assertEqual(3, text.count('GREATEST(0, '))
+
+    def test_the_uuid_comparisons_use_the_form_both_tables_store(self):
+        text, _ = self._statement()
+        # Every uuid joined here is an undashed CHAR(32), unlike the
+        # dashed object_references columns the usage query has to
+        # transform, so these comparisons are direct. A REPLACE() here
+        # would be that pitfall in reverse and exactly as silent: the
+        # join would match nothing, and nothing matching is how the
+        # fold is told that no node holds anything.
+        self.assertNotIn('REPLACE(', text)
+        self.assertIn('ON c.uuid = h.claim_uuid', text)
+        self.assertIn('ON i.uuid = h.instance_uuid', text)
+        self.assertIn('ON d.instance_uuid = h.instance_uuid', text)
+
+    def test_disk_is_aggregated_exactly_as_recomputed_usage_is(self):
+        text, _ = self._statement()
+        usage = str(mariadb._RECONCILE_USAGE_SQL)
+        # The two halves of ``used + held`` are only consistent while
+        # both derive one instance's disk the same way, down to the
+        # malformed-document handling and the rounding.
+        for fragment in ("JSON_TABLE(i2.disk_spec, '$[*]'",
+                         "DEFAULT '0' ON EMPTY",
+                         "DEFAULT '0' ON ERROR",
+                         "JSON_TYPE(i2.disk_spec) = 'ARRAY'",
+                         'COALESCE(SUM(jt.size_gb), 0) AS disk_gb'):
+            self.assertIn(fragment, text)
+            self.assertIn(fragment, usage)
+
+    def test_only_an_active_claims_holds_are_counted(self):
+        text, params = self._statement()
+        # An inner join, so a hold whose claim row has gone counts
+        # towards nothing, and the state filter excludes a claim that
+        # lapsed since the last pass. An expired claim's limits are not
+        # in claimed_*, so there is no aggregate left for its bookings
+        # to sit inside.
+        self.assertIn('JOIN namespace_claims c\n        ON c.uuid = '
+                      'h.claim_uuid', text)
+        self.assertIn('WHERE c.state = :claim_state', text)
+        self.assertEqual('active', params['claim_state'])
+
+    def test_grouped_by_node_and_displaced_holds_excluded(self):
+        text, _ = self._statement()
+        self.assertIn('AND h.node_uuid IS NOT NULL', text)
+        self.assertIn('GROUP BY h.node_uuid', text)
+
+    def test_folds_rows_and_skips_malformed_node_uuid(self):
+        conn = mock.MagicMock()
+        conn.execute.return_value.fetchall.return_value = [
+            SimpleNamespace(
+                node_uuid='11111111-1111-1111-1111-111111111111',
+                held_cpus=3, held_memory_mb=2560, held_disk_gb=30),
+            SimpleNamespace(node_uuid='not-a-uuid', held_cpus=1,
+                            held_memory_mb=1, held_disk_gb=1),
+        ]
+        self.assertEqual(
+            {UUID('11111111-1111-1111-1111-111111111111'): (3, 2560, 30)},
+            mariadb._reconcile_fetch_held(conn))
+
+
 class FetchDemandTestCase(base.ShakenFistTestCase):
     """_reconcile_fetch_demand() statement shape and decay folding."""
 
@@ -639,6 +740,20 @@ def _hold_row(uuid, claim_uuid, node_uuid, cpus=2, memory_mb=2048,
         updated_at=1799000000.0)
 
 
+def _held_row(node_uuid, cpus=0, memory_mb=0, disk_gb=0):
+    """A row in the shape the booked-counter fold projects.
+
+    One row per node, already summed and already net of whatever the
+    consuming instances asked for: the residue arithmetic is the
+    statement's, and is proven against a real server in the live
+    suite. What a mocked fixture can show is what the pass does with
+    the answer.
+    """
+    return SimpleNamespace(
+        node_uuid=node_uuid, held_cpus=cpus, held_memory_mb=memory_mb,
+        held_disk_gb=disk_gb)
+
+
 class _ReconcileRouterMixin:
     """Routes a mocked connection's execute() calls to canned rows.
 
@@ -674,6 +789,13 @@ class _ReconcileRouterMixin:
         if 'DELETE FROM namespace_claim_holds' in text:
             return self._fake_result(
                 rowcount=len(getattr(self, 'hold_rows', [])))
+        # The booked-counter fold reads the same table as the
+        # lapsed-hold read, so it has to be told apart from it before
+        # that branch answers with whole hold rows -- which the fold
+        # would then try to read held_cpus off. The projection is what
+        # distinguishes them.
+        if 'held_cpus' in text and 'namespace_claim_holds' in text:
+            return self._fake_result(rows=getattr(self, 'held_rows', []))
         if 'FROM namespace_claim_holds' in text:
             return self._fake_result(rows=getattr(self, 'hold_rows', []))
         if 'UPDATE scheduler_node_capacity' in text:
@@ -1096,8 +1218,12 @@ class ReconcileLapsedHoldReleaseTestCase(
 
     def test_the_read_is_restricted_to_expired_claims(self):
         self._run([])
+        # A pass reads this table twice: here, for the rows a lapsed
+        # claim left behind, and again for the booked counters. The
+        # second one projects held_*, which is what tells them apart.
         [read] = [text for text in self._texts('SELECT')
-                  if 'FROM namespace_claim_holds' in text]
+                  if 'FROM namespace_claim_holds' in text
+                  and 'held_cpus' not in text]
         self.assertIn('FROM namespace_claims', read)
         self.assertIn('namespace_claims.state = ', read)
 
@@ -1130,6 +1256,141 @@ class ReconcileLapsedHoldReleaseTestCase(
         self.assertEqual([], self._texts('UPDATE scheduler_node_capacity'))
         self.assertEqual(
             [], self._texts('DELETE FROM namespace_claim_holds'))
+
+
+class ReconcileHeldCounterTestCase(
+        _ReconcileRouterMixin, base.ShakenFistTestCase):
+    """What the pass does with the booked-room fold's answer.
+
+    The counters are a materialisation of the hold rows, so a pass
+    states them outright from the fold rather than adjusting whatever
+    it found there. That is what makes them trustworthy: a counter that
+    drifted, was double counted, or was left behind by a crash between
+    two writes is corrected by the next pass instead of persisting
+    until an admission is refused room that nothing holds.
+    """
+
+    def _run(self, held_rows, previous_rows=None):
+        # One schedulable node, NODE1, with fresh metrics: cpu 14 x 3
+        # -> 42, memory floor(64243 x 3) - 4096 -> 188633, and
+        # limit_disk from the recomputed used_disk of 30 plus
+        # floor(803469852672 / GiB) - 20 -> 758.
+        self.previous_rows = previous_rows or []
+        self.metrics_rows = [
+            _metrics_row(NODE1, cpu_schedulable=14, memory_max=64243,
+                         memory_reserved_mb=4096,
+                         disk_free_instances=803469852672,
+                         disk_reservation_gb=20)]
+        self.non_hypervisor_rows = []
+        self.fresh_metrics_rows = [SimpleNamespace(node_uuid=NODE1)]
+        self.node_rows = [SimpleNamespace(uuid=NODE1)]
+        self.active_rows = [SimpleNamespace(object_uuid=str(NODE1))]
+        self.claim_rows = []
+        self.hold_rows = []
+        self.held_rows = held_rows
+        self.executed = []
+        self.all_statements = []
+
+        mock_engine = mock.MagicMock()
+        conn = mock_engine.connect.return_value.__enter__.return_value
+        conn.execute.side_effect = self._route
+        with mock.patch('shakenfist.mariadb._get_engine',
+                        return_value=mock_engine), \
+                mock.patch('shakenfist.mariadb._reconcile_fetch_usage',
+                           return_value={(NODE1, 'ns1'): (2, 2048, 30)}), \
+                mock.patch('shakenfist.mariadb._reconcile_fetch_demand',
+                           return_value={}), \
+                mock.patch.object(mariadb.config,
+                                  'CPU_OVERCOMMIT_RATIO', 3.0), \
+                mock.patch.object(mariadb.config,
+                                  'RAM_OVERCOMMIT_RATIO', 3.0):
+            result = mariadb._direct_reconcile_scheduler_capacity(2.5, 600, 1.0)
+        return result, conn
+
+    def _capacity_upserts(self, conn):
+        """The capacity-row upserts a pass issued, keyed by node uuid."""
+        upserts = {}
+        for call in conn.execute.call_args_list:
+            stmt = call.args[0]
+            if not isinstance(stmt, sa.sql.expression.Insert):
+                continue
+            text, params = _compiled(stmt)
+            if 'scheduler_node_capacity' in text:
+                upserts[params['node_uuid']] = params
+        return upserts
+
+    def test_the_recomputed_counters_are_written_beside_used(self):
+        _, conn = self._run([_held_row(NODE1, 6, 6144, 60)])
+        params = self._capacity_upserts(conn)[NODE1]
+        self.assertEqual(6, params['held_cpus'])
+        self.assertEqual(6144, params['held_memory_mb'])
+        self.assertEqual(60, params['held_disk_gb'])
+        # The same statement, from the same pass, writes both counters.
+        self.assertEqual(2, params['used_cpus'])
+        self.assertEqual(2048, params['used_memory_mb'])
+        self.assertEqual(30, params['used_disk_gb'])
+
+    def test_wrong_counters_are_recomputed_and_not_adjusted(self):
+        # The row claims room nobody holds. A pass that adjusted the
+        # counter would carry the error forever (and 99 + 6 would be
+        # the arithmetic of a pass that added the fold to what it
+        # found); a pass that recomputes it states the truth.
+        _, conn = self._run(
+            [_held_row(NODE1, 6, 6144, 60)],
+            previous_rows=[_capacity_row(
+                NODE1, 42, 188633, 758, held_cpus=99,
+                held_memory_mb=9999, held_disk_gb=999)])
+        params = self._capacity_upserts(conn)[NODE1]
+        self.assertEqual(6, params['held_cpus'])
+        self.assertEqual(6144, params['held_memory_mb'])
+        self.assertEqual(60, params['held_disk_gb'])
+
+    def test_a_node_the_fold_says_nothing_about_is_written_as_zero(self):
+        # Absent from the fold means nothing is booked there any more,
+        # which has to be written rather than skipped: a released or
+        # consumed booking disappears from the counters because a pass
+        # states them, not because anything decremented them.
+        _, conn = self._run([], previous_rows=[_capacity_row(
+            NODE1, 42, 188633, 758, held_cpus=99, held_memory_mb=9999,
+            held_disk_gb=999)])
+        params = self._capacity_upserts(conn)[NODE1]
+        self.assertEqual(0, params['held_cpus'])
+        self.assertEqual(0, params['held_memory_mb'])
+        self.assertEqual(0, params['held_disk_gb'])
+
+    def test_limit_disk_gb_is_unchanged_by_booked_disk(self):
+        # The trap this whole arrangement has to avoid. limit_disk_gb
+        # is the recomputed drawdown plus the headroom the filesystem
+        # reports; if booked disk entered that drawdown the limit would
+        # rise by exactly the bookings, and the guard
+        # ``used + held + request <= limit`` would collapse into
+        # ``request <= headroom`` -- handing every booked gigabyte out a
+        # second time to the next create along.
+        booked, _ = self._run([_held_row(NODE1, 6, 6144, 500)])
+        unbooked, _ = self._run([])
+
+        self.assertEqual(758, booked['nodes'][0]['limit_disk_gb'])
+        self.assertEqual(unbooked['nodes'][0]['limit_disk_gb'],
+                         booked['nodes'][0]['limit_disk_gb'])
+        self.assertEqual(unbooked['cluster']['total_disk_gb'],
+                         booked['cluster']['total_disk_gb'])
+
+    def test_a_hold_on_a_node_without_a_capacity_row_is_left_alone(self):
+        # NODE3 has no metrics, no nodes row and no state row, so it
+        # ends the pass without a capacity row. Its booking contributes
+        # to nothing -- the room is still owed to the claim, so the
+        # pass neither counts it against a node that has left service
+        # nor touches the hold row to say so.
+        result, conn = self._run([_held_row(NODE1, 6, 6144, 60),
+                                  _held_row(NODE3, 4, 4096, 40)])
+
+        self.assertEqual([str(NODE1)],
+                         [node['node_uuid'] for node in result['nodes']])
+        self.assertEqual({NODE1}, set(self._capacity_upserts(conn)))
+        writes = [text for text, _ in self.all_statements
+                  if 'namespace_claim_holds' in text
+                  and not text.lstrip().startswith('SELECT')]
+        self.assertEqual([], writes)
 
 
 class ReconcileNodeStateFilterTestCase(

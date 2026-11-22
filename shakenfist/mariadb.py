@@ -28234,6 +28234,132 @@ def _reconcile_fetch_usage(
     return usage
 
 
+# Booked-room recompute, grouped by node, from the hold rows that are
+# the ground truth for it. scheduler_node_capacity.held_* stands to
+# these rows exactly as used_* stands to the placement reference rows
+# above, and for the same reason: a counter the admission guard reads
+# inside its own UPDATE has to be a column on the row the guard locks,
+# and a column cannot be recomputed from itself.
+#
+# What a hold still contributes is its size less the consuming
+# instance's own request, because a consumption charges that request to
+# used_* and leaves the row at its full size -- so used_* plus held_*
+# counts a consumed hold's room once, not twice. An unconsumed hold has
+# no instance, the LEFT JOINs contribute NULL, and the COALESCE makes
+# the residue the hold's whole size, which is the same expression
+# rather than a second case.
+#
+# The request is read from the instances row (and, for disk, from the
+# same JSON_TABLE aggregation over disk_spec that used_disk_gb is
+# summed from) rather than from a copy of it on the hold row. A copy
+# would be a third ledger that can disagree with the other two, while
+# the instances row is the very ground truth used_* is computed from,
+# so the residue and the usage can not disagree about one instance.
+# That is also why the disk aggregation here has to stay identical to
+# the one in _RECONCILE_USAGE_SQL, including its ON EMPTY / ON ERROR
+# defaults and its JSON_TYPE guard: the two halves of ``used + held``
+# are only consistent while both round one instance's disks the same
+# way.
+#
+# Format note, and it is the opposite of pitfall 6 rather than another
+# instance of it. Every uuid column joined here -- the hold's claim and
+# instance uuids, namespace_claims.uuid and instances.uuid -- is a
+# uuid_column_type() CHAR(32) holding the undashed form, so these joins
+# compare directly and must *not* be wrapped in the REPLACE() the
+# comment block above _RECONCILE_USAGE_SQL explains. Both mistakes fail
+# the same silent way: a join across the two forms matches nothing, the
+# fold then reads that as "no node holds anything", and a pass that
+# looks entirely successful overwrites every booked counter with zero.
+# The live suite is where that shows, because a mock will return
+# whatever rows the test handed it whatever the join says.
+#
+# GREATEST(0, ...) clamps each hold's residue rather than the node's
+# total, so an instance which somehow consumes more than was booked for
+# it contributes zero here instead of cancelling out another hold's
+# genuine booking. It also keeps ``used + held`` from understating what
+# is really on the node: used_* counts that instance in full, and a
+# negative residue would subtract part of it back out again.
+#
+# Only holds belonging to a claim in coverage state 'active' count. An
+# expired claim's limits are not in the cluster rebuild's claimed_*
+# sums, so there is no aggregate left for its bookings to sit inside;
+# the pass releases those rows outright before it gets here, and this
+# filter is what keeps a hold whose claim was deleted or lapsed between
+# two passes from being counted in the meantime.
+#
+# The statement is deliberately not restricted to nodes that hold a
+# capacity row. That restriction belongs to the Python fold, which only
+# ever asks about the nodes it is about to write, for the reason given
+# beside the cluster singleton's unclaimed fold: a hold on a node that
+# has left service must inflate neither side of a total its node no
+# longer contributes to, and nothing here may edit or delete the hold
+# row to achieve that -- the room is still owed to the claim.
+_RECONCILE_HELD_SQL = sa.text('''
+    SELECT h.node_uuid AS node_uuid,
+           COALESCE(SUM(GREATEST(0, h.cpus - COALESCE(i.cpus, 0))), 0)
+               AS held_cpus,
+           COALESCE(SUM(GREATEST(0, h.memory_mb - COALESCE(i.memory, 0))), 0)
+               AS held_memory_mb,
+           COALESCE(SUM(GREATEST(0, h.disk_gb - COALESCE(d.disk_gb, 0))), 0)
+               AS held_disk_gb
+      FROM namespace_claim_holds h
+      JOIN namespace_claims c
+        ON c.uuid = h.claim_uuid
+      LEFT JOIN instances i
+        ON i.uuid = h.instance_uuid
+      LEFT JOIN (
+               SELECT i2.uuid AS instance_uuid,
+                      COALESCE(SUM(jt.size_gb), 0) AS disk_gb
+                 FROM instances i2,
+                      JSON_TABLE(i2.disk_spec, '$[*]'
+                          COLUMNS (size_gb BIGINT PATH '$.size'
+                                   DEFAULT '0' ON EMPTY
+                                   DEFAULT '0' ON ERROR)) jt
+                WHERE JSON_TYPE(i2.disk_spec) = 'ARRAY'
+                GROUP BY i2.uuid) d
+        ON d.instance_uuid = h.instance_uuid
+     WHERE c.state = :claim_state
+       AND h.node_uuid IS NOT NULL
+     GROUP BY h.node_uuid
+''')
+
+
+def _reconcile_fetch_held(
+        conn: sa.Connection) -> dict[UUID, tuple[int, int, int]]:
+    """Recompute booked room from the hold rows, grouped by node.
+
+    Returns {node_uuid: (cpus, memory_mb, disk_gb)}, where each figure
+    is the sum over that node's hold rows of the hold's size less the
+    consuming instance's request. A node with no hold rows is absent
+    rather than zero, and the caller writes zero for it, which is what
+    makes a released or consumed booking disappear from the counters
+    without anything having to decrement them.
+
+    Read on the same connection and inside the same transaction as the
+    usage recompute, so both counters a capacity row is about to be
+    written with come from one consistent view of the database rather
+    than from two.
+
+    A node uuid that does not parse is skipped with a warning, like the
+    usage fold's: it cannot be attributed to a capacity row anyway.
+    """
+    held: dict[UUID, tuple[int, int, int]] = {}
+    rows = conn.execute(
+        _RECONCILE_HELD_SQL, {'claim_state': CLAIM_STATE_ACTIVE}).fetchall()
+    for row in rows:
+        try:
+            node_uuid = UUID(str(row.node_uuid))
+        except ValueError:
+            LOG.warning(
+                f'Skipping held row with malformed node uuid '
+                f'{row.node_uuid!r}')
+            continue
+        held[node_uuid] = (
+            int(row.held_cpus), int(row.held_memory_mb),
+            int(row.held_disk_gb))
+    return held
+
+
 def _reconcile_fetch_demand(
         conn: sa.Connection,
         now: float,
@@ -28496,10 +28622,22 @@ def _direct_reconcile_scheduler_capacity(
                 except ValueError:
                     pass
 
-            # (3) Recompute usage from ground truth, and (4) expected
-            # demand. Usage comes before the limit writes because
-            # limit_disk_gb depends on used_disk_gb.
+            # (3) Recompute usage and booked room from ground truth,
+            # and (4) expected demand. Usage comes before the limit
+            # writes because limit_disk_gb depends on used_disk_gb.
+            #
+            # Booked room is recomputed here rather than adjusted
+            # wherever a booking lands, for the reason this pass
+            # recomputes every other counter it writes: the hold rows
+            # are the ground truth and the counters are a
+            # materialisation of them, so a drifted, double-counted or
+            # abandoned counter is corrected by the next pass instead
+            # of persisting until somebody notices. It reads inside the
+            # same transaction as the usage recompute and immediately
+            # after it, so the two counters a capacity row is written
+            # with are one answer rather than two.
             usage = _reconcile_fetch_usage(conn)
+            held_by_node = _reconcile_fetch_held(conn)
             demand = _reconcile_fetch_demand(
                 conn, now, demand_per_vcpu, demand_decay_seconds)
 
@@ -28550,6 +28688,14 @@ def _direct_reconcile_scheduler_capacity(
                 prev_row = previous.get(node_uuid)
                 metrics_row = metrics_rows.get(node_uuid)
                 used = usage_by_node.get(node_uuid, [0, 0, 0])
+                # Absent means nothing is booked here any more, which
+                # has to be written as zero rather than skipped: the
+                # counters are only trustworthy if a pass states them
+                # outright. Asking only about the nodes this loop
+                # writes is also what leaves a hold booked on a node
+                # that has left service contributing to nothing,
+                # without anything having to touch the hold row.
+                held = held_by_node.get(node_uuid, (0, 0, 0))
 
                 limit_cpus: Optional[int] = None
                 limit_memory_mb: Optional[int] = None
@@ -28561,6 +28707,17 @@ def _direct_reconcile_scheduler_capacity(
                         metrics_row.memory_reserved_mb,
                         config.CPU_OVERCOMMIT_RATIO,
                         config.RAM_OVERCOMMIT_RATIO)
+                    # used[2] alone, and booked disk must never be
+                    # added to it. The limit is the current drawdown
+                    # plus the headroom the filesystem reports, so
+                    # adding held disk here would raise the limit by
+                    # exactly the bookings and the guard
+                    # ``used + held + request <= limit`` would collapse
+                    # into ``request <= headroom`` -- handing every
+                    # booked gigabyte out a second time. A named test
+                    # asserts this line's argument, because the mistake
+                    # is one word on a line that already takes a used_*
+                    # figure.
                     limit_disk_gb = _derive_disk_limit_gb(
                         used[2],
                         metrics_row.disk_free_instances,
@@ -28591,6 +28748,9 @@ def _direct_reconcile_scheduler_capacity(
                     'used_cpus': used[0],
                     'used_memory_mb': used[1],
                     'used_disk_gb': used[2],
+                    'held_cpus': held[0],
+                    'held_memory_mb': held[1],
+                    'held_disk_gb': held[2],
                     'expected_demand': expected_demand,
                     'updated_at': sa.func.now(),
                 }
@@ -28604,6 +28764,13 @@ def _direct_reconcile_scheduler_capacity(
                 total_limits[1] += limit_memory_mb
                 total_limits[2] += limit_disk_gb
                 capacity_nodes.add(node_uuid)
+                # The reply reports the used deltas and not the booked
+                # counters, because the NodeCapacity message this dict
+                # is marshalled into has no field for them: every key
+                # here becomes a proto field, so reporting them is a
+                # wire change and a stub regeneration rather than a
+                # cheap extension of the pattern. The counters
+                # themselves are in the row the next read returns.
                 reply_nodes.append({
                     'node_uuid': str(node_uuid),
                     'limit_cpus': limit_cpus,
