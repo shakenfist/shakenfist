@@ -16835,6 +16835,27 @@ carries its own <code>state</code> of <code>unparseable</code> in the machine-re
 record rather than appearing as an <code>available</code> file with a count of
 zero. The prose and the record have to say the same thing, because
 the tooling that reads this consumes the record, not the prose.</p>
+<p>There is a further state those five do not cover, and it is not a
+reading of the file at all: a bundle whose suite has no code path that
+could ever write the trace. The Ansible modules lane is six playbooks
+with no Python test harness, so <code>BaseTestCase.setUp()</code> never executes
+for it and <code>ensure_capacity_wait_trace()</code> never runs; 25 of 25 such
+bundles read <code>absent</code>, and none <code>empty</code>, on both sides of #4337.
+Counted as <code>absent</code> those 25 put one real window's unknown fraction at
+28.4% rather than 2.1%, past the readability ceiling its decision rule
+had pre-registered — so the window would have had to be declared a
+collection defect rather than read, and the exclusion had to be made
+by hand in a scratchpad gather script instead (#4403, #4438).</p>
+<p><code>tools/ci_headroom_harvest.py</code> now answers that question in the
+record. <code>BUNDLE_TOPOLOGIES</code> answers "does this bundle carry a headroom
+series?"; <code>wait_capable</code> answers "is this bundle a unit of a
+capacity-wait reading at all?", with <code>wait_incapable_reason</code> carrying
+the why. The wait-capable set is a strict subset, and the field has no
+default, so a lane added to the table has to decide which it is. A
+reading can now exclude by construction what it had to exclude by
+hand. Records at <code>harvest_version</code> 1 — everything committed under
+<code>docs/plans/data/</code> — predate the field, and a consumer reading those
+has to keep applying the exclusion itself.</p>
 <h3 id="the-series-record-format">The series record format<a class="headerlink" href="#the-series-record-format" title="Permanent link">&para;</a></h3>
 <p><code>headroom.jsonl</code> is parsed as a contract, so treat the shape below as
 load-bearing rather than as prose to paraphrase; the tool's own

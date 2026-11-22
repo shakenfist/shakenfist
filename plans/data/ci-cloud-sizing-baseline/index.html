@@ -16423,7 +16423,7 @@ output, minus the two path fields above.</p>
 <tbody>
 <tr>
 <td><code>harvest_version</code></td>
-<td>Schema version of the framing fields (currently 1).</td>
+<td>Schema version of the framing fields. Every file here is <strong>1</strong>; the tool now emits <strong>2</strong>, which adds the two <code>wait_capable</code> fields below.</td>
 </tr>
 <tr>
 <td><code>repo</code>, <code>run_id</code>, <code>run_attempt</code>, <code>run_url</code></td>
@@ -16460,6 +16460,10 @@ output, minus the two path fields above.</p>
 <tr>
 <td><code>series_present</code>, <code>census_present</code>, <code>absent_reason</code></td>
 <td>Whether the bundle carried each file, and why not.</td>
+</tr>
+<tr>
+<td><code>wait_capable</code>, <code>wait_incapable_reason</code></td>
+<td>From <code>harvest_version</code> 2 only, so <strong>absent from every file here</strong>: whether this bundle's suite could ever write a capacity-wait trace, as distinct from whether it did. A capacity-wait reading over these records must still exclude <code>bundle-shakenfist-full-ansible-modules</code> itself -- see <a href="../../../developer_guide/ci_cloud_sizing/#a-third-file-the-capacity-wait-trace---waits">the capacity-wait trace</a>.</td>
 </tr>
 <tr>
 <td><code>summary</code></td>

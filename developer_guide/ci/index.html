@@ -16096,6 +16096,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-live-mariadb-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The live MariaDB tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#where-the-functional-jobs-get-their-code" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16734,6 +16745,36 @@ not call <code>smoke-cluster.yml</code>. It shares only the deploy (the
 teardown powers nodes off and the reusable workflow's does not. It has no
 <code>concurrency_key</code> to pass, so its own <code>concurrency.group</code> carries the lane
 name, and the seam test reads it from there.</p>
+<p>Two of its steps reach the cluster's nodes over ssh: the cached-image
+upload, which deliberately targets a hypervisor rather than the primary,
+and <code>tools/ci-restart-cluster-nodes.sh</code>, which power cycles the nodes
+once the test has killed some. Both ask <code>tools/ci-cluster-nodes.sh</code> which
+nodes exist. They used to carry the same hand-written list of five
+addresses, indexed positionally against <code>sf1_uuid</code>..<code>sf5_uuid</code> — and
+those addresses are the <code>slim-primary</code> topology, which lives in
+<code>shakenfist/actions</code> and is consumed at <code>@main</code> with nothing to bump. The
+list was correct and nothing made it stay correct; both failure modes
+were quiet (#4320). A renumbered node failed for a reason that said
+nothing about topology, and an <em>added</em> node was never chosen, because
+<code>RANDOM % 5</code> keeps picking from the first five, so the coverage the
+upload step exists to provide narrowed without anything noticing.</p>
+<p>The helper reads the list the cluster build already writes:
+<code>ci-environment.sh</code> (from <code>shakenfist/actions</code>'
+<code>ci-include-common-localhost.yml</code>) exports <code>nodes</code>, and for each node its
+address as <code>&lt;node&gt;</code> and its under-cloud instance as <code>&lt;node&gt;_uuid</code>, all from
+one loop over the topology — the same contract <code>tools/ci-jwks-ca.sh</code> reads.
+So no naming or numbering convention stands between the topology and this
+repository: a node added there appears on the next run whatever it is
+called. The helper leaves out the node named <code>primary</code> (the name
+<code>build-smoke-cluster</code> exports the primary's address under), because the
+lifecycle test runs there and the upload exists to exercise a non-primary
+node. It refuses, printing nothing, rather than print a short or guessed
+list, and its output is buffered so a caller cannot act on the first few
+nodes of a list that then failed; <code>ci-restart-cluster-nodes.sh</code> checks its
+exit status before reading a line.
+<code>shakenfist/tests/test_ci_cluster_nodes_seams.py</code> holds the node set out
+of both callers, and runs the helper and the restart script against a
+constructed environment for each refusal path.</p>
 <p>A weekly run now deploys all five weekly lanes at once: twenty-two nested
 instances (six each for the three <code>slim-primary</code> lanes, three for
 <code>slim-tier</code>, one for <code>localhost</code>; see <code>ci-topology-*.yml</code> in
@@ -16752,6 +16793,28 @@ another. Close the issue when the lane is fixed. The open issue is found
 by the lane's display name (its <code>name:</code> in <code>functional-lanes.yml</code>), so
 renaming a lane files a fresh issue and leaves the old one to be closed
 by hand.</p>
+<p>Two things make that reporting reachable, both of them about cancellation.
+The workflow carries a workflow-level <code>concurrency</code> group with
+<code>cancel-in-progress: false</code>, so a second dispatch <em>queues</em> behind a run in
+flight instead of cancelling it. Without that it did cancel it: every lane
+this workflow calls carries a job-level group keyed outside a merge group on
+<code>github.ref</code>, two runs on <code>develop</code> share that ref, and the superseded run
+concluded <code>cancelled</code> rather than <code>failure</code> — which neither reaches
+<code>report_failures</code> nor sends a GitHub failure notification, so a lost weekly
+run was silent. A workflow-level group is the whole fix rather than half of
+it, because a queued run starts no jobs at all, so the lane-level groups
+never see two runs of this workflow at once and need no edit. One residue
+remains by construction: GitHub holds at most one <em>pending</em> run per group,
+so a third dispatch arriving while one run is in flight and one is already
+pending displaces the pending one. That run tested nothing and lost nothing.</p>
+<p><code>report_failures</code> therefore also runs when <code>weekly_lanes</code> concludes
+<code>cancelled</code>, not only <code>failure</code>. A run cancelled mid-flight after a lane had
+already failed used to bury that failure completely, and reporting a
+cancellation adds no noise because <code>FAILED_CONCLUSIONS</code> in the reporter does
+not count a cancelled job as a failure. The <code>--lanes-result</code> argument is what
+separates the two cases: with no failed job a <code>failure</code> still files the
+unattributed issue, which is the guarantee that a red run never comes back
+silent, while a <code>cancelled</code> exits quietly because it lost nothing.</p>
 <p>GitHub runs a <code>schedule:</code> trigger only from the copy of the workflow on
 the repository's default branch, and with that branch checked out. The
 default branch is <code>develop</code>, which is what makes the weekly run test
@@ -16779,6 +16842,55 @@ weekly lanes against a branch, dispatch it by hand:
 files nothing: <code>report_failures</code> prints the issue it would have filed
 to its log, because the failure is the branch's and not the lane's,
 and only runs of the default branch are reported.</p>
+<h2 id="the-live-mariadb-tests">The live MariaDB tests<a class="headerlink" href="#the-live-mariadb-tests" title="Permanent link">&para;</a></h2>
+<p><code>shakenfist/tests/test_mariadb_*_live.py</code> need a real MariaDB server rather
+than the sqlite engine the unit suite uses, so they run in one place: the
+<code>Schema ENUM widening</code> job in <code>functional-tests.yml</code>, which apt-installs
+MariaDB and then runs every one of those modules
+(<code>tools/ci-enum-widening-test.sh</code>). It is not itself a protected context:
+the ruleset requires <code>Can see status</code>, <code>Can enqueue</code> and <code>Can merge</code>, and this
+job is required through their <code>needs</code>. The job and the script keep the ENUM
+widening name because the script, the job, the gate jobs and the seam tests
+name each other, not because branch protection does; rename them together.</p>
+<p>That job ran on <code>merge_group</code> and <code>workflow_dispatch</code> only, so a change to a
+schema migration met a real server for the first time <em>after</em> review and
+approval, inside the queue. #4954 added <code>UNIQUE (instance_uuid, order,
+active)</code> to <code>network_interfaces</code>; a pre-existing live test rolls that table
+back to version 2 by dropping <code>active</code>, which the new constraint blocks, so
+the merge group failed with <code>Key column 'active' doesn't exist in table</code>,
+the entry was ejected, every functional lane in the group was cancelled, and
+the pull request went back for a fixup it could have had before review
+(issue #5005). The sqlite stand-in that closed the same gap for the batch
+hard delete (#4897, after #4880) does not carry over: a migration is MariaDB
+DDL, and sqlite neither runs <code>ALTER TABLE ... ADD CONSTRAINT</code> nor has the
+<code>information_schema</code> those tests probe.</p>
+<p>So the job also runs on a <code>pull_request</code> whose diff touches what those
+modules cover — <code>shakenfist/mariadb*.py</code>, <code>shakenfist/schema/**</code>, the live
+modules themselves, the test-support modules they import
+(<code>shakenfist/tests/hard_delete_cases.py</code> decides what the hard delete live
+test asserts), the object modules a live test drives directly
+(<code>shakenfist/network/interface.py</code> for the device index live test), and the
+job's own three tools files — through the
+<code>live_mariadb</code> output of a second <code>dorny/paths-filter</code> step in
+<code>check_paths</code>. It is a second step and not another filter in the first
+because <code>predicate-quantifier</code> is a step-level input: the first step needs
+<code>every</code> for its "everything except docs" filter, and under <code>every</code> a
+multi-pattern filter matches nothing at all. <code>can_enqueue</code> needs the job,
+so a red pull request run blocks enqueue rather than only being visible;
+on a pull request which does not touch those paths the job is skipped, and
+<code>can_enqueue</code> counts a skip as success.</p>
+<p>Two asymmetries are deliberate. The pull request arm is narrower than a code
+change, because installing a database server on every pull request is not
+the trade. The <code>merge_group</code> arm is not narrowed at all and stays on
+<code>code_changed</code>, because <code>can_merge</code> excuses a skipped dependency only when
+<code>check_paths</code> found no code, so a narrower merge arm would fail every
+code-changing merge group that did not touch the schema.
+<code>shakenfist/tests/test_schema_enum_widening_seams.py</code> holds the filter to
+the files the job runs and to every in-repo module the live modules import
+(bar a short named list of deliberate exclusions: the generic test harness,
+constants and exceptions), holds <code>can_enqueue</code> to consuming the job, and
+holds those two arms apart, because a live module the filter does not match
+is one whose pull request CI has quietly stopped running it.</p>
 <h2 id="where-the-functional-jobs-get-their-code">Where the functional jobs get their code<a class="headerlink" href="#where-the-functional-jobs-get-their-code" title="Permanent link">&para;</a></h2>
 <p>The functional jobs do not install released packages. <code>shakenfist/actions</code>'s
 <code>setup-test-environment</code> checks out three repositories --
