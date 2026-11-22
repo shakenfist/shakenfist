@@ -1589,7 +1589,11 @@ message DeleteNamespaceRequest {
 
 message NamespaceAttributesProto {
   string name = 1;          // References namespaces.name
-  string keys_json = 2;     // JSON-encoded keys dict
+  // Tag 2 (keys_json) dropped with the legacy namespace_attributes.keys
+  // column in the table's version 3 migration; namespace keys are their
+  // own objects. Tag reserved so the wire layout cannot be reused.
+  reserved 2;
+  reserved "keys_json";
   string trust_json = 3;    // JSON-encoded trust list
 }
 

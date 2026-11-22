@@ -165,11 +165,21 @@ now first-class objects in their own tables. Migration happens during
 exactly, so tokens minted before the upgrade keep validating and no operator
 action is required.
 
-The migration is one-way in the usual sense: keys created *after* the upgrade
-are not written back to the old JSON column, so downgrading to a release that
-predates this change loses them. Keys that existed before the upgrade are
-unaffected either way. The exposure is one upgrade cycle, and it matches the
-precedent set by the `node_daemon_states` migration.
+That old column has since been dropped, by the same command, one schema
+version later. It had no reader left, and a cluster which keeps a second copy
+of live bcrypt hashes and nonces at rest is carrying an exposure for nothing.
+The two steps run in the right order within one run of the command, so a
+cluster upgrading from before first-class keys copies its keys out of the
+column before it is dropped, however many releases it skips.
+
+The migration is one-way, and the drop makes that sharper. Before the drop,
+downgrading to a release that predates first-class keys lost keys created
+*after* the migration and kept the ones that predated it. After the drop
+there is no column for such a release to read, so it sees **no keys at all**
+and refuses every credential until one is created again on the older release.
+If you keep a rollback plan which crosses this upgrade, plan to re-create
+keys as part of it, or take a database backup first: the keys are not
+recoverable from the new tables by a release which does not know about them.
 
 ## Federated identity
 

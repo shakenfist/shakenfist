@@ -3383,7 +3383,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Convert a proto NamespaceAttributesProto to model."""
         return NamespaceAttributesData(
             name=d.name,
-            keys=json.loads(d.keys_json) if d.keys_json else {'nonced_keys': {}},
             trust=json.loads(d.trust_json) if d.trust_json else ['system'],
         )
 
@@ -3391,7 +3390,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                            data: 'NamespaceAttributesData') -> database_pb2.NamespaceAttributesProto:
         """Convert a Pydantic NamespaceAttributesData to proto."""
         return database_pb2.NamespaceAttributesProto(
-            name=data.name, keys_json=json.dumps(data.keys), trust_json=json.dumps(data.trust))
+            name=data.name, trust_json=json.dumps(data.trust))
 
     # =========================================================================
     # NetworkInterface Operations (MariaDB)

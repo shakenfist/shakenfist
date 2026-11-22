@@ -285,13 +285,11 @@ class NamespaceColumnValuesTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
         self.data = NamespaceAttributesData(
-            name='testspace',
-            keys={'nonced_keys': {'deploy': {'key': 'abc', 'nonce': 'n'}}},
-            trust=['system'])
+            name='testspace', trust=['system'])
 
     def test_no_mask_returns_every_column(self):
         values = mariadb._namespace_attributes_column_values(self.data)
-        self.assertEqual({'keys', 'trust'}, set(values))
+        self.assertEqual({'trust'}, set(values))
 
     def test_mask_limits_columns(self):
         values = mariadb._namespace_attributes_column_values(
@@ -302,7 +300,18 @@ class NamespaceColumnValuesTestCase(base.ShakenFistTestCase):
     def test_unknown_field_rejected(self):
         self.assertRaises(
             ValueError, mariadb._namespace_attributes_column_values,
-            self.data, ['keys', 'not_a_column'])
+            self.data, ['trust', 'not_a_column'])
+
+    def test_retired_keys_field_rejected(self):
+        """The retired keys field is an unknown field like any other.
+
+        A writer which still names it is naming a column which no
+        longer exists (issue 5016), so it must be refused rather than
+        silently dropped from the write.
+        """
+        self.assertRaises(
+            ValueError, mariadb._namespace_attributes_column_values,
+            self.data, ['keys'])
 
 
 class BlobColumnValuesTestCase(base.ShakenFistTestCase):

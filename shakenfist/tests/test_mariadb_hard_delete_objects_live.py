@@ -47,11 +47,12 @@ ENSURES = [
     mariadb._ensure_blob_hashes_schema,
     mariadb._ensure_blob_transfers_schema,
     mariadb._ensure_blob_attributes_schema,
-    # The namespace key migration reads namespace attributes.
+    # namespace_attributes is last of the four: its v2->v3 step drops
+    # the legacy keys column which the namespace key migration reads.
     mariadb._ensure_namespaces_schema,
-    mariadb._ensure_namespace_attributes_schema,
     mariadb._ensure_namespace_key_attributes_schema,
     mariadb._ensure_namespace_keys_schema,
+    mariadb._ensure_namespace_attributes_schema,
     mariadb._ensure_trusted_issuer_attributes_schema,
     mariadb._ensure_trusted_issuers_schema,
     mariadb._ensure_mapping_rule_attributes_schema,

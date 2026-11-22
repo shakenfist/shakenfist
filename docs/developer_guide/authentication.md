@@ -692,9 +692,14 @@ Keys previously lived in a `keys` JSON column on the `namespace_attributes`
 table. Existing keys are migrated into the new tables by
 `sf-ctl ensure-mariadb-schema` during upgrade, preserving each key's hash,
 nonce and expiry exactly, so tokens minted before the upgrade continue to
-validate. The old column is left in place but is no longer read or written.
-Note that this means downgrading after the migration loses any key created
-afterwards; keys that predate the upgrade are unaffected.
+validate. That column has since been dropped, by the `namespace_attributes`
+v3 migration, because it had no reader but the fan-out itself and holding a
+second copy of live key material at rest bought nothing. The two steps run
+in that order in `ensure_schema()`, and must: the other way round an
+upgrading cluster would lose every key which predated first-class keys.
+Note that a downgrade across either migration loses keys — across the first
+one, any key created since it ran; across the drop, all of them, because the
+column a pre-first-class-keys release reads is no longer there.
 
 ## Secrets and the event log
 

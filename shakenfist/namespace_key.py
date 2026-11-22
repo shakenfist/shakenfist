@@ -5,8 +5,8 @@
 # JWT's "<namespace>:<keyname>" identity string refers to.
 #
 # Keys used to be anonymous entries in the namespace_attributes "keys"
-# JSON column. They are now first-class objects with their own tables,
-# lifecycle, events, expiry and reaping. See
+# JSON column, which no longer exists: they are first-class objects
+# with their own tables, lifecycle, events, expiry and reaping. See
 # docs/developer_guide/authentication.md.
 #
 # The secret material (the base64 encoded bcrypt hash and the nonce)
