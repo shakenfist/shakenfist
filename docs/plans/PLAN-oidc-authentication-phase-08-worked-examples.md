@@ -1643,3 +1643,132 @@ cache, which costs nothing and saves a pull in 8g.
 * The row implies a `groups` claim might need work. It needs none. The
   work on this provider is in the three fields whose API defaults are
   empty, and in the redirect URI's matching mode.
+
+### Step 8d — mutation testing
+
+Every property D1, D2 and D3 claim was broken on purpose, one at a
+time, against the matching change of step 8c (`3a36d68549`). **14
+mutations: 12 behaviour-changing ones, all killed, and 2 proven
+semantic no-ops which survive by construction.** Two of the twelve
+survived on the first round and are the two most informative rows
+below: each was a real gap in the tests, and each is now closed.
+
+The harness is `run-mutants.sh` in this session's scratchpad, beside
+`mutants.yaml` (the twelve), `mutants-noops.yaml` (the two), and
+`pristine/` holding the three files step 8c touched. It drives
+`~/bin/mutation-check`, which applies one mutant at a time, gives the
+file an mtime it has never had so no stale `.pyc` is trusted, runs the
+command in its own process group under a 300s timeout, and always puts
+the file back. `./run-mutants.sh --all` re-runs the whole set in about
+three minutes. The test command is both modules in full, not just the
+matching tests:
+
+```
+python -B -m testtools.run shakenfist.tests.test_federation        (96 tests)
+python -B -m testtools.run shakenfist.tests.test_oidc_discovery    (34 tests)
+```
+
+so a mutant that breaks `MatchingRulesTestCase`, the token exchange or
+the captured discovery documents is seen rather than missed. All
+`ClaimMatchingTestCase` names below are in `shakenfist/tests/
+test_federation.py`.
+
+#### The twelve that change behaviour
+
+| # | What was changed in `shakenfist/federation.py` | Killed by |
+| --- | --- | --- |
+| M1 | `if candidate in alternatives` → `if any(alternative in candidate for alternative in alternatives)`, so a matcher becomes a substring match | `test_there_is_no_globbing`, `test_there_is_no_globbing_in_a_list_claim`, `test_an_exact_matcher_compares_exactly` |
+| M2 | `[element for element in value if isinstance(element, str)]` → `[str(element) for element in value]` | `test_a_non_string_element_is_skipped_not_stringified` |
+| M3 | the same comprehension → `[matched for element in value for matched in matched_claim_values(element, matcher)]`, so the list branch recurses | `test_a_list_inside_a_list_is_not_descended_into` |
+| M4 | the final return → `if any(candidate in alternatives for candidate in candidates): return candidates`, the whole claim rather than what matched | `test_only_the_matched_elements_reach_provenance`, `test_the_matched_values_are_the_ones_that_matched` |
+| M5 | `candidates = [value]` → `return [value]` in the scalar branch, so every scalar claim matches | 8 tests, including `test_an_exact_matcher_compares_exactly` and `MatchingRulesTestCase.test_a_non_matching_rule_does_not_hide_a_matching_one` |
+| M6 | the final return → `return candidates`, so every bound claim matches | 15 tests, including both captured-identity tests |
+| M7b | `[alternative for alternative in matcher if isinstance(alternative, str)]` → `[str(alternative) for alternative in matcher]` | `test_a_non_string_alternative_is_skipped_not_stringified` (**new**, see below) |
+| M8a | the final return wrapped in `sorted(...)` | `test_the_matched_values_are_the_ones_that_matched` (**after** a new assertion, see below) |
+| M8b | the final return wrapped in `list(reversed(...))` | `test_the_matched_values_are_the_ones_that_matched` |
+| M9 | `satisfied[claim] = (matched if isinstance(claims[claim], list) else claims[claim])` → `satisfied[claim] = claims[claim]` | `test_only_the_matched_elements_reach_provenance` |
+| M10 | the same line with the `isinstance` test inverted | `test_matching_returns_the_satisfied_claims`, `test_only_the_matched_elements_reach_provenance`, `MatchingRulesTestCase.test_the_satisfied_claims_are_the_tokens_values` |
+| M11b | `else: return []` → `else: candidates = [str(value)]` in the value branch | `test_non_string_claim_values_never_match` |
+
+Each failure named the property it was aimed at. The two worth
+remarking on are M1, which is caught by the scalar no-globbing test as
+well as the list one -- the right answer, because D1 widened the claim
+side and must not have moved the scalar side -- and M10, which is
+caught by the *scalar* provenance tests, because inverting the test
+starts recording `['shakenfist/ryll']` where a string was recorded
+before. D3 is pinned from both directions.
+
+#### M7b: a missing test, found by re-aiming a no-op
+
+The mutant the row did not ask for and should have: drop the
+`isinstance` check from the matcher-side filter
+(`alternatives = list(matcher)`). It **survived**, and no test could
+have killed it, because it is a semantic no-op -- a candidate is
+always a `str`, `in` on a list compares with `==`, and a `str` never
+equals an `int`, a `bool`, `None` or a list. The filter on that side
+is defence in depth against a damaged row, not a behaviour.
+
+Re-aimed one-sidedly as M7b -- coerce with `str()` rather than skip --
+it was a real behaviour change: a claim of `'1'` would satisfy a
+matcher of `[1]`. That survived too, which is a missing test and not a
+note: the module's "no coercion" promise was pinned on the claim side
+and not on the matcher side, which step 8c rewrote. Closed with
+`test_a_non_string_alternative_is_skipped_not_stringified`. Rule
+creation refuses to write such a matcher
+(`mapping_rule.validate_bound_claims()`), so this is the damaged-row
+path, which is exactly where a coercion would be unobserved.
+
+#### M8a: the order assertion could not see sorting
+
+`test_the_matched_values_are_the_ones_that_matched` asserted
+`['b', 'c']` from `matched_claim_values(['a', 'b', 'c'], ['c', 'b'])`.
+That distinguishes the claim's order from the matcher's, which is what
+it was written for, but its expected value is also the sorted one, so
+`sorted()` **survived** while `reversed()` was killed. The fix is in
+the test, not the code: a second assertion whose expected order is
+neither sorted nor the matcher's,
+`matched_claim_values(['c', 'b'], ['a', 'b', 'c']) == ['c', 'b']`.
+D3's "in the order the token listed them" is now actually tested.
+
+#### The two no-ops, and why they stay in the tree
+
+| # | What was changed | Verdict |
+| --- | --- | --- |
+| M7 | the matcher-side `isinstance` filter dropped (`alternatives = list(matcher)`) | SURVIVED, semantic no-op |
+| M11 | `else: return []` → `else: candidates = [value]` for a value which is neither string nor list | SURVIVED, semantic no-op |
+
+Both survive for the same reason, and neither is a missing test: the
+final equality filter already excludes a non-`str`, so neither guard
+can change an outcome. They are kept because they keep the declared
+`list[str]` return honest and say what the function means; the
+behaviour each is standing in for is mutated one-sidedly by M7b and
+M11b, and both of those are killed. They live in
+`mutants-noops.yaml` rather than `mutants.yaml` so that the killing
+set exits 0, and so a later round can confirm they are still no-ops
+rather than rediscovering it.
+
+This is the one place the definition of done needs reading rather than
+applying: "a surviving mutation is a failed definition of done, not a
+note" is right about a mutation which changes behaviour and wrong
+about one which cannot. Read it as *every behaviour-changing mutation
+is killed by a named test*, which is what the twelve above are. The
+two no-ops are recorded rather than excused: each was re-aimed until
+it did change behaviour, and the re-aimed form is in the killed set.
+
+#### What this step did not do
+
+* The discovery code was not mutated. 8d's row scopes it to the
+  matching change, and `CapturedProviderDocumentTestCase` was run
+  against all 14 mutants rather than mutated against. The
+  acceptance those two tests pin is a property of
+  `shakenfist/oidc_discovery.py`, which step 8c did not touch, so a
+  mutant there would mostly be caught by tests written in earlier
+  phases.
+* Nothing was committed. `git status --short` after this step shows
+  this plan file and `shakenfist/tests/test_federation.py`, whose
+  diff is the one new test and the one new assertion described above;
+  `shakenfist/federation.py` and
+  `shakenfist/tests/test_oidc_discovery.py` are byte-identical to
+  `HEAD` and to the pristine copies taken before the first mutant.
+  `flake8` is clean and all 96 tests in `test_federation` and 34 in
+  `test_oidc_discovery` pass.

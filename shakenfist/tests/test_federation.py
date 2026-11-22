@@ -694,6 +694,16 @@ class ClaimMatchingTestCase(base.ShakenFistTestCase):
         self.assertFalse(federation.claim_matches([None, 'a'], 'None'))
         self.assertTrue(federation.claim_matches([1, 'a'], 'a'))
 
+    def test_a_non_string_alternative_is_skipped_not_stringified(self):
+        # The matcher side of the same argument, which rule creation
+        # refuses to write -- so reaching here means a damaged row, and
+        # the safe reading of one is that it grants nothing rather than
+        # that it grants a coerced match.
+        self.assertFalse(federation.claim_matches('1', [1]))
+        self.assertFalse(federation.claim_matches(['1'], [1]))
+        self.assertFalse(federation.claim_matches('true', [True]))
+        self.assertTrue(federation.claim_matches(['a', '1'], [1, 'a']))
+
     def test_a_list_inside_a_list_is_not_descended_into(self):
         # Membership is one level deep. A claim shaped like this is a
         # provider doing something unexpected, and the safe reading of
@@ -724,6 +734,12 @@ class ClaimMatchingTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             ['b', 'c'],
             federation.matched_claim_values(['a', 'b', 'c'], ['c', 'b']))
+        # And not in sorted order, which the assertion above cannot
+        # tell apart from the claim's order because the claim lists
+        # them sorted. The order is the token's, whatever it is.
+        self.assertEqual(
+            ['c', 'b'],
+            federation.matched_claim_values(['c', 'b'], ['a', 'b', 'c']))
 
     def test_every_bound_claim_must_be_present(self):
         self.assertRaises(
