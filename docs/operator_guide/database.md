@@ -1386,6 +1386,34 @@ log for `could not read its work list` to see which shape of failure it
 is — an unreachable database tier, or a reply too large for the client's
 receive cap.
 
+Orphan reconciliation can stop for a second reason that the streak
+above cannot see. Before repairing a zombie it reads whether that
+object is still live, and a failed liveness read ends the pass for that
+object type without writing anything. The work-list read is what found
+those zombies, so it succeeded, and the streak above has just been
+reset to zero by it — a reconciler that repairs nothing hour after hour
+would otherwise be completely silent. Two further metrics cover it,
+both published by the elected cluster maintainer only:
+
+- **`cluster_zombie_liveness_failure_streak`** — a gauge on
+  `CLUSTER_METRICS_PORT`, labelled by `object_type`: consecutive passes
+  that stopped before repairing that type's zombies because a liveness
+  read found the database tier unavailable. Reset to zero by the first
+  pass that gets through the type, and dropped on a leadership change,
+  with the same consequences for alerting as the gauge above.
+- **`cluster_zombie_liveness_errors_total`** — a counter on
+  `CLUSTER_METRICS_PORT`, labelled by `object_type`: liveness reads
+  that failed for any other reason, such as a row the object model
+  cannot parse. One of these costs only its own object, and the pass
+  carries on — but nothing resolves it on its own, the object stays a
+  candidate, and it will fail the same way every hour for as long as
+  the row is that shape. A rate that is flat and non-zero is a row
+  somebody has to look at; the cluster daemon log names it.
+
+```
+max by (object_type) (cluster_zombie_liveness_failure_streak) > 2
+```
+
 A deleted-object sweep which reads its work list fine can still fall
 behind, so three further metrics say how far behind it is and what each
 object costs. All are published by the elected cluster maintainer only.
@@ -1531,7 +1559,10 @@ iterators cannot see:
   authentication read path honours it without a state row and deleting
   it would silently revoke a working credential (issue 3836). If the
   liveness read fails because the database is unavailable, nothing is
-  written, the pass stops, and the zombie is retried on the next pass.
+  written, the pass stops, and the zombie is retried on the next pass
+  — which begins at the zombie after the one that stopped this one, so
+  a single unreadable row cannot hold up its whole object type. Such a
+  stop is counted by `cluster_zombie_liveness_failure_streak`, above.
   Node and namespace objects are never auto-repaired.
 
 Both sweeps log what they remove, and zombie repairs also emit an audit
