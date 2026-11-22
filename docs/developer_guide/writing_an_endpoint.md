@@ -312,8 +312,9 @@ anything else the response has to say about itself. One key is
 understood today:
 
 ```python
-(503, 'The database could not be reached; the request can be retried.',
- None, {'headers': [api_base.RETRY_AFTER_HEADER]}),
+(507, 'Unable to allocate resources for the instance. ...',
+ instance_post_507_example,
+ {'headers': [api_base.TRANSIENT_RETRY_AFTER_HEADER]}),
 ```
 
 A header is `(name, type token, description)`, taking its type from the
@@ -340,8 +341,11 @@ than being skipped. It does not recognise flask-restful's
 three-tuples the API helpers return for other reasons — set the header
 on a response object instead.
 Where the value is a constant, declare the header beside the constant
-(as `RETRY_AFTER_HEADER` is, in `external_api/base.py`) rather than
-writing the number into the prose twice.
+(as `RETRY_AFTER_HEADER` and `TRANSIENT_RETRY_AFTER_HEADER` are, in
+`external_api/base.py`) rather than writing the number into the prose
+twice. A header `swagger_helper()` publishes on every operation itself,
+as it does the generic `503`'s, is held against that generic
+declaration (`api_base.GENERIC_503`) rather than each handler's list.
 
 A response declaration still cannot carry a body *schema*, which is the
 other half of 4240 and is not built: publish a `sample` instead, which
@@ -357,12 +361,29 @@ without declaring it:
   peer node is involved, so borrowing the peer sentence would send
   diagnosis to the wrong machine (issue 4161).
 
-The published specification declares `503` only on the handful of
-endpoints where it was an observable change of behaviour rather than a
-new failure mode (`GET /blobs`, which used to answer `200` with an
-empty list, and the federated token endpoint). Treat `503` as a global
-response when writing a client; declare it on your endpoint only if you
-have something endpoint-specific to say about it.
+Both answer with `api_base.retryable_error()`, which is the one place
+in the API layer that sets `Retry-After`, fixed at
+`TRANSIENT_RETRY_AFTER_SECONDS`. Both conditions clear on their own —
+the database tier restarts, sf-nodelock comes back after a deploy — so
+a client is told how long to wait rather than left to invent a figure
+(issue 5030). `swagger_helper()` publishes that `503`, with the
+header, on **every** operation, the same way it publishes the `401`
+`verify_token` answers; it used to be declared only on the handful of
+endpoints which had something endpoint-specific to say about a `503`,
+which is why `POST /instances` published the header and the rest of the
+API did not.
+
+So do not declare the header, or the generic cause, on your endpoint.
+Declare `503` only when your endpoint has a cause of its own to
+describe — `POST /instances` tears the half-built instance down and
+names it in the body, which no generic sentence can say — and let the
+generic words follow yours. If that cause is itself retryable, answer
+it with `api_base.retryable_error()` too, so one status code does not
+mean two different contracts on one operation. If it is not — an
+unloadable `FEDERATION_JWKS_CA_BUNDLE` is a misconfiguration no wait
+clears — use `sf_api.error()` and say so in the description, because a
+`Retry-After` on it would have a client replay the request until its
+deadline.
 
 **Proxying to another node:** call `api_base.proxy_request_to_node()`
 rather than writing your own `requests` call. An unreachable peer is an

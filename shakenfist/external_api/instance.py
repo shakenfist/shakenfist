@@ -621,13 +621,9 @@ def _netdesc_allocate_address(inst, netdesc, order, hot_plug=False):
                 LOG.with_fields({'instance': inst.uuid}).error(
                     'Could not clean up instance after failed network '
                     f'interface create: {cleanup_error}')
-        resp = sf_api.error(
+        return None, api_base.retryable_error(
             503, f'network interface for instance {inst.uuid} could not be '
-                 f'created, the database could not be reached: {e}',
-            suppress_traceback=True)
-        resp.headers['Retry-After'] = str(
-            api_base.TRANSIENT_RETRY_AFTER_SECONDS)
-        return None, resp
+                 f'created, the database could not be reached: {e}')
 
     try:
         # Not a bare truthiness test on the raw body. The netdesc
@@ -797,11 +793,8 @@ class InstancesEndpoint(api_base.Resource):
                 'satisfies a hard affinity constraint.', None),
             (503, 'The database could not be reached while recording the '
                 'placement or a network interface. The half-built '
-                'instance is torn down (the error body names its uuid) '
-                'and the request can be retried; the response carries a '
-                '`Retry-After` header. A 503 from the generic '
-                'database-unavailable path does not.', None,
-                {'headers': [api_base.RETRY_AFTER_HEADER]}),
+                'instance is torn down and the error body names its '
+                'uuid.', None),
             (507, 'Unable to allocate resources for the instance. A refusal '
                 'from scheduling carries `stage` (the scheduler filter that '
                 'refused, or `capacity_guard`) and a boolean `transient` in '
@@ -1421,12 +1414,9 @@ class InstancesEndpoint(api_base.Resource):
                 LOG.with_fields({'instance': inst.uuid}).error(
                     'Could not clean up instance after failed placement '
                     f'write: {cleanup_error}')
-            resp = sf_api.error(
+            return api_base.retryable_error(
                 503, f'could not record placement for instance {inst.uuid}: '
-                f'{e}', suppress_traceback=True)
-            resp.headers['Retry-After'] = str(
-                api_base.TRANSIENT_RETRY_AFTER_SECONDS)
-            return resp
+                f'{e}')
 
         if placement is None:
             inst.add_event(
@@ -1585,10 +1575,7 @@ class InstanceInterfacesEndpoint(api_base.Resource):
             (409, 'Address or MAC address in use, or too many concurrent '
                   'plugs competed for a device index.', None),
             (503, 'The database could not be reached while recording the '
-                  'interface. The request can be retried; the response '
-                  'carries a `Retry-After` header. A 503 from the generic '
-                  'database-unavailable path does not.', None,
-                  {'headers': [api_base.RETRY_AFTER_HEADER]})
+                  'interface.', None)
         ]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership

@@ -137,25 +137,28 @@ TRANSIENT_RETRY_AFTER_SECONDS = 15
 # Here rather than beside each endpoint that declares it, and spelling
 # the number from the constant above rather than writing 15 into the
 # prose, because this module is also where the header is *set* --
-# capacity_error() below, and the two 503 arms in external_api/instance.py
-# which read TRANSIENT_RETRY_AFTER_SECONDS from here. One fact, one
-# place: the published specification cannot say a different number from
-# the one the server sends.
+# retryable_error() below is the only site in the API layer that sets
+# it. One fact, one place: the published specification cannot say a
+# different number from the one the server sends.
 #
 # Neither header is always present, and OpenAPI 2.0 has no way to say
 # "sometimes": a header object is published per status code, so the
-# condition is in the description where a reader will see it. The 503
-# form carries the header when the refusal comes from the recording
-# step the endpoint's own 503 description names -- but every endpoint
-# can also answer 503 from handle_database_unavailable, which sets no
-# Retry-After, and a client cannot tell the two apart by status code.
-# The 507 form carries it only when the refusal is transient.
+# condition is in the description where a reader will see it.
+# swagger_helper() publishes the 503 form on every operation, because
+# handle_database_unavailable and handle_nodelock_unavailable can
+# answer from any of them; but a 503 from an unreachable peer node, from
+# a misconfiguration no wait clears, or from a claim refusal
+# (CLAIM_REFUSAL_STATUS in external_api/auth.py) carries no Retry-After,
+# and a client cannot tell those apart by status code. The 507 form carries
+# it only when the refusal is transient.
 RETRY_AFTER_HEADER = (
     'Retry-After', 'unsignedinteger',
     'How many seconds to wait before retrying this request, fixed at '
-    '%d. Present when the refusal comes from the recording step this '
-    'response describes; a 503 from the generic database-unavailable '
-    'path, which any endpoint can answer, carries no Retry-After.'
+    '%d. Present when the refusal is one a wait clears: the database '
+    'tier or the lock service on the node handling this request could '
+    'not be reached, or the endpoint-specific cause described above '
+    'says it is retryable. Other 503s -- an unreachable peer node, a '
+    'misconfiguration, a refused claim -- carry no Retry-After.'
     % TRANSIENT_RETRY_AFTER_SECONDS)
 
 TRANSIENT_RETRY_AFTER_HEADER = (
@@ -164,6 +167,50 @@ TRANSIENT_RETRY_AFTER_HEADER = (
     '%d. Present only when the body says `transient` is true; a refusal '
     'no wait can clear carries no Retry-After at all.'
     % TRANSIENT_RETRY_AFTER_SECONDS)
+
+# The 503 swagger_helper() publishes on every operation, as (httpcode,
+# description, extras) -- a response declaration without its sample.
+#
+# Unconditional, because handle_database_unavailable and
+# handle_nodelock_unavailable are in Resource.method_decorators and
+# answer before any handler runs, whatever the endpoint and whatever its
+# authentication. This used to be declared on the handful of endpoints
+# which had something endpoint-specific to say about a 503, which left
+# every other operation publishing no 503 at all and the header on none
+# of them (issue 5030). An endpoint with something of its own to say
+# still declares it; its words lead and this follows, so neither has to
+# restate the header. A module constant rather than a literal inside
+# swagger_helper() so that test_response_headers.py can read the
+# declaration that publishes retryable_error()'s header everywhere.
+GENERIC_503 = (
+    503,
+    'The database tier, or the lock service on the node handling this '
+    'request, could not be reached. Either is retryable, and the '
+    'response says how long to wait in its `Retry-After` header.',
+    {'headers': [RETRY_AFTER_HEADER]})
+
+
+def retryable_error(httpcode: int, message: str) -> flask.Response:
+    """An error which tells the client it is worth coming back, and when.
+
+    One header-setting site for the whole API layer. Every refusal a
+    wait can clear -- a transient capacity 507, a database outage, a
+    nodelock daemon restarting -- answers with the same fixed
+    ``Retry-After``, because the server has no release horizon to
+    compute a per-response figure from (D31 of
+    ``docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md``).
+    It is a floor on when a client should ask again, not a promise that
+    the condition will have cleared by then.
+
+    Centralised because it was not: the two create-path 503s set the
+    header by hand while ``handle_database_unavailable`` -- which
+    answers the same condition for every other endpoint in the API --
+    did not, so one database outage produced two different contracts
+    depending on which handler the request reached (issue 5030).
+    """
+    resp = sf_api.error(httpcode, message, suppress_traceback=True)
+    resp.headers['Retry-After'] = str(TRANSIENT_RETRY_AFTER_SECONDS)
+    return resp
 
 
 # The capacity refusal vocabulary, re-exported from shakenfist.constants
@@ -230,9 +277,10 @@ def capacity_error(message: str, stage: str) -> flask.Response:
     """
     transient = constants.capacity_refusal_is_transient(stage)
 
-    resp = sf_api.error(507, message, suppress_traceback=True)
     if transient:
-        resp.headers['Retry-After'] = str(TRANSIENT_RETRY_AFTER_SECONDS)
+        resp = retryable_error(507, message)
+    else:
+        resp = sf_api.error(507, message, suppress_traceback=True)
     resp.set_data(json.dumps({
         'error': message,
         'status': 507,
@@ -2098,23 +2146,32 @@ def swagger_helper(section, description, parameters, responses,
     # endpoint with something specific to say about a code had it
     # silently overwritten; now the endpoint's words lead and the
     # generic cause follows.
-    generic_responses = []
+    generic_responses: list[tuple[int, str, dict[str, Any]]] = []
     if requires_auth:
         generic_responses.append((
             401,
             'You must authenticate. See '
             'https://shakenfist.com/developer_guide/authentication/ for '
-            'details.'))
+            'details.', {}))
     if requires_admin:
         generic_responses.append((
             403,
-            'The token is not scoped for administrative operations.'))
-    for (httpcode, respdescription) in generic_responses:
+            'The token is not scoped for administrative operations.', {}))
+    generic_responses.append(GENERIC_503)
+    for (httpcode, respdescription, extras) in generic_responses:
         if httpcode in out['responses']:
             out['responses'][httpcode]['description'] += \
                 ' ' + respdescription
         else:
             out['responses'][httpcode] = {'description': respdescription}
+
+        # The endpoint's own header declaration wins, as its words lead:
+        # a generic header only fills in a name the endpoint did not
+        # declare itself.
+        for name, rendered in _validated_response_headers(
+                section, httpcode, extras).items():
+            out['responses'][httpcode].setdefault(
+                'headers', {}).setdefault(name, rendered)
 
     access_notes = []
     if requires_admin:
@@ -3083,8 +3140,10 @@ def handle_database_unavailable(func):
                     getattr(code, 'name', str(code)) if code else None),
                 'error': str(e)}).error(
                 'Database unavailable while handling API request')
-            return sf_api.error(503, 'database unavailable, please retry',
-                                suppress_traceback=True)
+            # Retry-After, because 'please retry' with no figure on it
+            # leaves every client to invent one, and the two create-path
+            # 503s already sent one for the same condition (issue 5030).
+            return retryable_error(503, 'database unavailable, please retry')
 
     return wrapper
 
@@ -3108,11 +3167,14 @@ def handle_nodelock_unavailable(func):
                 'path': flask.request.path,
                 'error': str(e)}).warning(
                 'Nodelock daemon unavailable while handling API request')
-            return sf_api.error(
+            # Retryable on the same terms as the database outage above,
+            # and for a better reason: the commonest cause is this
+            # node's own sf-nodelock restarting, which finishes in
+            # seconds.
+            return retryable_error(
                 503,
                 'the lock service on the node handling this request is '
-                'unavailable, please retry',
-                suppress_traceback=True)
+                'unavailable, please retry')
 
     return wrapper
 

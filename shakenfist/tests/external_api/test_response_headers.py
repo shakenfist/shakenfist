@@ -45,22 +45,25 @@ from shakenfist.tests import base
 # static read of this tree says which endpoints reach a given helper.
 # The audit's value is that the table cannot quietly fall behind the
 # code, because a site missing from it fails.
+#
+# EVERY_OPERATION in place of a (class, method) means the response is
+# one swagger_helper() publishes on every operation itself -- today
+# only api_base.GENERIC_503 -- so it is checked against that generic
+# declaration rather than against each handler's own list.
+EVERY_OPERATION = '*'
+
 HEADER_SITES: dict[tuple[str, str | None, str, str],
                    set[tuple[str, str, int]]] = {
-    # The transient capacity refusal. Its two call sites are both in
-    # InstancesEndpoint.post.
-    ('base.py', None, 'capacity_error', 'Retry-After'): {
+    # The one place the API layer sets Retry-After (issue 5030).
+    ('base.py', None, 'retryable_error', 'Retry-After'): {
+        # The transient capacity refusal, through capacity_error();
+        # both of its call sites are in InstancesEndpoint.post.
         ('InstancesEndpoint', 'post', 507),
-    },
-    # A database failure while recording a network interface, shared
-    # between instance create and interface hotplug.
-    ('instance.py', None, '_netdesc_allocate_address', 'Retry-After'): {
-        ('InstancesEndpoint', 'post', 503),
-        ('InstanceInterfacesEndpoint', 'post', 503),
-    },
-    # A database failure while recording the placement.
-    ('instance.py', 'InstancesEndpoint', 'post', 'Retry-After'): {
-        ('InstancesEndpoint', 'post', 503),
+        # handle_database_unavailable and handle_nodelock_unavailable,
+        # which wrap every handler, and the create-path 503s in
+        # instance.py, which answer the same database outage from
+        # inside the handler.
+        (EVERY_OPERATION, EVERY_OPERATION, 503),
     },
 }
 
@@ -218,6 +221,23 @@ class ResponseHeaderDeclarationTestCase(base.ShakenFistTestCase):
             % (sorted(found - set(HEADER_SITES)),
                sorted(set(HEADER_SITES) - found)))
 
+    def test_retry_after_is_set_in_one_place(self):
+        """Not a style preference, and stricter than the table.
+
+        The header used to be set at each site that wanted it, which is
+        how POST /instances came to serve it on one of its two 503
+        paths and not the other while handle_database_unavailable sent
+        none (issue 5030). A second site would be found by the walk and
+        could be added to HEADER_SITES; this says it must not be, and
+        that the new caller should go through retryable_error().
+        """
+        sites = sorted(site for site in _header_assignments()
+                       if site[3] == 'Retry-After')
+        self.assertEqual(
+            [('base.py', None, 'retryable_error', 'Retry-After')], sites,
+            'Retry-After is set somewhere other than '
+            'api_base.retryable_error(); call that instead')
+
     def _declared(self):
         """{(class, method, httpcode): header names} for every handler.
 
@@ -235,6 +255,12 @@ class ResponseHeaderDeclarationTestCase(base.ShakenFistTestCase):
                     f'{cls.name}.{fn.name} has a response declaration '
                     f'this audit cannot read')
                 declared[(cls.name, fn.name, httpcode)] = names
+
+        # What swagger_helper() adds to every operation, under the
+        # EVERY_OPERATION key HEADER_SITES uses for it.
+        httpcode, _, extras = api_base.GENERIC_503
+        declared[(EVERY_OPERATION, EVERY_OPERATION, httpcode)] = {
+            header[0] for header in extras.get('headers', [])}
         return declared
 
     def test_every_response_which_carries_a_header_declares_it(self):
@@ -268,12 +294,17 @@ class ResponseHeaderDeclarationTestCase(base.ShakenFistTestCase):
                   for response in responses}
         declared = self._declared()
 
-        # The floor: Retry-After is declared on three responses today,
-        # so an empty walk cannot pass this vacuously.
+        # The floor: Retry-After is declared on a handler's own 507
+        # and on the generic 503, so an empty walk of the handlers
+        # cannot pass this vacuously.
         published = [(response, header)
                      for response, names in declared.items()
                      for header in names]
-        self.assertGreaterEqual(len(published), 3)
+        self.assertIn(
+            (('InstancesEndpoint', 'post', 507), 'Retry-After'), published)
+        self.assertIn(
+            ((EVERY_OPERATION, EVERY_OPERATION, 503), 'Retry-After'),
+            published)
 
         unsent = sorted(item for item in published if item not in set_on)
         self.assertEqual(
