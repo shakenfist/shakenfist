@@ -216,14 +216,18 @@ def _require_fits(value: str, what: str) -> None:
     update path sets the same fields with setattr, which skips validation
     entirely because the model is not configured with
     validate_assignment. So one path failed obscurely, the other not at
-    all, and jwks_uri -- whose column is smaller than the model admits --
-    could be truncated on its way in. A truncated key set URL is a
-    signature check against the wrong place, which is the single thing
-    this module exists to prevent.
+    all, and jwks_uri -- whose column was then smaller than the model
+    admitted -- could be truncated on its way in. A truncated key set
+    URL is a signature check against the wrong place, which is the
+    single thing this module exists to prevent.
 
     The limit comes from stored_max_length() rather than from the
-    model's declared max_length, because those two numbers are not the
-    same and only one of them is true of the column.
+    model's declared max_length. For jwks_uri the two now agree, since
+    the column builder reads the declaration (issue 4901), but the
+    helper is still the right question to ask: it answers from the
+    column the model builds, so this check cannot drift from the schema,
+    and for a field declaring less than its column the two legitimately
+    differ.
     """
     limit = stored_max_length(TrustedIssuerAttributesData, what)
     if limit is None or len(value) <= limit:

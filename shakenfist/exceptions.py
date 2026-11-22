@@ -866,3 +866,13 @@ class InvalidAPIDeclaration(Exception):
     API and are the input to request validation, so a malformed one
     must stop the process rather than produce a wrong specification.
     """
+
+
+class InvalidSchemaDeclaration(Exception):
+    """A Pydantic schema field cannot be turned into a column.
+
+    Raised while a table definition is being built, which happens on
+    first use of that table, so a malformed declaration stops the
+    process rather than producing a column that cannot hold what the
+    model accepts.
+    """

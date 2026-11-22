@@ -8,6 +8,7 @@
 from typing import Annotated
 from typing import Optional
 
+import annotated_types
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
@@ -16,6 +17,8 @@ from pydantic import UUID4
 import sqlalchemy as sa
 from sqlalchemy.dialects import mysql
 
+from shakenfist import exceptions
+from shakenfist.schema import sqlalchemy as sqlalchemy_module
 from shakenfist.schema.namespace_key_attributes import (
     NamespaceKeyAttributesData)
 from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
@@ -258,12 +261,14 @@ class StoredMaxLengthTestCase(base.ShakenFistTestCase):
     than with the declaration.
     """
 
-    def test_a_plain_str_field_is_bounded_by_its_column(self):
+    def test_a_plain_str_field_gets_a_column_for_its_declaration(self):
         class Model(BaseModel):
             value: Annotated[str, Field(max_length=4096)]
 
-        # Declared 4096, stored in a VARCHAR(255).
-        self.assertEqual(255, stored_max_length(Model, 'value'))
+        # Declared 4096 and stored in a VARCHAR(4096), because the
+        # column builder reads the declaration. This asserted 255 until
+        # it did, which is the defect issue 4901 describes.
+        self.assertEqual(4096, stored_max_length(Model, 'value'))
 
     def test_a_longtext_field_is_bounded_by_its_declaration(self):
         class Model(BaseModel):
@@ -323,3 +328,96 @@ class StoredMaxLengthTestCase(base.ShakenFistTestCase):
                 min(expected) if expected else None,
                 stored_max_length(TrustedIssuerAttributesData, name),
                 f'{name} disagrees with its own column')
+
+
+class DeclaredColumnWidthTestCase(base.ShakenFistTestCase):
+    """The column a str field's declared max_length builds.
+
+    Before issue 4901 every str field got VARCHAR(255) whatever it
+    declared, so a field declaring more accepted values its column could
+    not hold, and nothing but an author remembering SQLLongText() held
+    the two numbers together.
+    """
+
+    def _column_type(self, model, field_name='value'):
+        table = pydantic_to_sqlalchemy_table(
+            model, 'probe_%s' % field_name, sa.MetaData(),
+            include_id_column=True)
+        return table.c[field_name].type
+
+    def test_a_declaration_over_the_default_widens_the_column(self):
+        class Model(BaseModel):
+            value: Annotated[str, Field(max_length=1024)]
+
+        self.assertEqual(1024, self._column_type(Model).length)
+
+    def test_a_declaration_under_the_default_keeps_the_default(self):
+        """Narrowing is not done, deliberately.
+
+        It would be a migration on most tables in the tree to enforce a
+        bound the model enforces first, and MariaDB would then refuse a
+        value the model has already refused.
+        """
+        class Model(BaseModel):
+            value: Annotated[str, Field(max_length=16)]
+
+        self.assertEqual(255, self._column_type(Model).length)
+
+    def test_an_undeclared_field_keeps_the_default(self):
+        class Model(BaseModel):
+            value: str
+
+        self.assertEqual(255, self._column_type(Model).length)
+
+    def test_the_strictest_declaration_is_the_one_built(self):
+        class Model(BaseModel):
+            value: Annotated[str, Field(max_length=2048),
+                             annotated_types.MaxLen(1024)]
+
+        self.assertEqual(1024, self._column_type(Model).length)
+
+    def test_an_optional_field_is_widened_too(self):
+        class Model(BaseModel):
+            value: Annotated[Optional[str], Field(max_length=1024)] = None
+
+        self.assertEqual(1024, self._column_type(Model).length)
+
+    def test_a_secret_field_is_widened_too(self):
+        class Model(BaseModel):
+            value: Annotated[SecretStr, Field(max_length=1024)]
+
+        self.assertEqual(1024, self._column_type(Model).length)
+
+    def test_the_longtext_marker_still_wins(self):
+        """A marked field is LONGTEXT however wide its declaration.
+
+        The marker is how a field says it wants its value stored away
+        from the row, which is not the same question as how long the
+        value may be.
+        """
+        class Model(BaseModel):
+            value: Annotated[str, SQLLongText(), Field(max_length=1024)]
+
+        self.assertIsInstance(self._column_type(Model), mysql.LONGTEXT)
+
+    def test_a_declaration_wider_than_a_varchar_is_refused(self):
+        """Rather than silently emitting LONGTEXT.
+
+        A LONGTEXT column cannot be indexed without a prefix length, so
+        the choice stays with whoever writes the model.
+        """
+        class Model(BaseModel):
+            value: Annotated[str, Field(
+                max_length=sqlalchemy_module.MAX_VARCHAR_LENGTH + 1)]
+
+        self.assertRaises(
+            exceptions.InvalidSchemaDeclaration, self._column_type, Model)
+
+    def test_the_widest_varchar_is_allowed(self):
+        class Model(BaseModel):
+            value: Annotated[str, Field(
+                max_length=sqlalchemy_module.MAX_VARCHAR_LENGTH)]
+
+        self.assertEqual(
+            sqlalchemy_module.MAX_VARCHAR_LENGTH,
+            self._column_type(Model).length)

@@ -608,7 +608,7 @@ NAMESPACE_ATTRIBUTES_VERSION = 2
 NAMESPACE_KEYS_VERSION = 2
 NAMESPACE_KEY_ATTRIBUTES_VERSION = 1
 TRUSTED_ISSUERS_VERSION = 1
-TRUSTED_ISSUER_ATTRIBUTES_VERSION = 2
+TRUSTED_ISSUER_ATTRIBUTES_VERSION = 3
 MAPPING_RULES_VERSION = 1
 MAPPING_RULE_ATTRIBUTES_VERSION = 1
 ARTIFACTS_VERSION = 3
@@ -15345,6 +15345,16 @@ TRUSTED_ISSUER_ATTRIBUTES_V2_COLUMNS = (
     'device_authorization_endpoint', 'client_id', 'oidc_scopes',
     'discovered_at')
 
+# Columns widened to VARCHAR(1024) by the v3 migration. Each has
+# declared max_length=1024 since it was written and was stored in the
+# VARCHAR(255) a str field used to get whatever it declared, so a value
+# the model accepted could not be stored. The column builder now reads
+# the declaration, which means a fresh install gets VARCHAR(1024) from
+# create_all() and an upgraded cluster needs this. None of the three is
+# indexed, so widening them costs the table a rebuild and nothing else.
+TRUSTED_ISSUER_ATTRIBUTES_V3_WIDENED_COLUMNS = (
+    'issuer_url', 'jwks_uri', 'audience')
+
 
 def _ensure_trusted_issuer_attributes_schema(
         engine: sa.Engine) -> dict[str, Any]:
@@ -15385,6 +15395,28 @@ def _ensure_trusted_issuer_attributes_schema(
                 f'ALTER TABLE {table_name} MODIFY COLUMN '
                 f'jwks_uri {jwks_type} NULL'))
         current_ver = 2
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver == 2:
+        # v3 widens issuer_url, jwks_uri and audience to the VARCHAR
+        # their max_length declares (issue 4901). Nothing is rewritten:
+        # a wider VARCHAR holds every value the narrow one did, so this
+        # is a table rebuild with no data change and no application
+        # behaviour depending on when it runs. Nullability is restated
+        # from the table definition rather than assumed, because MODIFY
+        # COLUMN replaces the whole definition and a MODIFY which forgot
+        # it would silently make a nullable column NOT NULL.
+        LOG.info(f'Widening declared columns on {table_name} (version 3)')
+        mysql_dialect = sa.dialects.mysql.dialect()
+        with engine.begin() as conn:
+            for column_name in TRUSTED_ISSUER_ATTRIBUTES_V3_WIDENED_COLUMNS:
+                column = table.c[column_name]
+                null_clause = 'NULL' if column.nullable else 'NOT NULL'
+                column_type = column.type.compile(dialect=mysql_dialect)
+                conn.execute(sa.text(
+                    f'ALTER TABLE {table_name} MODIFY COLUMN '
+                    f'{column_name} {column_type} {null_clause}'))
+        current_ver = 3
         _set_table_version(engine, table_name, current_ver)
 
     return {

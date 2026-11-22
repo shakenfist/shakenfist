@@ -1127,17 +1127,21 @@ def _validate_issuer_arguments(issuer_url, jwks_uri, audience,
     existence to serve a flow that issuer will never run.
 
     Every length limit below is stored_max_length() of the field's
-    column, not the max_length its model declares. The two are not the
-    same number: str maps to VARCHAR(255) whatever a field declares, so
-    issuer_url, jwks_uri and audience each declare 1024 and hold 255. A
-    value between the two was accepted here and then refused by MariaDB,
-    or silently truncated where strict mode is off -- and a truncated
-    issuer_url or jwks_uri is a token checked against the wrong issuer
-    or a key set fetched from the wrong place. Nothing which worked is
-    refused by using the real number, because a value longer than the
-    column could never have been stored in the first place. The general
-    defect, that a declared limit never reaches the generated DDL, is
-    recorded in the master plan's future work.
+    column, not the max_length its model declares. The two agree for
+    these three fields now that the column builder reads the
+    declaration (issue 4901), so issuer_url, jwks_uri and audience
+    declare 1024 and hold 1024; they did not when this check was
+    written, when a str mapped to VARCHAR(255) whatever it declared and
+    a value between the two was accepted here and then refused by
+    MariaDB, or silently truncated where strict mode is off -- and a
+    truncated issuer_url or jwks_uri is a token checked against the
+    wrong issuer or a key set fetched from the wrong place.
+
+    Still stored_max_length() rather than the declaration, for two
+    reasons that survive the fix: a field declaring *less* than its
+    column still legitimately differs, and the helper reads the column
+    the model builds, so a validator written against it cannot drift
+    from the schema the way a number copied into this file would.
     """
     for name, value in (('issuer_url', issuer_url),
                         ('audience', audience)):

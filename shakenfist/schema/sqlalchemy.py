@@ -49,6 +49,8 @@ from sqlalchemy.dialects.mysql import mariadb
 from sqlalchemy.engine.interfaces import Dialect
 from shakenfist_utilities import logs
 
+from shakenfist import exceptions
+
 
 LOG, _ = logs.setup(__name__)
 
@@ -291,6 +293,24 @@ PYTHON_TO_SQLALCHEMY: dict[type[Any], sa.types.TypeEngine[Any]] = {
 }
 
 
+# The width a str field gets when it declares nothing wider, which is the
+# entry above and the number every existing VARCHAR column in the tree was
+# created at.
+DEFAULT_STRING_LENGTH = 255
+
+# The widest VARCHAR a declaration may ask for. MariaDB's limit is a
+# 65,535 byte maximum row size shared by every column in the row, and at
+# utf8mb4 a character costs four bytes, so 16,383 characters is the most
+# a single VARCHAR can occupy even in a row holding nothing else. A field
+# which genuinely needs more is a LONGTEXT, which is stored away from the
+# row and costs it only a pointer, and SQLLongText() is how a field says
+# so. Refusing above this bound rather than silently emitting LONGTEXT
+# keeps the decision with the person writing the model: a LONGTEXT column
+# cannot be indexed without a prefix length, which is not a thing to
+# acquire by accident.
+MAX_VARCHAR_LENGTH = 16383
+
+
 def _unwrap_annotated(annotation: Any) -> Any:
     """Unwrap an Annotated type to get the base type.
 
@@ -348,6 +368,27 @@ def _is_complex_type(annotation: Any) -> bool:
     return False
 
 
+def _declared_max_length(
+        field_metadata: Optional[list[Any]]) -> Optional[int]:
+    """The character limit a field's own declaration asks for.
+
+    Field(max_length=...) arrives as an annotated_types.MaxLen in the
+    field's metadata, and a field may carry more than one -- an
+    Annotated chain can name two -- in which case the strictest is the
+    one Pydantic enforces. None means the field declares no limit.
+    """
+    if not field_metadata:
+        return None
+
+    declared = None
+    for item in field_metadata:
+        candidate = getattr(item, 'max_length', None)
+        if candidate is None:
+            continue
+        declared = candidate if declared is None else min(declared, candidate)
+    return declared
+
+
 def _get_sqlalchemy_type(
         annotation: Any,
         field_metadata: Optional[list[Any]] = None) -> sa.types.TypeEngine[Any]:
@@ -391,6 +432,31 @@ def _get_sqlalchemy_type(
             _has_longtext_marker(field_metadata)):
         return mysql.LONGTEXT()
 
+    # A str field declaring more than the default width gets a column
+    # wide enough to hold it. Without this the declared limit and the
+    # column were independent numbers: the model accepted a value
+    # MariaDB then refused, or -- with strict mode off -- truncated, and
+    # the only thing holding them together was whoever remembered to add
+    # SQLLongText() as well. The declaration is now what the column is
+    # built from, so the two cannot disagree.
+    #
+    # Only upwards. A field declaring less than the default keeps its
+    # VARCHAR(255), because narrowing a column is a migration on every
+    # table in the tree to enforce a bound the model already enforces
+    # first, and the model refuses the over-long value before MariaDB
+    # ever sees it. stored_max_length() is how a validator asks which of
+    # the two numbers is the real bound.
+    if annotation in (str, SecretStr):
+        declared = _declared_max_length(field_metadata)
+        if declared is not None and declared > DEFAULT_STRING_LENGTH:
+            if declared > MAX_VARCHAR_LENGTH:
+                raise exceptions.InvalidSchemaDeclaration(
+                    'a str field declares max_length=%d, which is wider '
+                    'than the %d characters a VARCHAR can hold; mark it '
+                    'SQLLongText() if it really needs that much'
+                    % (declared, MAX_VARCHAR_LENGTH))
+            return sa.String(declared)
+
     # Basic Python types
     if annotation in PYTHON_TO_SQLALCHEMY:
         return PYTHON_TO_SQLALCHEMY[annotation]
@@ -404,13 +470,13 @@ def stored_max_length(
         model: type[BaseModel], field_name: str) -> Optional[int]:
     """How many characters this field's generated column can really hold.
 
-    Field(max_length=...) constrains what the model accepts. It does not
-    reach the generated DDL: _get_sqlalchemy_type() maps str to
-    VARCHAR(255) whatever the declared limit says, and only the
-    SQLLongText() marker changes that. The declared limit and the
-    column's capacity are therefore independent numbers, so a field
-    declaring more than its column holds accepts a value which MariaDB
-    then refuses or, with strict mode off, silently truncates.
+    Field(max_length=...) constrains what the model accepts, and
+    _get_sqlalchemy_type() now builds a column wide enough to hold it,
+    so a declaration over the 255 character default is no longer a
+    number the column knows nothing about. The two can still differ in
+    the other direction, which is deliberate and harmless: a field
+    declaring less than its column holds is refused by the model before
+    MariaDB sees it.
 
     This returns the smaller of the two, taken from the same
     _get_sqlalchemy_type() call pydantic_to_sqlalchemy_table() builds the
@@ -419,20 +485,19 @@ def stored_max_length(
     declares no limit.
 
     Validate operator or third party supplied strings against this
-    rather than against the declared limit, which is the number a reader
-    of the model sees and the one that is wrong.
+    rather than against either number in isolation.
+
+    It answers from the column the *current model* would build, not from
+    the column the database has, so it does not and cannot describe a
+    cluster whose migration has not run yet. What protects that window
+    is mariadb.verify_schema_versions(), which refuses to start a daemon
+    against a table at the wrong version.
     """
     field_info = model.model_fields[field_name]
     column_limit = getattr(
         _get_sqlalchemy_type(field_info.annotation, field_info.metadata),
         'length', None)
-
-    declared = None
-    for item in field_info.metadata:
-        candidate = getattr(item, 'max_length', None)
-        if candidate is None:
-            continue
-        declared = candidate if declared is None else min(declared, candidate)
+    declared = _declared_max_length(field_info.metadata)
 
     limits = [limit for limit in (column_limit, declared) if limit is not None]
     return min(limits) if limits else None

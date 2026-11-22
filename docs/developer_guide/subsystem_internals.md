@@ -721,8 +721,8 @@ track any object-to-object relationship.
 | `instance_location` | Node | Instance | NULL (instance is placed on this node) |
 
 `relationship_value` is capped at 255 characters, which is the generated
-column's width rather than a semantic limit — the schema generator renders
-every `str` field as `VARCHAR(255)` and ignores `max_length`. The cap is one
+column's width rather than a semantic limit — 255 is what a `str` field gets
+when it declares nothing wider. The cap is one
 constant, `RELATIONSHIP_VALUE_MAX_LENGTH` in
 `shakenfist/schema/object_reference.py`, used both as the model's validation
 limit and as the write-time check in `mariadb.record_relationship()` and

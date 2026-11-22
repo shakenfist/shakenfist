@@ -21,6 +21,9 @@ import requests
 
 from shakenfist import exceptions
 from shakenfist import oidc_discovery
+from shakenfist.schema.sqlalchemy import stored_max_length
+from shakenfist.schema.trusted_issuer_attributes import (
+    TrustedIssuerAttributesData)
 from shakenfist.tests import base
 
 
@@ -420,21 +423,24 @@ class DiscoveryDocumentTestCase(OIDCDiscoveryTestCase):
         self.assertIn('is not https', str(e))
 
     def test_a_jwks_uri_longer_than_its_column_is_refused(self):
-        # 300 characters: inside the model's declared 1024 and outside
-        # the VARCHAR(255) the column actually is. Before this was
-        # bounded the value reached MariaDB, which either refused it --
-        # a 500 to the administrator, from inside the handler -- or,
-        # with strict mode off, truncated it. A truncated jwks_uri is
-        # signature verification against whatever answers at the
-        # shortened URL, which is the one thing this module exists to
-        # prevent, so this refusal is the point of the check rather
-        # than tidiness about column widths.
-        long_uri = 'https://keycloak.example.com/' + ('k' * 300)
+        # Over the column, which since issue 4901 is the VARCHAR(1024)
+        # the model declares rather than the 255 a str field used to
+        # get regardless -- so this now serves 1100 characters where it
+        # served 300. Before the value was bounded at all it reached
+        # MariaDB, which either refused it -- a 500 to the
+        # administrator, from inside the handler -- or, with strict
+        # mode off, truncated it. A truncated jwks_uri is signature
+        # verification against whatever answers at the shortened URL,
+        # which is the one thing this module exists to prevent, so this
+        # refusal is the point of the check rather than tidiness about
+        # column widths.
+        limit = stored_max_length(TrustedIssuerAttributesData, 'jwks_uri')
+        long_uri = 'https://keycloak.example.com/' + ('k' * (limit + 1))
         self._serve(_document(KEYCLOAK, jwks_uri=long_uri))
         e = self.assertRaises(
             exceptions.OIDCDiscoveryFailed, oidc_discovery.fetch, KEYCLOAK)
         self.assertIn('jwks_uri', str(e))
-        self.assertIn('255 characters', str(e))
+        self.assertIn(f'{limit} characters', str(e))
 
     def test_an_endpoint_longer_than_its_column_is_refused(self):
         # The three endpoint columns are LONGTEXT, so their real limit

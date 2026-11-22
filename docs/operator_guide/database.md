@@ -2026,7 +2026,7 @@ Python types are mapped to SQL column types:
 
 | Python Type | SQL Type |
 |-------------|----------|
-| `str` | `VARCHAR(255)` |
+| `str` | `VARCHAR(255)`, or `VARCHAR(N)` where the field declares `max_length=N` above 255 |
 | `int` | `BIGINT` |
 | `float` | `DOUBLE` |
 | `bool` | `BOOLEAN` |
@@ -2037,11 +2037,39 @@ Python types are mapped to SQL column types:
 | `list`, `dict`, nested models | `LONGTEXT` (JSON) |
 | `Optional[X]` | Nullable column of type X |
 
-A Pydantic `Field(max_length=N)` constrains the model only; it does not
-change the generated column, which is `VARCHAR(255)` for every `str` field.
-A model declaring less than that will accept a write the column stores
-happily and then refuse to read it back, so a field whose limit matters has
-to be checked where it is written as well.
+A Pydantic `Field(max_length=N)` constrains the model, and where `N` is
+above the 255 character default it also widens the generated column to
+`VARCHAR(N)`, so a field cannot accept a value its column will not store.
+Declaring *less* than 255 leaves the column at 255 deliberately: the model
+refuses the long value first, and narrowing the column would be a migration
+on most tables in the tree to enforce a bound that is already enforced. Ask
+`stored_max_length()` (`shakenfist/schema/sqlalchemy.py`) for the limit that
+really applies to a field rather than reading either number on its own; it
+answers from the same call that builds the column.
+
+Two consequences worth knowing:
+
+* A declaration above 16,383 characters is refused with
+  `InvalidSchemaDeclaration` when the table definition is built, because
+  that is the widest `VARCHAR` MariaDB's 65,535 byte row limit allows at
+  utf8mb4. A field which genuinely needs more is marked `SQLLongText()`,
+  which stores the value away from the row. The refusal is deliberate
+  rather than a silent fall back to `LONGTEXT`: a `LONGTEXT` column cannot
+  be indexed without a prefix length.
+* Raising a `max_length` above 255 on an *existing* column changes the DDL
+  a fresh install generates, so it needs a schema version bump and a
+  migration like any other column change. `test_declared_limits.py` holds
+  every model to this property, so a declaration the column cannot hold
+  fails the unit suite rather than production writes.
+
+This was not always so. Until [issue
+4901](https://github.com/shakenfist/shakenfist/issues/4901) the generated
+column was `VARCHAR(255)` for every `str` field whatever it declared, and
+only the `SQLLongText()` marker changed that, so four fields accepted
+values MariaDB then refused or silently truncated. A write-time check was
+how a field whose limit mattered defended itself, and
+`relationship_value`'s is still there because its bound is below 255 rather
+than above it.
 
 ### Index Annotations
 
