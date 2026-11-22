@@ -799,7 +799,8 @@ class InstancesEndpoint(api_base.Resource):
                 'placement or a network interface. The half-built '
                 'instance is torn down (the error body names its uuid) '
                 'and the request can be retried; the response carries a '
-                '`Retry-After` header.', None,
+                '`Retry-After` header. A 503 from the generic '
+                'database-unavailable path does not.', None,
                 {'headers': [api_base.RETRY_AFTER_HEADER]}),
             (507, 'Unable to allocate resources for the instance. A refusal '
                 'from scheduling carries `stage` (the scheduler filter that '
@@ -1585,7 +1586,8 @@ class InstanceInterfacesEndpoint(api_base.Resource):
                   'plugs competed for a device index.', None),
             (503, 'The database could not be reached while recording the '
                   'interface. The request can be retried; the response '
-                  'carries a `Retry-After` header.', None,
+                  'carries a `Retry-After` header. A 503 from the generic '
+                  'database-unavailable path does not.', None,
                   {'headers': [api_base.RETRY_AFTER_HEADER]})
         ]))
     @api_base.arg_is_instance_ref

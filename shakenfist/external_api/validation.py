@@ -764,12 +764,15 @@ def coercing_field(spec: dict[str, Any], load_default: Any,
     compiled path, where a bound renders as a marshmallow validator and
     a failure becomes a 400 naming the parameter. A ``@use_kwargs``
     schema is the only mechanism by which a query-string parameter
-    reaches a handler at all, and a validator failing there raises
-    webargs' UnprocessableEntity, which the app's error handler renders
-    as a 500 -- the serialisation hazard the json_or_query loader in
-    base.py documents. So the declared *type* is honoured here and the
-    declared *bounds* are not: they are enforced by the compiled path,
-    and by the handler for the modes where that path only warns.
+    reaches a handler at all, so the declared *type* has to be honoured
+    here. The declared *bounds* are not, because they already have
+    their enforcement: the compiled path refuses them when
+    API_VALIDATION_MODE is enforce, and the handler holds them in the
+    modes where that path only warns. A validator here would be a third
+    copy of the bound, and one which ignored API_VALIDATION_MODE.
+    (A failure here would answer 400 in this API's shape like any
+    other -- ``_webargs_error`` in base.py sees to that -- so this is
+    about the bound being stated once, not about the status code.)
 
     ``load_default`` is what the field answers when the caller sends
     nothing, and its caller reads it off the handler's own signature so

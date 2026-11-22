@@ -891,6 +891,12 @@ def response_headers(
                 out[None] = None
                 continue
             httpcode = literal(item.elts[0])
+            if not isinstance(httpcode, int):
+                # The None key means "unreadable" and nothing else; a
+                # code that is not a literal must not land there as an
+                # empty set, which reads as "publishes no header".
+                out[None] = None
+                continue
             names = out.setdefault(httpcode, set())
             if len(item.elts) == 3 or names is None:
                 continue

@@ -227,9 +227,9 @@ COVERAGE_STATE_PATTERN = '^(%s)$' % '|'.join(mariadb.CLAIM_COVERAGE_STATES)
 # use_declared_args() builds the webargs schema which is how the value
 # reaches the handler (issue 4098). The declared pattern is published
 # and compiled into request validation; it deliberately does not reach
-# the webargs schema, where a validator's failure renders as a 500 --
-# the handler below is the refusal for the modes validation only warns
-# in.
+# the webargs schema, where it would be another copy of the bound and
+# one which ignored API_VALIDATION_MODE -- the handler below is the
+# refusal for the modes validation only warns in.
 ADMIN_CLAIMS_PARAMETERS = [
     ('coverage_state', 'query', 'string',
      'Only list claims in this coverage state, active or expired. '

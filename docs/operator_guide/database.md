@@ -2056,11 +2056,23 @@ Two consequences worth knowing:
   which stores the value away from the row. The refusal is deliberate
   rather than a silent fall back to `LONGTEXT`: a `LONGTEXT` column cannot
   be indexed without a prefix length.
+* The two limits that belong to a whole table are refused the same way.
+  The 65,535 byte row limit is shared by every column, so two fields that
+  each fit can together overflow it (16,383 is the widest a `VARCHAR` can
+  be alone in its row, not beside an `id` column). And InnoDB's 3,072 byte
+  index key limit is shared by every column of an index, the primary key
+  included, so an indexed `str` field can be at most 768 characters, less
+  in a compound index. Either would otherwise fail `CREATE TABLE` only on
+  a fresh install, which is the hardest place to find it.
 * Raising a `max_length` above 255 on an *existing* column changes the DDL
   a fresh install generates, so it needs a schema version bump and a
   migration like any other column change. `test_declared_limits.py` holds
-  every model to this property, so a declaration the column cannot hold
-  fails the unit suite rather than production writes.
+  every model to its column, so a declaration the column cannot hold
+  fails the unit suite rather than production writes, and
+  `test_schema_fingerprints.py` records what every versioned table
+  compiles to, so DDL that moves without its `EXPECTED_SCHEMA_VERSIONS`
+  entry moving fails too. After a deliberate bump, re-record with
+  `python -m shakenfist.tests.schema.test_schema_fingerprints`.
 
 This was not always so. Until [issue
 4901](https://github.com/shakenfist/shakenfist/issues/4901) the generated

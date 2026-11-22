@@ -331,7 +331,14 @@ response could not express one at all, so `POST /instances` served
 English in the description, where a generated client cannot find it.
 `shakenfist/tests/external_api/test_response_headers.py` now holds every
 header-setting site in the API layer against the declarations that
-publish it, so adding one without declaring it fails the unit suite.
+publish it, so adding one without declaring it fails the unit suite. It
+recognises a `.headers[...]` assignment, a mutator such as
+`.headers.add()` or `.headers.update()`, and headers passed to
+`flask.Response` or `make_response`; a site it cannot read fails rather
+than being skipped. It does not recognise flask-restful's
+`return body, code, headers` tuple, which is indistinguishable from the
+three-tuples the API helpers return for other reasons — set the header
+on a response object instead.
 Where the value is a constant, declare the header beside the constant
 (as `RETRY_AFTER_HEADER` is, in `external_api/base.py`) rather than
 writing the number into the prose twice.
@@ -694,11 +701,14 @@ the type vocabulary landed.)
 ```
 
   It binds every parameter the list declares at `query`, with the type
-  the published specification uses and **not** the declared bound: a
-  marshmallow validator failing inside webargs raises
-  `UnprocessableEntity`, which the app's error handler renders as a
-  500, so bounds belong to the compiled path (which answers 400) and to
-  the handler. The defaults are passed rather than read off the
+  the published specification uses and **not** the declared bound. The
+  bound is stated once, in the declaration, and enforced by the
+  compiled path (which answers 400 naming the parameter) and, for the
+  `warn` and `off` validation modes, by the handler; a marshmallow
+  validator in the webargs schema would be another copy of it that
+  ignored `API_VALIDATION_MODE`. A webargs failure that does happen —
+  a value that is not the declared type — answers 400 in this API's
+  error shape through `_webargs_error` in `base.py`. The defaults are passed rather than read off the
   signature because 24 of the 25 per-method decorators in `base.py` do
   not use `functools.wraps`, so by the time the decorator runs
   `inspect.signature()` sees a wrapper's `(*args, **kwargs)`;

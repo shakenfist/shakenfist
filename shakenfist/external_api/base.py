@@ -142,15 +142,20 @@ TRANSIENT_RETRY_AFTER_SECONDS = 15
 # place: the published specification cannot say a different number from
 # the one the server sends.
 #
-# Two forms because the two responses differ in a way a client has to
-# know about and OpenAPI 2.0 cannot express: a 503 from a database
-# failure always carries the header, while a 507 carries it only when
-# the refusal is transient. A header object has no "sometimes", so the
-# difference is in the description where a reader will see it.
+# Neither header is always present, and OpenAPI 2.0 has no way to say
+# "sometimes": a header object is published per status code, so the
+# condition is in the description where a reader will see it. The 503
+# form carries the header when the refusal comes from the recording
+# step the endpoint's own 503 description names -- but every endpoint
+# can also answer 503 from handle_database_unavailable, which sets no
+# Retry-After, and a client cannot tell the two apart by status code.
+# The 507 form carries it only when the refusal is transient.
 RETRY_AFTER_HEADER = (
     'Retry-After', 'unsignedinteger',
-    'How many seconds to wait before retrying this request. Always '
-    'present on this response, and fixed at %d.'
+    'How many seconds to wait before retrying this request, fixed at '
+    '%d. Present when the refusal comes from the recording step this '
+    'response describes; a 503 from the generic database-unavailable '
+    'path, which any endpoint can answer, carries no Retry-After.'
     % TRANSIENT_RETRY_AFTER_SECONDS)
 
 TRANSIENT_RETRY_AFTER_HEADER = (
@@ -1697,8 +1702,8 @@ def use_declared_args(parameters: list[Any], defaults: dict[str, Any],
     declares at ``'query'``. The field's type comes from the same
     ARGTYPES rendering the published specification uses. The declared
     *bounds* deliberately do not come along -- see
-    ``validation.coercing_field()`` for why a validator here answers
-    500 rather than 400.
+    ``validation.coercing_field()`` for why they already have an
+    enforcement and a webargs validator would be another copy.
 
     ``defaults`` is what each field answers when the caller sends
     nothing, and has to be passed rather than read off the handler's

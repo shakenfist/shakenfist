@@ -210,16 +210,15 @@ class BlobEndpoint(api_base.Resource):
 # query-located declarations for the same reason.
 #
 # NOTE(mikal): a marshmallow validate=Range(min=0) in that schema would
-# be the obvious place for the bound, but webargs raises
-# UnprocessableEntity and the app's error handler renders that as a
-# 500 -- the same serialisation hazard the json_or_query loader in
-# base.py documents. So the bound is checked in the handler, where
-# it can answer 400 like every other malformed argument in the
-# tree. The compiled declaration (external_api/validation.py) now
-# refuses a negative value too, but only when API_VALIDATION_MODE is
-# enforce; the handler check holds the bound under warn and off. The
-# generated schema carries the declared type and deliberately not the
-# declared bound, for that reason.
+# be the obvious place for the bound, but it would be a third copy of
+# it. The compiled declaration (external_api/validation.py) refuses a
+# negative value when API_VALIDATION_MODE is enforce, and the handler
+# check holds the bound under warn and off; a webargs validator would
+# refuse in every mode regardless of that setting. So the generated
+# schema carries the declared type and deliberately not the declared
+# bound. (It once could not have held the bound anyway: webargs' 422
+# reached clients as a 500 until _webargs_error in base.py gave it a
+# 400 in this API's shape.)
 BLOB_DATA_PARAMETERS = [
     ('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True),
     ('offset', 'query', 'unsignedinteger',

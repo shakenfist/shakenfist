@@ -63,12 +63,6 @@ GUIDE_SECTIONS = {
     'sf_claim': 'Capacity claims',
 }
 
-#: The connection parameters every module takes, merged in from
-#: module_utils/sf_connection.py's connection_argument_spec() rather
-#: than written into each module's own argument_spec. Read from there
-#: rather than listed here, so a fourth one would be picked up.
-CONNECTION_IDENTITY_PARAMETERS = frozenset(['namespace', 'auth_namespace'])
-
 
 def _documentation_options(module):
     """The parameter names a module's DOCUMENTATION block declares."""
@@ -81,7 +75,13 @@ def _documentation_options(module):
 
 
 def _connection_parameters():
-    """The parameter names connection_argument_spec() contributes."""
+    """The fixed parameter names connection_argument_spec() contributes.
+
+    Read from its dict literal rather than listed here, so a fourth one
+    would be picked up. The identity parameter is not among them: its
+    key is the identity_param variable, which _identity_parameter()
+    resolves per module.
+    """
     source = open(os.path.join(MODULE_UTILS_DIR, 'sf_connection.py')).read()
     tree = ast.parse(source)
     for node in ast.walk(tree):
@@ -97,15 +97,63 @@ def _connection_parameters():
         'parameters it contributes')
 
 
+def _default_identity_parameter():
+    """connection_argument_spec()'s own default for identity_param."""
+    source = open(os.path.join(MODULE_UTILS_DIR, 'sf_connection.py')).read()
+    for node in ast.walk(ast.parse(source)):
+        if (isinstance(node, ast.FunctionDef)
+                and node.name == 'connection_argument_spec'):
+            names = [arg.arg for arg in node.args.args]
+            defaults = dict(zip(names[len(names) - len(node.args.defaults):],
+                                node.args.defaults))
+            default = defaults.get('identity_param')
+            if isinstance(default, ast.Constant):
+                return default.value
+    raise AssertionError(
+        'connection_argument_spec() no longer takes identity_param with a '
+        'literal default, so this test cannot say what a module which '
+        'passes none is called')
+
+
+def _identity_parameter(tree, module):
+    """The identity parameter a module asks connection_argument_spec() for.
+
+    Read from the call rather than from DOCUMENTATION, because
+    DOCUMENTATION is what this is compared against: sf_claim passes
+    identity_param='auth_namespace' (its `namespace` is the namespace
+    a claim covers, not the one it authenticates as), and every other
+    module takes the default. None if the module never merges the
+    connection parameters in at all.
+    """
+    calls = [node for node in ast.walk(tree)
+             if isinstance(node, ast.Call)
+             and isinstance(node.func, ast.Name)
+             and node.func.id == 'connection_argument_spec']
+    if not calls:
+        return None
+    assert len(calls) == 1, (
+        '%s calls connection_argument_spec() %d times, so this test '
+        'cannot say which identity parameter it accepts'
+        % (module, len(calls)))
+    call = calls[0]
+    argument = call.args[0] if call.args else None
+    for keyword in call.keywords:
+        if keyword.arg == 'identity_param':
+            argument = keyword.value
+    if argument is None:
+        return _default_identity_parameter()
+    assert isinstance(argument, ast.Constant), (
+        '%s passes connection_argument_spec() an identity_param that is '
+        'not a literal, so this test cannot read it' % module)
+    return argument.value
+
+
 def _argument_spec(module):
     """The parameter names a module's own argument_spec declares.
 
     Plus the connection parameters, which the module merges in from
-    connection_argument_spec() and so does not spell itself. The
-    identity parameter is whichever of `namespace` and
-    `auth_namespace` the module's DOCUMENTATION names -- sf_claim's
-    `namespace` is the namespace a claim covers rather than the one it
-    authenticates as, so it documents `auth_namespace` instead.
+    connection_argument_spec() and so does not spell itself, with the
+    identity parameter that call asks for.
     """
     source = open(os.path.join(MODULE_DIR, '%s.py' % module)).read()
     tree = ast.parse(source)
@@ -128,11 +176,10 @@ def _argument_spec(module):
         '%s does not build its argument_spec as a dict literal, so this '
         'test cannot read what it accepts' % module)
 
-    connection = _connection_parameters()
-    documented_identity = _documentation_options(module) & (
-        CONNECTION_IDENTITY_PARAMETERS)
-    return spec | (connection - CONNECTION_IDENTITY_PARAMETERS) | (
-        documented_identity)
+    identity = _identity_parameter(tree, module)
+    if identity is None:
+        return spec
+    return spec | _connection_parameters() | {identity}
 
 
 def _guide_sections():
@@ -302,3 +349,29 @@ class AnsibleModuleDocumentationTestCase(base.ShakenFistTestCase):
             'await_timeout',
             _documentation_options('sf_instance') - _guide_parameters(
                 'sf_instance', without))
+
+    def test_the_identity_parameter_comes_from_the_call(self):
+        """Not from DOCUMENTATION, which is what it is compared against.
+
+        Deriving it from the documentation made the identity
+        unfalsifiable: a module documenting `namespace` while asking
+        for `auth_namespace` agreed with itself.
+        """
+        def identity(source):
+            return _identity_parameter(ast.parse(source), 'probe')
+
+        self.assertEqual('namespace', identity(
+            'argument_spec.update(connection_argument_spec())'))
+        self.assertEqual('auth_namespace', identity(
+            'argument_spec.update(connection_argument_spec('
+            "identity_param='auth_namespace'))"))
+        self.assertEqual('auth_namespace', identity(
+            "argument_spec.update(connection_argument_spec('auth_namespace'))"))
+        self.assertIsNone(identity('argument_spec = {}'))
+
+    def test_the_real_modules_ask_for_the_identity_they_document(self):
+        """sf_claim is the one which differs, so it is the one checked."""
+        self.assertEqual('namespace', _default_identity_parameter())
+        self.assertIn('auth_namespace', _argument_spec('sf_claim'))
+        self.assertIn('auth_namespace', _documentation_options('sf_claim'))
+        self.assertNotIn('auth_namespace', _argument_spec('sf_instance'))

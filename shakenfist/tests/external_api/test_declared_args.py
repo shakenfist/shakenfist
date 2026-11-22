@@ -281,11 +281,11 @@ class DeclarationElementsTestCase(base.ShakenFistTestCase):
 class CoercingFieldTestCase(base.ShakenFistTestCase):
     """The field a declared query parameter is parsed with.
 
-    Coercion without validation, deliberately: a validator failing in a
-    webargs schema raises UnprocessableEntity, which the app's error
-    handler renders as a 500. The declared bound is enforced by the
-    compiled validation path, which answers 400, and by the handler for
-    the modes where that path only warns.
+    Coercion without validation, deliberately: the declared bound is
+    enforced by the compiled validation path, which answers 400, and by
+    the handler for the modes where that path only warns. A validator
+    here would be another copy of the bound, one which ignored
+    API_VALIDATION_MODE.
     """
 
     def _field(self, token, load_default=marshmallow.missing):
@@ -310,8 +310,9 @@ class CoercingFieldTestCase(base.ShakenFistTestCase):
 
     def test_the_declared_bound_does_not_become_a_validator(self):
         # unsignedinteger renders minimum 0. A Range validator here
-        # would turn a negative offset into a 500 rather than the 400
-        # the handler answers.
+        # would refuse a negative offset even under API_VALIDATION_MODE
+        # off, where the declared bounds are meant to stop applying and
+        # the handler's own check is the refusal.
         field = self._field('unsignedinteger')
         self.assertEqual([], list(field.validators))
 

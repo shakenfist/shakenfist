@@ -722,10 +722,10 @@ track any object-to-object relationship.
 
 `relationship_value` is capped at 255 characters, which is the generated
 column's width rather than a semantic limit — 255 is what a `str` field gets
-when it declares nothing wider. The cap is one
-constant, `RELATIONSHIP_VALUE_MAX_LENGTH` in
-`shakenfist/schema/object_reference.py`, used both as the model's validation
-limit and as the write-time check in `mariadb.record_relationship()` and
+when it declares nothing wider. The cap is one constant,
+`RELATIONSHIP_VALUE_MAX_LENGTH` in `shakenfist/schema/object_reference.py`,
+used both as the model's validation limit and as the write-time check in
+`mariadb.record_relationship()` and
 `_direct_record_relationship()`. Both ends are needed: the insert is raw SQL
 and validates nothing, while every read builds an `ObjectReference` from the
 row, so without the write-time check an over-long value is written once and

@@ -310,6 +310,42 @@ DEFAULT_STRING_LENGTH = 255
 # acquire by accident.
 MAX_VARCHAR_LENGTH = 16383
 
+# The two limits MAX_VARCHAR_LENGTH cannot enforce, because each is a
+# property of a whole table rather than of one field. A per-field bound
+# lets two VARCHAR(16383) columns each pass while together they exceed
+# the row, and lets a widened column pass while an index over it cannot
+# be built. Both failures happen only when the table is created, which
+# is only on a fresh install -- every upgraded cluster already has the
+# table -- so _check_table_limits() refuses them when the definition is
+# built instead, where the unit suite sees them.
+#
+# MAX_ROW_BYTES is MariaDB's server-level row size limit, which every
+# engine shares. MAX_INDEX_KEY_BYTES is InnoDB's index key limit with
+# the DYNAMIC row format MariaDB 10.11 defaults to: 3072 bytes, which at
+# four bytes per utf8mb4 character is 768 characters for a lone
+# VARCHAR, and is shared by every column of a compound index.
+MAX_ROW_BYTES = 65535
+MAX_INDEX_KEY_BYTES = 3072
+UTF8MB4_BYTES_PER_CHARACTER = 4
+
+# The numeric column types the builder makes, costed as an upper bound:
+# BIGINT and DOUBLE are eight bytes and BOOLEAN is one. Over-counting
+# here can only refuse a table that would have fitted, and by seven
+# bytes at most per column.
+FIXED_WIDTH_COLUMN_TYPES = (sa.BigInteger, sa.Integer, sa.Double, sa.Float,
+                            sa.Boolean)
+FIXED_WIDTH_COLUMN_BYTES = 8
+
+# The types stored off the page, which cost the row only a pointer and
+# length -- 9 to 12 bytes depending on the type; 12 is the LONGTEXT and
+# LONGBLOB figure. Named rather than found through sa.Text, because
+# mysql.LONGTEXT is not an sa.Text subclass: it derives from sa.String,
+# and would otherwise be costed as a VARCHAR with no length.
+OFF_PAGE_COLUMN_TYPES = (sa.Text, sa.LargeBinary, mysql.TINYTEXT,
+                         mysql.TEXT, mysql.MEDIUMTEXT, mysql.LONGTEXT,
+                         mysql.LONGBLOB, mysql.MEDIUMBLOB)
+OFF_PAGE_COLUMN_ROW_BYTES = 12
+
 
 def _unwrap_annotated(annotation: Any) -> Any:
     """Unwrap an Annotated type to get the base type.
@@ -466,6 +502,78 @@ def _get_sqlalchemy_type(
     return mysql.LONGTEXT()
 
 
+def _column_bytes(
+        col_type: sa.types.TypeEngine[Any]) -> tuple[Optional[int], int]:
+    """(index key bytes, row bytes) for one column type.
+
+    The key bytes are None for a TEXT or BLOB column, which InnoDB will
+    not index without a prefix length the builder has no way to say.
+
+    A type this does not recognise is refused rather than given a
+    guessed cost: a guess is a check that silently stops checking.
+    """
+    if isinstance(col_type, OFF_PAGE_COLUMN_TYPES):
+        return None, OFF_PAGE_COLUMN_ROW_BYTES
+    if isinstance(col_type, sa.Uuid):
+        # uuid_column_type() is CHAR(32) of undashed hex.
+        stored = 32 * UTF8MB4_BYTES_PER_CHARACTER
+        return stored, stored
+    if isinstance(col_type, sa.String) and col_type.length is not None:
+        stored = col_type.length * UTF8MB4_BYTES_PER_CHARACTER
+        # A VARCHAR spends one length byte on a value of up to 255
+        # bytes and two above that.
+        return stored, stored + (1 if stored <= 255 else 2)
+    if isinstance(col_type, FIXED_WIDTH_COLUMN_TYPES):
+        return FIXED_WIDTH_COLUMN_BYTES, FIXED_WIDTH_COLUMN_BYTES
+    raise exceptions.InvalidSchemaDeclaration(
+        'cannot cost a %r column against the row and index key limits; '
+        'add its storage size to _column_bytes()' % col_type)
+
+
+def _check_table_limits(
+        table_name: str, columns: list[sa.Column[Any]],
+        indexes: list[tuple[str, tuple[str, ...]]]) -> None:
+    """Refuse a table MariaDB would refuse to create.
+
+    ``indexes`` is every index the table will carry, the primary key
+    included, as (name, column names). See MAX_ROW_BYTES for why this
+    is checked here rather than left to CREATE TABLE.
+    """
+    by_name = {column.name: _column_bytes(column.type) for column in columns}
+
+    # Plus the row's null bitmap, a bit per nullable column.
+    nullable = sum(1 for column in columns if column.nullable)
+    row_bytes = (sum(row for _, row in by_name.values())
+                 + (nullable + 7) // 8)
+    if row_bytes > MAX_ROW_BYTES:
+        raise exceptions.InvalidSchemaDeclaration(
+            'table %s would need %d bytes per row at utf8mb4, over the '
+            '%d byte row limit MariaDB applies to the sum of its columns; '
+            'lower a str field\'s max_length or mark it SQLLongText(), '
+            'which is stored off the row'
+            % (table_name, row_bytes, MAX_ROW_BYTES))
+
+    for idx_name, idx_columns in indexes:
+        key_bytes = 0
+        for col in idx_columns:
+            column_key_bytes = by_name[col][0]
+            if column_key_bytes is None:
+                raise exceptions.InvalidSchemaDeclaration(
+                    'index %s on table %s includes %s, a TEXT or BLOB '
+                    'column, which InnoDB cannot index without a prefix '
+                    'length' % (idx_name, table_name, col))
+            key_bytes += column_key_bytes
+        if key_bytes > MAX_INDEX_KEY_BYTES:
+            raise exceptions.InvalidSchemaDeclaration(
+                'index %s on table %s (%s) would need a %d byte key at '
+                'utf8mb4, over InnoDB\'s %d byte index key limit; lower '
+                'the max_length of its str fields (%d characters is the '
+                'most a lone VARCHAR may index) or index a shorter column'
+                % (idx_name, table_name, ', '.join(idx_columns), key_bytes,
+                   MAX_INDEX_KEY_BYTES,
+                   MAX_INDEX_KEY_BYTES // UTF8MB4_BYTES_PER_CHARACTER))
+
+
 def stored_max_length(
         model: type[BaseModel], field_name: str) -> Optional[int]:
     """How many characters this field's generated column can really hold.
@@ -596,6 +704,14 @@ def pydantic_to_sqlalchemy_table(
                 idx_columns = (idx_columns,)
             idx_name = f'idx_{table_name}_{"_".join(idx_columns)}'
             all_indexes.append((idx_name, idx_columns, False))
+
+    checked_indexes = [(idx_name, tuple(idx_columns))
+                       for idx_name, idx_columns, _ in all_indexes]
+    primary_key = tuple(
+        column.name for column in columns if column.primary_key)
+    if primary_key:
+        checked_indexes.append(('PRIMARY', primary_key))
+    _check_table_limits(table_name, columns, checked_indexes)
 
     # Serialise table creation; if the table was registered while we
     # were waiting on the lock, hand back the existing Table object
