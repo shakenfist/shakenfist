@@ -657,6 +657,10 @@
          <lastmod>2026-11-22</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/instar/crates/fetch-protocol/</loc>
+         <lastmod>2026-11-22</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/instar/crates/guest-protocol/</loc>
          <lastmod>2026-11-22</lastmod>
     </url>
@@ -1202,6 +1206,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-http-input-phase-01-guest-wait/</loc>
+         <lastmod>2026-11-22</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-http-input-phase-02-protocol/</loc>
          <lastmod>2026-11-22</lastmod>
     </url>
     <url>

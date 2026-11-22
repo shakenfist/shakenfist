@@ -4542,6 +4542,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#what-a-failed-copy-leaves-behind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a failed copy leaves behind
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#known-divergences-from-qemu-img-dd" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5624,6 +5635,34 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crates/fetch-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fetch Protocol Crate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -16362,6 +16401,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#what-a-failed-copy-leaves-behind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a failed copy leaves behind
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#known-divergences-from-qemu-img-dd" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16754,6 +16804,13 @@ and virtual-size- and data-identical (round-trip-to-raw byte-identical)
 for structured formats. This is verified by the integration test suite
 (<code>tests/test_dd.py</code>, <code>tests/test_dd_baselines.py</code>) across qemu-img
 versions 6.0.0 through 10.2.0.</p>
+<h2 id="what-a-failed-copy-leaves-behind">What a failed copy leaves behind<a class="headerlink" href="#what-a-failed-copy-leaves-behind" title="Permanent link">&para;</a></h2>
+<p><code>dd</code> shares <code>convert</code>'s rule -- an output left empty is removed, an
+output holding bytes is kept -- and in practice always takes the second
+branch. <code>dd</code> sizes its output to the window up front rather than growing
+it as it writes, so the file is never empty even when the first write
+fails. See "What a failed conversion leaves behind" in
+<a href="/components/instar/convert/">convert.md</a>.</p>
 <h2 id="known-divergences-from-qemu-img-dd">Known divergences from <code>qemu-img dd</code><a class="headerlink" href="#known-divergences-from-qemu-img-dd" title="Permanent link">&para;</a></h2>
 <h3 id="count0-o-vmdk"><code>count=0 -O vmdk</code><a class="headerlink" href="#count0-o-vmdk" title="Permanent link">&para;</a></h3>
 <p><code>qemu-img dd</code> itself exits non-zero (exit 1) when <code>count=0 -O vmdk</code>

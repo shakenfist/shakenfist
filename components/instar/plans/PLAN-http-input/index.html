@@ -5402,6 +5402,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../crates/fetch-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fetch Protocol Crate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../crates/guest-protocol/" class="md-nav__link">
         
   
@@ -6470,10 +6498,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-not-started" class="md-nav__link">
+  <a href="#status-in-progress" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: Not started
+        Status: In progress
       
     </span>
   </a>
@@ -16313,10 +16341,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-not-started" class="md-nav__link">
+  <a href="#status-in-progress" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: Not started
+        Status: In progress
       
     </span>
   </a>
@@ -16544,7 +16572,7 @@
 
 
 <h1 id="streaming-image-input-over-http-and-https">Streaming image input over HTTP and HTTPS<a class="headerlink" href="#streaming-image-input-over-http-and-https" title="Permanent link">&para;</a></h1>
-<h2 id="status-not-started">Status: Not started<a class="headerlink" href="#status-not-started" title="Permanent link">&para;</a></h2>
+<h2 id="status-in-progress">Status: In progress<a class="headerlink" href="#status-in-progress" title="Permanent link">&para;</a></h2>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the instar codebase thoroughly. Read relevant
@@ -16679,9 +16707,14 @@ taking longer than that to answer one read. Queue depth is one.</p>
 <p><strong>Unix-socket limits, measured here.</strong> <code>net.core.wmem_max</code> is
 212992, so a <code>SOCK_SEQPACKET</code> socketpair's <code>SO_SNDBUF</code> saturates at
 425984 however much is requested: a single 256 KiB datagram sends,
-and a single 1 MiB datagram fails. Any design that carries a block
-of image data in one datagram is capped near 256 KiB on default
-sysctls, and that limit is a sysctl the user can lower.</p>
+and a single 1 MiB datagram fails. So a design that carries a block
+of image data in one datagram is capped at 425952 bytes here once a
+side asks for the buffer, and at 212960 if it does not -- the kernel
+clamps a request to <code>wmem_max</code> and then doubles it, so neither
+figure follows from the sysctl by inspection, and both move if the
+user lowers it. Phase 2 measured this precisely; see open question 2,
+which this paragraph used to contradict by splitting the difference
+at "near 256 KiB".</p>
 <p><strong>What the host already reads for itself.</strong> Backing-chain discovery
 (<code>src/vmm/src/chain.rs</code>) runs the sandboxed info operation once per
 chain level, and checks each discovered path against an allowlist
@@ -16823,26 +16856,38 @@ give it -- and both say so in their own text.</p>
    the only new untrusted parse in the privileged process and it
    should be small enough to fuzz exhaustively.</p>
 <ol>
-<li>
-<p><strong><code>SOCK_SEQPACKET</code> or <code>SOCK_STREAM</code>, and what block size?</strong>
+<li><strong><code>SOCK_SEQPACKET</code> or <code>SOCK_STREAM</code>, and what block size?</strong>
    <em>Resolved 2026-11-18: <code>SOCK_SEQPACKET</code>, 64 KiB default, 256 KiB
    ceiling negotiated at init.</em> SEQPACKET makes message boundaries
    the kernel's problem, which removes framing desynchronisation
    from the privileged parser entirely. 64 KiB matches the guest's
    own request size, and readahead comes from many outstanding
-   requests rather than larger ones. The measured <code>wmem_max</code> of
-   212992 caps a single datagram near 256 KiB here and will be lower
-   on some machines, so the ceiling is negotiated rather than
-   assumed. If phase 6's measurement shows round-trip count
+   requests rather than larger ones.</li>
+</ol>
+<p><em>Corrected by phase 2's survey, 2026-11-19.</em> This question
+   originally said that "the measured <code>wmem_max</code> of 212992 caps a
+   single datagram near 256 KiB here". It does not, in either
+   direction. A fresh <code>SOCK_SEQPACKET</code> socketpair on this host gets
+   <code>SO_SNDBUF</code> 212992 and caps a datagram at 212960 bytes, which is
+   208 KiB and below 256 KiB; after an explicit
+   <code>setsockopt(SO_SNDBUF, ...)</code> the kernel clamps the request to
+   <code>wmem_max</code> and then doubles it, giving 425984 and a 425952-byte
+   ceiling, which is 416 KiB and above it. Neither number follows
+   from the sysctl by inspection, so phase 2 negotiates from the
+   <code>SO_SNDBUF</code> the kernel actually granted on each side rather than
+   from any sysctl, and 64 KiB is the default because it is the only
+   size that fits everywhere without asking for anything. If phase
+   6's measurement shows round-trip count
    dominating, phase 6 revisits it -- <code>SOCK_STREAM</code> with fixed
    headers, or scatter-gather across several datagrams -- rather
    than phase 2 guessing now.</p>
-</li>
+<ol>
 <li>
 <p><strong>Where do the cache and the readahead live?</strong>
    <em>Resolved 2026-11-18: in the fetcher.</em> The VMM's <code>read_at</code> stays
    one round trip, and the fetcher owns the block cache, the
-   coalescing of 512-byte requests, and the asynchronous readahead,
+   coalescing of repeated and overlapping 64 KiB requests, and the
+   asynchronous readahead,
    issuing overlapping HTTP requests without the VMM knowing. A
    compromised fetcher serving stale or wrong cached bytes is still
    only serving wrong bytes. Putting the cache in the VMM would mean
@@ -17055,12 +17100,12 @@ there is a confined process to put it in.</p>
 <tr>
 <td>1. Guest I/O wait</td>
 <td><a href="/components/instar/plans/PLAN-http-input-phase-01-guest-wait/">PLAN-http-input-phase-01-guest-wait.md</a></td>
-<td>Not started</td>
-<td></td>
+<td>Complete</td>
+<td>a8387ffe</td>
 </tr>
 <tr>
 <td>2. Fetch protocol and a file-backed fetcher</td>
-<td>PLAN-http-input-phase-02-protocol.md</td>
+<td><a href="/components/instar/plans/PLAN-http-input-phase-02-protocol/">PLAN-http-input-phase-02-protocol.md</a></td>
 <td>Not started</td>
 <td></td>
 </tr>
@@ -17147,11 +17192,53 @@ protocol -- fixed-layout headers, offset-addressed reads,
 out-of-order completion by request id -- and build <code>instar-fetch</code>
 serving a local file over it, with no network code at all. Records
 the NBD and virtqueue comparisons from open question 1.</p>
+<p>Planned 2026-11-19. Three things the phase plan decided that this
+section did not anticipate. The <strong>VMM-side client lands in this
+phase too</strong>, as a standalone type with <code>BackingStore::read_at</code>'s
+exact signature, because otherwise phase 2 can only be tested
+through throwaway code and phase 3 integrates a client written for
+the first time at the point of integration. The fetcher <strong>takes
+descriptor numbers rather than a path</strong> -- the VMM opens the file and
+the fetcher inherits it -- which keeps path resolution on the side
+that holds the user's authority and lets phase 4 confine the file
+backend to no filesystem access at all. And the <strong>decoder's fuzz
+target lands here rather than in phase 9</strong>, because this decoder is
+the only new untrusted parse the plan adds to the privileged
+process and phase 9's business is HTTP and fault injection.</p>
+<p>The survey also found that <code>std</code> cannot create a <code>SOCK_SEQPACKET</code>
+socket at all -- <code>std::os::unix::net</code> offers only <code>SOCK_STREAM</code> and
+<code>SOCK_DGRAM</code> -- so the socket is a <code>libc::socketpair</code> behind a safe
+wrapper in the pattern of <code>src/vmm/src/ioevent.rs</code>, rather than a
+new dependency in the privileged process.</p>
 <p><strong>3. Remote backing store.</strong> <code>BackingStore</code> gains a second kind,
 the read-only operations accept a URL, and the fetcher's lifecycle
 is owned: started before <code>/dev/kvm</code> is opened, reaped on every exit
 path. End state: <code>instar info file:///path</code> works end to end
 through the socket.</p>
+<p>Phase 2's survey sharpened two things here. <code>BackingStore</code> is a
+plain struct today -- <code>src/vmm/src/backing.rs</code> holds a <code>File</code>, a
+capacity, a size and a sparse flag, with no enum, trait or
+indirection -- so "gains a second kind" means introducing the
+polymorphism as well as the remote implementation. And the VMM has
+never spawned a child process: the only <code>Command::new</code> under
+<code>src/vmm/src/</code> runs <code>qemu-img --version</code>, so there is no
+descriptor-passing, reaping or child signal handling to extend. Phase
+2's review round added a third thing this phase does not have to do:
+the fetch client's <code>read_at</code> zero-fills past the advertised capacity,
+exactly as the local store does past the end of its file, because a
+device's capacity is the image's length rounded up to a whole sector
+and the guest's last read of a ragged image legitimately overhangs it.
+The two are interchangeable there, so nothing above has to clamp. The
+second review round added two facts this phase inherits rather than
+decides: the advertised capacity is read once at init and never
+re-read, so a source that grows afterwards reads as zeros past the old
+size and one that shrinks fails with <code>UnexpectedEof</code> -- again what the
+local store does with a file that changes under it -- and the
+fetcher's stderr carries one line per refused or non-<code>Ok</code> request, so
+whatever routes that stderr into a log owns a rate the peer sets and
+should bound or sample it. This phase should also fix #932, the
+virtqueue error the host cannot read that hangs the guest, because it
+multiplies the ways the host can fail to answer a request.</p>
 <p><strong>4. Confinement.</strong> Landlock, seccomp-bpf, user and mount
 namespaces, rlimits (<code>RLIMIT_FSIZE</code> 0 and <code>RLIMIT_NPROC</code> 0 are the
 cheap wins), <code>PR_SET_NO_NEW_PRIVS</code>, <code>PR_SET_DUMPABLE</code> 0, and
@@ -17672,6 +17759,23 @@ chosen to defer to here, so that we do not forget them.</p>
   35 test modules. Phase 1 added its own two and the shared rig, and
   marked the list as curated rather than complete; completing it, with
   a CI guard in <code>tools/ci/check-test-partition.py</code>, is the fix.</li>
+<li><strong>#932 should be fixed in phase 3, not later.</strong> Phase 1 made the
+  guest's wait unbounded and made the host complete a failed request
+  with an error status, which is what makes a remote read's failure
+  survivable. But an error the host cannot <em>read</em> is still never
+  completed, and phase 3 multiplies the ways the host can fail to
+  answer by putting a socket and another process behind every read,
+  so the hang stops being a corner case once the fetcher exists.</li>
+<li><strong>The measured datagram ceiling, for phase 6's block-size
+  decision.</strong> On a stock Linux host a socket pair that asks for the
+  largest buffers is granted 425984 bytes an end, giving a
+  425952-byte datagram ceiling; a pair left alone gets 212992 and</li>
+<li>The kernel clamps a request to <code>wmem_max</code> and then doubles
+  it, so neither figure follows from the sysctl by inspection. The
+  negotiation settles on the 64 KiB default rather than either, and
+  phase 6 raising that default is a change to one constant, because
+  the headers and the requested buffers are already built for the
+  256 KiB maximum.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>This section should list any bugs we encounter during development

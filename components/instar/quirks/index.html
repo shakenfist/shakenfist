@@ -9514,6 +9514,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../crates/fetch-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fetch Protocol Crate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../crates/guest-protocol/" class="md-nav__link">
         
   
@@ -25943,6 +25971,12 @@ checksum is refused rather than read from the trailing footer instead.
 The fallback to the tail exists for a fixed VHD, which keeps no copy at
 offset 0 at all; using it for a <em>bad</em> copy would open an image qemu will
 not touch, with the image's two footers disagreeing about its geometry.</p>
+<p>Every operation says so in qemu's words. The refusal is raised by name
+from the reader, so <code>info</code>, <code>map</code>, <code>measure</code> and <code>convert</code> all print
+<code>Could not open 'X': Incorrect header checksum</code>, as qemu-img does for
+each of them. <code>map</code> used to say <code>source format unrecognised</code> and
+<code>measure</code> <code>source image is unsupported format</code> -- for an image whose
+format was recognised and then refused.</p>
 <p><code>check</code> is the exception, and deliberately: it parses a footer without
 verifying it, so that it can decode a corrupt one and report
 <code>VHD footer checksum mismatch</code> as a finding. A reader that refuses the

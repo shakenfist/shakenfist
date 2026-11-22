@@ -5693,6 +5693,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../crates/fetch-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fetch Protocol Crate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../crates/guest-protocol/" class="md-nav__link">
         
   
@@ -16655,8 +16683,10 @@ that reason; the dev/test image next door stays managed normally.</p>
 <p>Two checks back the pin up, because a comment is not a control:</p>
 <ul>
 <li><code>tools/ci/check-glibc-floor.sh</code> runs on the line immediately after
-  <code>make instar</code>, in both <code>build-and-test</code> and the release workflow, and
-  fails if the binary references a symbol above <code>GLIBC_2.31</code> — the
+  <code>make instar</code>, in both <code>build-and-test</code> and the release workflow, once
+  per shipped binary — <code>instar</code> by default and <code>instar-fetch</code> by
+  argument — and fails if either references a symbol above
+  <code>GLIBC_2.31</code> — the
   floor published in <a href="/components/instar/installation/">installation.md</a>, not the matrix
   CI's oldest distro (Rocky 9, 2.34), which is looser than the promise
   and would let a smaller base movement through unnoticed. It needs
@@ -17779,7 +17809,7 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 <li><code>tools/ci/test_differential_fuzz_issues.py</code> - Tests that the differential fuzzer files one issue per divergence shape, capped at <code>--max-issues</code>, and does not report a failed filing as filed. Run with <code>python3 -m unittest</code>; the <code>ci-tooling</code> CI job does</li>
 <li><code>tools/ci/test_differential_fuzz_oracles.py</code> - Tests that the differential fuzzer refuses to run with a libyal oracle missing when <code>INSTAR_REQUIRE_LIBYAL</code> is set, names the tool, package and affected formats when it does, and still degrades gracefully without the variable. Run with <code>python3 -m unittest</code>; the <code>ci-tooling</code> CI job does</li>
 <li><code>tools/ci/test_extract_fuzz_corpus.py</code> - Tests the corpus seed builders in <code>scripts/extract-fuzz-corpus.py</code>: that a fixture carrying a hostile locator offset cannot abort the nightly seeding run, and that the defect it carries survives the reshape. Run with <code>python3 -m unittest</code>; the <code>ci-tooling</code> CI job does</li>
-<li><code>tools/ci/check-glibc-floor.sh</code> - Fails if the built <code>instar</code> binary needs a glibc above the published floor (<code>GLIBC_2.31</code>, Debian 11; see <code>docs/installation.md</code>). Runs immediately after <code>make instar</code> in both <code>build-and-test</code> and the release workflow. Do not raise the ceiling to make it pass: it means the release image's base moved, and <code>src/.devcontainer/build/Dockerfile</code> must stay on <code>debian:bullseye</code></li>
+<li><code>tools/ci/check-glibc-floor.sh</code> - Fails if a built binary needs a glibc above the published floor (<code>GLIBC_2.31</code>, Debian 11; see <code>docs/installation.md</code>). Takes the binary as its first argument and defaults to <code>instar</code>, so each shipped binary needs its own invocation: both call sites check <code>instar</code> and then <code>src/target/release/instar-fetch</code>, which the packages and the release tarball also carry. Runs immediately after <code>make instar</code> in both <code>build-and-test</code> and the release workflow. Do not raise the ceiling to make it pass: it means the release image's base moved, and <code>src/.devcontainer/build/Dockerfile</code> must stay on <code>debian:bullseye</code></li>
 <li><code>tools/ci/test-check-glibc-floor.sh</code> - Tests for that check; the <code>ci-tooling</code> CI job runs it</li>
 <li><code>tools/ci/claude-result.sh</code> - Reads the JSONL stream a <code>claude -p --output-format stream-json --verbose</code> run leaves behind; <code>--text</code> reconstructs the assistant text (plus a diagnostic block when the run reported an error or the stream was truncated), <code>--trailer</code> emits the <code>Assisted-By:</code>/<code>Co-Authored-By:</code> pair naming the model the run actually resolved to. Called from <code>test-drift-fix.yml</code></li>
 <li><code>tools/ci/test-claude-result.sh</code> - Tests for that helper; the <code>ci-tooling</code> CI job runs it</li>

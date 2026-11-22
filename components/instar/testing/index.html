@@ -5213,10 +5213,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#failed-host-read-tests-test_luks_probe_read_failurepy" class="md-nav__link">
+  <a href="#failed-host-read-tests-test_luks_probe_read_failurepy-test_copy_read_failurepy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Failed Host Read Tests (test_luks_probe_read_failure.py)
+        Failed Host Read Tests (test_luks_probe_read_failure.py, test_copy_read_failure.py)
       
     </span>
   </a>
@@ -5668,6 +5668,34 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crates/fetch-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fetch Protocol Crate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -16489,10 +16517,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#failed-host-read-tests-test_luks_probe_read_failurepy" class="md-nav__link">
+  <a href="#failed-host-read-tests-test_luks_probe_read_failurepy-test_copy_read_failurepy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Failed Host Read Tests (test_luks_probe_read_failure.py)
+        Failed Host Read Tests (test_luks_probe_read_failure.py, test_copy_read_failure.py)
       
     </span>
   </a>
@@ -17006,8 +17034,8 @@ run read...") is index drift, and re-running is the right response. A
 failure from the behavioural assertion -- a delayed conversion that
 exited non-zero, or a failed probe read that converted anyway -- is
 the defect these tests exist for, and re-running it is not.</p>
-<h3 id="failed-host-read-tests-test_luks_probe_read_failurepy">Failed Host Read Tests (<code>test_luks_probe_read_failure.py</code>)<a class="headerlink" href="#failed-host-read-tests-test_luks_probe_read_failurepy" title="Permanent link">&para;</a></h3>
-<p>The sibling of the test above, and the same machinery pointed the
+<h3 id="failed-host-read-tests-test_luks_probe_read_failurepy-test_copy_read_failurepy">Failed Host Read Tests (<code>test_luks_probe_read_failure.py</code>, <code>test_copy_read_failure.py</code>)<a class="headerlink" href="#failed-host-read-tests-test_luks_probe_read_failurepy-test_copy_read_failurepy" title="Permanent link">&para;</a></h3>
+<p>The siblings of the test above, and the same machinery pointed the
 other way: <code>strace -e inject=read:error=EIO:when=N</code> fails one host
 read instead of delaying it. What it guards is <code>convert</code>'s choice
 between a LUKS container's two payload shapes, which it makes by
@@ -17028,6 +17056,24 @@ flat payload path re-reads the sector the probe read, and treats a
 failure there as fatal, so a hard error on every read of that offset
 is reported correctly and proves nothing. <code>when=N</code> failing exactly one
 invocation is what reproduces the transient failure the defect needed.</p>
+<p><code>test_copy_read_failure.py</code> points the same injection at <code>copy</code>, whose
+defect was the whole verdict rather than one decision inside it: the
+host inferred success from the guest reaching HLT, which every failure
+path also reaches, so a failed read gave exit 0 and an output file
+holding only the sectors written before it. It needs no fixture -- the
+input is generated, since nothing about the test depends on a format --
+and it fails a read in the middle of the copy rather than the first
+one, so the half-written file the defect leaves behind is part of what
+is asserted. Its index is derived the same way, from a trace of the
+very copy it is about to inject into.</p>
+<p><code>test_failed_output_file.py</code> is the one of these that injects into
+<code>write</code> rather than <code>read</code>, because which write fails is what selects
+the behaviour under test: the first write failing leaves the output
+empty and the second leaves one sector in it, which are the two halves
+of the rule about what a failed run leaves on disk. It needs no index
+derivation for that reason, and asserts instead that exactly one write
+was injected -- an uninjected run writes the whole output and exits 0,
+so without that assertion the test would be measuring a successful run.</p>
 <h2 id="running-tests">Running Tests<a class="headerlink" href="#running-tests" title="Permanent link">&para;</a></h2>
 <h3 id="make-targets">Make Targets<a class="headerlink" href="#make-targets" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Create Python virtual environment (first time only). The venv sees</span>
@@ -17171,9 +17217,10 @@ the host however long it takes, so contention alone no longer
 produces either message. In a current tree they mean something else:
 <code>&lt;op&gt; operation failed</code> — <code>convert operation failed</code>,
 <code>dd operation failed</code> — is a guest failure the host captured no
-reason for, and a genuine I/O error names the image and the offset
-it stopped at. Treat either as a real defect rather than replaying
-it for load.</p>
+reason for, a genuine I/O error names the image and the offset it
+stopped at, and a guest that faulted names the CPU exception and the
+address it faulted at. Treat any of them as a real defect rather than
+replaying it for load.</p>
 <p>The design is <strong>tests from the source tree, binary from the package</strong>:
 the whole <code>tests/</code> tree is copied into the container and driven by
 <code>stestr</code>, while the harness is pointed at the installed
@@ -18573,8 +18620,8 @@ mock <code>CallTable</code> backed by fuzzer input provides the I/O layer,
 allowing libFuzzer to explore malformed input space that differential
 differential fuzzing cannot reach.</p>
 <h3 id="fuzz-targets">Fuzz targets<a class="headerlink" href="#fuzz-targets" title="Permanent link">&para;</a></h3>
-<p>44 targets across the parser and planner crates, organized in
-<code>src/fuzz/</code>:</p>
+<p>45 targets across the parser, planner and protocol crates, organized
+in <code>src/fuzz/</code>:</p>
 <table>
 <thead>
 <tr>
@@ -18668,6 +18715,11 @@ differential fuzzing cannot reach.</p>
 <td><code>fuzz_vdi_bat</code></td>
 <td>vdi</td>
 <td>CallTable</td>
+</tr>
+<tr>
+<td><code>fuzz_fetch_protocol</code></td>
+<td>fetch-protocol</td>
+<td>Buffer-based</td>
 </tr>
 <tr>
 <td><code>fuzz_parallels_header</code></td>
@@ -18998,9 +19050,9 @@ Rather than splitting the budget evenly, the run plan is computed by
 math, CHS rounding, and the planner/emitter crates) take a short fixed
 slice (300s — they reach steady coverage in well under a minute), and
 the deep parser/format targets split the remainder. With the current
-44 targets (18 fast, 26 deep) and the full 450 minutes, that gives the
+45 targets (19 fast, 26 deep) and the full 450 minutes, that gives the
 26 deep targets ~14 min each versus ~10 min under an even split
-(27000 / 44). A plan never sums to more than its budget: a budget too
+(27000 / 45). A plan never sums to more than its budget: a budget too
 small for every target's fast slice is shared equally instead, with a
 warning. <code>tools/ci/test-fuzz-tier.sh</code> asserts both, in <code>ci-tooling</code>.</p>
 <p>The budget used to be a fixed 450 minutes, which left 30 for setup and
@@ -20484,9 +20536,20 @@ and this section has never named all of them.</p>
   first payload sector must fail the conversion rather than read as
   "no inner format" (<code>strace -e inject=read:error=EIO</code>); see "Failed
   Host Read Tests" above</li>
-<li><code>tests/strace_injection.py</code> - The shared syscall-injection rig for
-  the two modules above: the capability probe, the per-thread index
-  derivation and the did-it-land parsers</li>
+<li><code>tests/test_copy_read_failure.py</code> - A failed read of the input must
+  fail <code>copy</code> rather than give exit 0 and a short output file
+  (<code>strace -e inject=read:error=EIO</code>); see "Failed Host Read Tests"
+  above</li>
+<li><code>tests/test_failed_output_file.py</code> - A failed run must remove an
+  output file it left empty and keep one holding bytes
+  (<code>strace -e inject=write:error=ENOSPC</code>); see "Failed Host Read Tests"
+  above</li>
+<li><code>tests/strace_injection.py</code> - The shared syscall-injection rig: the
+  capability probe all four modules above use, and the read-line
+  parsers (<code>_READ_LINE</code>, <code>_busiest_thread</code>) the read-injecting modules
+  build on. Each module derives its own injection index and checks its
+  own injection landed, because each aims at a different syscall or a
+  different read</li>
 <li><code>tests/test_bench.py</code> - Integration tests for the <code>instar bench</code>
   subcommand (62 tests): read/write request scheduling, host-side
   validation matrix, the qcow2 write-envelope gates, <code>--output json</code>

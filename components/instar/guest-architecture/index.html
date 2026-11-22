@@ -5526,6 +5526,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../crates/fetch-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fetch Protocol Crate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../crates/guest-protocol/" class="md-nav__link">
         
   
@@ -16599,7 +16627,7 @@ provides a modular architecture with:
  because the guest waits for each request without a deadline and the
  host completes every request it can read, with an error status when
  it cannot serve it — see "A request the host cannot answer" below
- for the one case that is not completed, which hangs the guest),
+ for the one case that is not completed, which fails the run),
  <code>Durability</code> fsyncs where the capability exists and degrades to
  <code>Ordering</code> elsewhere (matching commit/rebase's no-fsync
  output-device reality). Host-unit-tested against a mock <code>DeviceIo</code>
@@ -17178,25 +17206,39 @@ that shrank, a full filesystem -- produces a used-ring entry carrying
 sector it was on, the host adds the errno it recorded, and the process
 exits non-zero. This is the ordinary failure path and it is tested
 both as a unit and end to end with an injected <code>EIO</code>.</p>
-<p><strong>A request the host cannot <em>read</em> is not completed at all.</strong> If the
-descriptor chain is malformed, a descriptor names an address outside
-guest memory, or a guest-memory access fails, the device has no status
-descriptor it can trust and propagates the error instead. On the
-ioeventfd path -- the normal one -- the I/O thread can only log it and
-carry on: nothing reaches the used ring, the guest's wait never ends,
-and the vCPU thread is inside <code>KVM_RUN</code> while the guest spins, so the
-run cannot be failed from either side. It takes a <code>SIGINT</code>. The
-vCPU-exit fallback (<code>process_queue_for_device</code>) propagates to the run
-loop and does fail the run, so the behaviour depends on which path is
-active.</p>
-<p>Every way to reach the second case is an instar bug rather than
-anything a hostile image can ask for: the guest builds its own
-descriptor chains, and the addresses in them come from the guest's own
-fixed DMA pool. Image data cannot steer it. That is why it is recorded
-here rather than fixed -- the fix is to carry the failure out to the
-run loop and terminate the run, which needs shared fatal state and a
-way to kick the vCPU out of <code>KVM_RUN</code>, and that is tracked as its own
-issue.</p>
+<p><strong>A request the host cannot <em>read</em> fails the run.</strong> If the descriptor
+chain is malformed, a descriptor names an address outside guest memory,
+or a guest-memory access fails, the device has no status descriptor it
+can trust, so there is nowhere to put a status byte and nothing reaches
+the used ring. The guest's wait for that request can therefore never
+end on its own, and the vCPU thread is inside <code>KVM_RUN</code> while the guest
+spins on it, so neither thread can report the failure where it
+happened.</p>
+<p>The I/O thread hands it over instead. It records the failure in state
+the run loop shares (<code>FatalIoError</code>) and signals the vCPU thread, whose
+<code>KVM_RUN</code> returns <code>EINTR</code>; every run loop enters the guest through
+<code>run_guest</code>, which renders the recorded failure rather than the
+interruption that delivered it. <code>run_guest</code> checks for one on every
+exit, not only an interrupted one, so a failure recorded while the vCPU
+was already outside <code>KVM_RUN</code> cannot be lost to an exit the loop ends
+on. The kick is repeated on each wake of the I/O loop while a failure
+is recorded and the run loop has not read it, because a signal that
+arrives in the moment before <code>KVM_RUN</code> is entered is simply lost; once
+the run loop has read it the kick stops. The handler is installed with
+<code>SA_RESTART</code>, which does not stop <code>KVM_RUN</code> returning <code>EINTR</code> but does
+keep a late kick from failing an ordinary syscall the vCPU thread makes
+afterwards, and a handler that cannot be installed is reported as a
+warning, since without it the run would hang again. The vCPU-exit fallback
+(<code>process_queue_for_device</code>) propagates the same error to the run loop,
+so the two queue-service paths now agree; before, which one was active
+decided whether the run hung or failed.</p>
+<p>Every way to reach this is an instar bug rather than anything a hostile
+image can ask for: the guest builds its own descriptor chains, and the
+addresses in them come from the guest's own fixed DMA pool. Image data
+cannot steer it. So no fixture reaches it, and what is tested is the
+mechanism rather than a trigger: that the first failure is the one
+kept, and that recording one really does interrupt a thread blocked in
+a syscall.</p>
 
 
 

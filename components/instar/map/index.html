@@ -5654,6 +5654,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../crates/fetch-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fetch Protocol Crate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../crates/guest-protocol/" class="md-nav__link">
         
   
@@ -16769,16 +16797,18 @@ sparseness is not reflected (see below), and the virtual size the
 extent covers is the virtio device's capacity rounded up to the input
 sector size rather than the file's own length (see below as well).</p>
 <h2 id="malformed-block-tables">Malformed block tables<a class="headerlink" href="#malformed-block-tables" title="Permanent link">&para;</a></h2>
-<p><code>map</code>'s VHDX walk refuses a payload block whose BAT entry names a
+<p><code>map</code>'s VHDX and VHD walks refuse a block whose table entry names a
 byte range that is the image's own structure, rather than reporting
-it as <code>Data</code>: file offset zero, where the file identifier and
-headers live, or a range overlapping any region the image's region
-table declares (the BAT region, the metadata region, or one this
-build does not recognise). This is the same test the guest chain
-walker already applies when reading such a block for <code>convert</code>,
-<code>dd</code>, <code>compare</code>, <code>bench</code> and <code>rebase</code>; <code>map</code>'s own whole-BAT walk did
-not apply it until recently, so it could report a block one of those
-operations already refused to read:</p>
+it as <code>Data</code>. For VHDX that is file offset zero, where the file
+identifier and headers live, or a range overlapping any region the
+image's region table declares (the BAT region, the metadata region,
+or one this build does not recognise); for VHD it is a BAT entry
+whose block overlaps a region the image declares, which at an entry
+of zero is the footer copy and the dynamic header. This is the same
+test the guest chain walker already applies when reading such a block
+for <code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code> and <code>rebase</code>; <code>map</code>'s own
+whole-table walk did not apply it until recently, so it could report
+a block one of those operations already refused to read:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>map: source block table names a block inside the image's own
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>structure (at file offset zero, or overlapping a region the image
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>declares); the format is recognised, the image is malformed
@@ -16791,6 +16821,10 @@ immediately past the last region in the table is unaffected and
 still maps normally. See
 <a href="/components/instar/format-internals/#vhdx">docs/format-internals.md § vhdx</a> for the
 predicate both the readers and this walk share.</p>
+<p>The VHD half said <code>map: I/O failure walking the source</code> until
+recently, which named the one thing that had not gone wrong: nothing
+failed to read, and what was read disagrees with itself. The two
+formats now answer alike.</p>
 <h2 id="refused-qcow2-l2-entries">Refused qcow2 L2 entries<a class="headerlink" href="#refused-qcow2-l2-entries" title="Permanent link">&para;</a></h2>
 <p><code>map</code> refuses a qcow2 image whose L2 table holds an entry <code>qemu-img
 map</code> fails on with <code>EIO</code>, rather than mapping it. There are two

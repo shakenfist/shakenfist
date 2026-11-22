@@ -5402,6 +5402,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../crates/fetch-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fetch Protocol Crate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../crates/guest-protocol/" class="md-nav__link">
         
   
@@ -16397,8 +16425,8 @@ maintained document, so it may state things a later phase overturned.</p>
 <td>2026-11-18</td>
 <td><a href="/components/instar/plans/PLAN-http-input/">Streaming image input over HTTP and HTTPS</a></td>
 <td>Let read-only operations take an <code>https://</code> input and start work before the transfer finishes, fetching only the bytes the image's own metadata asks for, with every line of network, TLS and URL code in a separate confined <code>instar-fetch</code> process that never holds a <code>/dev/kvm</code> descriptor and speaks a fixed-layout, offset-addressed byte protocol over a Unix socket. Measurement says the buffer is the easy part: the guest's I/O wait is a 100M-iteration spin budget (1.3 s here) that reports a slow read as a hard failure, queue depth is one so 10 GiB at 64 KiB is about 164,000 serialised round trips, and an HTTP client in the VMM would put a TLS stack and a redirect follower in the process holding the invoking user's whole ambient authority. The partition is cheap because instar already assumes its input bytes are hostile, so a confined fetcher's compromise degrades to the baseline assumption. Phase 1 is a bug fix rather than enabling work: measurement on 2026-11-18 reproduced the timeout from one injected slow host read, which already fails a local convert with no network in sight and is now filed as #923 with its reporting half as #924; remote output, authentication and image-supplied URLs are refused by name</td>
-<td>Not started</td>
-<td><a href="/components/instar/plans/PLAN-http-input-phase-01-guest-wait/">1: guest wait</a>, 2: protocol, 3: backing, 4: confinement, 5: HTTP, 6: prefetch, 7: scope, 8: failures, 9: tests, 10: docs, 11: push audit (all nine open questions resolved 2026-11-18 -- a plain framed protocol over SEQPACKET rather than a virtqueue over shared memory, which would hand the untrusted fetcher a writable mapping the VMM dereferences; cache and readahead in the fetcher; ureq with rustls so the packages gain no C TLS stack; no credentials and no Range fallback without an explicit --spool. Phase 1 planned 2026-11-18: its survey corrected the master plan's claim that the deadline should move to the host -- nothing in the VMM times a request and neither thread servicing a virtio queue could, since both block inside the synchronous read, so the guest waits indefinitely and there is no host deadline; the phase also found the timeout is the only place a call-table I/O outlives its caller, which docs/guest-architecture.md relies on not happening)</td>
+<td>In progress</td>
+<td><a href="/components/instar/plans/PLAN-http-input-phase-01-guest-wait/">1: guest wait</a>, <a href="/components/instar/plans/PLAN-http-input-phase-02-protocol/">2: protocol</a>, 3: backing, 4: confinement, 5: HTTP, 6: prefetch, 7: scope, 8: failures, 9: tests, 10: docs, 11: push audit (all nine open questions resolved 2026-11-18 -- a plain framed protocol over SEQPACKET rather than a virtqueue over shared memory, which would hand the untrusted fetcher a writable mapping the VMM dereferences; cache and readahead in the fetcher; ureq with rustls so the packages gain no C TLS stack; no credentials and no Range fallback without an explicit --spool. Phase 1 planned 2026-11-18: its survey corrected the master plan's claim that the deadline should move to the host -- nothing in the VMM times a request and neither thread servicing a virtio queue could, since both block inside the synchronous read, so the guest waits indefinitely and there is no host deadline; the phase also found the timeout is the only place a call-table I/O outlives its caller, which docs/guest-architecture.md relies on not happening. Phase 1 merged 2026-11-19 as a8387ffe. Phase 2 planned 2026-11-19: its survey corrected the datagram ceiling open question 2 quoted -- measured, a default SEQPACKET socketpair caps a datagram at 208 KiB and an explicitly enlarged one at 416 KiB, so neither 256 KiB nor wmem_max is the number to negotiate against -- and found that Rust's std cannot create a SOCK_SEQPACKET socket at all, that make instar builds the VMM package rather than the workspace so a new binary is not built or packaged by default, and that BackingStore is a plain struct rather than something that can gain a second kind. The phase also pulls the VMM-side client and the decoder's fuzz target forward into itself, and has the fetcher inherit descriptors rather than open a path)</td>
 </tr>
 </tbody>
 </table>

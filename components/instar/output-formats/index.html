@@ -5236,6 +5236,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#diagnostic-records-on-stderr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagnostic Records on stderr
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#text-read-from-an-image" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5647,6 +5658,34 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crates/fetch-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fetch Protocol Crate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -16435,6 +16474,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#diagnostic-records-on-stderr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagnostic Records on stderr
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#text-read-from-an-image" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16766,6 +16816,39 @@ and parsing the version string. It then selects the appropriate output profile.<
 <a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Virtual size: </span><span class="si">{</span><span class="n">info</span><span class="p">[</span><span class="s1">'virtual-size'</span><span class="p">]</span><span class="si">}</span><span class="s2"> bytes"</span><span class="p">)</span>
 <a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Actual size: </span><span class="si">{</span><span class="n">info</span><span class="p">[</span><span class="s1">'actual-size'</span><span class="p">]</span><span class="si">}</span><span class="s2"> bytes"</span><span class="p">)</span>
 </code></pre></div>
+<h2 id="diagnostic-records-on-stderr">Diagnostic Records on stderr<a class="headerlink" href="#diagnostic-records-on-stderr" title="Permanent link">&para;</a></h2>
+<p>Separate from the answer a command prints on stdout, instar logs
+diagnostic records on stderr. <code>--verbose</code> chooses how much of that
+reaches you, not whether any of it does:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Without <code>--verbose</code></th>
+<th>With <code>--verbose</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Warnings and errors</td>
+<td>printed</td>
+<td>printed</td>
+</tr>
+<tr>
+<td>The running commentary (the guest's own messages, the host's trace of the run)</td>
+<td>suppressed</td>
+<td>printed</td>
+</tr>
+</tbody>
+</table>
+<p>A warning is written because the user needs to see it, so it does not
+wait for a flag the user had no reason to pass before the thing went
+wrong. An ordinary successful run logs nothing, because nothing in
+instar warns on the success path -- so the default behaviour is
+unchanged for every run that works.</p>
+<p>The records that end a command are not logged at all. A failure is
+reported as the process's error message and a non-zero exit status,
+which is independent of logging and of <code>--verbose</code>.</p>
 <h2 id="text-read-from-an-image">Text Read From an Image<a class="headerlink" href="#text-read-from-an-image" title="Permanent link">&para;</a></h2>
 <p>Many values instar prints come out of the image rather than from instar
 itself: a backing file name, an external data file path, a VMDK create
@@ -16792,9 +16875,9 @@ divergence from qemu-img, which prints these strings raw. It only shows
 for a name that contains one of the characters above, so the output for
 every ordinary image is byte-identical to qemu-img's.</p>
 <p>The same rule applies to <code>info --chain</code>, <code>snapshot -l</code>, <code>check</code>, the
-stderr notices about a backing reference, and every guest message and
-debug line printed with <code>--verbose</code>: the logger escapes each record as a
-whole, so this holds for lines added later too. Error messages that end a command
+stderr notices about a backing reference, and every diagnostic record
+the host logs: the logger escapes each record as a whole, so this holds
+for lines added later too. Error messages that end a command
 are printed with the same escaping by the Rust runtime.</p>
 <p><strong>JSON output</strong> always carries the exact value, so a script reading
 <code>backing-filename</code> gets the bytes the image holds. Strings are escaped

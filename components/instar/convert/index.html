@@ -4822,6 +4822,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#malformed-block-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Malformed block tables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-failed-conversion-leaves-behind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a failed conversion leaves behind
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#differencing-images" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5474,6 +5496,34 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crates/fetch-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fetch Protocol Crate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -16156,6 +16206,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#malformed-block-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Malformed block tables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-failed-conversion-leaves-behind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a failed conversion leaves behind
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#differencing-images" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16321,6 +16393,74 @@ so a 100-byte source converts to 512 bytes.</p>
 <p><code>dd</code> is the exception, because its <code>count</code>, <code>skip</code> and <code>seek</code> operands
 describe a window of the source rather than the whole of it; see
 <a href="/components/instar/dd/">dd.md</a>.</p>
+<h2 id="malformed-block-tables">Malformed block tables<a class="headerlink" href="#malformed-block-tables" title="Permanent link">&para;</a></h2>
+<p><code>convert</code> refuses a VHD or VHDX block whose table entry names a byte
+range that is the image's own structure, rather than reading the
+image's metadata out as disk content. For VHD that is a BAT entry whose
+block overlaps a region the image declares, which at an entry of zero
+is the footer copy and the dynamic header:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>convert: source block table names a block inside the image's own
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>structure, at host offset 0 (0x0); the format is recognised, the image
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>is malformed
+</code></pre></div>
+<p>Exit 1, and the output file is removed if nothing was written to it.
+The wording matches what <code>map</code> and <code>measure</code> say about the same image,
+so one image gets one answer whichever operation is asked, with the
+host offset added because only the chain reader knows it. qemu reads
+such a block out instead -- measured: <code>qemu-img convert</code> of a crafted
+fixture yields the image's own <code>cxsparse</code> header as payload -- so
+instar is deliberately stricter here. See <code>docs/map.md</code> for the walk
+side and <code>docs/format-internals.md</code> for the predicate they share.</p>
+<h2 id="what-a-failed-conversion-leaves-behind">What a failed conversion leaves behind<a class="headerlink" href="#what-a-failed-conversion-leaves-behind" title="Permanent link">&para;</a></h2>
+<p><code>convert</code> creates its output file before launching the guest, so a
+conversion the guest fails has already created the target. What is left
+there depends on how far the run got:</p>
+<table>
+<thead>
+<tr>
+<th>The run</th>
+<th>The output file</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>wrote nothing</td>
+<td>removed</td>
+</tr>
+<tr>
+<td>wrote some of the image</td>
+<td>kept, holding what was written</td>
+</tr>
+<tr>
+<td>was given the target with <code>--no-create</code></td>
+<td>kept, whatever it holds</td>
+</tr>
+</tbody>
+</table>
+<p>An output holding bytes is kept because <code>qemu-img convert</code> keeps its
+own, and those bytes are the only record of how far the run got. An
+empty one is removed because qemu-img never leaves one -- it diagnoses
+the failures that would produce it before creating the target at all --
+and because a file that holds nothing still tells a caller testing for
+the file's existence that the conversion ran.</p>
+<p>Under <code>--no-create</code> the target is an image the user supplied to be
+written into, which is never instar's to delete. The same applies to
+the <code>monolithicFlat</code> extent file, which is removed on the same terms as
+the descriptor.</p>
+<p>The rule holds however the run failed: a refusal the guest reports, a
+guest that crashes, or a request the host could not read (see "A
+request the host cannot answer" in
+<a href="/components/instar/guest-architecture/">guest-architecture.md</a>). And only a regular
+file is ever removed. A block device, <code>/dev/null</code> or a FIFO reports a
+length of zero as well, but an output path naming one is a target the
+user supplied, so a failed <code>convert in.qcow2 /dev/sdb</code> leaves the
+device node where it was; an output path that is a symlink is left
+alone too, along with whatever it points at.</p>
+<p><code>instar copy</code> follows the same rule.</p>
+<p>Three cases produce an output that is sized up front rather than grown
+as it is written, and such a file is never empty and so is always kept:
+<code>dd</code>, <code>convert -S 0</code> or <code>--preallocation</code> on a raw target, and
+<code>copy --preallocate-output</code>.</p>
 <h2 id="differencing-images">Differencing images<a class="headerlink" href="#differencing-images" title="Permanent link">&para;</a></h2>
 <p>A differencing VHD (footer disk type 4) or VHDX (<code>HasParent</code> set) stores
 only the sectors that differ from a parent image. <code>convert</code> composes such
@@ -16332,9 +16472,9 @@ flattened by hand.</p>
 <p>If the source's own chain has no parent to read — a differencing image
 with an empty or absent parent reference — <code>convert</code> still refuses it,
 rather than composing from nothing:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>convert: a differencing &lt;VHD|VHDX&gt; image in the chain convert was given
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>has no parent behind it, so the sectors it leaves to its parent could
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>not be composed
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>convert: a differencing &lt;VHD|VHDX&gt; image in the chain convert was given
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>has no parent behind it, so the sectors it leaves to its parent could
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>not be composed
 </code></pre></div>
 <p>and exits 1 with no output file left behind. If the chain names a parent
 that cannot be resolved — the file is missing, or outside the backing

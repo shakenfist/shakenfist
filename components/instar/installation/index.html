@@ -5504,6 +5504,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../crates/fetch-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fetch Protocol Crate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../crates/guest-protocol/" class="md-nav__link">
         
   
@@ -16252,17 +16280,22 @@ any host whose glibc is at least the one it was built against.)</p>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span><span class="s2">"./instar-</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">-1.x86_64.rpm"</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>instar<span class="w"> </span>--help
 </code></pre></div>
-<p>The packages install the VMM at <code>/usr/bin/instar</code> and the six guest
-binaries (loaded into the KVM sandbox at runtime) at
+<p>The packages install the VMM at <code>/usr/bin/instar</code> and the sixteen guest
+binaries (<code>.bin</code> files, loaded into the KVM sandbox at runtime) at
 <code>/usr/lib/instar/</code>.</p>
+<p>They also install a host-side executable, <code>instar-fetch</code>, at
+<code>/usr/lib/instar/instar-fetch</code> (mode 755). It is not a guest binary, and
+nothing invokes it yet: it is a component for later work to use.</p>
 <h2 id="tarball-any-linux">Tarball (any Linux)<a class="headerlink" href="#tarball-any-linux" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nv">VERSION</span><span class="o">=</span><span class="m">0</span>.3.0
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>curl<span class="w"> </span>-sL<span class="w"> </span><span class="s2">"https://github.com/shakenfist/instar/releases/download/v</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">/instar-v</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">-x86_64-unknown-linux-gnu.tar.gz"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>tar<span class="w"> </span>xz<span class="w"> </span>-C<span class="w"> </span>/usr/local/bin/
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>instar<span class="w"> </span>--help
 </code></pre></div>
-<p>The tarball contains the VMM and guest <code>.bin</code> files together; instar
-finds them by looking in the directory containing the executable.</p>
+<p>The tarball contains the VMM, the guest <code>.bin</code> files and the host-side
+<code>instar-fetch</code> executable together; instar finds them by looking in the
+directory containing the executable. As with the packages, nothing invokes
+<code>instar-fetch</code> yet.</p>
 <h2 id="system-requirements">System requirements<a class="headerlink" href="#system-requirements" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Linux</strong> (instar uses KVM for sandboxed image processing)</li>
