@@ -703,7 +703,65 @@ expensive to redo:
 
 ## Results
 
-To be completed as the phase executes.
+Every step ran. The table is `namespace_claim_holds` at schema
+version 1, `scheduler_node_capacity` at version 2 with three `held_*`
+columns, the node guard testing `used + held + request <= limit`, the
+reconciler recomputing the counters from the hold rows, the held
+figures published per node, and the documentation describing all of
+it. Nothing a caller can reach books a hold, so `held_*` is zero in
+any running cluster and none of this changes an admission today.
+
+### The mutation sweep
+
+Eight mutations, each applied alone from a pristine copy held outside
+the worktree, restored in a `finally` and compared afterwards, run
+with bytecode writing off and under `timeout 900`. Baselines were
+702 unit tests and 254 live tests on 11.8 with
+`innodb_snapshot_isolation` on, both clean. Every mutation was
+killed. The sweep script and one log per mutation are in the session
+scratchpad.
+
+| Mutation | Killed by |
+|---|---|
+| `held_*` dropped from `_claim_node()`'s `WHERE` | `test_the_node_guard_charges_booked_room_as_well_as_used` and the agreement test; live, `test_booked_room_binds_a_real_admission` |
+| `COALESCE` dropped from the claim's sum subquery | `test_the_empty_sum_is_coalesced_to_zero` and five more; live, every claim create fails its own guard |
+| `used[2]` becomes `used[2] + held[2]` | `test_limit_disk_gb_is_unchanged_by_booked_disk`, one test in each tier and nothing else |
+| the fold totals a hold's size, not its residue | `test_the_residue_is_the_hold_less_the_consuming_request`, `test_an_over_consuming_hold_can_not_cancel_another_booking` |
+| a shrink releases the oldest hold first | `test_the_most_recently_booked_hold_goes_first`; live, `test_a_shrink_releases_the_most_recently_booked_hold_first` |
+| the floor comes off the release decrement | `test_a_counter_already_too_low_is_clamped_rather_than_negative` and five more |
+| held netted out of `disk_available` | `test_summarize_resources_does_not_net_held_out_of_disk` |
+| a column removed from `SCHEDULER_NODE_CAPACITY_HELD_COLUMNS` | `test_scheduler_node_capacity_types`, `test_version_one_gains_the_held_columns` |
+
+**No findings.** Two things are worth carrying forward. The last two
+mutations are **unit-only kills**: nothing in the live suite bites on
+the published summary or on the held-column migration, which is a
+coverage boundary rather than a gap, since `_summarize_resources()`
+touches no database. And the management session re-ran a sharper
+variant of the first mutation than the sweep did -- dropping **only**
+the `held_cpus` clause rather than all three -- because that single
+dimension is exactly what passed step 3e's first agreement test. It
+now fails `test_the_node_guard_charges_booked_room_as_well_as_used`
+and `test_the_guard_and_the_prefilter_agree_on_the_same_row` by name.
+A sweep that mutates all three dimensions at once cannot tell a
+per-dimension assertion from a whole-statement one, so that variant
+is the one worth repeating in a later phase.
+
+### Definition of done
+
+All seventeen items pass, checked by the management session rather
+than taken from a step report. The mechanical ones: the two schema
+versions and the ensure-function references; `_claim_capacity_guard()`
+byte-identical to its state at `0b0271ef64`; `constants.py`
+untouched, so no stage name was minted or moved; nothing changed under
+`shakenfist/external_api/` but three lines of `admin.py`'s example
+payload, with `API_CAPABILITIES` unchanged; the only lines the proto
+diff removes are comments, so no field number was reused; `tox
+-epy3,flake8,mypy,genprotos` green with 8126 passed and 255 skipped,
+and the `genprotos` run leaving no diff, which is what proves the
+committed stubs current rather than merely present;
+`tools/check-plan-status.py` agreeing with the index; and the live
+suite at 254 of 254 with zero skips on 11.8.9 with snapshot isolation
+on and on 10.11.19 with it off.
 
 ## Execution notes
 
