@@ -340,8 +340,8 @@ alternative.
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
-| 8a | xhigh | opus | none | Stand up Keycloak in Docker (pin a tag; `quay.io/keycloak/keycloak`, dev mode is fine, no TLS needed because nothing validates it in this step). Create a realm, a confidential-or-public client suitable for `sf-client`, a group, a user in that group, and a group-membership protocol mapper writing a `groups` claim into the **ID token**. Enable the OAuth 2.0 device authorization grant on the client. Then complete both a device login and an authorization-code login by hand and capture two files per flow under `shakenfist/tests/files/idp/keycloak-*.json`: the full `.well-known/openid-configuration`, and the decoded claim set of the identity token with every value that identifies a real person replaced by an obvious placeholder (`sub`, `email`, `name`; keep `aud`, `iss`, `groups`, `exp` shapes intact). Read the captures back the way this repository already reads test data -- `os.path.join(os.path.dirname(__file__), 'files', name)`, as `shakenfist/tests/test_image_checksums.py:41` does -- and note that no packaging change is needed, because `pyproject.toml:228` excludes `shakenfist.tests*` from the wheel and `tools/check-wheel-data.py` only guards `shakenfist/data/*.yaml`. Record the exact administrative steps as you go, in note form in this plan's Results section -- step 8e turns them into prose, so what matters here is that nothing is remembered rather than observed. Do not write any documentation prose. Do not configure Authentik. Stop the containers when you are done; the lab script in 8g is written from what you learn here, so keep the commands you ran. |
-| 8b | xhigh | opus | none | The same for Authentik (`ghcr.io/goauthentik/server`, pinned; it needs a postgres and a redis, which the compose file in 8g will carry). Create an OAuth2/OpenID provider and an application, note the issuer URL **including its trailing slash**, and arrange a `groups` claim in the ID token (the default OpenID `profile` mapping, or a custom scope mapping if that is what it takes -- record which). Configure a device-code flow at the **brand**, which is not the default, and verify both that the discovery document advertises `device_authorization_endpoint` and that a device login actually completes; if it does not complete without the brand flow, capture that failure's symptom too, because finding 5 says that is the default experience and the walkthrough must name it. Capture the same artefacts under `shakenfist/tests/files/idp/authentik-*.json`, same placeholder rules. Notes, not prose. |
+| 8a | xhigh | opus | none | Stand up Keycloak in Docker (pin a tag; `quay.io/keycloak/keycloak`, `start-dev` is fine, but it generates no certificate and serves http only: supply a self-signed one, because the discovery code refuses a non-https issuer and the capture would not be a usable fixture). Create a realm, a public client suitable for `sf-client` (public because the thing registering is a program on a person's laptop, and the device grant requires it), a group, a user in that group, and a group-membership protocol mapper writing a `groups` claim into the **ID token**. Enable the OAuth 2.0 device authorization grant on the client. Then complete both a device login and an authorization-code login by hand and capture under `shakenfist/tests/files/idp/keycloak-*.json`: the full `.well-known/openid-configuration`, and the decoded claim set of the identity token with every value that identifies a real person replaced by an obvious placeholder (`sub`, `email`, `name`; keep `aud`, `iss`, `groups`, `exp` shapes intact). Read the captures back the way this repository already reads test data -- `os.path.join(os.path.dirname(__file__), 'files', name)`, as `shakenfist/tests/test_image_checksums.py:41` does -- and note that no packaging change is needed, because `pyproject.toml:228` excludes `shakenfist.tests*` from the wheel and `tools/check-wheel-data.py` only guards `shakenfist/data/*.yaml`. Record the exact administrative steps as you go, in note form in this plan's Results section -- step 8e turns them into prose, so what matters here is that nothing is remembered rather than observed. Do not write any documentation prose. Do not configure Authentik. Stop the containers when you are done; the lab script in 8g is written from what you learn here, so keep the commands you ran. |
+| 8b | xhigh | opus | none | The same for Authentik (`ghcr.io/goauthentik/server`, pinned; it needs a postgres and a redis, which the compose file in 8g will carry). It needs TLS for the same reason step 8a did, which that step found the hard way: a capture whose issuer or endpoints are `http` is not a fixture the discovery code would accept. Create an OAuth2/OpenID provider and an application, note the issuer URL **including its trailing slash**, and arrange a `groups` claim in the ID token (the default OpenID `profile` mapping, or a custom scope mapping if that is what it takes -- record which). Configure a device-code flow at the **brand**, which is not the default, and verify both that the discovery document advertises `device_authorization_endpoint` and that a device login actually completes; if it does not complete without the brand flow, capture that failure's symptom too, because finding 5 says that is the default experience and the walkthrough must name it. Capture the same artefacts under `shakenfist/tests/files/idp/authentik-*.json`, same placeholder rules. Notes, not prose. |
 | 8c | high | opus | none | Implement D1, D2 and D3 in `shakenfist/federation.py`. `claim_matches(value, matcher)` keeps its signature and meaning; add `matched_claim_values(value, matcher) -> list[str]` returning the values which matched (`[value]` for a scalar hit, the matching elements for a list, `[]` for no match) and make `claim_matches()` return `bool()` of it. `match_claims()` (:432) records `matched_claim_values()` for a list claim and the token's value for a scalar, so provenance keeps its current shape where nothing changed. Amend `test_non_string_claim_values_never_match` rather than deleting it: 1, True and None must still never match, and move the `['a']` assertion into a new test which asserts membership works -- the comment on the old test argues coercion and does not cover lists, which finding 1 explains. Add tests for: a matching element among several, no matching element, a non-string element skipped alongside a matching string, a nested list refused, an empty list refused, a list against a matcher list (both the hit and the miss), and provenance recording only the matched elements. Then add an end-to-end rule-matching test for each provider, reading the real claim sets 8a and 8b captured, asserting a `{"groups": "<the group>"}` rule matches and a rule naming a group the person is not in does not. Update `docs/developer_guide/authentication.md`'s `### Claim matching` section (:525) and the `bound_claims` swagger description in `shakenfist/external_api/auth.py:1917-1921`, both of which state the old rule. Do not touch `validate_bound_claims()`: matchers are unchanged. |
 | 8d | high | opus | none | Mutation-test 8c, following the `mutation-check` skill. At minimum: make the list case match on `in` rather than equality (prefix matching) and confirm a test fails; make it stringify a non-string element; make it recurse into a nested list; make `matched_claim_values()` return the whole list rather than the matched elements and confirm the provenance test fails; make the scalar path return `[value]` unconditionally. Run each mutant under `timeout` and with `-B`, restore from pristine copies rather than `git checkout`, and record the table in this plan's Results section. A surviving mutant is a missing test, not a note. |
 | 8e | high | opus | none | Write the two walkthroughs into `docs/operator_guide/authentication.md`, as `### A worked Keycloak example` and `### A worked Authentik example`, after the GitHub Actions example at :582 and before `### Abuse resistance`. Each one: what to create at the provider (from 8a/8b's notes, naming the version it was produced against), the `curl` that creates the issuer including `client_id` and `oidc_scopes`, the `curl` that writes a group-bound mapping rule in a namespace, and what the person then runs -- `sf-client login`. Reuse the existing one-sentence explanation of why these are `curl` rather than `sf-client`. State the trailing-slash difference once, where it bites, and link rather than restate the existing warning about `client_id` versus `audience`. The Authentik section carries D8's device-flow caveat as a step that cannot be skipped. Add the same caveat to `### Discovery` in two sentences. Nothing in these sections may name a plan, a phase, a decision or a step: a pre-commit hook enforces that, and the fact that a walkthrough exists is not evidence of a plan. |
@@ -389,9 +389,13 @@ depends on both sets of notes.
       test asserts the discovery code accepts each and fills
       `authorization_endpoint`, `token_endpoint` and
       `device_authorization_endpoint` from it.
-* [ ] `grep -c device_authorization_endpoint` on the Authentik
-      discovery fixture is 1, so finding 5 is pinned by the
-      fixture rather than by a sentence in this file.
+* [ ] Each captured discovery document carries a top-level
+      `device_authorization_endpoint`, read with `json` rather
+      than counted with `grep`, so finding 5 is pinned by the
+      fixtures rather than by a sentence in this file. Step 8a
+      proved the counting form wrong: Keycloak publishes the
+      name twice, the second time inside
+      `mtls_endpoint_aliases`.
 * [ ] `docs/operator_guide/authentication.md` has a Keycloak
       section and an Authentik section, each naming the provider
       version it was produced against, and each containing the
@@ -486,6 +490,39 @@ finishes.
 * Patterns in claim matchers, with anchoring enforced at rule
   creation. Declined on the record in the developer guide and
   untouched by D1, which widens the claim side only.
+
+## Execution notes
+
+Execution began on 2026-11-22 (AEDT). The back brief was
+answered before step 8a started:
+
+* **D3 stands.** Provenance records only the elements of an
+  array claim which matched, not the whole claim.
+* **D6 stands.** The container lab lands in the repository, at
+  `tools/idp-lab/`.
+* **The containers were approved.** Both providers are
+  configured for real on the development host, loopback only,
+  and removed when each step finishes. No cluster is touched.
+* **This session may push the branch and open the pull request**
+  once the definition of done has run.
+
+Departures from the plan are recorded here as they happen.
+
+* **Step 8a corrected three things this plan had wrong**, at
+  source rather than only here: `start-dev` serves http and
+  generates no certificate, so the lab needs TLS before a
+  capture is worth anything; a command line client wants a
+  public registration rather than a confidential one; and the
+  two flows produce the same claim set, so there is one capture
+  rather than one per flow. The same TLS constraint was added
+  to step 8b's row, which had not stated it.
+* **A definition-of-done item was replaced rather than ticked.**
+  It counted occurrences of `device_authorization_endpoint`
+  with `grep -c` and expected 1. Keycloak publishes the name
+  twice, the second time inside `mtls_endpoint_aliases`, so the
+  check now reads the top-level key with `json`. Counting was
+  the wrong instrument, and it would have failed on a correct
+  fixture.
 
 ## Results
 
