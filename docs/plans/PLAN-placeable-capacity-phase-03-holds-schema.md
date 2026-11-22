@@ -1065,3 +1065,26 @@ would have let the offset through.
 `limit_disk_gb_is_unchanged_by_booked_disk` tests and nothing else,
 which is the narrow signal that the assertion is about that term
 rather than incidentally sensitive to it.
+
+### Step 3g, publishing held room
+
+**The step netted held in before the maximum, not after, and that is
+the right reading of `D4`.** The row asked that held be netted out of
+`cpu_available`. The step instead charged the node
+`max(measured, committed + held)`, which is verbatim what
+`_has_sufficient_cpu()` does, and that function's docstring says it
+charges "whichever of the two is larger, which is the same arithmetic
+summarize_resources() publishes". Step 3e taught the pre-filter about
+holds and left that sentence false; this form makes it true again.
+Subtracting after the maximum would have left the published figure
+and the pre-filter disagreeing on every node where the measurement
+binds, which is `R2`'s concern one layer out, in the figure an
+operator reads rather than the one admission applies.
+
+**Three mutations, re-run by the management session.** Netting held
+out of `disk_available` fails exactly
+`test_summarize_resources_does_not_net_held_out_of_disk`; dropping
+held from the cpu term and from the ram term each fail the netting
+test and the cluster-totals test. The disk test books 40 GB of held
+disk on the node it asserts over, which is what makes it bite: with
+held disk at zero it would pass whether or not the netting existed.
