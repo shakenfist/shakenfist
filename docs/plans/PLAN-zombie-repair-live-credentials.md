@@ -291,7 +291,7 @@ other push-audit phase in this repository.
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 1. Repair live zombies forward | This file, "Phase 1" below | Complete | f79a23cd5c (#4419) |
-| 2. Push audit | [PLAN-zombie-repair-live-credentials-phase-02-push-audit.md](PLAN-zombie-repair-live-credentials-phase-02-push-audit.md) | Complete | — |
+| 2. Push audit | [PLAN-zombie-repair-live-credentials-phase-02-push-audit.md](PLAN-zombie-repair-live-credentials-phase-02-push-audit.md) | Complete | b0af1770ff (#5018) |
 
 ### Phase 1: repair live zombies forward
 
@@ -573,6 +573,47 @@ claiming one `iss`.
 
 Findings, grades and dispositions are in
 [the phase plan](PLAN-zombie-repair-live-credentials-phase-02-push-audit.md).
+
+#### What the follow-up fixed
+
+The audit merged as #5018 (`b0af1770ff`), and its findings were fixed
+in the pull request that records that commit above.
+
+`_heal_missing_state()` now reads through `get_state_checked()` and
+leaves the key alone when the read failed, so a read blip during a
+rotation can no longer undelete a revoked key. Neither of its state
+writes may escape either: `rotate()` has already replaced the secret
+by the time the heal runs, so raising there lost the caller a secret
+that was live in the database. A key left in `initial` by a contained
+failure is finished by the next rotation.
+
+The liveness stop became visible. It has its own streak gauge
+(`cluster_zombie_liveness_failure_streak`), because the work-list
+streak cannot carry it -- that read succeeded, which is how the
+zombies were found, so it had just been reset to zero. Liveness
+failures that are not the tier are counted
+(`cluster_zombie_liveness_errors_total`) rather than only logged.
+Repairs also resume at the zombie after the one that stopped the last
+pass, mirroring what the sweep already did one scale up: without it
+the lexically first zombie of a type gated every zombie behind it for
+as long as its own read kept failing.
+
+The pinned test now pins the whole set of types the reconciler
+repairs, not only the set which overrides `zombie_repair_state()`, so
+registering a type fails it whether or not the author wrote an
+override -- which is what mission statement 3 claimed and the old
+assertion did not do. The three attributes servicers stopped putting
+`str(e)` in their reply details, since those messages carry the
+statement text and the bound uuid, and a round-trip test now drives a
+failed read through a real in-process servicer and out of the client
+as `DatabaseUnavailable`.
+
+Four findings were recorded and not acted on, which the phase plan's
+disposition table says individually: a functional test for an hourly
+sweep is its own piece of work (T4), the torn-hard-delete backstop
+belongs with #5015 (S2), a corrupt rule persisting is the intended
+behaviour and visible as `unusable` (C5), and T3 is an observation
+about a mutation count rather than a defect.
 
 <!-- shared-block: plan-push-audit-phase v3 -->
 Push audit phase (shared block; do not edit -- the canonical
