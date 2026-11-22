@@ -568,6 +568,36 @@ Departures from the plan are recorded here as they happen.
   sorted order. Both are now closed by tests, which is why that
   step changed a test file as well as the plan -- a survivor is
   a missing test, and fixing it is the point.
+* **Step 8e was sent back once, over the one thing in it that
+  had been written from memory.** Its prose was observed, but
+  the console labels were renderings of API field names, and it
+  said so itself rather than letting a reviewer find out. The
+  labels were then verified against the releases that ship them
+  -- one provider's console message bundle, the other's compiled
+  form definitions and locale catalogue, both extracted from the
+  cached images -- which corrected several, including one this
+  session would have accepted: the first provider's PKCE field
+  is labelled far more briefly than the draft spelled it out.
+  Four labels were re-checked here independently, from the image
+  rather than from the report. This matters more than it sounds:
+  the plan's standard is that a plausible walkthrough which does
+  not run is worse than none, and an invented label is exactly
+  that failure in miniature.
+* **Two facts in the operator guide were corrected, not just
+  contradicted.** The discovery notes said a provider which does
+  not offer the device grant publishes no device endpoint; that
+  is true of one which has not implemented it and misleading for
+  both providers documented here. And the issuer field table
+  offered an example scope list which neither provider accepts.
+  Both predate this phase and both would have made the new
+  sections read as though they disagreed with the page they are
+  on.
+* **A repository guard caught something review would not
+  have.** A test asserts that any single-line error document in
+  the documentation matches this project's own validation shape.
+  Four provider OAuth error bodies tripped it, and were
+  reformatted as multi-line JSON -- the escape that test's own
+  docstring names -- rather than the test being touched.
 * **A definition-of-done item was replaced rather than ticked.**
   It counted occurrences of `device_authorization_endpoint`
   with `grep -c` and expected 1. Keycloak publishes the name
