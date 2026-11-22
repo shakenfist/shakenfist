@@ -128,16 +128,25 @@ def _bare_decorator_name(node):
 
 
 def _namespace_description_node(fn):
-    """The description element of a handler's body `namespace` tuple."""
+    """The description element of a handler's body `namespace` tuple.
+
+    Through declarations.declaration_elements() rather than reading the
+    list itself, so that a parameter list hoisted to a module level
+    name -- which is how the endpoints that also build a webargs schema
+    from it are written -- is resolved here the same way the audit
+    resolves it.
+    """
     for dec in fn.decorator_list:
         if not (isinstance(dec, ast.Call)
                 and 'swagger_helper' in ast.unparse(dec)):
             continue
         call = dec.args[0] if dec.args else None
-        if not (isinstance(call, ast.Call) and len(call.args) >= 3
-                and isinstance(call.args[2], ast.List)):
+        elements = None
+        if isinstance(call, ast.Call) and len(call.args) >= 3:
+            elements = declarations.declaration_elements(call.args[2])
+        if elements is None:
             continue
-        for item in call.args[2].elts:
+        for item in elements:
             if not (isinstance(item, ast.Tuple) and len(item.elts) >= 5):
                 continue
             if (declarations.literal(item.elts[0]) == 'namespace'
@@ -160,14 +169,17 @@ def _declared_response_codes(fn):
                 and 'swagger_helper' in ast.unparse(dec)):
             continue
         call = dec.args[0] if dec.args else None
-        if not (isinstance(call, ast.Call) and len(call.args) >= 4
-                and isinstance(call.args[3], ast.List)):
+        elements = None
+        if isinstance(call, ast.Call) and len(call.args) >= 4:
+            elements = declarations.declaration_elements(call.args[3])
+        if elements is None:
             return None
         codes = set()
-        for item in call.args[3].elts:
-            # swagger_helper() destructures exactly (code, description,
-            # sample), so any other shape is malformed.
-            if not (isinstance(item, ast.Tuple) and len(item.elts) == 3):
+        for item in elements:
+            # swagger_helper() destructures (code, description, sample)
+            # plus an optional fourth element carrying response headers,
+            # so a tuple of any other length is malformed.
+            if not (isinstance(item, ast.Tuple) and len(item.elts) in (3, 4)):
                 return None
             code = declarations.literal(item.elts[0])
             if code is None:

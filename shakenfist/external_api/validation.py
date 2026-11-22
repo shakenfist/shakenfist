@@ -755,6 +755,41 @@ def _field(spec: dict[str, Any], required: bool = False) -> fields.Field[Any]:
     return field_class(**kwargs)
 
 
+def coercing_field(spec: dict[str, Any], load_default: Any,
+                   what: str) -> fields.Field[Any]:
+    """The webargs field for a declared scalar: coerces, checks nothing.
+
+    This is for the ``@use_kwargs`` schemas, which is a different job
+    from ``_field()`` below. ``_field()`` builds the *check-only*
+    compiled path, where a bound renders as a marshmallow validator and
+    a failure becomes a 400 naming the parameter. A ``@use_kwargs``
+    schema is the only mechanism by which a query-string parameter
+    reaches a handler at all, and a validator failing there raises
+    webargs' UnprocessableEntity, which the app's error handler renders
+    as a 500 -- the serialisation hazard the json_or_query loader in
+    base.py documents. So the declared *type* is honoured here and the
+    declared *bounds* are not: they are enforced by the compiled path,
+    and by the handler for the modes where that path only warns.
+
+    ``load_default`` is what the field answers when the caller sends
+    nothing, and its caller reads it off the handler's own signature so
+    that the default is written once.
+
+    Scalars only. Every parameter which reaches a handler this way is
+    one, and an array or object has no meaning in a query string; one
+    arriving here is a declaration mistake rather than something to
+    render as best it can.
+    """
+    argtype = spec.get('type')
+    if argtype not in _SCALARS or argtype == 'object':
+        raise exceptions.InvalidAPIDeclaration(
+            '%s declares type %r, which cannot be parsed from a query '
+            'string; the parsable types are %s'
+            % (what, argtype,
+               ', '.join(sorted(set(_SCALARS) - {'object'}))))
+    return _SCALARS[argtype](load_default=load_default)
+
+
 def _schema(properties: dict[str, dict[str, Any]]) -> marshmallow.Schema:
     return marshmallow.Schema.from_dict(
         {name: _field(spec) for name, spec in properties.items()})()

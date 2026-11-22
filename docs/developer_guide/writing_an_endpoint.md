@@ -230,6 +230,7 @@ are listed in `UNDOCUMENTED_BY_DESIGN` in
 | The parameter is | Its location is |
 |---|---|
 | a segment of the mounted route in `app.py` | `path` |
+| parsed by `@api_base.use_declared_args(...)` | `query` |
 | in a schema bound with `@use_kwargs(..., location='query')` | `query` |
 | read from `flask.request.args` | `query` |
 | popped out of kwargs by one of the handler's decorators | `body` |
@@ -593,7 +594,8 @@ the coercion happens before the value is stored; they are deliberately
 not routed through `declared_boolean()` because it would read an
 omitted parameter as False, and the reason is written at the handler.
 Three more — `all` on the outstanding-operations routes — arrive
-through a `@use_kwargs` schema, so marshmallow has already deserialised
+through a webargs schema built from their own declaration by
+`@api_base.use_declared_args`, so marshmallow has already deserialised
 them. And `confirm` on the delete-all routes is recorded, with a
 reason, as deliberately reading something *narrower*: an identity test
 on a destructive route refuses a string spelling rather than acting on
@@ -667,15 +669,52 @@ the type vocabulary landed.)
   using one requires an `UNDERIVABLE_BY_DESIGN` entry in
   `test_parameter_declarations.py` — otherwise the declaration would be
   a silent opt-out from the whole audit.
-* A schema bound with `@use_kwargs` must be a dict literal defined in
-  the handler's own class or module. The derivation refuses anything it
-  cannot resolve — a schema imported from another module, a marshmallow
-  `Schema` class — and CI stays red until `declarations.py` is taught to
-  read the new form. There is deliberately no allowlist for this,
-  unlike locations: an unresolvable schema means the audit does not
-  know which parameters arrive in the query string, so an opt-out
-  entry would have to restate the schema's keys by hand — exactly the
-  second source of truth this machinery exists to remove.
+* A webargs schema is normally not written by hand at all. A
+  query-string parameter reaches a handler only through webargs — the
+  compiled validation path is check-only and `log_request` merges the
+  JSON body but never `flask.request.args` — and the six endpoints
+  which needed one used to hand-author a marshmallow schema beside the
+  `swagger_helper()` declaration describing the same parameters, which
+  is two statements of one fact and is why
+  [issue 4098](https://github.com/shakenfist/shakenfist/issues/4098)
+  was filed. Instead, hoist the parameter list to a module level name,
+  pass it to both, and parse with `@api_base.use_declared_args`:
+
+```python
+    BLOB_DATA_PARAMETERS = [
+        ('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True),
+        ('offset', 'query', 'unsignedinteger', 'From here.', False),
+    ]
+
+    @swag_from(api_base.swagger_helper(
+        'blobs', 'Get blob data.', BLOB_DATA_PARAMETERS, [...]))
+    @api_base.use_declared_args(
+        BLOB_DATA_PARAMETERS, {'offset': 0}, location='query')
+    def get(self, blob_uuid=None, offset=0):
+```
+
+  It binds every parameter the list declares at `query`, with the type
+  the published specification uses and **not** the declared bound: a
+  marshmallow validator failing inside webargs raises
+  `UnprocessableEntity`, which the app's error handler renders as a
+  500, so bounds belong to the compiled path (which answers 400) and to
+  the handler. The defaults are passed rather than read off the
+  signature because 24 of the 25 per-method decorators in `base.py` do
+  not use `functools.wraps`, so by the time the decorator runs
+  `inspect.signature()` sees a wrapper's `(*args, **kwargs)`;
+  `test_declared_args.py` fails if the two disagree.
+
+* A hand-authored schema bound with `@use_kwargs` is still read, and
+  must be a dict literal defined in the handler's own class or module.
+  The derivation refuses anything it cannot resolve — a schema imported
+  from another module, a marshmallow `Schema` class — and CI stays red
+  until `declarations.py` is taught to read the new form. There is
+  deliberately no allowlist for this, unlike locations: an unresolvable
+  schema means the audit does not know which parameters arrive in the
+  query string, so an opt-out entry would have to restate the schema's
+  keys by hand — exactly the second source of truth this machinery
+  exists to remove. `test_declared_args.py` also fails on a new one,
+  because `use_declared_args` covers every case in the tree.
 * A decorator that consumes a request parameter must be a module level
   function of `shakenfist/external_api/`, and must consume it with a
   literal `kwargs.pop('name', ...)` or `del kwargs['name']` reached

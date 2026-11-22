@@ -253,8 +253,8 @@ one raises `InvalidAPIDeclaration` and **sf-api will not start**. The
 rules: every handler carries a declaration (an empty parameter list is
 valid, no declaration at all is not); `location` is one of
 `SWAGGER_PARAMETER_LOCATIONS` *and* is where the parameter actually
-arrives (route segment → `path`, `use_kwargs(location='query')` key or
-`flask.request.args` read → `query`, otherwise `body`); a `path`
+arrives (route segment → `path`, a parameter parsed by webargs or read
+from `flask.request.args` → `query`, otherwise `body`); a `path`
 parameter must be `required=True`; a raw body is declared as
 `api_base.RAW_BODY_PARAMETER` (and cannot be combined with named body
 parameters); and every accepted kwarg is declared, excluding the
@@ -266,6 +266,14 @@ schema-carrying body parameter, because Swagger 2.0 allows only one;
 objects and arrays of objects can only be declared in the body, since
 outside one there is no schema object to nest a structure in. The
 token vocabulary is `api_base.ARGTYPES`.
+
+A response is a `(httpcode, description, sample)` tuple plus an
+optional fourth element, today `{'headers': [...]}`, each header a
+`(name, type token, description)` triple from the same vocabulary. A
+query-string parameter is parsed with
+`@api_base.use_declared_args(PARAMETERS, defaults)`, which builds the
+webargs schema from the same declaration list rather than from a
+hand-authored one beside it.
 
 `shakenfist/external_api/declarations.py` derives the correct answer
 from the source and is shared by the fixer

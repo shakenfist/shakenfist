@@ -18,8 +18,6 @@ import validators
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
-from webargs import fields
-from webargs.flaskparser import use_kwargs
 
 from shakenfist import baseobject
 from shakenfist.schema.operations.baseclusteroperation import dependency
@@ -2832,28 +2830,36 @@ instance_outstanding_operations_example = """[
 ]"""
 
 
-class InstanceOutstandingOperationsEndpoint(api_base.Resource):
-    # NOTE(mikal): note that arguments from URL routes (object uuid for example),
-    # are not included in the webargs schema because webargs doesn't appear to
-    # know how to find them.
-    get_args = {
-        'all': fields.Boolean(load_default=False)
-    }
+# Declared once and read twice: swagger_helper() publishes these and
+# use_declared_args() builds the webargs schema which is how `all`
+# reaches the handler (issue 4098).
+#
+# NOTE(mikal): note that arguments from URL routes (object uuid for
+# example) are not included in the webargs schema because webargs
+# doesn't appear to know how to find them. use_declared_args() takes
+# the query-located declarations for the same reason.
+INSTANCE_OUTSTANDING_OPERATIONS_PARAMETERS = [
+    ('instance_ref', 'path', 'uuidorname',
+     'The UUID or name of the instance.', True),
+    ('namespace', 'body', 'namespace',
+     api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
+    ('all', 'query', 'boolean',
+     api_base.CLUSTER_OPERATIONS_ALL_DESCRIPTION, False)
+]
 
+
+class InstanceOutstandingOperationsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Get the outstanding cluster operations for an instance.',
-        [('instance_ref', 'path', 'uuidorname',
-          'The UUID or name of the instance.', True),
-         ('namespace', 'body', 'namespace',
-          api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
-         ('all', 'query', 'boolean',
-          api_base.CLUSTER_OPERATIONS_ALL_DESCRIPTION, False)],
+        INSTANCE_OUTSTANDING_OPERATIONS_PARAMETERS,
         [(
             200,
             'The cluster operations targeting this instance, newest first.',
             instance_outstanding_operations_example),
          (404, 'Instance not found.', None)]))
-    @use_kwargs(get_args, location='json_or_query')
+    @api_base.use_declared_args(
+        INSTANCE_OUTSTANDING_OPERATIONS_PARAMETERS, {'all': False},
+        location='json_or_query')
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use

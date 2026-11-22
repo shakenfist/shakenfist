@@ -7,6 +7,7 @@ import sys
 import time
 import traceback
 from typing import Any
+from typing import Callable
 from typing import NoReturn
 from typing import Optional
 
@@ -29,6 +30,7 @@ from jwt.exceptions import ExpiredSignatureError
 import marshmallow
 import requests
 from webargs.flaskparser import parser as webargs_parser
+from webargs.flaskparser import use_kwargs
 from werkzeug.exceptions import HTTPException
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
@@ -1630,6 +1632,98 @@ def _validated_constraints(section: str, name: str,
                     % (section, name, pattern))
 
     return constraints
+
+
+def declared_args_schema(parameters: list[Any],
+                         defaults: dict[str, Any]) -> dict[str, Any]:
+    """The webargs schema for the query parameters a declaration names.
+
+    Separate from the decorator below so that what it builds can be
+    read back and asserted; the decorator is the only caller.
+    """
+    schema = {}
+    for parameter in parameters:
+        # Shape, location and type are all checked by swagger_helper()
+        # against this same list, which every endpoint using this
+        # decorator also calls. Reading a malformed declaration here
+        # would report it from the wrong place, so this checks only
+        # what it needs: that a query parameter has a default and a
+        # type a query string can carry.
+        if not (isinstance(parameter, (tuple, list)) and len(parameter) >= 3):
+            continue
+        (name, declared_location, argtype) = parameter[:3]
+        if declared_location != 'query':
+            continue
+
+        what = 'the declared query parameter %r' % name
+        if name not in defaults:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s is parsed by webargs and has no default; pass the '
+                'one its handler signature gives it' % what)
+        schema[name] = validation.coercing_field(
+            ARGTYPES.get(argtype, {}), defaults[name], what)
+
+    unknown = set(defaults) - set(schema)
+    if unknown:
+        raise exceptions.InvalidAPIDeclaration(
+            'defaults are given for %s, which this endpoint does not '
+            'declare in the query string'
+            % ', '.join(sorted(repr(name) for name in unknown)))
+
+    if not schema:
+        raise exceptions.InvalidAPIDeclaration(
+            'an endpoint parses declared query parameters and declares '
+            'none')
+
+    return schema
+
+
+def use_declared_args(parameters: list[Any], defaults: dict[str, Any],
+                      location: str = 'query') -> Callable[..., Any]:
+    """``@use_kwargs`` built from the endpoint's own declaration list.
+
+    ``@use_kwargs`` is the only mechanism by which a query-string
+    parameter reaches a handler at all: the compiled validation path is
+    check-only, and ``log_request`` merges the JSON body into kwargs
+    but never ``flask.request.args``. So six endpoints carried a
+    webargs schema *and* a ``swagger_helper()`` declaration describing
+    the same parameters -- two statements of one fact, and decision D2
+    of the API input validation work noted at the time that the
+    endpoints which hand-authored a schema were exactly the ones whose
+    documentation had drifted (issue 4098).
+
+    This builds the schema from the declaration list the endpoint
+    already passes to ``swagger_helper()``, taking every parameter it
+    declares at ``'query'``. The field's type comes from the same
+    ARGTYPES rendering the published specification uses. The declared
+    *bounds* deliberately do not come along -- see
+    ``validation.coercing_field()`` for why a validator here answers
+    500 rather than 400.
+
+    ``defaults`` is what each field answers when the caller sends
+    nothing, and has to be passed rather than read off the handler's
+    signature, which is where it is also written. The 24 of 25
+    per-method decorators in this module which do not use
+    ``functools.wraps`` sit between this decorator and the handler, so
+    by the time this runs ``inspect.signature()`` sees a wrapper's
+    ``(*args, **kwargs)`` and the real defaults are unreachable.
+    ``test_declared_args.py`` reads both out of the source and fails if
+    they disagree, which is the same guarantee one call site away.
+
+    ``location`` is where the value may arrive on the wire, which is a
+    different question from where the parameter is declared:
+    ``'json_or_query'`` is the custom loader (issue 3629, decision D6)
+    for a query parameter the shipped client sends in the JSON body
+    instead. Its parameters are still declared ``'query'``, because
+    that is what the audit in declarations.py derives and what the
+    published specification says.
+    """
+    schema = declared_args_schema(parameters, defaults)
+
+    def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+        return use_kwargs(schema, location=location)(fn)
+
+    return decorator
 
 
 # The keys a response declaration's optional fourth element may carry.

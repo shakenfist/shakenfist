@@ -17,8 +17,6 @@ from flasgger import swag_from
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
 from shakenfist_utilities import random as sf_random  # noreorder
-from webargs import fields
-from webargs.flaskparser import use_kwargs
 
 from shakenfist import artifact
 from shakenfist import baseobject
@@ -716,27 +714,32 @@ def _caller_is_system():
     return request_namespace() == 'system'
 
 
-class AuthNamespaceKeysEndpoint(api_base.Resource):
-    # Arguments which come from the mounted route -- the namespace here
-    # -- are deliberately absent from the webargs schema, because
-    # webargs does not read them. The schema is bound where both a query
-    # string and a JSON body are read, since the shipped client
-    # serialises even a GET's parameters into a body.
-    get_args = {
-        'detail': fields.Boolean(load_default=False)
-    }
+# Declared once and read twice: swagger_helper() publishes these and
+# use_declared_args() builds the webargs schema which is how `detail`
+# reaches the handler (issue 4098).
+#
+# Arguments which come from the mounted route -- the namespace here --
+# are deliberately absent from the webargs schema, because webargs does
+# not read them; use_declared_args() takes the query-located
+# declarations for the same reason.
+AUTH_NAMESPACE_KEYS_PARAMETERS = [
+    ('namespace', 'path', 'string',
+     'The namespace to fetch authentication keys for.', True),
+    ('detail', 'query', 'boolean',
+     'Optional. When set, the response is one object per key '
+     'carrying that key\'s metadata instead of a list of key '
+     'names, and keys which have already expired are included. '
+     'Defaults to false, which is the historical response.', False)
+]
 
+
+class AuthNamespaceKeysEndpoint(api_base.Resource):
+    # The schema is bound where both a query string and a JSON body are
+    # read, since the shipped client serialises even a GET's parameters
+    # into a body.
     @swag_from(api_base.swagger_helper(
         'auth', 'Get the authentication keys for a namespace.',
-        [
-            ('namespace', 'path', 'string',
-             'The namespace to fetch authentication keys for.', True),
-            ('detail', 'query', 'boolean',
-             'Optional. When set, the response is one object per key '
-             'carrying that key\'s metadata instead of a list of key '
-             'names, and keys which have already expired are included. '
-             'Defaults to false, which is the historical response.', False)
-        ],
+        AUTH_NAMESPACE_KEYS_PARAMETERS,
         [(200, 'A list of keynames for the namespace, or one metadata '
                'object per key when detail is set, in the shape the '
                'single key route documents. Both are ordered by key '
@@ -746,7 +749,9 @@ class AuthNamespaceKeysEndpoint(api_base.Resource):
                'key is unrestricted rather than unprivileged.',
           '["deploy", ...]'),
          (404, 'Namespace not found.', None)]))
-    @use_kwargs(get_args, location='json_or_query')
+    @api_base.use_declared_args(
+        AUTH_NAMESPACE_KEYS_PARAMETERS, {'detail': False},
+        location='json_or_query')
     @requires_namespace_ownership
     @arg_is_namespace
     @api_base.log_token_use
