@@ -423,9 +423,13 @@ depends on both sets of notes.
       `tools/gitleaks-scan.sh` passes.
 * [ ] Open question 12 in the master plan is marked answered,
       naming what each of its three audiences now reads.
-* [ ] Every mutation in 8d is killed by a named test, recorded in
-      this file's Results section. A surviving mutation is a
-      failed definition of done, not a note.
+* [ ] Every behaviour-changing mutation in 8d is killed by a
+      named test, recorded in this file's Results section. A
+      surviving one is a failed definition of done, not a note.
+      Step 8d earned the qualifier: two of its mutants were
+      proven semantic no-ops, which cannot be killed by any test
+      because they change no outcome, and recording them as
+      survivors would have been as misleading as hiding them.
 * [ ] `pre-commit run --all-files` passes, which includes
       flake8, the unit tests, mypy, `check-doc-anchors`,
       `check-plan-phase-references` and `check-plan-status`.
@@ -555,6 +559,15 @@ Departures from the plan are recorded here as they happen.
   fake session lives in that module, and importing one test
   module into another to reach it would have been worse. The
   departure is the right call and was kept.
+* **Step 8d found a gap step 8c had opened.** Two of fourteen
+  mutants survived their first run. One was a genuinely missing
+  test: "no coercion" was pinned on the claim side only, and the
+  matching change had added a matcher side which nothing
+  guarded. The other was an order assertion which could not
+  discriminate, because the order it expected was also the
+  sorted order. Both are now closed by tests, which is why that
+  step changed a test file as well as the plan -- a survivor is
+  a missing test, and fixing it is the point.
 * **A definition-of-done item was replaced rather than ticked.**
   It counted occurrences of `device_authorization_endpoint`
   with `grep -c` and expected 1. Keycloak publishes the name
