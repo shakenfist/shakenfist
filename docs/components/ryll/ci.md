@@ -41,6 +41,7 @@ enqueue` status check:
 | `gitleaks` | self-hosted `s` | Secret scanning over full history |
 | `shellcheck` | self-hosted `s` | `tools/run-shellcheck.sh`, then `tools/audit/test-audit-range.sh`, `tools/test-report-fuzz-failure.sh`, `tools/test-report-fuzz-run.sh` and `tools/test-fuzz-targets.sh` |
 | `bidi and zero-width` | self-hosted `s` | `tools/check-bidi.sh` |
+| `source size ratchet` | self-hosted `s` | `tools/source-size-ratchet.py`, which fails when a source file over 1,500 lines grows past its entry in `tools/source-size-baseline`, or when a new file crosses that line with no entry |
 | `skillsaw` | self-hosted `s` | `pre-commit run skillsaw` over the agent context, then `tools/test-wave0-scan.sh` |
 
 Every job in that table except `gitleaks` is fork-guarded: a pull
@@ -55,7 +56,8 @@ every fresh runner.
 
 Each of those jobs runs something a fork can edit — the Makefile and
 dependencies' `build.rs` for the three build lanes, `tools/*.sh` for
-`shellcheck` and `bidi and zero-width`, `.pre-commit-config.yaml` and
+`shellcheck` and `bidi and zero-width`, `tools/source-size-ratchet.py`
+for `source size ratchet`, `.pre-commit-config.yaml` and
 `.skillsaw.yaml` (whose `custom-rules` skillsaw imports as Python) for
 `skillsaw`, and `.cargo/config.toml`, whose `[alias]` and `[build]`
 keys cargo honours, for `cargo audit` and `cargo deny`. `gitleaks` is

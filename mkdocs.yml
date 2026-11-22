@@ -189,6 +189,7 @@ nav:
                 - "Protect development's default branch": components/development/plans/PLAN-protect-development-main.md
                 - "Release gating": components/development/plans/PLAN-release-gating.md
                 - "Renovate cadence": components/development/plans/PLAN-renovate-cadence.md
+                - "Require the shellcheck-py versioning rule": components/development/plans/PLAN-renovate-shellcheck-audit.md
                 - "Review coverage steady state": components/development/plans/PLAN-review-coverage.md
                 - "Review import": components/development/plans/PLAN-review-import.md
                 - "Shaken Fist Project Consistency Plan": components/development/plans/PLAN-consistency.md

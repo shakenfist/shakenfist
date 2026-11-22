@@ -733,6 +733,105 @@ checks the retry logic against a fake `apt-get`.
 `apt-get` run inside a fresh container needs none of this, since nothing
 else in the container is running apt, and calls it directly.
 
+### Distro mirrors and dnf
+
+The container legs have the mirror-image problem, and it is not about
+locks. Installing a package resolves its dependencies against the
+distro's repositories -- a local `.rpm` included, since its `Requires`
+have to come from somewhere -- so those legs depend on a third party's
+metadata being self-consistent at the moment they run. A point release's
+repodata rotation breaks that: a `repomd.xml` served from a stale mirror
+or edge cache names `primary` and `filelists` files the mirrors have
+already deleted, every mirror answers 404, and dnf stops before it has
+looked at the package at all:
+
+```
+  - Status code: 404 for https://.../9.9/AppStream/x86_64/os/repodata/
+      8dad4ae7...-primary.xml.gz
+Error: Failed to download metadata for repo 'appstream': ... Cannot
+download, all mirrors were already tried without success
+```
+
+Nothing in this repository is wrong when that happens, and it is
+expensive to be told so: the matrix legs are the last to run, so a 404
+in one of them can cost most of a day of queue wait before the ejected
+pull request can go back.
+
+So every dnf that resolves against a distro repository goes through
+`tools/ci/dnf.sh`, which retries that failure with a `clean metadata` in
+between -- so the retry cannot be answered from the copy that just
+failed -- inside one five-minute deadline. The deadline is checked
+between attempts, so it bounds when the last retry starts rather than
+when the wrapper returns: an attempt against wedged mirrors is not cut
+short, and can run past it. Any other failure, an unknown package or an
+unsatisfied dependency, is returned at once: that is an answer about the
+package, and retrying it would only make a clear failure slow.
+`tools/ci/test-dnf.sh` checks all of that against a fake dnf, including
+that the wrapper adds nothing to the arguments it is given -- and fails
+on any dnf in `tools/` or the workflows that does not go through the
+wrapper, unless its line ends in `# direct dnf: <reason>`.
+
+A rotation deletes packages as well as repodata, and a deleted package
+is retried too -- but not on the mirror line. librepo reports running
+out of mirrors as "all mirrors were already tried", which is how a
+metadata failure ends, while a payload that has spent its allowance of
+mirror failures ends in the bare transfer error (`Status code: 404 for
+...`), naming no mirrors. So the wrapper also matches the wordings dnf
+wraps a failed payload in: `Error downloading packages:` from dnf4 and
+`Failed to download packages` from dnf5. That is deliberately broad --
+a repository with `skip_if_unavailable` turns an unreachable mirror into
+a warning and carries on, so an unrelated failure in the same run can
+carry a matching line and be retried for the whole deadline. One wasted
+deadline on a failure that would have failed anyway is the cheaper
+mistake; `tools/ci/test-dnf.sh` pins that trade rather than leaving it
+to a comment.
+
+Two things follow for callers. The wrapper merges dnf's stderr into its
+stdout, because that is what it matches on, so a caller that captures
+the wrapper's stdout captures dnf's diagnostics with it -- group an
+`||` chain before redirecting it (`{ a || b; } >/dev/null 2>&1`), since
+a redirection on a list binds to its last command alone. And where a
+fallback arm exists at all, give it a short `DNF_RETRY_TIMEOUT` so that
+the waiting is paid once per install rather than once per arm.
+
+It has four callers:
+
+- `tools/test-package-install.sh` and `tools/probe-qemu-versions.sh` run
+  dnf inside a container, where the wrapper has to be mounted to be
+  callable; that is what `-v "$REPO_ROOT/tools/ci/dnf.sh:/dnf.sh:ro"`
+  is for.
+- `tools/test-package-functional.sh` already mounts the repository at
+  `/workspace` and calls it from there. dnf loads every enabled
+  repository's metadata on its first transaction, so later calls reuse
+  that, but they still download packages from the mirrors, which a
+  rotation deletes too. So every dnf in the leg goes through the
+  wrapper, the best-effort installs ending in `|| true` included: losing
+  the newer interpreters to a 404 fails the leg later at the Python
+  check, with a message that hides the mirror, and losing
+  `qemu-storage-daemon` skips the bitmap oracle tests without a word.
+- `tools/validate-published-release.sh`, the manual release check, finds
+  the wrapper relative to itself, so it only has it when run from a
+  clone. "From a clone" means the script's own resolved directory is
+  the enclosing tree's `tools/`, not merely that something exists at
+  `tools/ci/dnf.sh`: a lone copy run from `/tmp/foo/` would otherwise
+  resolve the probe to `/tmp/tools/ci/dnf.sh` and run whatever a local
+  user had left there with `sudo` already primed. The check compares
+  `realpath`-derived names rather than inodes, because `test -ef`
+  follows a symlink planted at `/tmp/tools/validate-published-release.sh`
+  back to the real file and passes. A lone copy falls back to plain dnf
+  and prints a note saying so, because there a mirror mid-rotation looks
+  like a broken artifact.
+
+The wrapper needs bash, `mktemp`, `tee` and `grep` wherever it runs,
+which every image in the matrix has.
+
+The deb arms of the same container legs carry the same third-party risk
+-- a Debian or Ubuntu mirror caught mid-push fails with `Hash Sum
+mismatch`, or a 404 for a `Packages` file its `InRelease` still names --
+and still call `apt-get` directly. That is deliberate for now, to keep
+this wrapper about dnf, and is tracked in
+[#955](https://github.com/shakenfist/instar/issues/955).
+
 ### Self-hosted runners and the GitHub CLI
 
 The same applies to `gh`: the `[self-hosted, debian-13, ...]` runners do
@@ -1164,6 +1263,8 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 - `scripts/extract-fuzz-corpus.py` - Seeds + restores the coverage-fuzz corpus from instar-testdata
 - `tools/ci/apt-get.sh` - Runs `sudo apt-get`, waiting for apt's locks rather than failing on them; every host-side `apt-get` in CI goes through it (see "apt and its locks" above)
 - `tools/ci/test-apt-get.sh` - Tests for that wrapper against a fake `apt-get`; the `ci-tooling` CI job runs it
+- `tools/ci/dnf.sh` - Runs `dnf`, retrying a repository-metadata failure rather than failing the job on it; every dnf that resolves against a distro repository goes through it (see "Distro mirrors and dnf" above)
+- `tools/ci/test-dnf.sh` - Tests for that wrapper against a fake `dnf`, and that nothing in `tools/` or the workflows calls dnf around it; the `ci-tooling` CI job runs it
 - `tools/ci/install-docker.sh` - Installs the Docker client and daemon on a self-hosted runner, plus any extra packages passed as arguments (see "Self-hosted runners and Docker" above)
 - `tools/ci/install-gh-cli.sh` - Installs the GitHub CLI on a self-hosted runner if absent (see "Self-hosted runners and the GitHub CLI" above)
 - `tools/propose-release.sh`, `tools/tag-release.sh` - The two release steps: open the version-bump pull request, then tag the commit that merged it (see "Releases" above)

@@ -217,9 +217,9 @@ with web mode).
 | 1. Reuse survey and shared draw dispatch | [PLAN-app-split-phase-01-reuse.md](/components/ryll/plans/PLAN-app-split-phase-01-reuse/) | Complete | acc7a12 (#483) |
 | 2. Module directory and pure state | [PLAN-app-split-phase-02-pure-state.md](/components/ryll/plans/PLAN-app-split-phase-02-pure-state/) | Complete | b245380 (#501) |
 | 3. Events and bug-report flow | [PLAN-app-split-phase-03-events.md](/components/ryll/plans/PLAN-app-split-phase-03-events/) | Complete | 79fc466 (#714), cdecf94 (#717) |
-| 4. Split `ui` into per-panel files | [PLAN-app-split-phase-04-panels.md](/components/ryll/plans/PLAN-app-split-phase-04-panels/) | In progress | |
+| 4. Split `ui` into per-panel files | [PLAN-app-split-phase-04-panels.md](/components/ryll/plans/PLAN-app-split-phase-04-panels/) | Complete | ecf54b5 (#726) |
 | 5. Panel state sub-structs | PLAN-app-split-phase-05-substructs.md | Not started | |
-| 6. Function-length lint | PLAN-app-split-phase-06-lint.md | Not started | |
+| 6. Function-length lint | shakenfist/development `PLAN-size-ratchet.md`, phase 3 | Complete | (#746) |
 | 7. Push audit | This file, below | Not started | |
 
 Phase plans are written at the start of each phase (see the
@@ -344,13 +344,22 @@ request; the phase plan decides the grouping.
 Enable `clippy::too_many_lines` workspace-wide (via
 `[workspace.lints.clippy]` in the root `Cargo.toml`) and set
 `too-many-lines-threshold` in `clippy.toml`. Pick the threshold
-from data -- the distribution of function lengths after phase 5 --
-not from the lint's default of 100. Every remaining offender
-across the workspace gets
+from data -- the distribution of function lengths -- not from the
+lint's default of 100. Every remaining offender across the
+workspace gets
 `#[expect(clippy::too_many_lines, reason = "...")]` with a real
 reason, so the exemptions are a reviewable inventory rather than a
 blanket allow. `#[expect]` rather than `#[allow]`, so that an
 exemption that stops being needed fails and is removed.
+
+This phase was planned and executed as phase 3 of
+shakenfist/development's `PLAN-size-ratchet.md`, so the threshold
+was measured before phase 5 rather than after it. That is safe
+because `#[expect]` turns an exemption that stops being needed into
+a failed build: if phase 5 shortens one of the annotated functions,
+its annotation fails and is removed rather than quietly surviving.
+The threshold and the exemptions are recorded in `clippy.toml` and
+`docs/development.md`, not here.
 
 Record the convention in `AGENTS.md` (it is one an agent cannot
 infer from the code) and the rationale in

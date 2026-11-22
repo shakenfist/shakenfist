@@ -90,7 +90,7 @@ both ends of the traffic through the proxy. This would allow:
 - [Kasm workspace](/components/ryll/kasm-workspace/) - Packaging the ryll GUI as a Kasm Workspaces image
 - [Control socket protocol](/components/ryll/control-socket-protocol/) - Driving headless sessions from external tools, and how the socket is implemented
 - [Key design decisions](/components/ryll/design-decisions/) - Why ryll is shaped the way it is
-- [SPICE protocol handling](/components/ryll/spice-protocol/) - Channels, handshake, image encodings, scancodes
+- [SPICE protocol handling](/components/ryll/spice-protocol/) - Channels, handshake, image encodings, scancodes, reference source trees
 - [Rendering and audio pipeline](/components/ryll/rendering-pipeline/) - Surfaces, window sizing, multi-monitor, audio, notifications
 - [Device redirection](/components/ryll/device-redirection/) - USB, WebDAV folder sharing, paste-as-keystrokes
 - [Diagnostics and instrumentation](/components/ryll/diagnostics/) - Capture, statistics, snapshots, bug reports
