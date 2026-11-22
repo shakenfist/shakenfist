@@ -1013,8 +1013,9 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
         pre-filter ... not the admission decision", and describes
         exactly why it nonetheless sees what the guard sees: it reads the
         capacity row's ``limit_cpus`` and charges the candidate
-        ``max(measured_cpus, committed_cpus)``, refusing when that plus the
-        request exceeds the limit. A node deliberately filled until its
+        ``max(measured_cpus, committed_cpus + held_cpus)``, refusing
+        when that plus the request exceeds the limit. A node
+        deliberately filled until its
         ``cpu_committed`` equals its ``cpu_limit`` therefore fails that
         pre-filter for a one-vCPU request, the only candidate is pruned,
         and the stage message is raised before any admission is attempted.

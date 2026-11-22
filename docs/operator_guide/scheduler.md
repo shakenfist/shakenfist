@@ -469,6 +469,34 @@ measurements above. See
 [`docs/operator_guide/database.md`](database.md) for the RPCs and the
 tables they draw down.
 
+The node-side test in that claim is `used + held + request <= limit` for
+each of cpus, memory and disk, where `held` is room a capacity claim has
+booked on the node for instances it has not created yet. Booked room
+therefore binds every namespace's creates on that node, not only the
+claim holder's. The CPU and RAM pre-filters charge the same `held`
+figure, and the live memory check treats a node's held memory as
+resident, since a booked instance's memory will be. The claim and
+cluster halves of the claim are unchanged: a hold sits inside its claim's
+own limits, which the cluster already counts in full.
+
+Each node's held room is published in `/admin/resources` as `cpu_held`,
+`ram_held_mb` and `disk_held_gb`, beside the committed figures and with
+the same convention that a node with no capacity row reports zero.
+`cpu_available` and `ram_available` already have held room netted out of
+them. `disk_available` does **not**: it is a filesystem measurement, and
+the disk ledger is published beside it rather than folded into it. A
+reader who wants the disk ledger reads `disk_limit_gb`,
+`disk_committed_gb` and `disk_held_gb`. The disk pre-filter does not read
+the ledger at all, so held disk becomes visible to a create only when the
+guard refuses it, and the placement walk then moves to the next
+candidate.
+
+There is currently no operator-facing way to create a hold. No API
+route, command or capability books one, so `held` is zero on every
+cluster and these terms change no refusal you will see today. They are
+in place so that the booking that arrives later does not have to change
+the guard every instance create passes through.
+
 A refused candidate is not a failed create: there is a single shared
 placement walk (`Instance.place_on_candidates()`) that both the create
 path and the start-redirect operation use. It calls `place_instance()`
