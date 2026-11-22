@@ -1683,6 +1683,14 @@ def declared_args_schema(parameters: list[Any],
     return schema
 
 
+# The webargs locations a declared query parameter may be parsed from:
+# the query string, or the json_or_query loader above for the shipped
+# client which sends it in the body. Anything else would read the value
+# from somewhere the published declaration, and the audit which derives
+# it, do not say -- the parameters are declared 'query' either way.
+DECLARED_ARGS_LOCATIONS = ('query', 'json_or_query')
+
+
 def use_declared_args(parameters: list[Any], defaults: dict[str, Any],
                       location: str = 'query') -> Callable[..., Any]:
     """``@use_kwargs`` built from the endpoint's own declaration list.
@@ -1723,6 +1731,12 @@ def use_declared_args(parameters: list[Any], defaults: dict[str, Any],
     that is what the audit in declarations.py derives and what the
     published specification says.
     """
+    if location not in DECLARED_ARGS_LOCATIONS:
+        raise exceptions.InvalidAPIDeclaration(
+            'declared query parameters are parsed from location %r, '
+            'which is not one of %s; they would arrive somewhere the '
+            'published declaration does not say'
+            % (location, ', '.join(DECLARED_ARGS_LOCATIONS)))
     schema = declared_args_schema(parameters, defaults)
 
     def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
@@ -1776,9 +1790,16 @@ def _validated_response_headers(section: str, httpcode: Any,
             % (section, httpcode, ', '.join(sorted(unknown)),
                ', '.join(sorted(RESPONSE_EXTRA_KEYS))))
 
+    headers = extras.get('headers', [])
+    if not isinstance(headers, (tuple, list)):
+        raise exceptions.InvalidAPIDeclaration(
+            '%s response %r declares headers which are not a list of '
+            '(name, type, description) tuples: %r'
+            % (section, httpcode, headers))
+
     declarable = set(ARGTYPES) - {'bearer'}
     out: dict[str, Any] = {}
-    for header in extras.get('headers', []):
+    for header in headers:
         # Checked before destructuring, for the reason the parameter
         # loop checks its own arity: a wrong-shaped declaration has to
         # arrive as an InvalidAPIDeclaration rather than as a ValueError
@@ -1837,6 +1858,17 @@ def swagger_helper(section, description, parameters, responses,
         raise exceptions.InvalidAPIDeclaration(
             '%s declares requires_admin without requires_auth, but '
             'caller_is_admin reads the verified token' % section)
+
+    # The two lists are iterated below, and a value which is not one --
+    # None, say -- would escape as a TypeError naming neither the
+    # endpoint nor the argument, rather than as the one exception type
+    # every other malformed declaration raises.
+    for argument, value in (('parameters', parameters),
+                            ('responses', responses)):
+        if not isinstance(value, (tuple, list)):
+            raise exceptions.InvalidAPIDeclaration(
+                '%s declares %s which are not a list: %r'
+                % (section, argument, value))
 
     out = {
         'tags': [section],

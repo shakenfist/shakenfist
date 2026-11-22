@@ -2047,7 +2047,7 @@ on most tables in the tree to enforce a bound that is already enforced. Ask
 really applies to a field rather than reading either number on its own; it
 answers from the same call that builds the column.
 
-Two consequences worth knowing:
+Three consequences worth knowing:
 
 * A declaration above 16,383 characters is refused with
   `InvalidSchemaDeclaration` when the table definition is built, because
@@ -2063,7 +2063,14 @@ Two consequences worth knowing:
   index key limit is shared by every column of an index, the primary key
   included, so an indexed `str` field can be at most 768 characters, less
   in a compound index. Either would otherwise fail `CREATE TABLE` only on
-  a fresh install, which is the hardest place to find it.
+  a fresh install, which is the hardest place to find it. Both refusals
+  apply to tables built from a model by `pydantic_to_sqlalchemy_table()`.
+  A table registered by hand as an `sa.Table` in `mariadb.py` is not
+  checked, and is still left to `CREATE TABLE` to refuse. These are the
+  server-level row limit and the index key limit, not a complete model
+  of InnoDB: its on-page row size bound and the extra byte per nullable
+  key column are not counted, so a table close to either limit may
+  still be refused.
 * Raising a `max_length` above 255 on an *existing* column changes the DDL
   a fresh install generates, so it needs a schema version bump and a
   migration like any other column change. `test_declared_limits.py` holds

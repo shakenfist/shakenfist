@@ -95,6 +95,21 @@ class SwaggerHelperResponseHeadersTestCase(base.ShakenFistTestCase):
         out = _helper([(200, 'Fine.', None)])
         self.assertNotIn('headers', out['responses'][200])
 
+    def test_a_headers_value_which_is_not_a_list_is_refused(self):
+        # As InvalidAPIDeclaration naming the response, not as the
+        # TypeError iterating None would raise.
+        for headers in (None, 'Retry-After', 15):
+            with self.assertRaises(
+                    exceptions.InvalidAPIDeclaration) as ctx:
+                _helper([(503, 'Later.', None, {'headers': headers})])
+            self.assertIn('503', str(ctx.exception))
+
+    def test_parameters_or_responses_which_are_not_lists_are_refused(self):
+        self.assertRaises(exceptions.InvalidAPIDeclaration, _helper, None)
+        self.assertRaises(
+            exceptions.InvalidAPIDeclaration, api_base.swagger_helper,
+            'tests', 'A test endpoint.', None, [])
+
     def test_a_declared_header_is_published(self):
         out = _helper([
             (503, 'Try later.', None,

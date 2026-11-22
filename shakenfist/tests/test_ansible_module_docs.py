@@ -64,13 +64,19 @@ GUIDE_SECTIONS = {
 }
 
 
+def _read(path):
+    with open(path) as f:
+        return f.read()
+
+
 def _documentation_options(module):
     """The parameter names a module's DOCUMENTATION block declares."""
-    source = open(os.path.join(MODULE_DIR, '%s.py' % module)).read()
+    source = _read(os.path.join(MODULE_DIR, '%s.py' % module))
     match = re.search(r"DOCUMENTATION\s*=\s*r?'''(.*?)'''", source, re.S)
     if match is None:
         match = re.search(r'DOCUMENTATION\s*=\s*r?"""(.*?)"""', source, re.S)
-    assert match is not None, '%s has no DOCUMENTATION block' % module
+    if match is None:
+        raise AssertionError('%s has no DOCUMENTATION block' % module)
     return set(yaml.safe_load(match.group(1)).get('options', {}))
 
 
@@ -82,7 +88,7 @@ def _connection_parameters():
     key is the identity_param variable, which _identity_parameter()
     resolves per module.
     """
-    source = open(os.path.join(MODULE_UTILS_DIR, 'sf_connection.py')).read()
+    source = _read(os.path.join(MODULE_UTILS_DIR, 'sf_connection.py'))
     tree = ast.parse(source)
     for node in ast.walk(tree):
         if not isinstance(node, ast.Dict):
@@ -99,7 +105,7 @@ def _connection_parameters():
 
 def _default_identity_parameter():
     """connection_argument_spec()'s own default for identity_param."""
-    source = open(os.path.join(MODULE_UTILS_DIR, 'sf_connection.py')).read()
+    source = _read(os.path.join(MODULE_UTILS_DIR, 'sf_connection.py'))
     for node in ast.walk(ast.parse(source)):
         if (isinstance(node, ast.FunctionDef)
                 and node.name == 'connection_argument_spec'):
@@ -131,10 +137,11 @@ def _identity_parameter(tree, module):
              and node.func.id == 'connection_argument_spec']
     if not calls:
         return None
-    assert len(calls) == 1, (
-        '%s calls connection_argument_spec() %d times, so this test '
-        'cannot say which identity parameter it accepts'
-        % (module, len(calls)))
+    if len(calls) != 1:
+        raise AssertionError(
+            '%s calls connection_argument_spec() %d times, so this test '
+            'cannot say which identity parameter it accepts'
+            % (module, len(calls)))
     call = calls[0]
     argument = call.args[0] if call.args else None
     for keyword in call.keywords:
@@ -142,9 +149,10 @@ def _identity_parameter(tree, module):
             argument = keyword.value
     if argument is None:
         return _default_identity_parameter()
-    assert isinstance(argument, ast.Constant), (
-        '%s passes connection_argument_spec() an identity_param that is '
-        'not a literal, so this test cannot read it' % module)
+    if not isinstance(argument, ast.Constant):
+        raise AssertionError(
+            '%s passes connection_argument_spec() an identity_param that '
+            'is not a literal, so this test cannot read it' % module)
     return argument.value
 
 
@@ -155,7 +163,7 @@ def _argument_spec(module):
     connection_argument_spec() and so does not spell itself, with the
     identity parameter that call asks for.
     """
-    source = open(os.path.join(MODULE_DIR, '%s.py' % module)).read()
+    source = _read(os.path.join(MODULE_DIR, '%s.py' % module))
     tree = ast.parse(source)
     spec = None
     for node in ast.walk(tree):
@@ -172,9 +180,10 @@ def _argument_spec(module):
                         and isinstance(keyword.value, ast.Dict)):
                     spec = {key.value for key in keyword.value.keys
                             if isinstance(key, ast.Constant)}
-    assert spec is not None, (
-        '%s does not build its argument_spec as a dict literal, so this '
-        'test cannot read what it accepts' % module)
+    if spec is None:
+        raise AssertionError(
+            '%s does not build its argument_spec as a dict literal, so '
+            'this test cannot read what it accepts' % module)
 
     identity = _identity_parameter(tree, module)
     if identity is None:
@@ -186,7 +195,7 @@ def _guide_sections():
     """The lines of each `##` section of the user guide, by heading."""
     sections = {}
     current = None
-    for line in open(GUIDE).read().splitlines():
+    for line in _read(GUIDE).splitlines():
         if line.startswith('## '):
             current = line[3:].strip()
             sections[current] = []

@@ -218,11 +218,14 @@ class ResponseHeaderDeclarationTestCase(base.ShakenFistTestCase):
             % (sorted(found - set(HEADER_SITES)),
                sorted(set(HEADER_SITES) - found)))
 
-    def test_every_response_which_carries_a_header_declares_it(self):
-        # Read through declarations.response_headers() with base.py's
-        # real namespace, because a header declared as
-        # api_base.RETRY_AFTER_HEADER is assembled from another
-        # constant and so is not a literal a source read can resolve.
+    def _declared(self):
+        """{(class, method, httpcode): header names} for every handler.
+
+        Read through declarations.response_headers() with base.py's
+        real namespace, because a header declared as
+        api_base.RETRY_AFTER_HEADER is assembled from another constant
+        and so is not a literal a source read can resolve.
+        """
         declared: dict[tuple[str, str, int], set[str]] = {}
         for path, tree, cls, fn in declarations.handlers():
             for httpcode, names in declarations.response_headers(
@@ -232,7 +235,10 @@ class ResponseHeaderDeclarationTestCase(base.ShakenFistTestCase):
                     f'{cls.name}.{fn.name} has a response declaration '
                     f'this audit cannot read')
                 declared[(cls.name, fn.name, httpcode)] = names
+        return declared
 
+    def test_every_response_which_carries_a_header_declares_it(self):
+        declared = self._declared()
         missing = []
         for (module, _, function, header), responses in \
                 HEADER_SITES.items():
@@ -248,6 +254,32 @@ class ResponseHeaderDeclarationTestCase(base.ShakenFistTestCase):
                         % (module, function, header, response))
 
         self.assertEqual([], missing, '\n'.join(missing))
+
+    def test_every_declared_header_is_set_somewhere(self):
+        """The other direction: a published header nothing sends.
+
+        To a generated client an over-declared header is the same
+        defect as a missing one -- it waits for, or parses, something
+        that never arrives. So every (response, header) a declaration
+        publishes must be named by some site in the table.
+        """
+        set_on = {(response, header)
+                  for (_, _, _, header), responses in HEADER_SITES.items()
+                  for response in responses}
+        declared = self._declared()
+
+        # The floor: Retry-After is declared on three responses today,
+        # so an empty walk cannot pass this vacuously.
+        published = [(response, header)
+                     for response, names in declared.items()
+                     for header in names]
+        self.assertGreaterEqual(len(published), 3)
+
+        unsent = sorted(item for item in published if item not in set_on)
+        self.assertEqual(
+            [], unsent,
+            'these responses publish a header no site in HEADER_SITES '
+            'sets; set it, or stop declaring it: %s' % unsent)
 
     def test_the_audit_can_tell_a_declared_header_from_an_undeclared_one(self):
         """The positive control.

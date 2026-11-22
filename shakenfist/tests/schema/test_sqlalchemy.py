@@ -537,3 +537,15 @@ class TableLimitsTestCase(base.ShakenFistTestCase):
         self.assertRaises(
             exceptions.InvalidSchemaDeclaration, self._build, one_over,
             include_id_column=False)
+
+    def test_a_column_type_with_no_cost_is_refused_not_guessed(self):
+        """A guess would be a check that silently stopped checking.
+
+        DATETIME is the shape that reaches this: the builder does not
+        make one today, so a hand-registered table moved onto it would
+        land here, and the message says what to add.
+        """
+        with self.assertRaises(exceptions.InvalidSchemaDeclaration) as ctx:
+            sqlalchemy_module._check_table_limits(
+                'probe', [sa.Column('when', sa.DateTime())], [])
+        self.assertIn('_column_bytes()', str(ctx.exception))

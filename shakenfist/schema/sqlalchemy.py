@@ -533,11 +533,17 @@ def _column_bytes(
 def _check_table_limits(
         table_name: str, columns: list[sa.Column[Any]],
         indexes: list[tuple[str, tuple[str, ...]]]) -> None:
-    """Refuse a table MariaDB would refuse to create.
+    """Refuse a table over MariaDB's row or InnoDB's index key limit.
 
     ``indexes`` is every index the table will carry, the primary key
     included, as (name, column names). See MAX_ROW_BYTES for why this
     is checked here rather than left to CREATE TABLE.
+
+    This catches the two limits a widened declaration reaches, and is
+    not a complete model of what InnoDB refuses: its on-page row size
+    bound (roughly half a page) and the extra byte it spends per
+    nullable key column are not counted. Passing here is therefore
+    necessary for CREATE TABLE to succeed, not sufficient.
     """
     by_name = {column.name: _column_bytes(column.type) for column in columns}
 

@@ -59,7 +59,11 @@ class BlobHash(BaseModel):
         }
     )
 
-    # Primary key fields
+    # Primary key fields. Each is a VARCHAR(255) column whatever it
+    # declares -- narrower declarations keep the default width -- so the
+    # key costs 3,060 of InnoDB's 3,072 byte index key limit at utf8mb4.
+    # None of the three can be widened past 255 without restructuring
+    # the key, and pydantic_to_sqlalchemy_table() refuses the attempt.
     blob_uuid: Annotated[str, Field(max_length=36)]
     node: Annotated[str, Field(max_length=255)]
     algorithm: Annotated[str, Field(max_length=32)]

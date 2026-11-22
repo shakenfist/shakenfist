@@ -847,7 +847,7 @@ def declarations(fn: ast.FunctionDef, path: Optional[str] = None,
 
 def response_headers(
         fn: ast.FunctionDef,
-        constants: Optional[dict[str, Any]] = None
+        constants: dict[str, Any]
 ) -> dict[Any, Optional[set[str]]]:
     """The response headers a handler's declaration publishes.
 
@@ -866,15 +866,15 @@ def response_headers(
     ``base._validated_response_headers()`` -- or as a name bound to
     such a tuple, which is how the one header in the tree is written so
     that the published description and the value the server sends come
-    from one place. ``constants`` is where such a name is resolved;
-    ``base_constants()`` by default, which reads base.py's literals
-    from source. A caller which can import the module (a test) should
-    pass its namespace instead, because a constant assembled from
-    another constant is not a literal and source reading cannot see it.
+    from one place. ``constants`` is where such a name is resolved,
+    and it is required: pass the imported module's namespace,
+    ``vars(api_base)``. ``base_constants()``, which reads base.py's
+    literals from source, is not offered as a default because it cannot
+    resolve either header constant in the tree -- both are assembled
+    with ``%`` from another constant, so neither is a literal -- and a
+    default which reports every real declaration as unreadable is one a
+    later caller would trust.
     """
-    if constants is None:
-        constants = base_constants()
-
     out: dict[Any, Optional[set[str]]] = {}
     for dec in fn.decorator_list:
         if 'swagger_helper' not in ast.unparse(dec):

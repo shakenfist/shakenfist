@@ -33,8 +33,14 @@ from shakenfist.external_api import validation
 from shakenfist.tests import base
 
 
-def _use_declared_args_sites():
-    """(class, method, declaration list name, defaults) per call site."""
+def _use_declared_args_sites(unreadable=None):
+    """(class, method, declaration list name, defaults) per call site.
+
+    A site whose declaration list or defaults this cannot read -- an
+    argument missing, or defaults which are not a literal dict -- is
+    appended to ``unreadable`` as 'Class.method' rather than raising
+    from here, so that the test asserting there are none can say which.
+    """
     out = []
     for path, tree, cls, fn in declarations.handlers():
         for dec in fn.decorator_list:
@@ -42,9 +48,22 @@ def _use_declared_args_sites():
                 continue
             if ast.unparse(dec.func).split('.')[-1] != 'use_declared_args':
                 continue
-            defaults = ast.literal_eval(dec.args[1])
-            out.append((cls.name, fn.name, ast.unparse(dec.args[0]),
-                        defaults, fn))
+            # Bound by name, as Python binds them: positionally in
+            # use_declared_args()'s parameter order, then by keyword.
+            arguments = dict(zip(('parameters', 'defaults'), dec.args))
+            arguments.update((keyword.arg, keyword.value)
+                             for keyword in dec.keywords)
+            try:
+                defaults = ast.literal_eval(arguments['defaults'])
+            except (KeyError, ValueError, TypeError, SyntaxError):
+                defaults = None
+            if not isinstance(defaults, dict) or (
+                    'parameters' not in arguments):
+                if unreadable is not None:
+                    unreadable.append('%s.%s' % (cls.name, fn.name))
+                continue
+            out.append((cls.name, fn.name,
+                        ast.unparse(arguments['parameters']), defaults, fn))
     return out
 
 
@@ -79,7 +98,13 @@ class UseDeclaredArgsCallSiteTestCase(base.ShakenFistTestCase):
     def test_the_sites_are_still_found(self):
         # Every assertion below passes vacuously if the AST walk stops
         # finding the decorator.
-        sites = _use_declared_args_sites()
+        unreadable = []
+        sites = _use_declared_args_sites(unreadable)
+        self.assertEqual(
+            [], unreadable,
+            'these use_declared_args() sites pass a declaration list and '
+            'a defaults dict this test cannot read, so nothing below '
+            'checks them: %s' % ', '.join(unreadable))
         self.assertEqual(
             6, len(sites),
             'expected the six endpoints which parse declared query '
@@ -198,6 +223,26 @@ class UseDeclaredArgsTestCase(base.ShakenFistTestCase):
         self.assertRaises(
             exceptions.InvalidAPIDeclaration, self._schema,
             [('namespace', 'body', 'namespace', 'A namespace.', False)], {})
+
+    def test_a_location_which_cannot_carry_a_query_parameter_is_refused(self):
+        """The parameters are published as query whatever is passed.
+
+        So parsing them from the JSON body alone, or a form, would read
+        them from somewhere the specification and the audit do not say
+        -- and nothing else would notice, because the audit reads the
+        same list the specification publishes.
+        """
+        for location in ('json', 'form', 'headers'):
+            self.assertRaises(
+                exceptions.InvalidAPIDeclaration, api_base.use_declared_args,
+                self.PARAMETERS, {'all': False, 'offset': 0},
+                location=location)
+
+    def test_each_location_which_can_carry_one_is_accepted(self):
+        for location in api_base.DECLARED_ARGS_LOCATIONS:
+            api_base.use_declared_args(
+                self.PARAMETERS, {'all': False, 'offset': 0},
+                location=location)
 
     def test_a_structured_type_in_the_query_string_is_refused(self):
         self.assertRaises(
