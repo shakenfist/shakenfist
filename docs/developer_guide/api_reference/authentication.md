@@ -597,7 +597,10 @@ A rule carries:
 | `key_name_prefix` | Prefix for minted key names; the cluster appends a random discriminator |
 
 `bound_claims` values are exact strings, or lists of exact strings
-meaning "any of these". There is no globbing and no pattern matching:
+meaning "any of these". A claim in the token whose value is a list
+matches when one of its elements is exactly the matcher, which is how
+a group claim grants a namespace. There is no globbing and no pattern
+matching:
 `shakenfist/*` looks reasonable until somebody registers
 `shakenfist-evil`, and the anchored patterns needed to make that safe
 are exactly what reviewers get wrong. A rule must bind at least one

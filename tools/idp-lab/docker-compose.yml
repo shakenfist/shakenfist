@@ -1,0 +1,118 @@
+# A development lab of two OpenID Connect providers, for working on
+# Shaken Fist's federated identity support and for regenerating the
+# captured provider documents under shakenfist/tests/files/idp/.
+#
+# THIS IS NOT A DEPLOYMENT. Every port is bound to loopback, the
+# certificates are self signed and valid for two days, the databases
+# are throwaway volumes, and the credentials are generated fresh by
+# tools/idp-lab/lab-up.sh into a state directory outside this
+# repository. Nothing here is hardened, backed up or upgradable.
+#
+# Bring it up with tools/idp-lab/lab-up.sh rather than by hand: this
+# file names variables it has no defaults for, and the certificates
+# Keycloak mounts do not exist until that script has made them.
+#
+# The image tags are pinned because the walkthroughs in
+# docs/operator_guide/authentication.md name the versions they were
+# produced against, and an unpinned provider silently rewrites its own
+# administration interface underneath them.
+
+name: sf-idp-lab
+
+# Both Authentik containers are the same image with the same
+# configuration and a different command, so the environment is written
+# once. The double underscores are Authentik's own spelling for a
+# nested setting.
+x-authentik-environment: &authentik-environment
+  AUTHENTIK_SECRET_KEY: ${IDP_LAB_AUTHENTIK_SECRET_KEY:?run tools/idp-lab/lab-up.sh instead of docker compose directly}
+  AUTHENTIK_POSTGRESQL__HOST: postgres
+  AUTHENTIK_POSTGRESQL__USER: authentik
+  AUTHENTIK_POSTGRESQL__NAME: authentik
+  AUTHENTIK_POSTGRESQL__PASSWORD: ${IDP_LAB_POSTGRES_PASSWORD:?}
+  AUTHENTIK_REDIS__HOST: redis
+  AUTHENTIK_BOOTSTRAP_PASSWORD: ${IDP_LAB_AUTHENTIK_ADMIN_PASSWORD:?}
+  AUTHENTIK_BOOTSTRAP_TOKEN: ${IDP_LAB_AUTHENTIK_API_TOKEN:?}
+  AUTHENTIK_BOOTSTRAP_EMAIL: ${IDP_LAB_AUTHENTIK_ADMIN_EMAIL:-admin@example.com}
+  # The lab's own log reading is the only diagnostic there is for a
+  # provider which answers a bare 404, so keep it talkative.
+  AUTHENTIK_LOG_LEVEL: info
+
+services:
+  # Keycloak serves http only unless it is given a certificate, and
+  # start-dev does not generate one. Shaken Fist refuses an issuer
+  # which is not https, so the lab supplies a certificate whose
+  # subjectAltName names localhost and 127.0.0.1.
+  #
+  # KC_HOSTNAME is what decides the issuer URL and every endpoint in
+  # the discovery document, so it has to be right before anything is
+  # captured.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.2
+    command: start-dev
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${IDP_LAB_KEYCLOAK_ADMIN_USER:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${IDP_LAB_KEYCLOAK_ADMIN_PASSWORD:?}
+      KC_HOSTNAME: https://localhost:8443
+      KC_HTTP_ENABLED: 'false'
+      KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/conf/tls.crt
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/conf/tls.key
+    volumes:
+      - ${IDP_LAB_TLS_DIR:?}/tls.crt:/opt/keycloak/conf/tls.crt:ro
+      - ${IDP_LAB_TLS_DIR:?}/tls.key:/opt/keycloak/conf/tls.key:ro
+    ports:
+      - '127.0.0.1:8443:8443'
+
+  postgres:
+    image: docker.io/library/postgres:16.16-alpine
+    environment:
+      POSTGRES_USER: authentik
+      POSTGRES_DB: authentik
+      POSTGRES_PASSWORD: ${IDP_LAB_POSTGRES_PASSWORD:?}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U authentik -d authentik']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: docker.io/library/redis:7.4.12-alpine
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli ping | grep -q PONG']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Authentik is two containers from one image. The server applies the
+  # database migrations on first boot and that boot is slow, which is
+  # why lab-up.sh waits on /-/health/ready/ rather than sleeping.
+  #
+  # It serves https on 9443 from first boot with a certificate it
+  # generates itself. That certificate carries no subjectAltName, so
+  # configure-authentik.sh replaces the brand's web certificate with
+  # the lab's; see the README.
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2026.8.6
+    command: server
+    environment: *authentik-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1:9443:9443'
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2026.8.6
+    command: worker
+    environment: *authentik-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

@@ -196,7 +196,7 @@ Three fields are mandatory, and three more are optional:
 | `audience` | Yes | Tokens must be minted for this. Usually your cluster's API URL |
 | `jwks_uri` | No | Where the signing keys are published. Always taken from here, never from the token. Must be `https`. Left out, it is [discovered](#discovery) from the provider |
 | `client_id` | No | The OAuth client identifier you registered at the provider for human login. A workload exchange never reads it |
-| `oidc_scopes` | No | The OpenID Connect scopes to request at human login, as one space separated string such as `openid profile groups`. A workload exchange never reads it |
+| `oidc_scopes` | No | The OpenID Connect scopes to request at human login, as one space separated string such as `openid profile`. What a provider needs here differs; the worked examples below show two. A workload exchange never reads it |
 
 An issuer which only verifies workload tokens -- GitHub Actions, say --
 has no client registration at its provider and never will, which is why
@@ -258,8 +258,10 @@ What it fills in on the issuer:
 * `jwks_uri`, when you did not supply one.
 * `authorization_endpoint`, `token_endpoint` and
   `device_authorization_endpoint`, which a human login flow starts
-  from. A provider which does not offer the device code grant simply
+  from. A provider which does not implement the device code grant
   publishes no device endpoint, and the issuer then has none. A
+  provider which implements it but has not configured it is a
+  different case, and may publish the endpoint anyway -- see below. A
   successful run replaces all three, so a provider which stops
   publishing one stops being advertised as having it.
 * `discovered_at`, the time of the last successful run.
@@ -267,6 +269,16 @@ What it fills in on the issuer:
 It cannot fill in `client_id` or `oidc_scopes`. Those are a
 registration you make at the provider, and no document says what you
 registered.
+
+The three endpoints say what the provider published rather than what it
+will honour: a provider can advertise a `device_authorization_endpoint`
+for a flow it has not actually configured, and serve a document
+indistinguishable from a working one's. So an issuer which appears
+device capable here proves that the provider published an endpoint, not
+that a login through it will complete, which is why the
+[Keycloak](#a-worked-keycloak-example) and
+[Authentik](#a-worked-authentik-example) examples below name the
+provider side switches that decide.
 
 The document's `issuer` member must equal the `issuer_url` you
 configured **exactly**, character for character, or the document is
@@ -666,6 +678,378 @@ workflow have access to" is a query rather than an investigation.
 
 Nothing here is specific to GitHub's hosted runners; a self hosted
 runner asks for its token the same way.
+
+### A worked Keycloak example
+
+Keycloak is the less surprising of the two self hosted providers to
+configure for human login, and this is the whole of it: a realm, a public
+client, a group, one mapper, and two `curl` calls at the cluster. Produced
+against **Keycloak 26.8.2**, which was configured through its admin REST
+API; the console labels below are that release's, and each one is given with
+the API attribute it sets so the attribute is the authority.
+The cluster side is `curl` for the reason given in the
+[GitHub Actions example](#a-worked-github-actions-example).
+
+At the provider, as a Keycloak administrator:
+
+1. **Create a realm**, `sf`, under *Manage realms*. The realm name is the
+    last element of the issuer URL, so the issuer becomes
+    `https://idp.example.com/realms/sf`.
+
+2. **Create a group**, `sf-admins`, under *Groups*. Membership of this group
+    is what will entitle a person to a namespace.
+
+3. **Create a client**, `shakenfist`, under *Clients*, with *Client
+    authentication* **off** — a public client. The thing registering is a
+    command line program on a person's laptop, so a confidential client's
+    secret would have to be handed to everyone who logs in, at which point it
+    is not a secret. The device grant requires a public client anyway, and
+    there is nothing here for a secret to protect: `POST /auth/login` verifies
+    a token's signature and its `client_id`, not a client secret.
+
+    Three settings on the client matter.
+
+    * *Valid redirect URIs*: `http://127.0.0.1:*`. `sf-client` binds an
+      ephemeral loopback port for the browser flow, so the redirect URI it
+      sends cannot be registered exactly; Keycloak's trailing `*` matches it.
+    * *OAuth 2.0 Device Authorization Grant*, under *Authentication flow*:
+      **on** (`oauth2.device.authorization.grant.enabled`). That checkbox is
+      the whole of enabling the device flow at Keycloak, which has nothing at
+      a realm or brand level to configure.
+    * *PKCE Method* (`pkce.code.challenge.method`): **leave it empty**, for
+      the reason in the warning below.
+
+4. **Add a group membership mapper to the client**, under *Clients* ->
+    `shakenfist` -> *Client scopes* -> `shakenfist-dedicated` -> *Add mapper*
+    -> *By configuration* -> *Group Membership*, and check that *Add to ID
+    token* (`id.token.claim`) is on. Keycloak ships no group claim at all, so without this mapper
+    there is nothing to bind a rule to; and with it pointed only at the access
+    token there is a claim visible at `/userinfo` while every login is still
+    refused, because the identity token is the only token Shaken Fist ever
+    sees.
+
+5. **Create the person**, under *Users*, with *Email verified* on, then set
+    their password under *Credentials* with *Temporary* off. Each alternative
+    puts a required action on the account, which stops the login on an extra
+    screen before any token is issued.
+
+6. **Join them to the group**, under the user's *Groups* tab.
+
+The mapper's *Full group path* switch (`full.path`) decides what the claim
+says and it defaults to on, so a mapper created through the console writes
+`"groups": ["/sf-admins"]` — with a leading slash. The slash is there because
+the value is a group *path*: a group nested under another is `/parent/child`,
+which is the real reason to leave full paths on. Whichever form you choose,
+the rule below has to bind the string the token actually carries.
+
+`groups` is **not** a scope Keycloak knows, and asking for one is a hard
+refusal rather than a quietly ignored request:
+
+```json
+{
+  "error": "invalid_scope",
+  "error_description": "Invalid scopes: openid profile groups"
+}
+```
+
+So the issuer's `oidc_scopes` is `openid profile`. The claim arrives anyway,
+because a mapper on the client's own dedicated scope is always in scope. A
+realm client scope literally named `groups` can be created instead, and then
+`openid profile groups` is accepted — but attached to the client as an
+*optional* scope that is a trap, because a login which does not ask for it by
+name gets no claim, no rule match, and the deliberately uninformative 401.
+
+Keycloak publishes its `device_authorization_endpoint` **per realm**, whether
+or not the client you registered has the grant enabled, so the issuer is
+advertised as device capable either way. The device endpoint itself is clear
+about it when asked, which is more than the cluster can be, and running that
+one request is quicker than suspecting the cluster:
+
+```json
+{
+  "error": "unauthorized_client",
+  "error_description": "Client is not allowed to initiate OAuth 2.0 Device Authorization Grant. The flow is disabled for the client."
+}
+```
+
+???+ warning "Requiring PKCE at the client breaks only the device flow"
+
+    Setting the client's *PKCE Method* (`pkce.code.challenge.method`) to
+    `S256` makes Keycloak **require** a challenge on every request,
+    including the device authorization request, which has nowhere to put one:
+
+    ```json
+    {
+      "error": "invalid_request",
+      "error_description": "Missing parameter: code_challenge_method"
+    }
+    ```
+
+    The authorization endpoint is unaffected, so the symptom is a device
+    login which cannot start on a client whose browser login works.
+    `sf-client` sends an S256 challenge on the browser flow of its own
+    accord, so leaving this setting empty costs no protection and is what a
+    working device flow needs. "Require PKCE" is exactly the box a careful
+    operator ticks, which is why it is worth naming.
+
+Configure the issuer once, as a cluster administrator:
+
+```bash
+curl -X POST https://sf.example.com/auth/issuers \
+  -H "Authorization: Bearer ${SF_ADMIN_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "name": "corporate",
+        "issuer_url": "https://idp.example.com/realms/sf",
+        "audience": "https://sf.example.com",
+        "client_id": "shakenfist",
+        "oidc_scopes": "openid profile"
+      }'
+```
+
+No `jwks_uri` is sent, so [discovery](#discovery) supplies it along with the
+three login endpoints. `audience` is mandatory, and a login does not check
+it: a real Keycloak identity token's `aud` is the bare client id, which is
+why `client_id` is set here as well and why [human login verifies the
+`client_id`](#human-login-mints-credentials) rather than the audience.
+
+Then, as the owner of the namespace those people should reach:
+
+```bash
+curl -X POST https://sf.example.com/auth/namespaces/ops/rules \
+  -H "Authorization: Bearer ${SF_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "name": "corporate-admins",
+        "issuer": "corporate",
+        "bound_claims": {"groups": "/sf-admins"},
+        "scopes": ["instance.*"],
+        "key_ttl": 3600,
+        "key_name_prefix": "corporate"
+      }'
+```
+
+`bound_claims` names `/sf-admins` with its leading slash, because that is
+what this provider's token says. The claim is an array even for a person in
+exactly one group, and a rule matches when any element of it equals the
+string bound, so one group out of a person's twenty is enough; only the
+elements which matched are recorded in the key's provenance.
+
+The person then runs:
+
+```bash
+sf-client login
+```
+
+which prints a short code and a URL for them to open. Tell them that
+Keycloak asks them to confirm **after** they have signed in: a *Yes* / *No*
+consent page which belongs to the device grant itself rather than to the
+client's *Consent required* setting, and which appeared here with that setting
+off. A login described as "sign in and you are done" leaves them looking at
+it while the client polls. Once they accept, they come back with one key per
+namespace their groups entitle them to.
+
+### A worked Authentik example
+
+Authentik needs more switches than Keycloak, and two of them are invisible
+from outside: a stock install advertises a device flow it cannot complete, and
+serves a discovery document which says nothing is wrong. Produced against
+**Authentik 2026.8.6**, configured through its API; the interface labels below
+are that release's, and each field is given with the API name it sets.
+
+At the provider, as an Authentik administrator:
+
+1. **Replace the brand's web certificate**, before anything else. Authentik
+    serves https from first boot with a certificate it generates itself, and
+    that certificate carries no `subjectAltName` — so a cluster fetching its
+    discovery document refuses it by hostname even when that same certificate
+    is the trust anchor:
+
+    ```
+    certificate verify failed: Hostname mismatch, certificate is not valid
+    for 'idp.example.com'
+    ```
+
+    Pointing `FEDERATION_JWKS_CA_BUNDLE` at the certificate does not help,
+    because trusting a certificate does not give it a name; only replacing it
+    does. Upload a keypair whose certificate names the provider's hostname in
+    a `subjectAltName`, under *System* -> *Certificates*, and set it as the
+    brand's *Web Certificate* (`web_certificate`) under *System* -> *Brands*.
+    The running server
+    picks it up within seconds and needs no restart.
+
+2. **Create a group**, `sf-admins`, under *Directory* -> *Groups*. The
+    group's **name** is what reaches the token: there is no path and no uuid
+    in the claim.
+
+3. **Create the person**, under *Directory* -> *Users*, with the group
+    assigned, and *Set password* from the user's own menu.
+
+4. **Create an OAuth2/OpenID provider**, under *Applications* ->
+    *Providers*. The fields which matter are mostly the ones a newly created
+    provider does not have.
+
+    * *Client Type* (`client_type`): **public**, for the same reasons as the
+      other provider.
+    * *Client ID* (`client_id`): `shakenfist`. This is the string the issuer's
+      `client_id` must be.
+    * *Authorization Flow* and *Invalidation Flow*: both required, with no
+      defaults. A stock install ships
+      `default-provider-authorization-implicit-consent` and
+      `default-provider-invalidation-flow`.
+    * *Signing Key* (`signing_key`): empty by default, and without one there
+      is nothing to sign an RS256 identity token with. The self signed certificate
+      Authentik generated on first boot is a perfectly good signing key even
+      though it was a poor web certificate.
+    * *Scopes* (`property_mappings`): the shipped `openid`, `profile` and
+      `email` scope mappings. `profile` is the one which carries the group
+      claim, and the default is no mappings at all.
+    * *Grant Types* (`grant_types`): must list the device code grant alongside
+      `authorization_code` and `refresh_token`. The default is the empty
+      list, and see the warning below for what that costs.
+    * *Redirect URIs/Origins (RegEx)* (`redirect_uris`): one entry whose mode
+      is *Regex* rather than *Strict*, with the value
+      `http://127\.0\.0\.1:[0-9]+/`. The mode is the part to get right:
+      `sf-client` binds an ephemeral loopback port, and only a regex entry can
+      match one. The other provider's spelling,
+      `http://127.0.0.1:*/`, is accepted here as a `strict` entry and then
+      matches nothing, which answers the authorization request with a 400
+      and an HTML error page rather than a redirect — correctly, since the
+      redirect URI is the thing in doubt — and logs
+      `redirect_uri_no_match`. It is a real regular expression, so the dots
+      have to be escaped or they match any character.
+    * *Include claims in id_token* (`include_claims_in_id_token`): leave it
+      on, which is the default. Off,
+      the scope mappings' claims are served from `/userinfo` and in the
+      access token but not in the identity token, which is the only token
+      Shaken Fist sees.
+
+5. **Create an application**, under *Applications* -> *Applications*, with
+    the slug `sf`, and bind the provider to it. The slug is the last element
+    of the issuer URL, so the issuer becomes
+    `https://idp.example.com/application/o/sf/` — including the trailing
+    slash, which is part of the issuer and which [discovery](#discovery)
+    compares character for character. The slugs `authorize`, `token`,
+    `device`, `userinfo`, `introspect` and `revoke` are reserved, because the
+    global endpoints live at those paths.
+
+6. **Create a device code flow and point the brand at it.** Under *Flows and
+    Stages* -> *Flows*, create a flow whose *Designation* is *Stage
+    Configuration* and whose authentication is *Require authentication*;
+    nothing needs to be bound to it, and an empty flow is enough. Then under
+    *System* -> *Brands*, edit the brand in use and set that flow as its
+    *Device code flow* (`flow_device_code`). This is not the default and it is
+    not optional.
+
+Authentik needs no mapper for the group claim: the shipped `profile` property
+mapping already emits `"groups": ["sf-admins"]` — group names, as an array,
+with no path and no prefix, which is not the same string the other provider
+writes for the same group. What it needs instead is for `profile` to actually
+be **granted**, so the issuer's `oidc_scopes` must be at least
+`openid profile`. A login asking for `openid` alone gets no groups, no rule
+match, and the uninformative 401. `groups` is not a scope here and asking for
+one would be wrong; the claim rides on `profile`. Beware also that a request
+naming no scopes at all is treated as asking for every scope the provider
+has, so a hand rolled test of this configuration can pass while `sf-client`,
+which always names its scopes, fails.
+
+???+ warning "Discovery cannot tell you if an Authentik device login works"
+
+    Authentik's discovery document carries a
+    `device_authorization_endpoint`, and lists the device code grant in its
+    `grant_types_supported`, whether or not a device login can complete. The
+    document served by a provider with no device grant and a brand with no
+    device code flow is byte for byte identical to the one a working
+    configuration serves, so the issuer is advertised as device capable
+    either way and nothing the cluster can read tells the two apart.
+
+    With the **brand's device code flow** missing, the failure lands on the
+    person rather than on the client, and only after they have typed their
+    password. The device code request succeeds and looks perfectly normal;
+    the verification URL sends them through an ordinary login; and the page
+    they are returned to answers a bare **404 with an empty body**. No
+    message, no error page. The reason is in Authentik's log and nowhere
+    else:
+
+    ```
+    "event": "Brand has no device code flow configured",
+    "logger": "authentik.providers.oauth2.views.device_init",
+    "status": 404
+    ```
+
+    Meanwhile the client polls with `authorization_pending` until the code
+    expires, which by default is sixty seconds later.
+
+    With the **provider's grant types** missing the device grant, the device
+    code request itself is refused, at the client rather than at the person,
+    with a message that names something else entirely:
+
+    ```json
+    {
+      "error": "invalid_client",
+      "error_description": "Client authentication failed (e.g., unknown client, no client authentication included, or unsupported authentication method)"
+    }
+    ```
+
+    Neither state is visible from here, so when a device login fails against
+    an Authentik issuer, check those two settings at the provider before
+    suspecting anything about the cluster.
+
+Configure the issuer once, as a cluster administrator:
+
+```bash
+curl -X POST https://sf.example.com/auth/issuers \
+  -H "Authorization: Bearer ${SF_ADMIN_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "name": "directory",
+        "issuer_url": "https://idp.example.com/application/o/sf/",
+        "audience": "https://sf.example.com",
+        "client_id": "shakenfist",
+        "oidc_scopes": "openid profile"
+      }'
+```
+
+As with the other provider, `jwks_uri` is left to [discovery](#discovery),
+and the `aud` of a real Authentik identity token is the bare client id
+rather than the audience — so [`client_id` is the field a login is verified
+against](#human-login-mints-credentials). Authentik decides its issuer URL
+from the `Host` header of the request rather than from a setting, so an
+issuer configured from a document fetched through the wrong name is silently
+wrong; fetch it the way your users will reach it.
+
+Then, as the owner of the namespace those people should reach:
+
+```bash
+curl -X POST https://sf.example.com/auth/namespaces/ops/rules \
+  -H "Authorization: Bearer ${SF_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "name": "directory-admins",
+        "issuer": "directory",
+        "bound_claims": {"groups": "sf-admins"},
+        "scopes": ["instance.*"],
+        "key_ttl": 3600,
+        "key_name_prefix": "directory"
+      }'
+```
+
+`sf-admins` here, with no leading slash, is the whole of the difference from
+the other provider's rule: a rule binds the string its provider emits, and a
+value copied between the two matches nothing.
+
+The person then runs:
+
+```bash
+sf-client login
+```
+
+Using the URL with the code already in it, they never see a code entry page
+— but the brand's device code flow is still what makes that route exist,
+which is why it cannot be skipped. They do see one button to press at the
+end, which is the device grant's own confirmation step and appears even though the
+provider's authorization flow is the implicit consent one. The same shape as
+the other provider, reached from the other direction.
 
 ### Abuse resistance
 

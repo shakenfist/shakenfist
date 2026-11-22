@@ -1,0 +1,23 @@
+{
+  "exp": 1795313096,
+  "iat": 1795312796,
+  "auth_time": 1795312796,
+  "jti": "00d46dc2-f5e9-30e8-a894-d93891f06fdc",
+  "iss": "https://localhost:8443/realms/shakenfist",
+  "aud": "shakenfist",
+  "sub": "00000000-0000-0000-0000-000000000000",
+  "typ": "ID",
+  "azp": "shakenfist",
+  "sid": "WTguxUgIIuIm3kYFLegtb9ye",
+  "at_hash": "Qgj3F2g3EHMKv-KmZlBxbg",
+  "acr": "1",
+  "email_verified": true,
+  "name": "Example Person",
+  "groups": [
+    "/sf-admins"
+  ],
+  "preferred_username": "person",
+  "given_name": "Example",
+  "family_name": "Person",
+  "email": "person@example.com"
+}

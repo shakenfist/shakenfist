@@ -529,6 +529,18 @@ meaning "any of these". There is no globbing, no regular expressions,
 no prefix matching and no type coercion: a claim of `1` does not match
 a matcher of `"1"`.
 
+A claim whose *value* is a list matches by membership: the rule is
+satisfied when one of the claim's elements is a string exactly equal
+to the matcher, or to one of the matcher's alternatives. That is how a
+group claim grants a namespace, because a provider writes a person's
+groups as an array of strings rather than as one string. Nothing else
+is relaxed. A non-string element is skipped rather than stringified, a
+list inside a list is not descended into, an empty list matches
+nothing, and the matcher side is exactly as it was: still an exact
+string or a list of exact strings. The minted key's provenance records
+only the elements which matched, which is the grant as it was made
+rather than everything the person happens to be a member of.
+
 This is deliberate and is the most likely thing to feel restrictive.
 Prefix matching on `repository` reads naturally right up until someone
 registers `shakenfist-evil`, and the anchored patterns needed to make
@@ -656,6 +668,16 @@ Configuring an issuer and writing a mapping rule are operator tasks, and
 the worked end to end example -- registering GitHub as an issuer, writing
 a rule, and the workflow YAML that exchanges a token -- lives with them in
 the [operator guide](/operator_guide/authentication/#a-worked-github-actions-example).
+So do the two worked examples for human login, one per self hosted
+identity provider.
+
+Those two were produced by configuring the providers rather than from
+documentation, and `tools/idp-lab/` is what they were produced with: it
+stands both up from pinned images, configures them through their
+administrative APIs, and regenerates the captured provider documents the
+unit tests assert against. An instruction in them which has rotted can
+therefore be found out by running it, which is the only way a walkthrough
+stays true.
 
 ## Inter-node authentication
 

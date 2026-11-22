@@ -111,6 +111,21 @@ expires fairly quickly.
 Setting this up is an administrator's job, and is covered in the
 [operator guide](/operator_guide/authentication/#federated-identity).
 
+## Logging in as a person
+
+If your identity lives at an identity provider your cluster trusts, you do not
+need an administrator to hand you a key. Run `sf-client login` and sign in at
+the provider. The cluster then mints one namespace key for every namespace
+your identity entitles you to, so if you are entitled to three namespaces you
+receive three keys.
+
+The client caches those keys locally, and `sf-client logout` discards them.
+The [client documentation](https://github.com/shakenfist/client-python/blob/develop/docs/human-login.md)
+covers the rest: the ways of logging in, where the cache lives, and how to
+choose between credentials. Whether a person can log in at all depends on an
+administrator having set up a provider for it, which is covered in the
+[operator guide](/operator_guide/authentication/#federated-identity).
+
 ## Reading your own keys
 
 You can ask Shaken Fist what your own keys expire at and what they are scoped
