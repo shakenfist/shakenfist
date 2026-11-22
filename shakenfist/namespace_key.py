@@ -276,12 +276,56 @@ class NamespaceKey(dbo):
         Issue 3836: a create which failed between the row inserts and
         the state writes leaves a live key with no state row, and the
         retry reaches new() as a rotation, which writes no state. Does
-        nothing if the key has a state.
+        nothing for a key which already has a state, except one left in
+        initial by a heal which could not finish -- see below.
+
+        The read is get_state_checked() rather than the state property.
+        That property is get_state(), which returns None both for a key
+        with no state row and for a read which failed, and this caller
+        acts on absence. from_db_by_name() applies no state filter, so a
+        soft deleted key reaches here: were a read failure to read as
+        absence, the heal would write initial over deleted and undelete
+        a key an operator had revoked. The "objects do not undelete"
+        guard cannot catch that, because it re-reads the same way and
+        so misreads it the same way.
+
+        Neither write is allowed to escape. rotate() has already
+        replaced the secret by the time we are called, so raising here
+        would lose the caller a secret which is live in the database --
+        the key would authenticate with a value nobody holds. A key left
+        in initial is in ACTIVE_STATES and is no longer stateless, so
+        expiry governs it normally and the next rotation finishes the
+        job.
         """
-        if self.state.value is not None:
+        readable, state = mariadb.get_state_checked(
+            self.object_type, str(self.uuid))
+        if not readable:
+            LOG.with_fields({
+                'namespace': self.namespace,
+                'key': self.name,
+                'uuid': str(self.uuid)
+            }).warning('Could not tell whether a rotated key has a state '
+                       'row, so its state was left alone')
             return
-        self.state = self.STATE_INITIAL
-        self.state = self.STATE_CREATED
+
+        value = state.value if state else None
+        if value not in (None, self.STATE_INITIAL):
+            return
+
+        try:
+            if value is None:
+                self.state = self.STATE_INITIAL
+            self.state = self.STATE_CREATED
+        except (exceptions.InvalidStateException,
+                exceptions.StateWriteFailed) as e:
+            LOG.with_fields({
+                'namespace': self.namespace,
+                'key': self.name,
+                'uuid': str(self.uuid),
+                'error': str(e)
+            }).warning('Failed to repair the state of a rotated key')
+            return
+
         self.add_event(EVENT_TYPE_AUDIT,
                        'rotation repaired a key which had no state row')
 

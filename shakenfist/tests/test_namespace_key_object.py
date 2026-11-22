@@ -170,6 +170,16 @@ class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
             base64.b64decode(
                 self._attributes(loser).key.get_secret_value())))
 
+    def _stored_state(self, key):
+        """The state value in the store, not through a patched reader.
+
+        The read failure tests patch the state readers, so the object's
+        own state property cannot be used to assert what was written.
+        """
+        row = self.mock_mariadb.mariadb_states.get(
+            f'{key.object_type}/{key.uuid}')
+        return row['state_value'] if row else None
+
     def _drop_state(self, key):
         self.mock_mariadb.mariadb_states.pop(
             f'{key.object_type}/{key.uuid}', None)
@@ -205,6 +215,68 @@ class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
         self.assertEqual(
             [], [c for c in mock_add_event.call_args_list
                  if c.args[0] == EVENT_TYPE_AUDIT])
+
+    def test_an_unreadable_state_does_not_heal_a_deleted_key(self):
+        """A read failure must not read as "this key has no state row".
+
+        from_db_by_name() applies no state filter, so a revoked key
+        reaches the heal. If a failed read were taken for absence the
+        heal would write initial over deleted, and the key an operator
+        revoked would authenticate again with a secret this very call
+        has just minted.
+        """
+        first = NamespaceKey.new('banana', 'deploy', 'sekrit')
+        first.state = NamespaceKey.STATE_DELETED
+
+        # What a read failure looks like from here: get_state() cannot
+        # say why it has no state to offer, and get_state_checked() can.
+        # The row itself is untouched and still says deleted.
+        with mock.patch('shakenfist.mariadb.get_state', return_value=None), \
+                mock.patch('shakenfist.mariadb.get_state_checked',
+                           return_value=(False, None)), \
+                mock.patch.object(NamespaceKey, 'add_event') as mock_add_event, \
+                mock.patch('shakenfist.mariadb.set_state',
+                           wraps=self.mock_mariadb._mariadb_set_state) as spy:
+            NamespaceKey.new('banana', 'deploy', 'different')
+
+        spy.assert_not_called()
+        self.assertEqual(NamespaceKey.STATE_DELETED, self._stored_state(first))
+        self.assertEqual(
+            [], [c for c in mock_add_event.call_args_list
+                 if c.args[0] == EVENT_TYPE_AUDIT])
+
+    def test_a_failed_heal_write_does_not_escape_the_rotation(self):
+        """The secret is already replaced, so the heal may not raise.
+
+        rotate() runs before the heal. A heal which threw would leave
+        the stored hash and nonce rotated with the caller never told
+        the new secret, so the key would authenticate with a value
+        nobody holds.
+        """
+        first = NamespaceKey.new('banana', 'deploy', 'sekrit')
+        self._drop_state(first)
+
+        with mock.patch('shakenfist.mariadb.set_state', return_value=False):
+            second = NamespaceKey.new('banana', 'deploy', 'different')
+
+        self.assertIsNotNone(second.minted_nonce)
+        self.assertEqual(self._attributes(second).nonce.get_secret_value(),
+                         second.minted_nonce.get_secret_value())
+
+    def test_a_key_left_in_initial_is_healed_the_rest_of_the_way(self):
+        """A heal which wrote initial and then failed is finished later.
+
+        Containing the writes makes this state reachable, so the heal
+        has to treat initial as unfinished rather than as a state which
+        means "leave this key alone".
+        """
+        first = NamespaceKey.new('banana', 'deploy', 'sekrit')
+        self._drop_state(first)
+        first.state = NamespaceKey.STATE_INITIAL
+
+        second = NamespaceKey.new('banana', 'deploy', 'different')
+
+        self.assertEqual(NamespaceKey.STATE_CREATED, second.state.value)
 
     def test_the_race_fallback_heals_a_stateless_key(self):
         winner = NamespaceKey.new('banana', 'deploy', 'sekrit')
