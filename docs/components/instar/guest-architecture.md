@@ -340,7 +340,7 @@ provides a modular architecture with:
  because the guest waits for each request without a deadline and the
  host completes every request it can read, with an error status when
  it cannot serve it — see "A request the host cannot answer" below
- for the one case that is not completed, which hangs the guest),
+ for the one case that is not completed, which fails the run),
  `Durability` fsyncs where the capability exists and degrades to
  `Ordering` elsewhere (matching commit/rebase's no-fsync
  output-device reality). Host-unit-tested against a mock `DeviceIo`
@@ -936,23 +936,38 @@ sector it was on, the host adds the errno it recorded, and the process
 exits non-zero. This is the ordinary failure path and it is tested
 both as a unit and end to end with an injected `EIO`.
 
-**A request the host cannot *read* is not completed at all.** If the
-descriptor chain is malformed, a descriptor names an address outside
-guest memory, or a guest-memory access fails, the device has no status
-descriptor it can trust and propagates the error instead. On the
-ioeventfd path -- the normal one -- the I/O thread can only log it and
-carry on: nothing reaches the used ring, the guest's wait never ends,
-and the vCPU thread is inside `KVM_RUN` while the guest spins, so the
-run cannot be failed from either side. It takes a `SIGINT`. The
-vCPU-exit fallback (`process_queue_for_device`) propagates to the run
-loop and does fail the run, so the behaviour depends on which path is
-active.
+**A request the host cannot *read* fails the run.** If the descriptor
+chain is malformed, a descriptor names an address outside guest memory,
+or a guest-memory access fails, the device has no status descriptor it
+can trust, so there is nowhere to put a status byte and nothing reaches
+the used ring. The guest's wait for that request can therefore never
+end on its own, and the vCPU thread is inside `KVM_RUN` while the guest
+spins on it, so neither thread can report the failure where it
+happened.
 
-Every way to reach the second case is an instar bug rather than
-anything a hostile image can ask for: the guest builds its own
-descriptor chains, and the addresses in them come from the guest's own
-fixed DMA pool. Image data cannot steer it. That is why it is recorded
-here rather than fixed -- the fix is to carry the failure out to the
-run loop and terminate the run, which needs shared fatal state and a
-way to kick the vCPU out of `KVM_RUN`, and that is tracked as its own
-issue.
+The I/O thread hands it over instead. It records the failure in state
+the run loop shares (`FatalIoError`) and signals the vCPU thread, whose
+`KVM_RUN` returns `EINTR`; every run loop enters the guest through
+`run_guest`, which renders the recorded failure rather than the
+interruption that delivered it. `run_guest` checks for one on every
+exit, not only an interrupted one, so a failure recorded while the vCPU
+was already outside `KVM_RUN` cannot be lost to an exit the loop ends
+on. The kick is repeated on each wake of the I/O loop while a failure
+is recorded and the run loop has not read it, because a signal that
+arrives in the moment before `KVM_RUN` is entered is simply lost; once
+the run loop has read it the kick stops. The handler is installed with
+`SA_RESTART`, which does not stop `KVM_RUN` returning `EINTR` but does
+keep a late kick from failing an ordinary syscall the vCPU thread makes
+afterwards, and a handler that cannot be installed is reported as a
+warning, since without it the run would hang again. The vCPU-exit fallback
+(`process_queue_for_device`) propagates the same error to the run loop,
+so the two queue-service paths now agree; before, which one was active
+decided whether the run hung or failed.
+
+Every way to reach this is an instar bug rather than anything a hostile
+image can ask for: the guest builds its own descriptor chains, and the
+addresses in them come from the guest's own fixed DMA pool. Image data
+cannot steer it. So no fixture reaches it, and what is tested is the
+mechanism rather than a trigger: that the first failure is the one
+kept, and that recording one really does interrupt a thread blocked in
+a syscall.

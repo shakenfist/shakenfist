@@ -241,6 +241,7 @@ nav:
                 - "Architectural Decisions": components/instar/commentary/architectural-decisions.md
                 - "Reading Order": components/instar/commentary/reading-order.md
             - Crates:
+                - "Fetch Protocol Crate": components/instar/crates/fetch-protocol.md
                 - "Guest Protocol Crate": components/instar/crates/guest-protocol.md
             - Image Notes:
                 - "cirros-qcow2 Test Image": components/instar/image_notes/cirros-qcow2.md

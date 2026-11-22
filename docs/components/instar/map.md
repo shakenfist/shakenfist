@@ -199,16 +199,18 @@ sector size rather than the file's own length (see below as well).
 
 ## Malformed block tables
 
-`map`'s VHDX walk refuses a payload block whose BAT entry names a
+`map`'s VHDX and VHD walks refuse a block whose table entry names a
 byte range that is the image's own structure, rather than reporting
-it as `Data`: file offset zero, where the file identifier and
-headers live, or a range overlapping any region the image's region
-table declares (the BAT region, the metadata region, or one this
-build does not recognise). This is the same test the guest chain
-walker already applies when reading such a block for `convert`,
-`dd`, `compare`, `bench` and `rebase`; `map`'s own whole-BAT walk did
-not apply it until recently, so it could report a block one of those
-operations already refused to read:
+it as `Data`. For VHDX that is file offset zero, where the file
+identifier and headers live, or a range overlapping any region the
+image's region table declares (the BAT region, the metadata region,
+or one this build does not recognise); for VHD it is a BAT entry
+whose block overlaps a region the image declares, which at an entry
+of zero is the footer copy and the dynamic header. This is the same
+test the guest chain walker already applies when reading such a block
+for `convert`, `dd`, `compare`, `bench` and `rebase`; `map`'s own
+whole-table walk did not apply it until recently, so it could report
+a block one of those operations already refused to read:
 
 ```
 map: source block table names a block inside the image's own
@@ -224,6 +226,11 @@ immediately past the last region in the table is unaffected and
 still maps normally. See
 [docs/format-internals.md § vhdx](/components/instar/format-internals/#vhdx) for the
 predicate both the readers and this walk share.
+
+The VHD half said `map: I/O failure walking the source` until
+recently, which named the one thing that had not gone wrong: nothing
+failed to read, and what was read disagrees with itself. The two
+formats now answer alike.
 
 ## Refused qcow2 L2 entries
 
