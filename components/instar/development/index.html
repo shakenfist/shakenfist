@@ -3836,6 +3836,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-renovate-shellcheck-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Require the shellcheck-py versioning rule
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/plans/PLAN-review-coverage/" class="md-nav__link">
         
   
@@ -4999,6 +5027,17 @@
     <span class="md-ellipsis">
       
         apt and its locks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#distro-mirrors-and-dnf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Distro mirrors and dnf
       
     </span>
   </a>
@@ -16512,6 +16551,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#distro-mirrors-and-dnf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Distro mirrors and dnf
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#self-hosted-runners-and-the-github-cli" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -17211,14 +17261,103 @@ genuinely wedged apt still fails the step. <code>tools/ci/test-apt-get.sh</code>
 checks the retry logic against a fake <code>apt-get</code>.</p>
 <p><code>apt-get</code> run inside a fresh container needs none of this, since nothing
 else in the container is running apt, and calls it directly.</p>
+<h3 id="distro-mirrors-and-dnf">Distro mirrors and dnf<a class="headerlink" href="#distro-mirrors-and-dnf" title="Permanent link">&para;</a></h3>
+<p>The container legs have the mirror-image problem, and it is not about
+locks. Installing a package resolves its dependencies against the
+distro's repositories -- a local <code>.rpm</code> included, since its <code>Requires</code>
+have to come from somewhere -- so those legs depend on a third party's
+metadata being self-consistent at the moment they run. A point release's
+repodata rotation breaks that: a <code>repomd.xml</code> served from a stale mirror
+or edge cache names <code>primary</code> and <code>filelists</code> files the mirrors have
+already deleted, every mirror answers 404, and dnf stops before it has
+looked at the package at all:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>  - Status code: 404 for https://.../9.9/AppStream/x86_64/os/repodata/
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>      8dad4ae7...-primary.xml.gz
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>Error: Failed to download metadata for repo 'appstream': ... Cannot
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>download, all mirrors were already tried without success
+</code></pre></div>
+<p>Nothing in this repository is wrong when that happens, and it is
+expensive to be told so: the matrix legs are the last to run, so a 404
+in one of them can cost most of a day of queue wait before the ejected
+pull request can go back.</p>
+<p>So every dnf that resolves against a distro repository goes through
+<code>tools/ci/dnf.sh</code>, which retries that failure with a <code>clean metadata</code> in
+between -- so the retry cannot be answered from the copy that just
+failed -- inside one five-minute deadline. The deadline is checked
+between attempts, so it bounds when the last retry starts rather than
+when the wrapper returns: an attempt against wedged mirrors is not cut
+short, and can run past it. Any other failure, an unknown package or an
+unsatisfied dependency, is returned at once: that is an answer about the
+package, and retrying it would only make a clear failure slow.
+<code>tools/ci/test-dnf.sh</code> checks all of that against a fake dnf, including
+that the wrapper adds nothing to the arguments it is given -- and fails
+on any dnf in <code>tools/</code> or the workflows that does not go through the
+wrapper, unless its line ends in <code># direct dnf: &lt;reason&gt;</code>.</p>
+<p>A rotation deletes packages as well as repodata, and a deleted package
+is retried too -- but not on the mirror line. librepo reports running
+out of mirrors as "all mirrors were already tried", which is how a
+metadata failure ends, while a payload that has spent its allowance of
+mirror failures ends in the bare transfer error (<code>Status code: 404 for
+...</code>), naming no mirrors. So the wrapper also matches the wordings dnf
+wraps a failed payload in: <code>Error downloading packages:</code> from dnf4 and
+<code>Failed to download packages</code> from dnf5. That is deliberately broad --
+a repository with <code>skip_if_unavailable</code> turns an unreachable mirror into
+a warning and carries on, so an unrelated failure in the same run can
+carry a matching line and be retried for the whole deadline. One wasted
+deadline on a failure that would have failed anyway is the cheaper
+mistake; <code>tools/ci/test-dnf.sh</code> pins that trade rather than leaving it
+to a comment.</p>
+<p>Two things follow for callers. The wrapper merges dnf's stderr into its
+stdout, because that is what it matches on, so a caller that captures
+the wrapper's stdout captures dnf's diagnostics with it -- group an
+<code>||</code> chain before redirecting it (<code>{ a || b; } &gt;/dev/null 2&gt;&amp;1</code>), since
+a redirection on a list binds to its last command alone. And where a
+fallback arm exists at all, give it a short <code>DNF_RETRY_TIMEOUT</code> so that
+the waiting is paid once per install rather than once per arm.</p>
+<p>It has four callers:</p>
+<ul>
+<li><code>tools/test-package-install.sh</code> and <code>tools/probe-qemu-versions.sh</code> run
+  dnf inside a container, where the wrapper has to be mounted to be
+  callable; that is what <code>-v "$REPO_ROOT/tools/ci/dnf.sh:/dnf.sh:ro"</code>
+  is for.</li>
+<li><code>tools/test-package-functional.sh</code> already mounts the repository at
+  <code>/workspace</code> and calls it from there. dnf loads every enabled
+  repository's metadata on its first transaction, so later calls reuse
+  that, but they still download packages from the mirrors, which a
+  rotation deletes too. So every dnf in the leg goes through the
+  wrapper, the best-effort installs ending in <code>|| true</code> included: losing
+  the newer interpreters to a 404 fails the leg later at the Python
+  check, with a message that hides the mirror, and losing
+  <code>qemu-storage-daemon</code> skips the bitmap oracle tests without a word.</li>
+<li><code>tools/validate-published-release.sh</code>, the manual release check, finds
+  the wrapper relative to itself, so it only has it when run from a
+  clone. "From a clone" means the script's own resolved directory is
+  the enclosing tree's <code>tools/</code>, not merely that something exists at
+  <code>tools/ci/dnf.sh</code>: a lone copy run from <code>/tmp/foo/</code> would otherwise
+  resolve the probe to <code>/tmp/tools/ci/dnf.sh</code> and run whatever a local
+  user had left there with <code>sudo</code> already primed. The check compares
+  <code>realpath</code>-derived names rather than inodes, because <code>test -ef</code>
+  follows a symlink planted at <code>/tmp/tools/validate-published-release.sh</code>
+  back to the real file and passes. A lone copy falls back to plain dnf
+  and prints a note saying so, because there a mirror mid-rotation looks
+  like a broken artifact.</li>
+</ul>
+<p>The wrapper needs bash, <code>mktemp</code>, <code>tee</code> and <code>grep</code> wherever it runs,
+which every image in the matrix has.</p>
+<p>The deb arms of the same container legs carry the same third-party risk
+-- a Debian or Ubuntu mirror caught mid-push fails with <code>Hash Sum
+mismatch</code>, or a 404 for a <code>Packages</code> file its <code>InRelease</code> still names --
+and still call <code>apt-get</code> directly. That is deliberate for now, to keep
+this wrapper about dnf, and is tracked in
+<a href="https://github.com/shakenfist/instar/issues/955">#955</a>.</p>
 <h3 id="self-hosted-runners-and-the-github-cli">Self-hosted runners and the GitHub CLI<a class="headerlink" href="#self-hosted-runners-and-the-github-cli" title="Permanent link">&para;</a></h3>
 <p>The same applies to <code>gh</code>: the <code>[self-hosted, debian-13, ...]</code> runners do
 not ship it either, so any job that files an issue, opens a PR or
 otherwise calls the GitHub CLI must install it first. Do not paste an
 apt block into the workflow -- call the shared installer, which is a
 no-op when <code>gh</code> is already present:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Install GitHub CLI on host</span>
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tools/ci/install-gh-cli.sh</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Install GitHub CLI on host</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tools/ci/install-gh-cli.sh</span>
 </code></pre></div>
 <p>The <code>[self-hosted, claude-code]</code> and <code>[self-hosted, static]</code> runners do
 have <code>gh</code> preinstalled, which is why the Claude Code workflows and the
@@ -17330,16 +17469,16 @@ ruleset, transform the exported object rather than PUTting the <code>GET</code>
 response back unchanged — the response carries fields that are not part
 of the update schema (<code>id</code>, <code>_links</code>, and <code>"parameters": null</code> on the
 rules that take no parameters):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets/20783686<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">'{</span>
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="s1">  name, target, enforcement, conditions,</span>
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="s1">  bypass_actors: [.bypass_actors[] | {actor_id, actor_type, bypass_mode}],</span>
-<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="s1">  rules: [.rules[]</span>
-<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="s1">    | if .type == "required_status_checks"</span>
-<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="s1">      then .parameters.required_status_checks</span>
-<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="s1">             += [{context: "Can merge", integration_id: 15368}]</span>
-<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="s1">      else . end</span>
-<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="s1">    | if .parameters == null then {type: .type} else . end]}'</span><span class="w"> </span>&gt;<span class="w"> </span>ruleset.json
-<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>gh<span class="w"> </span>api<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>repos/shakenfist/instar/rulesets/20783686<span class="w"> </span>--input<span class="w"> </span>ruleset.json
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets/20783686<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">'{</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="s1">  name, target, enforcement, conditions,</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="s1">  bypass_actors: [.bypass_actors[] | {actor_id, actor_type, bypass_mode}],</span>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="s1">  rules: [.rules[]</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="s1">    | if .type == "required_status_checks"</span>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="s1">      then .parameters.required_status_checks</span>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="s1">             += [{context: "Can merge", integration_id: 15368}]</span>
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="s1">      else . end</span>
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="s1">    | if .parameters == null then {type: .type} else . end]}'</span><span class="w"> </span>&gt;<span class="w"> </span>ruleset.json
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>gh<span class="w"> </span>api<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>repos/shakenfist/instar/rulesets/20783686<span class="w"> </span>--input<span class="w"> </span>ruleset.json
 </code></pre></div>
 <p>Read it back and diff it against the intent afterwards; dropping
 <code>bypass_actors</code> from the payload silently removes the bypass.</p>
@@ -17357,8 +17496,8 @@ rules that take no parameters):</p>
   never reports leaves the queue waiting forever.</li>
 </ul>
 <p>To inspect or recreate it:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets<span class="w"> </span>--jq<span class="w"> </span><span class="s1">'.[] | "\(.id) \(.name) \(.enforcement)"'</span>
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets/&lt;id&gt;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets<span class="w"> </span>--jq<span class="w"> </span><span class="s1">'.[] | "\(.id) \(.name) \(.enforcement)"'</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/instar/rulesets/&lt;id&gt;
 </code></pre></div>
 <p><code>.github/exported-config/</code> carries the nightly export of the live
 ruleset state, which is the machine-readable companion to the table
@@ -17367,16 +17506,16 @@ committing directly.</p>
 <h3 id="differential-fuzzing">Differential fuzzing<a class="headerlink" href="#differential-fuzzing" title="Permanent link">&para;</a></h3>
 <p>On-demand differential fuzzing compares instar against qemu-img on randomly
 generated images to find behavioral divergences:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1"># Run locally (requires instar binary and qemu-img)</span>
-<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="w">    </span>--iterations<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="w">    </span>--seed<span class="w"> </span><span class="m">42</span>
-<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>
-<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="c1"># Trigger via GitHub Actions (workflow_dispatch)</span>
-<a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>differential-fuzz.yml<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">iterations</span><span class="o">=</span><span class="m">1000</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">seed</span><span class="o">=</span><span class="m">42</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># Run locally (requires instar binary and qemu-img)</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">    </span>--iterations<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="w">    </span>--seed<span class="w"> </span><span class="m">42</span>
+<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>
+<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a><span class="c1"># Trigger via GitHub Actions (workflow_dispatch)</span>
+<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>differential-fuzz.yml<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">iterations</span><span class="o">=</span><span class="m">1000</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a><span class="w">    </span>-f<span class="w"> </span><span class="nv">seed</span><span class="o">=</span><span class="m">42</span>
 </code></pre></div>
 <p>The fuzzer generates random images (varying format, size, cluster size,
 compression, data patterns), runs chains of operations (info, check, convert)
@@ -17389,9 +17528,9 @@ fills the gap for VMDK/VHD/VHDX where qemu-img check is unavailable.</p>
 <h3 id="coverage-guided-fuzzing">Coverage-guided fuzzing<a class="headerlink" href="#coverage-guided-fuzzing" title="Permanent link">&para;</a></h3>
 <p>Coverage-guided fuzzing uses <code>cargo-fuzz</code> (libFuzzer) to exercise the
 parser crates directly without the VMM/KVM stack:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># Inside the instar-build container:</span>
-<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
-<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>--<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1"># Inside the instar-build container:</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>--<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
 </code></pre></div>
 <p>44 fuzz targets cover all parser crates (QCOW2, VMDK, VHD, VHDX,
 VDI, Parallels, QCOW1, DMG, RAW, LUKS) including header parsing,
@@ -17406,7 +17545,7 @@ refcount mutators (<code>fuzz_snapshot_refcount</code>), the dd window math
 which drives the write/copy-on-write planner through the crate's
 <code>sim</code> harness asserting the <code>max_rc &lt; 3</code> COW invariant oracle, and
 <code>fuzz_qcow2_write_growth</code>). Seed the corpus from <code>instar-testdata</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>python3<span class="w"> </span>scripts/extract-fuzz-corpus.py<span class="w"> </span>--testdata<span class="w"> </span>/path/to/instar-testdata
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>python3<span class="w"> </span>scripts/extract-fuzz-corpus.py<span class="w"> </span>--testdata<span class="w"> </span>/path/to/instar-testdata
 </code></pre></div>
 <p>The CI workflow runs nightly at 04:00 UTC. Crashes are minimized and
 filed as GitHub Issues with the <code>security-audit</code> label immediately.
@@ -17447,8 +17586,8 @@ starts marking glibc version needs weak. <code>nightly-2026-07-22</code> emitted
 took out the Rocky 9, Rocky 10 and Fedora matrix jobs in the merge
 queue. <code>.deb</code> packaging is unaffected — cargo-deb uses
 <code>dpkg-shlibdeps</code>. To inspect what a built package actually requires:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>rpm<span class="w"> </span>-qpR<span class="w"> </span>src/target/generate-rpm/instar-*.rpm
-<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>readelf<span class="w"> </span>-V<span class="w"> </span>src/target/release/instar<span class="w">   </span><span class="c1"># Version needs section</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>rpm<span class="w"> </span>-qpR<span class="w"> </span>src/target/generate-rpm/instar-*.rpm
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>readelf<span class="w"> </span>-V<span class="w"> </span>src/target/release/instar<span class="w">   </span><span class="c1"># Version needs section</span>
 </code></pre></div>
 <p>Note that this class of breakage is only caught by the distro matrix,
 which runs in the merge queue rather than in the pull-request gate.</p>
@@ -17614,6 +17753,8 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 <li><code>scripts/extract-fuzz-corpus.py</code> - Seeds + restores the coverage-fuzz corpus from instar-testdata</li>
 <li><code>tools/ci/apt-get.sh</code> - Runs <code>sudo apt-get</code>, waiting for apt's locks rather than failing on them; every host-side <code>apt-get</code> in CI goes through it (see "apt and its locks" above)</li>
 <li><code>tools/ci/test-apt-get.sh</code> - Tests for that wrapper against a fake <code>apt-get</code>; the <code>ci-tooling</code> CI job runs it</li>
+<li><code>tools/ci/dnf.sh</code> - Runs <code>dnf</code>, retrying a repository-metadata failure rather than failing the job on it; every dnf that resolves against a distro repository goes through it (see "Distro mirrors and dnf" above)</li>
+<li><code>tools/ci/test-dnf.sh</code> - Tests for that wrapper against a fake <code>dnf</code>, and that nothing in <code>tools/</code> or the workflows calls dnf around it; the <code>ci-tooling</code> CI job runs it</li>
 <li><code>tools/ci/install-docker.sh</code> - Installs the Docker client and daemon on a self-hosted runner, plus any extra packages passed as arguments (see "Self-hosted runners and Docker" above)</li>
 <li><code>tools/ci/install-gh-cli.sh</code> - Installs the GitHub CLI on a self-hosted runner if absent (see "Self-hosted runners and the GitHub CLI" above)</li>
 <li><code>tools/propose-release.sh</code>, <code>tools/tag-release.sh</code> - The two release steps: open the version-bump pull request, then tag the commit that merged it (see "Releases" above)</li>

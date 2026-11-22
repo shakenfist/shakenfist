@@ -3836,6 +3836,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-renovate-shellcheck-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Require the shellcheck-py versioning rule
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/plans/PLAN-review-coverage/" class="md-nav__link">
         
   
@@ -16687,6 +16715,11 @@ enqueue</code> status check:</p>
 <td><code>tools/check-bidi.sh</code></td>
 </tr>
 <tr>
+<td><code>source size ratchet</code></td>
+<td>self-hosted <code>s</code></td>
+<td><code>tools/source-size-ratchet.py</code>, which fails when a source file over 1,500 lines grows past its entry in <code>tools/source-size-baseline</code>, or when a new file crosses that line with no entry</td>
+</tr>
+<tr>
 <td><code>skillsaw</code></td>
 <td>self-hosted <code>s</code></td>
 <td><code>pre-commit run skillsaw</code> over the agent context, then <code>tools/test-wave0-scan.sh</code></td>
@@ -16704,7 +16737,8 @@ contamination, not theft, because both secrets are written again onto
 every fresh runner.</p>
 <p>Each of those jobs runs something a fork can edit — the Makefile and
 dependencies' <code>build.rs</code> for the three build lanes, <code>tools/*.sh</code> for
-<code>shellcheck</code> and <code>bidi and zero-width</code>, <code>.pre-commit-config.yaml</code> and
+<code>shellcheck</code> and <code>bidi and zero-width</code>, <code>tools/source-size-ratchet.py</code>
+for <code>source size ratchet</code>, <code>.pre-commit-config.yaml</code> and
 <code>.skillsaw.yaml</code> (whose <code>custom-rules</code> skillsaw imports as Python) for
 <code>skillsaw</code>, and <code>.cargo/config.toml</code>, whose <code>[alias]</code> and <code>[build]</code>
 keys cargo honours, for <code>cargo audit</code> and <code>cargo deny</code>. <code>gitleaks</code> is

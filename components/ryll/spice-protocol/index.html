@@ -3836,6 +3836,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-renovate-shellcheck-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Require the shellcheck-py versioning rule
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/plans/PLAN-review-coverage/" class="md-nav__link">
         
   
@@ -12993,6 +13021,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#reference-source-trees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference source trees
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -16704,6 +16743,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#reference-source-trees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference source trees
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -17673,6 +17723,61 @@ PageUp, PageDown) require the E0 extended prefix to distinguish them from
 their numpad equivalents. These are encoded in the u32 scancode field as
 <code>(scancode &lt;&lt; 8) | 0xE0</code>, matching spice-gtk's <code>spice_make_scancode()</code>.
 The mapping table uses the 0x1xx convention internally (bit 8 set = extended).</p>
+<h2 id="reference-source-trees">Reference source trees<a class="headerlink" href="#reference-source-trees" title="Permanent link">&para;</a></h2>
+<p>When implementing a protocol detail, these local trees are the
+references to read rather than guess from. They are checkouts on the
+development host, not dependencies of the build.</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Path</th>
+<th>Use for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Kerbside Python proxy</td>
+<td><code>shakenfist/kerbside/</code></td>
+<td>Protocol docs in that repository's <code>docs/</code>, packet parsing in <code>kerbside/spiceprotocol/packets/</code>, reference test client in <code>testclient/ryll/</code></td>
+</tr>
+<tr>
+<td>SPICE protocol headers</td>
+<td><code>/srv/src-reference/spice/spice-protocol/</code></td>
+<td>Canonical enum definitions, message structures, capability flags</td>
+</tr>
+<tr>
+<td>SPICE common library</td>
+<td><code>/srv/src-reference/spice/spice-common/</code></td>
+<td>Shared marshalling code used by both server and client</td>
+</tr>
+<tr>
+<td>SPICE GTK client</td>
+<td><code>/srv/src-reference/spice/spice-gtk/</code></td>
+<td>Reference client implementation (C/GTK)</td>
+</tr>
+<tr>
+<td>spice-html5</td>
+<td><code>/srv/src-reference/spice/spice-html5/</code></td>
+<td>JavaScript SPICE client (useful for LZ/GLZ decompressor reference)</td>
+</tr>
+<tr>
+<td>virt-viewer</td>
+<td><code>/srv/src-reference/spice/virt-viewer/</code></td>
+<td>The standard SPICE client, .vv file handling</td>
+</tr>
+<tr>
+<td>QEMU</td>
+<td><code>/srv/src-reference/qemu/qemu/</code></td>
+<td>Server-side SPICE implementation in <code>ui/spice-*</code></td>
+</tr>
+<tr>
+<td>Linux kernel</td>
+<td><code>/srv/src-reference/torvalds/linux/</code></td>
+<td>QXL driver in <code>drivers/gpu/drm/qxl/</code></td>
+</tr>
+</tbody>
+</table>
 
 
 

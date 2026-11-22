@@ -16,7 +16,7 @@
         <link rel="prev" href="../PLAN-release-gating/">
       
       
-        <link rel="next" href="../PLAN-review-coverage/">
+        <link rel="next" href="../PLAN-renovate-shellcheck-audit/">
       
       
         
@@ -4135,6 +4135,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-renovate-shellcheck-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Require the shellcheck-py versioning rule
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -17424,11 +17452,11 @@ have to find this list first.</p>
    <code>renovate.json</code> against the template, so changing the template's
    copy fails nobody. One thing the survey found that is <em>not</em> in
    this phase's scope: a criterion requiring the shellcheck-py rule
-   in every repository using the hook is recorded against an
-   unwritten <code>PLAN-renovate-shellcheck-audit</code>, in the operator's
-   <code>plan-blockers</code> notes rather than in this repository. If it
-   lands after this phase it must read the preset form too, for the
-   reason decision 1 gives; Future work now says so.</p>
+   in every repository using the hook. When this was written it was
+   recorded only in the operator's <code>plan-blockers</code> notes; it is now
+   <code>docs/plans/PLAN-renovate-shellcheck-audit.md</code>, written on
+   2026-11-21, and it reads the preset form too, for the reason
+   decision 1 gives. Future work has the rest.</p>
 </li>
 </ol>
 <p><strong>Blast radius.</strong> This phase changes no criterion's requirements ---
@@ -19348,13 +19376,24 @@ chosen to defer to here, so that we do not forget them.</p>
   pre-commit --- but that plan should record the trade as its own,
   since it is the change that causes it.</li>
 <li>A criterion requiring the <code>shellcheck-py/shellcheck-py</code>
-  versioning rule, rather than merely permitting it, is recorded
-  against an unwritten <code>PLAN-renovate-shellcheck-audit</code>. If it is
-  written after phase 1 it must accept the rule reached through
+  versioning rule, rather than merely permitting it, is now
+  <code>docs/plans/PLAN-renovate-shellcheck-audit.md</code>, written on
+  2026-11-21. It accepts the rule reached through
   <code>local&gt;shakenfist/development:renovate-fleet</code> as well as a local
   copy, for the same reason phase 1's decision 1 gives: a criterion
   that reads only the local file holds the fleet to a line the
-  policy has moved out of.</li>
+  policy has moved out of -- and with only <code>development</code> on the
+  preset today, a local-file-only check would fail 23 repositories
+  rather than the four it does. That plan deliberately lands before
+  this plan's phase 3 rather than after it, because the sweep gives
+  all four failing repositories the rule as a side effect and a
+  criterion that has only ever passed has never been shown to fail;
+  its decision 4 argues the case. The other half of what was
+  recorded against it -- a test that the rule is identical in
+  <code>renovate.json</code> and the template -- is discharged rather than
+  deferred: phase 1 left one copy of the rule, in the preset, and
+  <code>test_the_template_holds_nothing_but_the_extend</code> holds the
+  template to carrying nothing to compare.</li>
 <li>Promoting lockstep groups into the preset, which is what
   <a href="https://github.com/shakenfist/development/issues/88">development#88</a>
   ultimately asks for. A group that appears in more than one

@@ -4014,6 +4014,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../plans/PLAN-renovate-shellcheck-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Require the shellcheck-py versioning rule
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../plans/PLAN-review-coverage/" class="md-nav__link">
         
   
@@ -16363,7 +16391,7 @@
   (<code>PINNED_RENOVATE_VERSION</code> and <code>PINNED_HASHIN_VERSION</code>) and the ref
   of each action it uses.</li>
 <li><code>renovate.json</code> exists. Nothing is checked about what it holds
-  beyond the two entries below, so a repository that keeps the fleet
+  beyond the entries below, so a repository that keeps the fleet
   policy locally rather than extending the preset still passes; the
   preset is the convention, not a requirement this check enforces. It
   is not expected to be byte-identical to the template's copy.</li>
@@ -16375,6 +16403,10 @@
   repository has remote pre-commit hooks to manage. Enabling it
   directly passes, and so does extending the fleet preset, which
   enables it.</li>
+<li><code>renovate.json</code> carries a <code>versioning</code> <code>packageRule</code> for
+  <code>shellcheck-py/shellcheck-py</code>, where <code>.pre-commit-config.yaml</code> uses
+  that hook. Naming it directly passes, and so does extending the
+  fleet preset, which carries it.</li>
 </ul>
 <h3 id="the-central-runner">The central runner<a class="headerlink" href="#the-central-runner" title="Permanent link">&para;</a></h3>
 <p>Everything above describes the arrangement the criterion checks: a
@@ -16640,11 +16672,29 @@ with no <code>.pre-commit-config.yaml</code>, or one whose hooks are all
 <code>repo: local</code>, passes without the manager. <code>sfui</code>'s
 <code>"pre-commit": {"enabled": true}</code> is the form repositories carried
 before the preset.</p>
-<p>Enabling the manager is not enough for the shellcheck hook:
-shellcheck-py's four-part tags need the fleet preset's regex versioning
-rule, or the lookup fails on the dependency dashboard and the hook is
-never bumped. This check does not look for that rule; see
-<a href="https://github.com/shakenfist/development/blob/main/templates/renovate/README.md#shellcheck-pys-four-part-tags">the template README</a>.</p>
+<p>Enabling the manager is not enough for the shellcheck hook. A
+repository whose <code>.pre-commit-config.yaml</code> uses
+<code>shellcheck-py/shellcheck-py</code> must also carry a <code>versioning</code>
+<code>packageRule</code> naming it, either itself or by extending the fleet
+preset, or the hook is never bumped. The check fires on the presence
+of the hook, not on a stale pin, and accepts any non-empty
+<code>versioning</code> string on a rule selecting it; the preset's own test
+holds the real rule's shape. The rule is matched as Renovate matches
+it -- exact, glob and <code>/regex/</code> entries, <code>matchDepNames</code> as well as
+<code>matchPackageNames</code>, and the deprecated spellings Renovate migrates --
+so a hand-written rule Renovate applies is not reported. A rule
+narrowed away from the <code>pre-commit</code> manager (by <code>matchManagers</code>,
+<code>matchFileNames</code> and the like) or carrying <code>enabled: false</code> still
+passes, although Renovate never applies it to the hook: that is the
+cheaper direction to be wrong in, leaving a pin unwatched rather than
+filing an issue against a repository that is configured correctly.
+See
+<a href="https://github.com/shakenfist/development/blob/main/templates/renovate/README.md#shellcheck-pys-four-part-tags">the template README</a>
+for why the rule is needed.</p>
+<p><code>images</code> and <code>private-ci</code> use the hook but are scoped out of this
+criterion by their <code>only_checks</code> entries, so no finding reports them
+and their pins age unwatched. Widening either entry is a decision
+about that exemption rather than about this check.</p>
 <h3 id="repositories-that-ship-workflow-templates">Repositories that ship workflow templates<a class="headerlink" href="#repositories-that-ship-workflow-templates" title="Permanent link">&para;</a></h3>
 <p>Renovate's <code>github-actions</code> manager only reads
 <code>.github/workflows</code>, <code>.github/actions</code> and <code>workflow-templates</code>. A
