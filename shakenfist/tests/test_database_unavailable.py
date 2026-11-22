@@ -150,10 +150,67 @@ class GrpcCallRetryExhaustionTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb.time')
     @mock.patch('shakenfist.mariadb._reset_database_stub')
     @mock.patch('shakenfist.mariadb._get_database_stub')
-    def test_non_retryable_rpc_error_raised_unchanged(
+    def test_non_retryable_rpc_error_raises_call_failed(
             self, mock_stub, mock_reset, mock_time):
+        # A non-retryable code still fails on the first attempt, but it
+        # leaves as DatabaseCallFailed rather than as an RpcError the
+        # wrappers would read as "no such object" (issue 3373).
         method = mock.MagicMock(
             side_effect=FakeRpcError(grpc.StatusCode.INTERNAL))
+        method._method = b'/shakenfist.protos.DatabaseService/GetNode'
+        mock_stub.return_value.GetNode = method
+
+        self.assertRaises(
+            exceptions.DatabaseCallFailed,
+            mariadb._grpc_call, method, mock.MagicMock())
+        self.assertEqual(1, method.call_count)
+
+    @mock.patch('shakenfist.mariadb.time')
+    @mock.patch('shakenfist.mariadb._reset_database_stub')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_call_failed_is_a_database_unavailable(
+            self, mock_stub, mock_reset, mock_time):
+        # The subclass is what keeps the ~30 sites which already
+        # tolerate "the database did not answer me" tolerating this
+        # too, so it is asserted rather than left to the hierarchy.
+        method = mock.MagicMock(
+            side_effect=FakeRpcError(grpc.StatusCode.RESOURCE_EXHAUSTED))
+        method._method = b'/shakenfist.protos.DatabaseService/GetNode'
+        mock_stub.return_value.GetNode = method
+
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb._grpc_call, method, mock.MagicMock())
+
+    @mock.patch('shakenfist.mariadb.time')
+    @mock.patch('shakenfist.mariadb._reset_database_stub')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_call_failed_carries_the_status_code(
+            self, mock_stub, mock_reset, mock_time):
+        # _log_failed_read() names INVALID_ARGUMENT as a caller bug
+        # rather than a database fault, and it can only do that if the
+        # code survives the translation.
+        method = mock.MagicMock(
+            side_effect=FakeRpcError(grpc.StatusCode.INVALID_ARGUMENT))
+        method._method = b'/shakenfist.protos.DatabaseService/GetNode'
+        mock_stub.return_value.GetNode = method
+
+        try:
+            mariadb._grpc_call(method, mock.MagicMock())
+            self.fail('expected DatabaseCallFailed')
+        except exceptions.DatabaseCallFailed as e:
+            self.assertEqual(grpc.StatusCode.INVALID_ARGUMENT, e.code())
+
+    @mock.patch('shakenfist.mariadb.time')
+    @mock.patch('shakenfist.mariadb._reset_database_stub')
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_unimplemented_is_still_an_rpc_error(
+            self, mock_stub, mock_reset, mock_time):
+        # The one non-retryable code the wrappers are entitled to read:
+        # it is how an sf-database older than an RPC answers, and the
+        # wrappers with a mixed-version fallback test for it.
+        method = mock.MagicMock(
+            side_effect=FakeRpcError(grpc.StatusCode.UNIMPLEMENTED))
         method._method = b'/shakenfist.protos.DatabaseService/GetNode'
         mock_stub.return_value.GetNode = method
 
@@ -999,6 +1056,50 @@ class ClusterOperationFetchFailureTestCase(base.ShakenFistTestCase):
             mariadb.get_cluster_operation, str(uuid.uuid4()))
 
 
+class FailedCallIsNotAbsenceTestCase(base.ShakenFistTestCase):
+    """The two halves of what a failed call now does to a wrapper.
+
+    #3370's crash loop came from `GetNodeByFqdn` answering "no such
+    node" while the node record existed and the tier was simply
+    unreachable. The exhausted-retry case was closed by the first half
+    of issue 3373; this is the non-retryable one, where the tier
+    answered and the answer was a failure.
+    """
+
+    @mock.patch('shakenfist.mariadb._grpc_call',
+                side_effect=exceptions.DatabaseCallFailed(
+                    'servicer raised', code=grpc.StatusCode.INTERNAL))
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_a_conflating_wrapper_no_longer_answers_none(
+            self, mock_stub, mock_call):
+        # This wrapper has one None for both facts, so it must not get
+        # to pick: the failure propagates instead.
+        self.assertRaises(
+            exceptions.DatabaseCallFailed,
+            mariadb._grpc_get_node_by_fqdn, 'sf-1')
+
+    @mock.patch('shakenfist.mariadb._grpc_call',
+                return_value=database_pb2.GetNodeReply(found=False))
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_a_genuine_miss_is_still_none(self, mock_stub, mock_call):
+        # The negative control: absence is still reported as absence.
+        self.assertIsNone(mariadb._grpc_get_node_by_fqdn('sf-1'))
+
+    @mock.patch('shakenfist.mariadb._grpc_call',
+                side_effect=exceptions.DatabaseCallFailed(
+                    'servicer raised', code=grpc.StatusCode.INTERNAL))
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_a_wrapper_which_can_say_so_still_says_so(
+            self, mock_stub, mock_call):
+        # get_state_checked() exists to report an unreadable state row,
+        # and (False, None) is how it does that, so it keeps catching a
+        # failed call rather than letting it escape to a caller which
+        # would have to learn a new exception to hold its dependency.
+        self.assertEqual(
+            (False, None),
+            mariadb._grpc_get_state_checked(ObjectType.INSTANCE, 'abc'))
+
+
 class StrictInstanceLookupTestCase(base.ShakenFistTestCase):
     """Before the cleaner deletes an unknown domain's disks it must be
     able to tell a genuine miss apart from a lookup that merely failed.
@@ -1010,7 +1111,8 @@ class StrictInstanceLookupTestCase(base.ShakenFistTestCase):
     INST_UUID = uuid.uuid4()
 
     @mock.patch('shakenfist.mariadb._grpc_call',
-                side_effect=FakeRpcError(grpc.StatusCode.UNKNOWN))
+                side_effect=exceptions.DatabaseCallFailed(
+                    'boom', code=grpc.StatusCode.UNKNOWN))
     @mock.patch('shakenfist.mariadb._get_database_stub')
     @mock.patch('shakenfist.mariadb._use_database_service',
                 return_value=True)
@@ -1021,14 +1123,21 @@ class StrictInstanceLookupTestCase(base.ShakenFistTestCase):
             mariadb.get_instance, self.INST_UUID, strict=True)
 
     @mock.patch('shakenfist.mariadb._grpc_call',
-                side_effect=FakeRpcError(grpc.StatusCode.UNKNOWN))
+                side_effect=exceptions.DatabaseCallFailed(
+                    'boom', code=grpc.StatusCode.UNKNOWN))
     @mock.patch('shakenfist.mariadb._get_database_stub')
     @mock.patch('shakenfist.mariadb._use_database_service',
                 return_value=True)
-    def test_grpc_non_strict_non_retryable_error_returns_none(
+    def test_grpc_non_strict_non_retryable_error_also_raises(
             self, mock_use, mock_stub, mock_call):
-        # Today's behaviour, kept for every other caller.
-        self.assertIsNone(mariadb.get_instance(self.INST_UUID))
+        # The non-strict path used to answer None here, which is what
+        # made strict=True necessary for each caller in turn. A failed
+        # call no longer arrives as an RpcError, so the wrapper cannot
+        # report it as a missing instance whether or not the caller
+        # thought to opt in (issue 3373).
+        self.assertRaises(
+            exceptions.DatabaseCallFailed,
+            mariadb.get_instance, self.INST_UUID)
 
     @mock.patch('shakenfist.mariadb._grpc_call',
                 return_value=database_pb2.GetInstanceReply(found=False))
@@ -1251,12 +1360,25 @@ class ReferenceReadFailureTestCase(base.ShakenFistTestCase):
     """
 
     @mock.patch('shakenfist.mariadb._grpc_call',
-                side_effect=FakeRpcError(grpc.StatusCode.RESOURCE_EXHAUSTED))
+                side_effect=exceptions.DatabaseCallFailed(
+                    'reply too large',
+                    code=grpc.StatusCode.RESOURCE_EXHAUSTED))
     @mock.patch('shakenfist.mariadb._get_database_stub')
     def test_oversized_reply_is_a_failed_read(self, mock_stub, mock_call):
-        # RESOURCE_EXHAUSTED is not retryable, so it arrives here as a
-        # raw RpcError rather than as DatabaseUnavailable from the retry
-        # budget. Both must end up as None, not [].
+        # RESOURCE_EXHAUSTED is not retryable, so _grpc_call translates
+        # it to DatabaseCallFailed rather than spending the retry
+        # budget. This wrapper reports a failed read distinguishably --
+        # None, never [] -- so it catches that too.
+        self.assertIsNone(
+            mariadb._grpc_get_references_from(ObjectType.NODE, 'sf-1'))
+
+    @mock.patch('shakenfist.mariadb._grpc_call',
+                side_effect=FakeRpcError(grpc.StatusCode.UNIMPLEMENTED))
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_unimplemented_is_also_a_failed_read(self, mock_stub, mock_call):
+        # The code which still arrives as an RpcError takes the same
+        # arm: an sf-database which cannot answer this RPC has not told
+        # us the node holds no blobs.
         self.assertIsNone(
             mariadb._grpc_get_references_from(ObjectType.NODE, 'sf-1'))
 

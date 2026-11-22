@@ -8,6 +8,8 @@ import threading
 import time as real_time
 from unittest import mock
 
+import grpc
+
 from shakenfist import exceptions
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.operations.baseoperation import BaseClusterOperation
@@ -449,7 +451,8 @@ class DependencyDeferBudgetTest(base.ShakenFistTestCase):
     and the back-off map's FIFO eviction."""
 
     def _run(self, defer_count, dep_kind,
-             dep_state=BaseClusterOperation.STATE_QUEUED, dep_missing=False):
+             dep_state=BaseClusterOperation.STATE_QUEUED, dep_missing=False,
+             dep_error=None):
         mock_op = mock.MagicMock()
         mock_op.uuid = OP_UUID
         mock_op.state.value = BaseClusterOperation.STATE_QUEUED
@@ -463,7 +466,11 @@ class DependencyDeferBudgetTest(base.ShakenFistTestCase):
         mock_dep_op.state.value = dep_state
 
         dep_class = mock.MagicMock()
-        dep_class.from_db.return_value = None if dep_missing else mock_dep_op
+        if dep_error is not None:
+            dep_class.from_db.side_effect = dep_error
+        else:
+            dep_class.from_db.return_value = (
+                None if dep_missing else mock_dep_op)
 
         from shakenfist.daemons.network.workitem import Job
         job = Job.__new__(Job)
@@ -537,6 +544,64 @@ class DependencyDeferBudgetTest(base.ShakenFistTestCase):
 
         mock_op.defer.assert_called_once()
         mock_op.execute.assert_not_called()
+
+    def test_a_failed_dependency_read_does_not_cancel(self):
+        """Issue 4910, on the sf-net copy of the walk: from_db() answers
+        None for an absent dependency and raises for a read which did
+        not happen, so a database blip must not cancel the dependent
+        for a dependency which is alive. Letting it out is the hold --
+        the worker loop leaves the work item claimed for the stuck-row
+        reaper."""
+        self.assertRaises(
+            exceptions.DatabaseUnavailable, self._run, 0, 'depends_on',
+            dep_error=exceptions.DatabaseUnavailable('tier is down'))
+
+    def test_an_unknown_depends_on_state_defers(self):
+        """Issue 4910: a state in neither tuple used to fall off the end
+        of the loop body and satisfy a fate-sharing edge."""
+        mock_op, mock_dep_op, _ = self._run(
+            0, 'depends_on', dep_state='invented-later')
+
+        mock_op.defer.assert_called_once()
+        mock_op.execute.assert_not_called()
+        mock_op.abort_for_unsuitable_dependency.assert_not_called()
+        mock_op.cancel_for_missing_dependency.assert_not_called()
+
+    def test_an_unknown_depends_on_state_past_the_budget_gives_up(self):
+        mock_op, mock_dep_op, defer_delays = self._run(
+            DEPENDENCY_DEFER_BUDGET, 'depends_on',
+            dep_state='invented-later')
+
+        mock_op.abandon_dependency_wait.assert_called_once_with(mock_dep_op)
+        mock_op.defer.assert_not_called()
+        mock_op.execute.assert_not_called()
+        self.assertNotIn(str(OP_UUID), defer_delays)
+
+    def test_an_unknown_runs_after_state_defers(self):
+        mock_op, _, _ = self._run(
+            0, 'runs_after', dep_state='invented-later')
+
+        mock_op.defer.assert_called_once()
+        mock_op.execute.assert_not_called()
+
+    def test_an_unknown_runs_after_state_past_the_budget_warns(self):
+        mock_op, _, _ = self._run(
+            DEPENDENCY_DEFER_BUDGET, 'runs_after',
+            dep_state='invented-later')
+
+        mock_op.defer.assert_not_called()
+        mock_op.execute.assert_called_once()
+        messages = [c.args[1] for c in mock_op.add_event.call_args_list]
+        self.assertIn(
+            'warning, gave up waiting for an unknown runs_after '
+            'dependency state', messages)
+
+    def test_a_complete_depends_on_dependency_still_runs(self):
+        mock_op, _, _ = self._run(
+            0, 'depends_on', dep_state=BaseClusterOperation.STATE_COMPLETE)
+
+        mock_op.defer.assert_not_called()
+        mock_op.execute.assert_called_once()
 
 
 class FakeNetOp:
@@ -885,7 +950,7 @@ class DispatcherStopTest(base.ShakenFistTestCase):
         op_class.from_db.side_effect = load or self.load
         with mock.patch.object(workitem, 'config') as mock_config, \
                 mock.patch.object(workitem, 'mariadb') as mock_mariadb, \
-                mock.patch.object(workitem, 'time'), \
+                mock.patch.object(workitem, 'time') as mock_time, \
                 mock.patch.object(workitem, 'util_concurrency'), \
                 mock.patch.object(workitem, 'get_object_class',
                                   return_value=op_class):
@@ -909,6 +974,7 @@ class DispatcherStopTest(base.ShakenFistTestCase):
                     int(c.args[1])
                     for c in mock_mariadb.resolve_work_item.call_args_list)
                 self.dequeues = mock_mariadb.dequeue_work_items.call_count
+                self.sleeps = [c.args[0] for c in mock_time.sleep.call_args_list]
 
     def live_workers(self):
         return [t for t in threading.enumerate()
@@ -1003,6 +1069,20 @@ class DispatcherStopTest(base.ShakenFistTestCase):
         self.assertEqual(['0', '2'], released)
         self.assertEqual(['1'], not_released)
 
+    def test_a_refused_release_does_not_stop_the_rest(self):
+        # DatabaseCallFailed is a DatabaseUnavailable, but it means the
+        # tier answered and refused this one call, so the rest are tried.
+        def clear(row):
+            if row == 1:
+                raise exceptions.DatabaseCallFailed(
+                    'refused', grpc.StatusCode.INTERNAL)
+            return True
+
+        attempted, released, not_released = self.release(clear, 3)
+        self.assertEqual([0, 1, 2], attempted)
+        self.assertEqual(['0', '2'], released)
+        self.assertEqual(['1'], not_released)
+
     def test_a_database_outage_stops_the_release_at_once(self):
         # Each call has already waited out its retries; the rest are left
         # for sf-net's next start or the reaper rather than waited on too.
@@ -1081,6 +1161,21 @@ class DispatcherStopTest(base.ShakenFistTestCase):
 
         self.assert_poison_item_left_claimed(load)
 
+    def test_an_item_whose_load_the_tier_refused_does_not_stall_dispatch(
+            self):
+        # DatabaseCallFailed is a DatabaseUnavailable, and an outage pauses
+        # dispatch with the item still first in line (the test below). A
+        # call the tier answered with a failure is usually permanent for
+        # that item, so pausing on it would retry it forever and dispatch
+        # nothing queued behind it. It is skipped like any unloadable item.
+        def load(op_uuid):
+            if op_uuid == 'op-0':
+                raise exceptions.DatabaseCallFailed(
+                    'refused', grpc.StatusCode.INVALID_ARGUMENT)
+            return self.load(op_uuid)
+
+        self.assert_poison_item_left_claimed(load)
+
     def test_items_a_database_outage_interrupted_are_routed_afterwards(self):
         executed = []
 
@@ -1111,3 +1206,30 @@ class DispatcherStopTest(base.ShakenFistTestCase):
         self.run_dispatcher(dequeue, fake_execute, load=load)
         self.assertEqual(['op-0', 'op-1'], executed)
         self.assertEqual([], self.released)
+
+    def test_a_refused_dequeue_backs_off_rather_than_pausing(self):
+        # A refused Dequeue is not an outage: the tier is up, and pausing
+        # for one reissued the identical call every five seconds forever.
+        # It backs off along the empty-queue ladder instead, growing while
+        # the refusal persists, and in short chunks so that shutdown is not
+        # held up. Two refusals, so the second interval is longer than one
+        # chunk.
+        from shakenfist.daemons.daemon import IdlePollBackoff
+        ladder = IdlePollBackoff()
+        expected = [ladder.next_empty_interval() for _ in range(2)]
+        self.assertGreater(expected[1], 0.2)
+
+        def dequeue(queue_names, limit):
+            dequeue.calls += 1
+            if dequeue.calls <= 2:
+                raise exceptions.DatabaseCallFailed(
+                    'refused', grpc.StatusCode.RESOURCE_EXHAUSTED)
+            self.abort()
+            return []
+        dequeue.calls = 0
+
+        self.run_dispatcher(dequeue, mock.MagicMock())
+        self.assertEqual(3, self.dequeues)
+        self.assertNotIn(5, self.sleeps)
+        self.assertTrue(all(s <= 0.2 for s in self.sleeps), self.sleeps)
+        self.assertAlmostEqual(sum(expected), sum(self.sleeps))

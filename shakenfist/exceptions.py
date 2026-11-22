@@ -70,6 +70,21 @@ class InvalidObjectPrefilter(ObjectException):
     ...
 
 
+class UnservableFilterCriteria(ObjectException):
+    """Raised when a find asks for a filter its table cannot serve.
+
+    Every ObjectFilterCriteria field is a column on some per-type
+    table and not on others -- ``name`` and ``namespace`` do not exist
+    on ``network_interfaces``, and ``network_uuid`` does not exist on
+    ``artifacts``. Applying only the fields which happen to match
+    would answer the query a caller did not ask, with *more* rows than
+    they asked for, which is how a scoping mistake becomes a
+    disclosure. Refusing is the only safe answer, and it is a caller
+    bug rather than a database condition (issue 4947).
+    """
+    ...
+
+
 # Instance
 class InstanceException(Exception):
     ...
@@ -239,13 +254,52 @@ class DatabaseException(Exception):
 
 
 class DatabaseUnavailable(DatabaseException):
-    """Raised when the database service cannot be reached (retries on
-    UNAVAILABLE or DEADLINE_EXCEEDED exhausted). Deliberately not a
-    grpc.RpcError subclass so the mariadb.py client wrappers, which
-    map RpcError to "object not found" return values, let it propagate
-    to callers instead -- an unreachable database must not be
-    indistinguishable from a missing object (issue 3373)."""
+    """Raised when a database request produced no usable answer.
+
+    The direct use is an unreachable database service: retries on
+    UNAVAILABLE, DEADLINE_EXCEEDED or CANCELLED exhausted.
+    DatabaseCallFailed below is the narrower case where the tier did
+    answer and the answer was a failure; it subclasses this one so
+    that every caller which already tolerates "the database did not
+    answer me" tolerates that too.
+
+    Deliberately not a grpc.RpcError subclass so the mariadb.py client
+    wrappers, which map RpcError to "object not found" return values,
+    let it propagate to callers instead -- a database which could not
+    answer must not be indistinguishable from a missing object
+    (issue 3373)."""
     ...
+
+
+class DatabaseCallFailed(DatabaseUnavailable):
+    """Raised when a database call failed for a non-retryable reason.
+
+    The tier was reachable and answered with a status code which no
+    retry can improve: INTERNAL (a servicer raised), INVALID_ARGUMENT
+    (our request was malformed), RESOURCE_EXHAUSTED (the reply did not
+    fit inside the message limit), UNKNOWN, and the rest. None of those
+    mean the object is absent, which is what the wrappers would
+    otherwise have reported, so this is raised in their place
+    (issue 3373).
+
+    UNIMPLEMENTED is excluded and still arrives at the wrappers as a
+    grpc.RpcError: it is how an sf-database older than an RPC answers,
+    and the wrappers which have a mixed-version fallback test for that
+    code to choose it.
+
+    ``code()`` is a method rather than an attribute deliberately: it
+    mirrors ``grpc.RpcError.code()`` so that the handlers which decide
+    what to log or do from the status code read it the same way
+    whichever of the two they were handed.
+    """
+
+    def __init__(self, message: str, code: Any = None) -> None:
+        super().__init__(message)
+        self._code = code
+
+    def code(self) -> Any:
+        """The gRPC status code the call failed with, or None."""
+        return self._code
 
 
 class LockException(DatabaseException):

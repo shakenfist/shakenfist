@@ -9,6 +9,9 @@ sleep or the wake path. See issue #3943.
 
 from unittest import mock
 
+import grpc
+
+from shakenfist import exceptions
 from shakenfist.daemons import daemon
 from shakenfist.daemons.queues import main as queues_main
 from shakenfist.tests import base
@@ -41,12 +44,14 @@ class QueuesBackoffTestCase(base.ShakenFistTestCase):
 
         with mock.patch.object(
                 daemon, 'check_abort_path', side_effect=fake_abort), \
-                mock.patch.object(queues_main, '_block_until_healthy'), \
+                mock.patch.object(
+                    queues_main, '_block_until_healthy') as block, \
                 mock.patch.object(
                     queues_main.sf_locks, 'get_existing_locks',
                     return_value={}):
             m._run_inner()
 
+        self.block_until_healthy = block
         return idle_calls
 
     def test_backs_off_when_idle(self):
@@ -98,3 +103,26 @@ class QueuesBackoffTestCase(base.ShakenFistTestCase):
                 daemon.DequeueOutcome.POOL_FULL,
                 daemon.DequeueOutcome.NOTHING_ELIGIBLE])
         self.assertEqual([0.2, 0.2, 0.2, 0.4], idle_calls)
+
+    def test_a_refused_call_backs_off_rather_than_spinning(self):
+        m = self._make_monitor()
+        # The tier answered and refused: it is healthy, so waiting for it
+        # to be healthy returns at once, and the loop used to reissue the
+        # same Dequeue with no sleep. A refusal backs off like an empty
+        # queue instead, and the backoff keeps growing while it persists.
+        refused = exceptions.DatabaseCallFailed(
+            'refused', code=grpc.StatusCode.RESOURCE_EXHAUSTED)
+        idle_calls = self._run_schedule(m, [refused] * 3)
+        self.assertEqual([0.2, 0.4, 0.8], idle_calls)
+        # Only the startup and periodic third party checks wait for
+        # health; no refusal does.
+        self.assertEqual(2, self.block_until_healthy.call_count)
+
+    def test_an_unreachable_tier_still_waits_for_health(self):
+        m = self._make_monitor()
+        # The negative control: an outage is not a refusal, and pauses in
+        # _block_until_healthy() rather than sleeping a backoff interval.
+        idle_calls = self._run_schedule(
+            m, [exceptions.DatabaseUnavailable('gone')] * 3)
+        self.assertEqual([], idle_calls)
+        self.assertEqual(2 + 3, self.block_until_healthy.call_count)

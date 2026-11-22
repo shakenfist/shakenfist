@@ -331,6 +331,19 @@ class FloatingIPReaperTestCase(base.ShakenFistTestCase):
         # sweep must fall back to per-network attribute reads rather
         # than dying (which would crash-restart the job every few
         # seconds) or treating every gateway as a leak candidate.
+        self._assert_bulk_failure_falls_back(grpc.RpcError())
+
+    def test_oversized_bulk_gateway_reply_falls_back_to_per_network(self):
+        # A reply which outgrows the message limit answers
+        # RESOURCE_EXHAUSTED, which _grpc_call raises as
+        # DatabaseCallFailed -- a DatabaseUnavailable subclass, so a
+        # handler which caught only grpc.RpcError let it past the
+        # fallback and aborted every sweep on a large enough cluster.
+        self._assert_bulk_failure_falls_back(
+            exceptions.DatabaseCallFailed(
+                'reply too large', grpc.StatusCode.RESOURCE_EXHAUSTED))
+
+    def _assert_bulk_failure_falls_back(self, failure):
         fake_network = mock.MagicMock()
         fake_network.floating_gateway = '192.168.10.11'
         fake_network.unique_label.return_value = (
@@ -345,7 +358,7 @@ class FloatingIPReaperTestCase(base.ShakenFistTestCase):
                 return_value=fake_floating_network), \
             mock.patch.object(
                 floating_ip_reaper.mariadb, 'get_network_floating_gateways',
-                side_effect=grpc.RpcError()), \
+                side_effect=failure), \
             mock.patch.object(
                 floating_ip_reaper.network, 'Networks',
                 return_value=[fake_network]), \

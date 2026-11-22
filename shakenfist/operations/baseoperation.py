@@ -56,6 +56,37 @@ class BaseOperation(dbo):
                      STATE_COMPLETE}
 
 
+# How a cluster-operation dispatcher classifies a dependency's state.
+# Both shakenfist/daemons/queues/workitem.py and
+# shakenfist/daemons/network/workitem.py walk depends_on and runs_after
+# the same way, and each used to carry its own copy of these two lists
+# inline -- which is how the two could come to disagree about a state,
+# and why a derived test could not hold either of them to the
+# vocabulary. One classification, one test.
+#
+# STATE_COMPLETE is the only state which satisfies a depends_on edge,
+# and the walks name it rather than it being a third tuple here: a
+# state in neither tuple below has to be *held*, not satisfied, so
+# there is nothing a third tuple could be used for.
+#
+# STATE_INITIAL and STATE_PREFLIGHT are classified as pending although
+# BaseClusterOperation.state_targets can reach neither -- a cluster
+# operation is created already queued. They are base-object states a
+# row could physically carry, and "wait for it" is the right answer for
+# both, so they are named rather than left to the unknown-state arm.
+DEPENDENCY_FAILED_STATES = (
+    dbo.STATE_ERROR,
+    dbo.STATE_DELETED,
+    BaseOperation.STATE_ABORT,
+)
+DEPENDENCY_PENDING_STATES = (
+    dbo.STATE_INITIAL,
+    BaseOperation.STATE_QUEUED,
+    BaseOperation.STATE_PREFLIGHT,
+    BaseOperation.STATE_EXECUTING,
+)
+
+
 def get_all_node_queues(node_uuid: str) -> list[str]:
     return (get_node_user_facing_node_queues(node_uuid) +
             get_general_user_facing_node_queues() +

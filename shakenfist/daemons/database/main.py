@@ -66,7 +66,6 @@ from shakenfist.schema.network_data import NetworkData
 from shakenfist.schema.network_interface_data import NetworkInterfaceData
 from shakenfist.schema.node_attributes import NodeAttributesData
 from shakenfist.schema.node_data import NodeData
-from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.upload import UploadData
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import json as util_json
@@ -3511,27 +3510,21 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Find NetworkInterface records matching filter criteria from MariaDB."""
         try:
             self.monitor.counters['find_network_interfaces'].inc()
-            criteria = ObjectFilterCriteria(
-                states=list(request.criteria.states) or None,
-                namespace=(
-                    request.criteria.namespace
-                    if request.criteria.HasField('namespace') else None),
-                name=(
-                    request.criteria.name
-                    if request.criteria.HasField('name') else None),
-                network_uuid=(
-                    request.criteria.network_uuid
-                    if request.criteria.HasField('network_uuid') else None),
-                instance_uuid=(
-                    request.criteria.instance_uuid
-                    if request.criteria.HasField('instance_uuid') else None),
-            )
+            criteria = mariadb.criteria_from_proto(request.criteria)
             nis = mariadb._direct_find_network_interfaces(criteria)
             return database_pb2.FindNetworkInterfacesReply(
                 network_interfaces=[
                     self._ni_to_proto(d)
                     for d in nis
                 ])
+        except exceptions.UnservableFilterCriteria as e:
+            # A caller bug which no retry can fix, and the one failure
+            # here which is not the tier's: INTERNAL would reach an
+            # API caller as a 503 asking them to retry (issue 4947).
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details(str(e))
+            return database_pb2.FindNetworkInterfacesReply(
+                network_interfaces=[])
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database FindNetworkInterfaces failed', e)
@@ -3846,21 +3839,20 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Find Network records matching filter criteria from MariaDB."""
         try:
             self.monitor.counters['find_networks'].inc()
-            criteria = ObjectFilterCriteria(
-                states=list(request.criteria.states) or None,
-                namespace=(
-                    request.criteria.namespace
-                    if request.criteria.HasField('namespace') else None),
-                name=(
-                    request.criteria.name
-                    if request.criteria.HasField('name') else None),
-            )
+            criteria = mariadb.criteria_from_proto(request.criteria)
             networks = mariadb._direct_find_networks(criteria)
             return database_pb2.FindNetworksReply(
                 networks=[
                     self._network_to_proto(d)
                     for d in networks
                 ])
+        except exceptions.UnservableFilterCriteria as e:
+            # A caller bug which no retry can fix, and the one failure
+            # here which is not the tier's: INTERNAL would reach an
+            # API caller as a 503 asking them to retry (issue 4947).
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details(str(e))
+            return database_pb2.FindNetworksReply(networks=[])
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database FindNetworks failed', e)
@@ -5043,15 +5035,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Find artifact records matching filter criteria from MariaDB."""
         try:
             self.monitor.counters['find_artifacts'].inc()
-            criteria = ObjectFilterCriteria(
-                states=list(request.criteria.states) or None,
-                namespace=(
-                    request.criteria.namespace
-                    if request.criteria.HasField('namespace') else None),
-                name=(
-                    request.criteria.name
-                    if request.criteria.HasField('name') else None),
-            )
+            criteria = mariadb.criteria_from_proto(request.criteria)
             all_artifacts = mariadb._direct_find_artifacts(criteria)
             return database_pb2.FindArtifactsReply(
                 artifacts=[
@@ -5066,6 +5050,13 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     for a in all_artifacts
                 ]
             )
+        except exceptions.UnservableFilterCriteria as e:
+            # A caller bug which no retry can fix, and the one failure
+            # here which is not the tier's: INTERNAL would reach an
+            # API caller as a 503 asking them to retry (issue 4947).
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details(str(e))
+            return database_pb2.FindArtifactsReply(artifacts=[])
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database FindArtifacts failed', e)
@@ -5392,21 +5383,20 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Find Instance records matching filter criteria from MariaDB."""
         try:
             self.monitor.counters['find_instances'].inc()
-            criteria = ObjectFilterCriteria(
-                states=list(request.criteria.states) or None,
-                namespace=(
-                    request.criteria.namespace
-                    if request.criteria.HasField('namespace') else None),
-                name=(
-                    request.criteria.name
-                    if request.criteria.HasField('name') else None),
-            )
+            criteria = mariadb.criteria_from_proto(request.criteria)
             all_data = mariadb._direct_find_instances(criteria)
             return database_pb2.FindInstancesReply(
                 instances=[
                     self._instance_to_proto(d)
                     for d in all_data
                 ])
+        except exceptions.UnservableFilterCriteria as e:
+            # A caller bug which no retry can fix, and the one failure
+            # here which is not the tier's: INTERNAL would reach an
+            # API caller as a 503 asking them to retry (issue 4947).
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details(str(e))
+            return database_pb2.FindInstancesReply(instances=[])
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database FindInstances failed', e)

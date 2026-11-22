@@ -386,19 +386,60 @@ into `cluster_sweep_work_list_failure_streak`, and is logged as a skipped pass.
 The general form: **silence is not success, and an empty result set is not the
 absence of an answer.**
 
-One trap when handling this deliberately: a failed read from the `mariadb`
-client arrives in *two* shapes. The client wrappers map `grpc.RpcError` to a
-`None`/`False`/`[]` return, but `_grpc_call()` raises
-`exceptions.DatabaseUnavailable` once its retry budget is spent, and that is
-deliberately not an `RpcError` subclass (issue 3373), so it propagates through
-the wrapper untouched. Handling only the return value covers the oversized-reply
-case and misses the tier outage -- which is the more likely reason a read fails,
-and the condition an alert on the streak most needs to see. Cover both, and
-prove it with a test that sets `side_effect = DatabaseUnavailable(...)` rather
-than a `None` return. Code which is meant to ride out an unreachable
-database catches `DatabaseUnavailable` explicitly and says so;
-`Daemon.check_daemon_state()` and `ClusterLock.__enter__` are the
-examples to copy.
+A failed read from the `mariadb` client therefore arrives as an *exception*,
+not as a return value. `_grpc_call()` raises `exceptions.DatabaseUnavailable`
+once its retry budget is spent, and `exceptions.DatabaseCallFailed` (a subclass
+of it) for a non-retryable status code -- `INTERNAL`, `INVALID_ARGUMENT`,
+`RESOURCE_EXHAUSTED` and the rest. Neither is a `grpc.RpcError` subclass
+(issue 3373), so neither can be caught by the wrappers' `except grpc.RpcError`
+clauses and turned into the `None`/`False`/`[]` they use for a missing object.
+Code which is meant to ride out a database that cannot answer catches
+`DatabaseUnavailable` explicitly and says so; `Daemon.check_daemon_state()` and
+`ClusterLock.__enter__` are the examples to copy, and because
+`DatabaseCallFailed` is a subclass they need no second clause *for safety*.
+
+They may need one for progress. `DatabaseUnavailable` is transient and
+tier-wide; `DatabaseCallFailed` is usually permanent and specific to the one
+call. A handler which answers the first by pausing and retrying the *same*
+work -- a dispatcher which sleeps with the item still at the head of its
+queue, a drain which puts the batch back where it was, a scheduled job left
+due so it sorts first next cycle -- will retry a refused call forever and
+starve everything queued behind it. Catch `DatabaseCallFailed` by name ahead
+of such a handler and treat it as a per-item failure: skip the item, count it
+failed, or log it and carry on. The network dispatcher's routing loop, its
+Dequeue, its `_release_claims()`, `_run_due_scheduled_jobs()`,
+`_grpc_hard_delete_objects()` and sf-queues' main loop all do, and each has a
+test raising `DatabaseCallFailed` beside the one raising `DatabaseUnavailable`.
+The two Dequeue loops are the ones to study for the shape that is easy to
+miss. sf-queues' outage handler waits until the tier is healthy, and a tier
+which refused a call *is* healthy, so the wait returned at once and the loop
+reissued the same Dequeue with no sleep. sf-net's paused five seconds and
+reissued it, which looks like a bound and is not one. A refusal in either now
+backs off as an empty queue does.
+
+What needs the clause is an *unbounded* retry of the same work, and a sleep
+between attempts does not bound it: ask what stops the retry, not how often it
+runs. A retry with a bound of its own does not need the clause: sf-queues' `Job.execute()` leaves a refused item
+claimed, so the stuck-row reaper retries it and errors it after
+`CLUSTER_OP_MAX_ATTEMPTS`, and a one-shot worker holds nothing up while it
+waits. `ClusterLock.__enter__` likewise retries a refused acquire only until
+its caller's timeout, sleeping between attempts. Each still fails closed, and
+each stops.
+
+`UNIMPLEMENTED` is the one status code still handed to the wrappers as an
+`RpcError`, because it is how an sf-database older than an RPC answers and the
+wrappers with a mixed-version fallback test for it.
+
+So a `None`/`False`/`[]` return from a wrapper now means one of two things: a
+genuinely absent object, or a failed read from one of the eleven wrappers which
+report a failed read *distinguishably* and catch `DatabaseCallFailed` to keep
+doing so -- `get_state_checked()`'s `(False, None)`, the `None`-rather-than-`[]`
+list readers behind `_log_failed_read()`, and the documented fail-safes such as
+`_grpc_is_vsock_cid_in_use()`. If you add a wrapper to that set, say in a
+comment why its sentinel cannot be confused with an answer. If you cannot say
+that, let the exception propagate. Prove either shape with a test that sets
+`side_effect = DatabaseUnavailable(...)` or `DatabaseCallFailed(...)` rather
+than a `None` return.
 
 Having covered both, do not then treat them alike inside a loop. The two shapes
 differ in blast radius. A `None` return is per-reply, so the next object type is
