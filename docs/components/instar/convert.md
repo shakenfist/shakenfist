@@ -141,6 +141,70 @@ so a 100-byte source converts to 512 bytes.
 describe a window of the source rather than the whole of it; see
 [dd.md](/components/instar/dd/).
 
+## Malformed block tables
+
+`convert` refuses a VHD or VHDX block whose table entry names a byte
+range that is the image's own structure, rather than reading the
+image's metadata out as disk content. For VHD that is a BAT entry whose
+block overlaps a region the image declares, which at an entry of zero
+is the footer copy and the dynamic header:
+
+```
+convert: source block table names a block inside the image's own
+structure, at host offset 0 (0x0); the format is recognised, the image
+is malformed
+```
+
+Exit 1, and the output file is removed if nothing was written to it.
+The wording matches what `map` and `measure` say about the same image,
+so one image gets one answer whichever operation is asked, with the
+host offset added because only the chain reader knows it. qemu reads
+such a block out instead -- measured: `qemu-img convert` of a crafted
+fixture yields the image's own `cxsparse` header as payload -- so
+instar is deliberately stricter here. See `docs/map.md` for the walk
+side and `docs/format-internals.md` for the predicate they share.
+
+## What a failed conversion leaves behind
+
+`convert` creates its output file before launching the guest, so a
+conversion the guest fails has already created the target. What is left
+there depends on how far the run got:
+
+| The run | The output file |
+|---|---|
+| wrote nothing | removed |
+| wrote some of the image | kept, holding what was written |
+| was given the target with `--no-create` | kept, whatever it holds |
+
+An output holding bytes is kept because `qemu-img convert` keeps its
+own, and those bytes are the only record of how far the run got. An
+empty one is removed because qemu-img never leaves one -- it diagnoses
+the failures that would produce it before creating the target at all --
+and because a file that holds nothing still tells a caller testing for
+the file's existence that the conversion ran.
+
+Under `--no-create` the target is an image the user supplied to be
+written into, which is never instar's to delete. The same applies to
+the `monolithicFlat` extent file, which is removed on the same terms as
+the descriptor.
+
+The rule holds however the run failed: a refusal the guest reports, a
+guest that crashes, or a request the host could not read (see "A
+request the host cannot answer" in
+[guest-architecture.md](/components/instar/guest-architecture/)). And only a regular
+file is ever removed. A block device, `/dev/null` or a FIFO reports a
+length of zero as well, but an output path naming one is a target the
+user supplied, so a failed `convert in.qcow2 /dev/sdb` leaves the
+device node where it was; an output path that is a symlink is left
+alone too, along with whatever it points at.
+
+`instar copy` follows the same rule.
+
+Three cases produce an output that is sized up front rather than grown
+as it is written, and such a file is never empty and so is always kept:
+`dd`, `convert -S 0` or `--preallocation` on a raw target, and
+`copy --preallocate-output`.
+
 ## Differencing images
 
 A differencing VHD (footer disk type 4) or VHDX (`HasParent` set) stores

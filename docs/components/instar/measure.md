@@ -227,15 +227,17 @@ names the divergence category.
 
 ## Malformed block tables
 
-`measure`'s VHDX allocation scan refuses a payload block whose BAT entry
-names a byte range that is the image's own structure, rather than
-counting it as allocated: file offset zero, where the file identifier
-and headers live, or a range overlapping any region the image's region
-table declares. This is the same test the guest chain walker already
-applies when reading such a block for `convert`, `dd`, `compare`,
-`bench` and `rebase`; `measure`'s own whole-BAT scan did not apply it
-until recently, so it could count a block one of those operations
-already refused to read:
+`measure`'s VHDX and VHD allocation scans refuse a block whose table
+entry names a byte range that is the image's own structure, rather than
+counting it as allocated. For VHDX that is file offset zero, where the
+file identifier and headers live, or a range overlapping any region the
+image's region table declares; for VHD it is a BAT entry whose block
+overlaps a region the image declares, which at an entry of zero is the
+footer copy and the dynamic header. This is the same test the guest
+chain walker already applies when reading such a block for `convert`,
+`dd`, `compare`, `bench` and `rebase`; `measure`'s own whole-table scan
+did not apply it until recently, so it could count a block one of those
+operations already refused to read:
 
 ```
 measure: source block table names a block inside the image's own
@@ -252,6 +254,11 @@ block declared immediately past the last region in the table is
 unaffected and still measures normally. See
 [docs/format-internals.md § vhdx](/components/instar/format-internals/#vhdx) for the
 predicate both the readers and this scan share.
+
+The VHD half said `measure: source image is unsupported format` until
+recently, which is the one thing it is not: the format was understood
+well enough for the scan to find the contradiction. The two formats now
+answer alike.
 
 ## Future work
 

@@ -28,9 +28,13 @@ sudo dnf install "./instar-${VERSION}-1.x86_64.rpm"
 instar --help
 ```
 
-The packages install the VMM at `/usr/bin/instar` and the six guest
-binaries (loaded into the KVM sandbox at runtime) at
+The packages install the VMM at `/usr/bin/instar` and the sixteen guest
+binaries (`.bin` files, loaded into the KVM sandbox at runtime) at
 `/usr/lib/instar/`.
+
+They also install a host-side executable, `instar-fetch`, at
+`/usr/lib/instar/instar-fetch` (mode 755). It is not a guest binary, and
+nothing invokes it yet: it is a component for later work to use.
 
 ## Tarball (any Linux)
 
@@ -41,8 +45,10 @@ curl -sL "https://github.com/shakenfist/instar/releases/download/v${VERSION}/ins
 instar --help
 ```
 
-The tarball contains the VMM and guest `.bin` files together; instar
-finds them by looking in the directory containing the executable.
+The tarball contains the VMM, the guest `.bin` files and the host-side
+`instar-fetch` executable together; instar finds them by looking in the
+directory containing the executable. As with the packages, nothing invokes
+`instar-fetch` yet.
 
 ## System requirements
 

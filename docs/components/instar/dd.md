@@ -182,6 +182,15 @@ for structured formats. This is verified by the integration test suite
 (`tests/test_dd.py`, `tests/test_dd_baselines.py`) across qemu-img
 versions 6.0.0 through 10.2.0.
 
+## What a failed copy leaves behind
+
+`dd` shares `convert`'s rule -- an output left empty is removed, an
+output holding bytes is kept -- and in practice always takes the second
+branch. `dd` sizes its output to the window up front rather than growing
+it as it writes, so the file is never empty even when the first write
+fails. See "What a failed conversion leaves behind" in
+[convert.md](/components/instar/convert/).
+
 ## Known divergences from `qemu-img dd`
 
 ### `count=0 -O vmdk`

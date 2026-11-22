@@ -499,9 +499,9 @@ failure from the behavioural assertion -- a delayed conversion that
 exited non-zero, or a failed probe read that converted anyway -- is
 the defect these tests exist for, and re-running it is not.
 
-### Failed Host Read Tests (`test_luks_probe_read_failure.py`)
+### Failed Host Read Tests (`test_luks_probe_read_failure.py`, `test_copy_read_failure.py`)
 
-The sibling of the test above, and the same machinery pointed the
+The siblings of the test above, and the same machinery pointed the
 other way: `strace -e inject=read:error=EIO:when=N` fails one host
 read instead of delaying it. What it guards is `convert`'s choice
 between a LUKS container's two payload shapes, which it makes by
@@ -525,6 +525,26 @@ flat payload path re-reads the sector the probe read, and treats a
 failure there as fatal, so a hard error on every read of that offset
 is reported correctly and proves nothing. `when=N` failing exactly one
 invocation is what reproduces the transient failure the defect needed.
+
+`test_copy_read_failure.py` points the same injection at `copy`, whose
+defect was the whole verdict rather than one decision inside it: the
+host inferred success from the guest reaching HLT, which every failure
+path also reaches, so a failed read gave exit 0 and an output file
+holding only the sectors written before it. It needs no fixture -- the
+input is generated, since nothing about the test depends on a format --
+and it fails a read in the middle of the copy rather than the first
+one, so the half-written file the defect leaves behind is part of what
+is asserted. Its index is derived the same way, from a trace of the
+very copy it is about to inject into.
+
+`test_failed_output_file.py` is the one of these that injects into
+`write` rather than `read`, because which write fails is what selects
+the behaviour under test: the first write failing leaves the output
+empty and the second leaves one sector in it, which are the two halves
+of the rule about what a failed run leaves on disk. It needs no index
+derivation for that reason, and asserts instead that exactly one write
+was injected -- an uninjected run writes the whole output and exits 0,
+so without that assertion the test would be measuring a successful run.
 
 ## Running Tests
 
@@ -694,9 +714,10 @@ the host however long it takes, so contention alone no longer
 produces either message. In a current tree they mean something else:
 `<op> operation failed` — `convert operation failed`,
 `dd operation failed` — is a guest failure the host captured no
-reason for, and a genuine I/O error names the image and the offset
-it stopped at. Treat either as a real defect rather than replaying
-it for load.
+reason for, a genuine I/O error names the image and the offset it
+stopped at, and a guest that faulted names the CPU exception and the
+address it faulted at. Treat any of them as a real defect rather than
+replaying it for load.
 
 The design is **tests from the source tree, binary from the package**:
 the whole `tests/` tree is copied into the container and driven by
@@ -2047,8 +2068,8 @@ differential fuzzing cannot reach.
 
 ### Fuzz targets
 
-44 targets across the parser and planner crates, organized in
-`src/fuzz/`:
+45 targets across the parser, planner and protocol crates, organized
+in `src/fuzz/`:
 
 | Target | Crate | Type |
 |--------|-------|------|
@@ -2069,6 +2090,7 @@ differential fuzzing cannot reach.
 | `fuzz_luks_header` | luks | Buffer-based |
 | `fuzz_vdi_header` | vdi | Buffer-based |
 | `fuzz_vdi_bat` | vdi | CallTable |
+| `fuzz_fetch_protocol` | fetch-protocol | Buffer-based |
 | `fuzz_parallels_header` | parallels | Buffer-based |
 | `fuzz_parallels_bat` | parallels | CallTable |
 | `fuzz_qcow1_header` | qcow1 | Buffer-based |
@@ -2314,9 +2336,9 @@ Rather than splitting the budget evenly, the run plan is computed by
 math, CHS rounding, and the planner/emitter crates) take a short fixed
 slice (300s — they reach steady coverage in well under a minute), and
 the deep parser/format targets split the remainder. With the current
-44 targets (18 fast, 26 deep) and the full 450 minutes, that gives the
+45 targets (19 fast, 26 deep) and the full 450 minutes, that gives the
 26 deep targets ~14 min each versus ~10 min under an even split
-(27000 / 44). A plan never sums to more than its budget: a budget too
+(27000 / 45). A plan never sums to more than its budget: a budget too
 small for every target's fast slice is shared equally instead, with a
 warning. `tools/ci/test-fuzz-tier.sh` asserts both, in `ci-tooling`.
 
@@ -3882,9 +3904,20 @@ and this section has never named all of them.
   first payload sector must fail the conversion rather than read as
   "no inner format" (`strace -e inject=read:error=EIO`); see "Failed
   Host Read Tests" above
-- `tests/strace_injection.py` - The shared syscall-injection rig for
-  the two modules above: the capability probe, the per-thread index
-  derivation and the did-it-land parsers
+- `tests/test_copy_read_failure.py` - A failed read of the input must
+  fail `copy` rather than give exit 0 and a short output file
+  (`strace -e inject=read:error=EIO`); see "Failed Host Read Tests"
+  above
+- `tests/test_failed_output_file.py` - A failed run must remove an
+  output file it left empty and keep one holding bytes
+  (`strace -e inject=write:error=ENOSPC`); see "Failed Host Read Tests"
+  above
+- `tests/strace_injection.py` - The shared syscall-injection rig: the
+  capability probe all four modules above use, and the read-line
+  parsers (`_READ_LINE`, `_busiest_thread`) the read-injecting modules
+  build on. Each module derives its own injection index and checks its
+  own injection landed, because each aims at a different syscall or a
+  different read
 - `tests/test_bench.py` - Integration tests for the `instar bench`
   subcommand (62 tests): read/write request scheduling, host-side
   validation matrix, the qcow2 write-envelope gates, `--output json`

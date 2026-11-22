@@ -1712,6 +1712,13 @@ The fallback to the tail exists for a fixed VHD, which keeps no copy at
 offset 0 at all; using it for a *bad* copy would open an image qemu will
 not touch, with the image's two footers disagreeing about its geometry.
 
+Every operation says so in qemu's words. The refusal is raised by name
+from the reader, so `info`, `map`, `measure` and `convert` all print
+`Could not open 'X': Incorrect header checksum`, as qemu-img does for
+each of them. `map` used to say `source format unrecognised` and
+`measure` `source image is unsupported format` -- for an image whose
+format was recognised and then refused.
+
 `check` is the exception, and deliberately: it parses a footer without
 verifying it, so that it can decode a corrupt one and report
 `VHD footer checksum mismatch` as a finding. A reader that refuses the

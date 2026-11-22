@@ -212,6 +212,27 @@ print(f"Virtual size: {info['virtual-size']} bytes")
 print(f"Actual size: {info['actual-size']} bytes")
 ```
 
+## Diagnostic Records on stderr
+
+Separate from the answer a command prints on stdout, instar logs
+diagnostic records on stderr. `--verbose` chooses how much of that
+reaches you, not whether any of it does:
+
+| | Without `--verbose` | With `--verbose` |
+|---|---|---|
+| Warnings and errors | printed | printed |
+| The running commentary (the guest's own messages, the host's trace of the run) | suppressed | printed |
+
+A warning is written because the user needs to see it, so it does not
+wait for a flag the user had no reason to pass before the thing went
+wrong. An ordinary successful run logs nothing, because nothing in
+instar warns on the success path -- so the default behaviour is
+unchanged for every run that works.
+
+The records that end a command are not logged at all. A failure is
+reported as the process's error message and a non-zero exit status,
+which is independent of logging and of `--verbose`.
+
 ## Text Read From an Image
 
 Many values instar prints come out of the image rather than from instar
@@ -244,9 +265,9 @@ for a name that contains one of the characters above, so the output for
 every ordinary image is byte-identical to qemu-img's.
 
 The same rule applies to `info --chain`, `snapshot -l`, `check`, the
-stderr notices about a backing reference, and every guest message and
-debug line printed with `--verbose`: the logger escapes each record as a
-whole, so this holds for lines added later too. Error messages that end a command
+stderr notices about a backing reference, and every diagnostic record
+the host logs: the logger escapes each record as a whole, so this holds
+for lines added later too. Error messages that end a command
 are printed with the same escaping by the Rust runtime.
 
 **JSON output** always carries the exact value, so a script reading

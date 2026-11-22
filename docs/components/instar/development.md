@@ -53,8 +53,10 @@ that reason; the dev/test image next door stays managed normally.
 Two checks back the pin up, because a comment is not a control:
 
 - `tools/ci/check-glibc-floor.sh` runs on the line immediately after
-  `make instar`, in both `build-and-test` and the release workflow, and
-  fails if the binary references a symbol above `GLIBC_2.31` — the
+  `make instar`, in both `build-and-test` and the release workflow, once
+  per shipped binary — `instar` by default and `instar-fetch` by
+  argument — and fails if either references a symbol above
+  `GLIBC_2.31` — the
   floor published in [installation.md](/components/instar/installation/), not the matrix
   CI's oldest distro (Rocky 9, 2.34), which is looser than the promise
   and would let a smaller base movement through unnoticed. It needs
@@ -1289,7 +1291,7 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 - `tools/ci/test_differential_fuzz_issues.py` - Tests that the differential fuzzer files one issue per divergence shape, capped at `--max-issues`, and does not report a failed filing as filed. Run with `python3 -m unittest`; the `ci-tooling` CI job does
 - `tools/ci/test_differential_fuzz_oracles.py` - Tests that the differential fuzzer refuses to run with a libyal oracle missing when `INSTAR_REQUIRE_LIBYAL` is set, names the tool, package and affected formats when it does, and still degrades gracefully without the variable. Run with `python3 -m unittest`; the `ci-tooling` CI job does
 - `tools/ci/test_extract_fuzz_corpus.py` - Tests the corpus seed builders in `scripts/extract-fuzz-corpus.py`: that a fixture carrying a hostile locator offset cannot abort the nightly seeding run, and that the defect it carries survives the reshape. Run with `python3 -m unittest`; the `ci-tooling` CI job does
-- `tools/ci/check-glibc-floor.sh` - Fails if the built `instar` binary needs a glibc above the published floor (`GLIBC_2.31`, Debian 11; see `docs/installation.md`). Runs immediately after `make instar` in both `build-and-test` and the release workflow. Do not raise the ceiling to make it pass: it means the release image's base moved, and `src/.devcontainer/build/Dockerfile` must stay on `debian:bullseye`
+- `tools/ci/check-glibc-floor.sh` - Fails if a built binary needs a glibc above the published floor (`GLIBC_2.31`, Debian 11; see `docs/installation.md`). Takes the binary as its first argument and defaults to `instar`, so each shipped binary needs its own invocation: both call sites check `instar` and then `src/target/release/instar-fetch`, which the packages and the release tarball also carry. Runs immediately after `make instar` in both `build-and-test` and the release workflow. Do not raise the ceiling to make it pass: it means the release image's base moved, and `src/.devcontainer/build/Dockerfile` must stay on `debian:bullseye`
 - `tools/ci/test-check-glibc-floor.sh` - Tests for that check; the `ci-tooling` CI job runs it
 - `tools/ci/claude-result.sh` - Reads the JSONL stream a `claude -p --output-format stream-json --verbose` run leaves behind; `--text` reconstructs the assistant text (plus a diagnostic block when the run reported an error or the stream was truncated), `--trailer` emits the `Assisted-By:`/`Co-Authored-By:` pair naming the model the run actually resolved to. Called from `test-drift-fix.yml`
 - `tools/ci/test-claude-result.sh` - Tests for that helper; the `ci-tooling` CI job runs it
