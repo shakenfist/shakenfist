@@ -16695,12 +16695,12 @@ mechanically. In brief, the policy is:</p>
 </tr>
 <tr>
 <td>3. Pin third-party actions to a sha</td>
-<td>In progress</td>
-<td>development 6170a78 (#406); development 528e46c (#407); development 4db8f79 (#409)</td>
+<td>Complete</td>
+<td>development 6170a78 (#406); development 528e46c (#407); development 4db8f79 (#409); development 9805498 (#429)</td>
 </tr>
 <tr>
 <td>4. Third-party action pinning criterion</td>
-<td>Not started</td>
+<td>Blocked</td>
 <td></td>
 </tr>
 <tr>
@@ -16735,10 +16735,9 @@ workflows and the push audit are now phases 5 to 7. This file uses
 the new numbers throughout. Commits and pull requests from before
 that date use the old ones; the date is AEDT, as are this plan's
 other dates, so the split's own commits read 2026-11-20 in UTC.
-Phase 3's row stays <code>In progress</code> until phase 4's first commit
-carries its close-out and the merge commit of the pull request that
-made the split, as the phase-landing rules require; the phase is
-not being worked in the meantime.</p>
+Phase 3 was closed out on 2026-11-22, in phase 4's first commit,
+which recorded the merge commit of the pull request that made the
+split.</p>
 <h3 id="phase-1-finish-the-inherit-rollout">Phase 1: finish the inherit rollout<a class="headerlink" href="#phase-1-finish-the-inherit-rollout" title="Permanent link">&para;</a></h3>
 <p>Planning effort: medium. Review effort: high for instar (step 1a),
 which is the only repository where a callee reads a real secret.</p>
@@ -17926,8 +17925,8 @@ in the preset, the pin pull request and its record, and the
 rust-toolchain exemption recorded at the end of this section, which
 settled the last pin by declining it. The 3b brief and its
 done-items are in phase 4. Decisions 4 to 7 and the risk entries
-stay here, where they were reasoned; where they say 3b, read phase
-4's step 4a.</p>
+stay here, where they were reasoned; wherever this section says 3b,
+read phase 4's step 4a.</p>
 <p><strong>Scope.</strong> In: <code>helpers:pinGitHubActionDigests</code> in the fleet preset,
 which is simultaneously the probe because this repository is the
 preset's only consumer today (3a). The
@@ -18622,9 +18621,10 @@ owes would also have broken.</p>
 <p>This is the one consequence of pinning that reaches beyond the files
 Renovate rewrites, and it generalises: <strong>any repository whose tests
 assert against a real workflow's <code>uses:</code> line breaks when that
-repository extends the preset.</strong> It therefore belongs in step 3b's
-specification, and the fleet sweep in <code>PLAN-renovate-cadence.md</code> phase
-3 should expect it per repository rather than discover it. Filed as</p>
+repository extends the preset.</strong> It therefore belongs in step 4a's
+specification, which carries it since phase 4 was planned, and the
+fleet sweep in <code>PLAN-renovate-cadence.md</code> phase 3 should expect it
+per repository rather than discover it. Filed as</p>
 <h1 id="410-so-the-sweep-can-plan-for-it-with-the-durable-half-of-the">410 so the sweep can plan for it, with the durable half of the<a class="headerlink" href="#410-so-the-sweep-can-plan-for-it-with-the-durable-half-of-the" title="Permanent link">&para;</a></h1>
 <p>guidance in <code>docs/consistency-audits.md</code> beside the rest of what
 <code>scripts/tests/base.py</code> offers, since this plan is a point-in-time
@@ -18680,9 +18680,11 @@ description says to delete it with them.
 <code>test_only_the_doomed_renovate_copies_keep_rust_toolchain_unpinned</code>
 freezes the rule. It cannot widen to <code>renovate-fleet.yml</code>, the
 workflow that holds the organisation's push token, which stays
-pinned. The rule is local rather than in the preset because the two
-files exist only here; the fleet's copies are unpinned anyway until
-each repository extends the preset. The definition of done's grep
+pinned. The rule is local rather than in the preset because no fleet
+copy is pinned until its own repository extends the preset, and the
+sweep that makes it do so deletes that copy, so a preset rule would
+have nothing to cover. (The template exists only here; the deployed
+copy is in 22 repositories.) The definition of done's grep
 therefore prints the same two lines until those files are deleted,
 and nothing after. <code>PLAN-renovate-cadence.md</code>'s cutover step 3 no
 longer waits for this pin; that plan's step and its risk entry are
@@ -18709,16 +18711,121 @@ a file about to be deleted. The residual is one unpinned reference,
 in a workflow holding this repository's Renovate token, until the
 cutover disables it. Every fleet repository carries the same
 residual until then.</p>
-<h3 id="phase-4-the-third-party-action-pinning-criterion">Phase 4: the third-party-action-pinning criterion<a class="headerlink" href="#phase-4-the-third-party-action-pinning-criterion" title="Permanent link">&para;</a></h3>
+<p><strong>Closed out 2026-11-22.</strong> #429 merged as 9805498 at 03:37 UTC on
+2026-11-21. Against main afterwards, each done-item holds:
+<code>renovate-fleet.json</code> extends the helper and the unit tests pass; the
+grep prints exactly the two <code>dtolnay/rust-toolchain@stable</code> lines;
+<code>renovate</code> and <code>plan-history-in-source</code> both pass here; and the
+fleet runner's first two runs after the merge, at 03:41 and 05:00
+UTC, opened no pull request. That last result is weaker than the
+done-item meant. <code>renovate-runner.json</code> disables every dependency in
+both files and this repository's own <code>renovate.yml</code> workflow is
+disabled, so nothing would have proposed the pin with or without the
+exemption, which acts only if the per-repository workflow runs
+again. Phase 4's last done-item carries that obligation forward:
+the two files and the exemption rule must be gone before 4a lands.
+The last automated review of #429 arrived four minutes before
+the merge, with no <code>fix</code> items. Its items in this plan's text were
+corrected in phase 4's planning commit, and the rest are #435.</p>
+<h3 id="phase-4-third-party-action-pinning-criterion">Phase 4: third-party action pinning criterion<a class="headerlink" href="#phase-4-third-party-action-pinning-criterion" title="Permanent link">&para;</a></h3>
 <p>Planning effort: medium, as phase 3 set it for its step 3b, which
-this was until 2026-11-21. The brief's line numbers were taken on
-2026-11-13, so the planning survey re-takes them.</p>
+this was until 2026-11-21. Planned on 2026-11-22, on branch
+<code>workflow-ref-trust-phase-04-pinning-criterion</code>, in the commit after
+phase 3's close-out. The survey below re-took the brief's line
+numbers, which were from 2026-11-13, and corrected the brief at
+source. A later step need not redo that.</p>
 <p><strong>Held</strong> until two weeks after <code>PLAN-renovate-cadence.md</code> phase 3's
 fleet sweep has landed, for the reason phase 3's decision 4 gives.
 The criterion fails every repository with an unpinned third-party
 reference. A repository can only fix that by merging the pin pull
 request Renovate opens once it extends the shared preset, and the
-sweep is what makes it extend the preset.</p>
+sweep is what makes it extend the preset. On 2026-11-22
+<code>PLAN-renovate-cadence.md</code> phase 2 had just turned the fleet
+runner's schedule on (#432) and was still <code>In progress</code>, and its
+phase 3 was <code>Not started</code>, so this phase is <code>Blocked</code>. <code>plan-blockers</code>
+cannot hold a plan on another plan's phase, so the hold is a note
+there rather than a blocker, and it does not clear itself.</p>
+<p>The hold reaches past this phase. Phase 5's step 5a links this
+phase's new specification and describes third-party refs as pinned
+under its criterion, so phase 5 cannot land before 4a either. The
+plan stays <code>In progress</code> in the index regardless, because work on it
+has begun and not finished, and the blocked state is this phase's to
+carry. Step 4b is not held (decision 2): when it lands this phase
+moves to <code>In progress</code>, and the hold on 4a stays until the sweep
+clears it.</p>
+<p><strong>What the survey found</strong> (2026-11-22, against main at 6aefd63).</p>
+<ol>
+<li><strong>The helpers the brief cites are not in <code>ci_workflows.py</code>.</strong>
+   <code>workflow_job_blocks()</code> (219), <code>JOB_USES_RE</code> (288),
+   <code>indented_block()</code> (374), <code>workflow_step_blocks()</code> (408) and
+   <code>step_uses()</code> (445) are in <code>scripts/audit/text/workflows.py</code>, at
+   exactly those lines, and <code>ci_workflows.py</code> imports them from there.
+   <code>ReusableWorkflowSecrets</code> is still at <code>ci_workflows.py:2428</code>,
+   <code>tracked_paths()</code> at <code>scripts/audit/files.py:193</code>, and <code>step_uses()</code>
+   still strips comments and quotes. Corrected in the brief.</li>
+<li><strong>The brief would fail pre-commit.</strong> The source-size ratchet, which
+   arrived after the brief was written, holds <code>ci_workflows.py</code> to
+   2,605 lines and <code>test_ci_workflows.py</code> to 3,793, both their size
+   today. Adding the class and its tests there fails
+   <code>source-size-ratchet</code>. Decision 1 moves both into new files.</li>
+<li><strong>The spec as briefed would fail <code>plan-phase-references</code>.</strong> That
+   criterion greps every <code>.md</code> under <code>docs/</code>, <code>docs/audits/</code> included,
+   for <code>phase &lt;n&gt;</code>, and the brief told the spec to cite "phase 3's
+   step 3a record". Corrected: the spec states the pinned form itself
+   and links this plan.</li>
+<li><strong><code>COMPOSITE_ACTION_MANIFESTS</code> already exists</strong>, at
+   <code>ci_workflows.py:85</code>, naming both <code>action.yml</code> spellings for
+   another rule. The brief now reuses it.</li>
+<li><strong>#410's guidance is where the plan says it is</strong>, in
+   <code>docs/consistency-audits.md</code> at <code>current_ref()</code> and <code>uses_clause()</code>
+   (about line 786). The step 3a record had sent that guidance to
+   this phase's specification, then step 3b, and the brief did not
+   carry it. It does now.</li>
+<li><strong>The exemption the last done-item waits on is inert today.</strong>
+   <code>renovate-runner.json</code> disables both files and this repository's
+   own <code>renovate.yml</code> workflow is disabled, so the root <code>renovate.json</code>
+   rule has nothing to act on. That changes nothing here, because the
+   done-item asks for the files and the rule to be gone, not for the
+   rule to have worked.</li>
+<li><strong>The two closing review items in this plan's text</strong> (#429's last
+   review: a wrong clause in the decline record, this heading's
+   leading article, and a "step 3b" instruction outside the split
+   note's mapping) were fixed at source in this commit. The rest are
+   #435, which <code>PLAN-renovate-cadence.md</code>'s sweep should read, since
+   one of its items is an ordering requirement on that sweep.</li>
+</ol>
+<p>Otherwise the brief's premises hold: <code>NETWORK_CHECKS</code> is in
+<code>scripts/audit_snapshot.py</code>, <code>FROZEN_METADATA</code> and
+<code>FROZEN_ISSUE_TITLES</code> are in <code>scripts/tests/test_metadata.py</code>,
+<code>CheckTestCase</code> is in <code>scripts/tests/base.py</code>, and
+<code>tools/audit-snapshot.sh</code> exists.</p>
+<p><strong>Decisions.</strong></p>
+<ol>
+<li><strong>A new family module, rather than growing a 2,605-line one.</strong>
+   <code>scripts/audit/checks/action_pinning.py</code> and
+   <code>scripts/tests/test_action_pinning.py</code>, rather than raising two
+   ratchet baselines. The ratchet asks a pull request that grows a
+   baselined file to say why the file should grow rather than split,
+   and here there is no such reason. The criterion shares only helpers
+   with the rest of <code>ci_workflows.py</code>, and those are already in
+   <code>audit/text/workflows.py</code>. <code>npm_dependencies.py</code> is the precedent
+   for a registered family module for one concern: three of its
+   classes are in <code>CHECKS</code>. <code>release_rust.py</code> supports only the split
+   half of the argument -- it keeps one concern out of a large file,
+   but registers nothing, and <code>release.py</code> imports its rules. A
+   reviewer may prefer the class beside
+   <code>ReusableWorkflowSecrets</code>, its nearest relative. The counter is
+   that <code>ci_workflows.py</code> was already 2,605 lines and the ratchet
+   exists to stop exactly that addition.</li>
+<li><strong>Observation 6 gets a step of its own</strong>, 4b, which the phase
+   lacked: it is a count, not code, and its window closes on a date,
+   independent of the sweep. 4a and 4b can land in either order.</li>
+<li><strong>No step moves earlier than the hold.</strong> The brief is complete
+   enough to run today, but the criterion would fail every repository
+   whose <code>renovate.json</code> does not extend the preset yet, and filing
+   about 20 issues that only the sweep can close is the noise
+   decision 4 of phase 3 exists to avoid.</li>
+</ol>
 <p><strong>Why a phase of its own.</strong> Split out of phase 3 on 2026-11-21,
 reversing that phase's back brief answer, so that phase 3 closes on
 what it landed instead of staying open for weeks behind another
@@ -18747,19 +18854,60 @@ question 4 and which nothing could shorten. Out: everything phase
 <td>medium</td>
 <td>sonnet</td>
 <td>worktree</td>
-<td>Held until two weeks after <code>PLAN-renovate-cadence.md</code> phase 3's sweep has landed (phase 3's decision 4). Add a <code>ThirdPartyActionPinning</code> class to <code>scripts/audit/checks/ci_workflows.py</code> beside <code>ReusableWorkflowSecrets</code> (line 2428 at planning), with <code>id = 'third-party-action-pinning'</code>, <code>spec = 'docs/audits/third-party-action-pinning.md'</code>, <code>template = None</code> and <code>issue_title = 'Third-party action pinning'</code>. <code>applies()</code> returns a reason unless the repository has a workflows directory with files or at least one tracked <code>action.yml</code>/<code>action.yaml</code> (<code>audit.files.tracked_paths</code>, <code>scripts/audit/files.py:193</code>). <code>run()</code> reads every workflow through <code>repo.workflows()</code> and <code>repo.read()</code>, splits jobs with <code>workflow_job_blocks()</code> (line 219) and steps with <code>workflow_step_blocks()</code> (line 408), takes each step's reference from <code>step_uses()</code> (line 445, which already drops a trailing comment and quotes) and each job's reusable-workflow reference from <code>JOB_USES_RE</code> (line 288) against the job body outside its steps; then reads every tracked <code>action.yml</code>/<code>action.yaml</code> and applies the same step splitter to its <code>runs:</code> block (<code>indented_block(body, 'runs')</code>, line 374). Check that <code>workflow_step_blocks()</code> accepts that indentation, and if it does not, add the smallest helper beside it rather than a YAML dependency. A reference is a finding when it is remote (not <code>./</code> or <code>docker://</code>), its owner is not <code>shakenfist</code>, and the part after <code>@</code> is not exactly 40 lowercase hex characters; a missing <code>@</code> is a finding too. Report findings as <code>&lt;file&gt;: &lt;job or action&gt;: &lt;ref&gt;</code>. Write <code>docs/audits/third-party-action-pinning.md</code> following <code>docs/audits/README.md</code>, with phase 3's decision 5's measured and reviewer-confirmed halves kept apart, the Why citing this plan's Situation (540 third-party references by tag on 2026-10-02, and what a tag can be moved to), phase 3's step 3a record for the form of a pinned line, and the branch-ref and reusable-workflow outcomes step 3a recorded. Register the instance in <code>CHECKS</code> in <code>scripts/audit/registry.py</code>, add the row to <code>docs/audits/README.md</code>, and add its entries to <code>FROZEN_METADATA</code> and <code>FROZEN_ISSUE_TITLES</code> in <code>scripts/tests/test_metadata.py</code>, leaving that file's pinned tool-failure list alone. This criterion reaches no network, so <code>NETWORK_CHECKS</code> in <code>scripts/audit_snapshot.py</code> is <strong>not</strong> edited. Add <code>ThirdPartyActionPinningTest(CheckTestCase)</code> to <code>scripts/tests/test_ci_workflows.py</code> covering: a tag ref (finding), a sha with a comment (pass), a sha without one (pass), a branch ref (finding), a commented-out line (not a finding), a quoted ref, a <code>docker://</code> ref (not a finding), a <code>./</code> ref (not a finding), a <code>shakenfist/actions/...@main</code> ref (not a finding), a job-level third-party reusable workflow (finding), a composite <code>action.yml</code> outside <code>.github/</code> with an unpinned step (finding) and with a pinned one (pass), a repository with neither workflows nor an action file (<code>not_applicable</code>), and a 40-character upper-case sha (a finding, since GitHub prints lower case and the comparison is exact). Then run the before-and-after procedure in <code>docs/consistency-audits.md</code> (<code>tools/audit-snapshot.sh</code> then <code>--diff</code>) against fresh clones of the matrix, and state in the commit message how many repositories newly fail, including this one, which must pass because 3a's pin pull request merged and the sweep deleted the two files whose <code>dtolnay/rust-toolchain</code> phase 3 left unpinned. Any <code>audit-manage-issues.py</code> run is <code>--dry-run</code>. Commit subject: <code>Add the third-party-action-pinning criterion.</code></td>
+<td>Held until two weeks after <code>PLAN-renovate-cadence.md</code> phase 3's sweep has landed (phase 3's decision 4). Add a <code>ThirdPartyActionPinning</code> class in a new family module, <code>scripts/audit/checks/action_pinning.py</code>, with a module docstring saying what the family covers (decision 1; <code>ci_workflows.py</code> and its tests are at their source-size ratchet baselines), with <code>id = 'third-party-action-pinning'</code>, <code>spec = 'docs/audits/third-party-action-pinning.md'</code>, <code>template = None</code> and <code>issue_title = 'Third-party action pinning'</code>. <code>applies()</code> returns a reason unless the repository has a workflows directory with files or at least one tracked <code>action.yml</code>/<code>action.yaml</code> (<code>audit.files.tracked_paths</code>, <code>scripts/audit/files.py:193</code>). <code>run()</code> reads every workflow through <code>repo.workflows()</code> and <code>repo.read()</code>, splits jobs with <code>workflow_job_blocks()</code> (<code>scripts/audit/text/workflows.py:219</code>, where every helper named below also lives) and steps with <code>workflow_step_blocks()</code> (line 408), takes each step's reference from <code>step_uses()</code> (line 445, which already drops a trailing comment and quotes) and each job's reusable-workflow reference from <code>JOB_USES_RE</code> (line 288) against the job body outside its steps; then reads every tracked <code>action.yml</code>/<code>action.yaml</code> and applies the same step splitter to its <code>runs:</code> block (<code>indented_block(body, 'runs')</code>, line 374). Check that <code>workflow_step_blocks()</code> accepts that indentation, and if it does not, add the smallest helper beside it rather than a YAML dependency. Import <code>COMPOSITE_ACTION_MANIFESTS</code> from <code>audit.checks.ci_workflows</code> (line 85) for the two manifest spellings rather than spelling them again. A reference is a finding when it is remote (not <code>./</code> or <code>docker://</code>), its owner, compared case-insensitively as the preset's <code>shakenfist/**</code> exemption is (<code>ref.split('/')[0].lower() != 'shakenfist'</code>), is not <code>shakenfist</code>, and the part after <code>@</code> is not exactly 40 lowercase hex characters; a missing <code>@</code> is a finding too. Report findings as <code>&lt;file&gt;: &lt;job or action&gt;: &lt;ref&gt;</code>. The criterion measures <code>.github/workflows/</code> and tracked action manifests only, which is what runs: workflow copies under <code>templates/</code> and vendored copies elsewhere in a tree are out of its reach. In this repository Renovate's <code>templates/</code> file patterns in the root <code>renovate.json</code> pin those anyway, and in an adopter the copy is measured where it runs. Say so in the docstring and the spec, so that a pass is not read as every <code>uses:</code> in the tree being pinned. Write <code>docs/audits/third-party-action-pinning.md</code> following <code>docs/audits/README.md</code>, with a <code>## Projects</code> section linking <code>compliance.md#third-party-action-pinning</code>, with phase 3's decision 5's measured and reviewer-confirmed halves kept apart. Its Why states the 540 third-party references by tag on 2026-10-02 and what a tag can be moved to, the form of a pinned line (<code>owner/repo@&lt;40 lowercase hex&gt; # &lt;tag&gt;</code>), and that Renovate pins branch refs and job-level reusable workflows the same way. The spec cites no plan phase, step or decision number, because <code>plan-phase-references</code> greps every <code>.md</code> under <code>docs/</code> for <code>phase &lt;n&gt;</code>; it links this plan for the history instead. Its fix section warns that a repository's pin pull request breaks any test that asserts against a real workflow's <code>uses:</code> line, and links the <code>current_ref()</code>/<code>uses_clause()</code> guidance in <code>docs/consistency-audits.md</code> and #410. Add <code>action_pinning</code> to the <code>from audit.checks import (...)</code> list in <code>scripts/audit/registry.py</code> and append the instance at the end of <code>CHECKS</code>, after the <code>github_config</code> entries, because the registry's docstring says families are appended rather than reshuffled and the results JSON's order is part of its bytes, add the row to <code>docs/audits/README.md</code>, and add its entries to <code>FROZEN_METADATA</code> and <code>FROZEN_ISSUE_TITLES</code> in <code>scripts/tests/test_metadata.py</code>, leaving that file's pinned tool-failure list alone. This criterion reaches no network, so <code>NETWORK_CHECKS</code> in <code>scripts/audit_snapshot.py</code> is <strong>not</strong> edited. Add <code>ThirdPartyActionPinningTest(CheckTestCase)</code> in a new <code>scripts/tests/test_action_pinning.py</code> covering: a tag ref (finding), a sha with a comment (pass), a sha without one (pass), a branch ref (finding), a commented-out line (not a finding), a quoted ref, a <code>docker://</code> ref (not a finding), a <code>./</code> ref (not a finding), a <code>shakenfist/actions/...@main</code> ref (not a finding), a <code>Shakenfist/actions/...@main</code> ref (not a finding: the owner comparison is case-insensitive), a job-level third-party reusable workflow (finding), a job-level first-party reusable workflow at <code>@main</code> (not a finding), a composite <code>action.yml</code> outside <code>.github/</code> with an unpinned step (finding) and with a pinned one (pass), an <code>action.yaml</code> with an unpinned step (finding, so both manifest spellings are exercised), a workflow copy under <code>templates/</code> with an unpinned ref (not a finding, holding the scope above), a 7-character short sha (finding), a repository with neither workflows nor an action file (<code>not_applicable</code>), an empty <code>.github/workflows/</code> and no action file (<code>not_applicable</code>), and a 40-character upper-case sha (a finding, since GitHub prints lower case and the comparison is exact). Then run the before-and-after procedure in <code>docs/consistency-audits.md</code> (<code>tools/audit-snapshot.sh</code> then <code>--diff</code>) against fresh clones of the matrix, and state in the commit message how many repositories newly fail, including this one, which must pass because 3a's pin pull request merged and the sweep deleted the two files whose <code>dtolnay/rust-toolchain</code> phase 3 left unpinned. Any <code>audit-manage-issues.py</code> run is <code>--dry-run</code>. Commit subject: <code>Add the third-party-action-pinning criterion.</code></td>
+</tr>
+<tr>
+<td>4b</td>
+<td>low</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Management session, inline, on or after 2027-02-01, once the January 2027 CI-tooling window has closed; independent of 4a and of the hold. List this repository's grouped pull requests: <code>gh pr list --repo shakenfist/development --state all --head renovate/ci-tooling --limit 100 --json number,title,createdAt,mergedAt</code>. That branch name is the one #407 and #426 were opened from, not derived from <code>groupName</code>; confirm it against the superset <code>gh pr list --repo shakenfist/development --state all --search 'head:renovate/' --limit 200 --json number,headRefName,createdAt</code> before counting, and if the group appears under another branch, count that one and record its name. An empty narrow result while the superset has grouped CI-tooling pull requests in the window is a measurement failure, not a zero. Keep those created from 2026-12-01 to 2027-01-31 inclusive, and for each say whether it moved an action digest (<code>gh pr diff &lt;n&gt; \| grep -E '^\+.*uses:.*@[0-9a-f]{40}'</code> prints a line). Record in this section the number, creation date and digest lines of each, the count per month, and whether any digest update arrived outside the group, which is the failure open question 4 asks about (<code>gh pr list --repo shakenfist/development --state all --author shakenfist-bot --search 'created:2026-12-01..2027-01-31'</code>, the account that opened #407 and #426, minus the grouped ones). Then put the answer under open question 4 in the Open questions section. Commit subject: <code>Record the two-window digest volume.</code></td>
 </tr>
 </tbody>
 </table>
+<p><strong>Risks and mitigations.</strong></p>
+<ul>
+<li><em>The sweep slips, and this phase stays <code>Blocked</code> for months.</em> That
+  is the accepted cost of decision 3. The <code>plan-blockers</code> note is
+  shown in every session's SessionStart report in this repository,
+  but as a note it never marks the plan waiting or ready, so whoever
+  plans <code>PLAN-renovate-cadence.md</code>'s phase 4 checks this one. #435
+  carries the one ordering requirement the sweep must meet.</li>
+<li><em><code>workflow_step_blocks()</code> misses the steps of an <code>action.yml</code>,
+  whose <code>runs.steps</code> sit at a different indentation from a
+  workflow's.</em> The check would then pass every composite action, and a
+  silent pass looks the same as compliance. 4a's composite-action
+  test with an unpinned step is the guard. The management session
+  confirms it fails when the action-file walk is removed, with the
+  <code>mutation-check</code> helper, before the step is committed.</li>
+<li><em>More repositories newly fail than the sweep explains</em>, for example
+  one that extends the preset but has not merged its pin pull request.
+  4a's commit states the count from <code>tools/audit-snapshot.sh</code>. If any
+  failing repository is not explained by an open pin pull request, the
+  management session holds the merge and lists them, because each one
+  becomes an auto-filed issue.</li>
+<li><em>4b's date passes unnoticed.</em> Nothing in this plan's hold watches
+  2027-02-01, and 4b is the one step the hold does not excuse. A
+  dated <code>plan-blockers</code> note carries the date. A slip delays the
+  answer rather than losing it: <code>gh pr list</code> with a <code>created:</code> range
+  answers as well in March as in February.</li>
+</ul>
+<p><strong>Back brief gate.</strong> Decision 1 is cheap to change now and costly
+once 4a has written the module, its tests and its registration.
+Confirm a new <code>action_pinning</code> family before 4a runs.</p>
 <p><strong>Definition of done.</strong></p>
 <ul>
-<li>Phase 3's observation 6 is answered here: the number of grouped
-  digest pull requests over the December 2026 and January 2027
-  windows, which is open question 4's answer, and the Open
+<li><code>pre-commit run --all-files</code> passes with <code>tools/source-size-baseline</code>
+  unchanged by this phase.</li>
+<li>Phase 3's observation 6 is answered here, by step 4b: the number
+  of grouped digest pull requests over the December 2026 and January
+  2027 windows, which is open question 4's answer, and the Open
   questions section says where it is.</li>
 <li><code>docs/audits/third-party-action-pinning.md</code> exists, is linked from
-  <code>docs/audits/README.md</code>, carries no <code>consistency-audit</code> marker
-  block, and keeps phase 3's decision 5's two halves apart.</li>
+  <code>docs/audits/README.md</code>, has a <code>## Projects</code> section linking
+  <code>compliance.md#third-party-action-pinning</code>, carries no
+  <code>consistency-audit</code> marker block, and keeps phase 3's decision 5's
+  two halves apart, and states the criterion's file scope.</li>
 <li><code>scripts/tests/test_metadata.py</code> passes without its pinned
   tool-failure list having been edited, and <code>NETWORK_CHECKS</code> in
   <code>scripts/audit_snapshot.py</code> is unchanged.</li>
