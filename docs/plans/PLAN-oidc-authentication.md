@@ -911,6 +911,43 @@ Scope boundaries:
     shapes is chosen. Both are settled, and phase 8 is
     planned against them.
 
+    **Answered by phase 8 (2026-11-22): five documents, four
+    extended and one checked and left alone.** The operator
+    guide carries two worked examples, `### A worked Keycloak
+    example` and `### A worked Authentik example`, each
+    naming the release it was produced against — Keycloak
+    26.8.2 and Authentik 2026.8.6 — and each walking the
+    provider-side objects a human login needs, the `curl`
+    which registers the issuer with its `client_id` and
+    `oidc_scopes`, the `curl` which binds a group claim in a
+    namespace, and the `sf-client login` the person then
+    runs; including, for Authentik, the two switches a stock
+    install leaves off and which nothing in its discovery
+    document distinguishes from a working one. The user guide
+    gained `## Logging in as a person`: a person runs the
+    login verb, signs in at the provider and receives one key
+    per namespace their identity entitles them to, with the
+    cache, the ways of logging in and the credential
+    precedence linked in `client-python` rather than copied
+    here. The developer guide's `### Claim matching` section
+    now states the widened rule — an array claim matches when
+    one of its elements is exactly the matcher, still with no
+    globbing and no coercion — and the API reference's
+    `bound_claims` description gained the same sentence,
+    because it had become the narrower of the two places a
+    reader compares. The glossary needed nothing, which was
+    checked rather than assumed: it already carries a
+    person's identity token and the federation vocabulary,
+    and that vocabulary with the developer guide's federated
+    identity section is where the architects' audience this
+    question names was already served. What keeps the two
+    walkthroughs honest rather than merely written is
+    `tools/idp-lab/`, which stands both providers up from
+    pinned images, configures them through their
+    administrative APIs and regenerates the captured provider
+    documents the tests assert against, so an instruction
+    which has rotted can be found out by running it.
+
 13. **Direct-bearer or exchange-based human sessions?**
     This plan's central unresolved question, and the one
     [`PLAN-auth-federation.md`](https://github.com/shakenfist/shakenfist/blob/a5476fb3862fbe3c913b7e83d25fdd459eab0327/docs/plans/PLAN-auth-federation.md) explicitly reserves for this

@@ -668,6 +668,16 @@ Configuring an issuer and writing a mapping rule are operator tasks, and
 the worked end to end example -- registering GitHub as an issuer, writing
 a rule, and the workflow YAML that exchanges a token -- lives with them in
 the [operator guide](/operator_guide/authentication/#a-worked-github-actions-example).
+So do the two worked examples for human login, one per self hosted
+identity provider.
+
+Those two were produced by configuring the providers rather than from
+documentation, and `tools/idp-lab/` is what they were produced with: it
+stands both up from pinned images, configures them through their
+administrative APIs, and regenerates the captured provider documents the
+unit tests assert against. An instruction in them which has rotted can
+therefore be found out by running it, which is the only way a walkthrough
+stays true.
 
 ## Inter-node authentication
 
