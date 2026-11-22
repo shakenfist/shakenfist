@@ -16908,15 +16908,18 @@ rest are noted.</p>
   <code>DatabaseUnavailable</code> before this range; only the key one changed.</li>
 </ul>
 <h2 id="disposition">Disposition<a class="headerlink" href="#disposition" title="Permanent link">&para;</a></h2>
-<p>Per decision 8 the audit fixes nothing: findings land as their own pull
-request once this phase has merged, and that pull request records this
-phase's merge commit.</p>
+<p>Per decision 8 the audit fixed nothing: the findings landed as their
+own pull request once this phase had merged, and that pull request
+records this phase's merge commit (<code>b0af1770ff</code>, #5018). The
+disposition column below says what became of each finding, with the
+outcome column added by that pull request.</p>
 <table>
 <thead>
 <tr>
 <th>Finding</th>
 <th>Grade</th>
 <th>Disposition</th>
+<th>Outcome</th>
 </tr>
 </thead>
 <tbody>
@@ -16924,106 +16927,127 @@ phase's merge commit.</p>
 <td>S1 heal conflates absent with unreadable</td>
 <td>medium</td>
 <td>Follow-up pull request, first</td>
+<td>Fixed: reads through <code>get_state_checked()</code>, skips the heal on a failed read, and contains both writes</td>
 </tr>
 <tr>
 <td>C1 liveness stop invisible to the streak gauge</td>
 <td>advisory</td>
 <td>Follow-up pull request</td>
+<td>Fixed: its own streak gauge, since the work-list streak had just been reset by the read that found the zombies</td>
 </tr>
 <tr>
 <td>T1 pinned test does not pin what was claimed</td>
 <td>advisory</td>
 <td>Follow-up pull request; master plan corrected at source here</td>
+<td>Fixed: the set of repairable types is pinned as well as the overriding set</td>
 </tr>
 <tr>
 <td>D1 unqualified "marks the static row deleted"</td>
 <td>advisory</td>
 <td>Follow-up pull request</td>
+<td>Fixed</td>
 </tr>
 <tr>
 <td>D2 missing retry clause</td>
 <td>advisory</td>
 <td>Follow-up pull request</td>
+<td>Fixed, with the two resume markers and the new metrics</td>
 </tr>
 <tr>
 <td>C4 docstring omits <code>CorruptMappingRule</code></td>
 <td>advisory</td>
 <td>Follow-up pull request</td>
+<td>Fixed</td>
 </tr>
 <tr>
 <td>S6 override docstrings overstate the login path</td>
 <td>low</td>
 <td>Follow-up pull request</td>
+<td>Fixed</td>
 </tr>
 <tr>
 <td>C2 no per-object resume</td>
 <td>advisory</td>
 <td>Follow-up pull request, with a test</td>
+<td>Fixed: repairs resume after the zombie that stopped the last pass</td>
 </tr>
 <tr>
 <td>C3 unbounded swallowing of other errors</td>
 <td>advisory</td>
 <td>Follow-up pull request, with a test</td>
+<td>Fixed: counted by object type rather than only logged</td>
 </tr>
 <tr>
 <td>C9 starvation test injects the wrong path</td>
 <td>advisory</td>
 <td>Follow-up pull request: rename, or cover the path the name promises</td>
+<td>Fixed: renamed for the path it drives, and the liveness path now has the test its old name promised</td>
 </tr>
 <tr>
 <td>T2 no servicer round-trip test</td>
 <td>advisory</td>
 <td>Follow-up pull request</td>
+<td>Fixed: a real in-process servicer, for all three readers</td>
 </tr>
 <tr>
 <td>T4 no functional coverage</td>
 <td>advisory</td>
 <td>Noted; a functional test for an hourly sweep is its own piece of work</td>
+<td>Not done</td>
 </tr>
 <tr>
 <td>S2 torn-hard-delete backstop</td>
 <td>low</td>
 <td>Noted; fold into <a href="https://github.com/shakenfist/shakenfist/issues/5015">#5015</a></td>
+<td>Not done</td>
 </tr>
 <tr>
 <td>S3 <code>set_details</code> carries SQL text</td>
 <td>low</td>
 <td>Follow-up pull request</td>
+<td>Fixed, for all three attributes servicers</td>
 </tr>
 <tr>
 <td>C5 corrupt rule persists</td>
 <td>low</td>
 <td>Noted; visible as <code>unusable</code>, which is the intended behaviour</td>
+<td>Not done</td>
 </tr>
 <tr>
 <td>T3 mutation count overstates guards</td>
 <td>advisory</td>
 <td>Noted, no action</td>
+<td>Not done</td>
 </tr>
 <tr>
 <td>Direct readers conflate absent/unreadable</td>
 <td>predating</td>
 <td><a href="https://github.com/shakenfist/shakenfist/issues/5017">#5017</a></td>
+<td>Issue filed</td>
 </tr>
 <tr>
 <td><code>_as_uuid</code> triplicated</td>
 <td>predating</td>
 <td>Noted</td>
+<td>Not done</td>
 </tr>
 <tr>
 <td>File sizes past the stated-reason mark</td>
 <td>predating</td>
 <td>Noted</td>
+<td>Not done</td>
 </tr>
 <tr>
 <td><code>get_stateless_object_uuids</code> unpaginated</td>
 <td>predating</td>
 <td>Noted</td>
+<td>Not done</td>
 </tr>
 <tr>
 <td>gRPC issuer/rule readers already raised</td>
 <td>predating</td>
 <td>No action; context only</td>
+<td>Not done</td>
 </tr>
 </tbody>
 </table>

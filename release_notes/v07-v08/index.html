@@ -18378,6 +18378,21 @@ daemon process:</p>
   maintainer, and dropped entirely when that node loses the election.
   Zero in steady state; see <a href="/operator_guide/database/">the operator guide on the
   database</a> for a sample alert.</li>
+<li><code>cluster_zombie_liveness_failure_streak{object_type}</code> — gauge,
+  sf-cluster: consecutive orphan reconciliation passes which stopped
+  before repairing that type's zombies because a liveness read found the
+  database tier unavailable. The work-list streak above cannot see this
+  stop, because the read that found the zombies succeeded. Published
+  only by the elected cluster maintainer, dropped when that node loses
+  the election, and reset by the next pass that reads the type without
+  stopping on it; see <a href="/operator_guide/database/">the operator guide on the
+  database</a> for a sample alert.</li>
+<li><code>cluster_zombie_liveness_errors_total{object_type}</code> — counter,
+  sf-cluster: zombie liveness reads which failed for a reason other than
+  the tier, such as a row the object model cannot parse. Each costs only
+  its own object, but recurs every pass until the row is fixed. Kept
+  across a leadership change, as a counter aggregates correctly across
+  nodes.</li>
 <li><code>cluster_deleted_object_backlog{object_type}</code> — gauge, sf-cluster:
   objects in a final state, counted hourly with no age filter, so it
   includes objects still inside their grace period. Published for every

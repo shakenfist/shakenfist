@@ -17112,7 +17112,14 @@ objects are excluded from zombie repair. The state written comes from
 <code>TrustedIssuer</code> and <code>MappingRule</code> override it to return <code>created</code> when
 their attributes row exists, since their authentication read path
 honours them without a state row. A failed liveness read
-(<code>DatabaseUnavailable</code>) writes nothing and ends the pass. Both kinds of
+(<code>DatabaseUnavailable</code>) writes nothing and ends the pass; the zombie
+stays a candidate and is retried on the next pass, which resumes at the
+zombie after the one that stopped this pass and at the object type
+after the type that stopped it, so neither one row nor one type can
+starve the rest. That stop is counted by
+<code>cluster_zombie_liveness_failure_streak</code> rather than by the work-list
+streak, which says nothing about it: the work-list read for that type
+succeeded, since that is how the zombies were found. Both kinds of
 orphan are otherwise invisible to every state-driven iterator.</p>
 <p>Writing that state directly is also why zombie repair of an interface
 cannot release the interface's address: the release lives in
