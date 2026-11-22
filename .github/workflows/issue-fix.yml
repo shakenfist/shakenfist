@@ -793,12 +793,20 @@ jobs:
       # The triage estimate of fix size is only an estimate. This is
       # the hard cap: an over-budget fix is never published as a PR,
       # but the branch is pushed for human inspection.
+      #
+      # Files the repository marks linguist-generated in .gitattributes
+      # are not counted: regenerated protobuf stubs, for one, rewrite
+      # every serialized offset when a single field is added, and once
+      # held back a ~200 line fix as 1800. The attributes are read from
+      # HEAD, the base branch, so the fix cannot mark its own code
+      # generated to slip under the cap.
       - name: Measure change size
         id: measure
         if: steps.assess.outputs.has_changes == 'true'
         run: |
           git add -A
-          nontest=$(git diff --cached --numstat | \
+          nontest=$(git --attr-source=HEAD diff --cached --numstat -- \
+              . ':(exclude,attr:linguist-generated)' | \
             awk -v pat="${TEST_PATH_PATTERN}" \
               '$3 !~ pat { if ($1 != "-") s += $1 + $2 } END { print s + 0 }')
           echo "Non-test lines changed: ${nontest} (cap: ${MAX_DIFF_LINES})"
