@@ -156,10 +156,18 @@ class TrustedIssuer(dbo):
 
         from_db_by_name() and the federated exchange's issuer listing
         (federation.issuer_claiming_url()) reject only an issuer whose
-        state is deleted, so one with no state row is still trusted.
-        Marking it deleted would silently revoke trust an operator
-        configured (issue 3836), so an issuer with its attributes row is
-        repaired to created instead.
+        state is deleted, so one with no state row is still trusted
+        there. Marking it deleted would silently revoke trust an
+        operator configured (issue 3836), so an issuer with its
+        attributes row is repaired to created instead.
+
+        Not every path honours a stateless issuer: the login endpoint
+        reads the issuer's state and refuses anything outside
+        ACTIVE_STATES, so a human login through one already fails.
+        That is an argument for repairing forward rather than against
+        it -- created is the state which makes the two paths agree
+        again -- but it is why this is not a claim that every reader
+        honours such an issuer.
 
         An issuer with no attributes row has no issuer URL or JWKS URI,
         so the exchange can never match a token to it and it is garbage.
