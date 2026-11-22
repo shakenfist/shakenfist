@@ -14192,6 +14192,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-crate-boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crate boundaries and transcoding out
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -16995,21 +17023,41 @@ invocation is what reproduces the transient failure the defect needed.</p>
 <a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="c1"># Clean test artifacts</span>
 <a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>make<span class="w"> </span>clean-tests
 </code></pre></div>
+<p>Each of these that runs the Python suite runs four stestr workers, from
+<code>STESTR_CONCURRENCY</code> in the <code>Makefile</code>; <code>make test-report</code> is the
+exception and runs serially. (<code>make test</code> is the Rust unit tests and
+then the Python suite, so the cap applies to its second half.) Four
+rather than one per core
+because each worker forks an <code>instar</code> and a <code>qemu-img</code> of its own, both
+working on multi-GB images: a run at stestr's default of one worker per
+core took a sixteen-core host to a load average of 69 and an IO
+pressure of 68%, which made the machine unusable for anything else
+sharing its disk. The containerised targets had the same four
+hardcoded; they read <code>STESTR_CONCURRENCY</code> too, so the override below
+reaches every target that runs the suite rather than the host-side ones
+alone. Raise it on a machine with room:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>make<span class="w"> </span>test-integration<span class="w"> </span><span class="nv">STESTR_CONCURRENCY</span><span class="o">=</span><span class="m">8</span>
+</code></pre></div>
+<p>The temporaries still go to <code>TMPDIR</code>, which is usually <code>/tmp</code>; on a
+host whose root filesystem is short of space or shared with anything
+else that matters, point it elsewhere.</p>
 <h3 id="direct-stestr-usage">Direct stestr Usage<a class="headerlink" href="#direct-stestr-usage" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>tests
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">source</span><span class="w"> </span>.venv/bin/activate
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Run all tests</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>stestr<span class="w"> </span>run
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Run specific test module</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>stestr<span class="w"> </span>run<span class="w"> </span>test_info_safe
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># Run with verbose output</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>stestr<span class="w"> </span>run<span class="w"> </span>--serial<span class="w"> </span>--<span class="w"> </span>--verbose
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="c1"># List available tests</span>
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>stestr<span class="w"> </span>list
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">cd</span><span class="w"> </span>tests
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">source</span><span class="w"> </span>.venv/bin/activate
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Run all tests. Note the concurrency: by hand there is no Makefile to</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># supply it, and the default is one worker per core, which is what made</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="c1"># a sixteen-core host unusable.</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>stestr<span class="w"> </span>run<span class="w"> </span>--concurrency<span class="w"> </span><span class="m">4</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="c1"># Run specific test module</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>stestr<span class="w"> </span>run<span class="w"> </span>--concurrency<span class="w"> </span><span class="m">4</span><span class="w"> </span>test_info_safe
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="c1"># Run with verbose output</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>stestr<span class="w"> </span>run<span class="w"> </span>--serial<span class="w"> </span>--<span class="w"> </span>--verbose
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="c1"># List available tests</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>stestr<span class="w"> </span>list
 </code></pre></div>
 <h3 id="running-against-an-installed-package-distro-matrix">Running against an installed package (distro matrix)<a class="headerlink" href="#running-against-an-installed-package-distro-matrix" title="Permanent link">&para;</a></h3>
 <p>The make targets above run the suite against the in-tree build
@@ -17017,29 +17065,29 @@ invocation is what reproduces the transient failure the defect needed.</p>
 against the <strong>installed <code>.deb</code>/<code>.rpm</code></strong>, inside a target-distro
 container, using that distro's own <code>qemu-img</code> as the differential
 oracle. <code>tools/test-package-functional.sh</code> is the per-distro runner:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Full suite, against the .deb installed on Debian 12 (qemu-img 7.2.x)</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>tools/test-package-functional.sh<span class="w"> </span>src/target/debian/instar_*.deb<span class="w"> </span>debian:12
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Fast subset, against the .rpm installed on Rocky 9 (proves the dnf path)</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>tools/test-package-functional.sh<span class="w"> </span>--smoke<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span>src/target/generate-rpm/instar-*.rpm<span class="w"> </span>rockylinux:9
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># Dial concurrency down when several matrix containers share one KVM host</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>tools/test-package-functional.sh<span class="w"> </span>--concurrency<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span>src/target/debian/instar_*.deb<span class="w"> </span>ubuntu:22.04
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="c1"># Replay one failure on one distro without paying for the whole suite</span>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>tools/test-package-functional.sh<span class="w"> </span>--select<span class="w"> </span><span class="s1">'test_convert\.'</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">    </span>src/target/debian/instar_*.deb<span class="w"> </span>debian:13
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Full suite, against the .deb installed on Debian 12 (qemu-img 7.2.x)</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>tools/test-package-functional.sh<span class="w"> </span>src/target/debian/instar_*.deb<span class="w"> </span>debian:12
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Fast subset, against the .rpm installed on Rocky 9 (proves the dnf path)</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>tools/test-package-functional.sh<span class="w"> </span>--smoke<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span>src/target/generate-rpm/instar-*.rpm<span class="w"> </span>rockylinux:9
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="c1"># Dial concurrency down when several matrix containers share one KVM host</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>tools/test-package-functional.sh<span class="w"> </span>--concurrency<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span>src/target/debian/instar_*.deb<span class="w"> </span>ubuntu:22.04
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="c1"># Replay one failure on one distro without paying for the whole suite</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>tools/test-package-functional.sh<span class="w"> </span>--select<span class="w"> </span><span class="s1">'test_convert\.'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">    </span>src/target/debian/instar_*.deb<span class="w"> </span>debian:13
 </code></pre></div>
 <p>To reproduce a <strong>CI matrix entry</strong> exactly as the merge queue runs it —
 same package resolution, same summary line — use the wrapper CI calls
 rather than the runner directly:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>make<span class="w"> </span>package
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nv">PACKAGE_DIR</span><span class="o">=</span>src/target/debian<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nv">TESTDATA_PATH</span><span class="o">=</span>../instar-testdata<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="nv">MATRIX_SELECT</span><span class="o">=</span><span class="s1">'test_map\.'</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span>tools/ci/run-matrix-entry.sh<span class="w"> </span><span class="s1">'Debian 12'</span><span class="w"> </span>debian:12<span class="w"> </span>deb
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>make<span class="w"> </span>package
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nv">PACKAGE_DIR</span><span class="o">=</span>src/target/debian<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nv">TESTDATA_PATH</span><span class="o">=</span>../instar-testdata<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="nv">MATRIX_SELECT</span><span class="o">=</span><span class="s1">'test_map\.'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span>tools/ci/run-matrix-entry.sh<span class="w"> </span><span class="s1">'Debian 12'</span><span class="w"> </span>debian:12<span class="w"> </span>deb
 </code></pre></div>
 <p><code>MATRIX_SELECT</code> exists for exactly this and is never set in CI: it
 makes the run partial, and a partial run must not be able to report as
@@ -17052,10 +17100,10 @@ half that gates a merge), <code>nightly</code> (the six heavy VHD conversion
 tests that do not), or <code>all</code> (the whole suite, both halves together,
 which is what every matrix entry ran before the split). To reproduce
 the nightly's selection on one distro instead:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nv">PACKAGE_DIR</span><span class="o">=</span>src/target/debian<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nv">TESTDATA_PATH</span><span class="o">=</span>../instar-testdata<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nv">MATRIX_SET</span><span class="o">=</span>nightly<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span>tools/ci/run-matrix-entry.sh<span class="w"> </span><span class="s1">'Debian 12'</span><span class="w"> </span>debian:12<span class="w"> </span>deb
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nv">PACKAGE_DIR</span><span class="o">=</span>src/target/debian<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nv">TESTDATA_PATH</span><span class="o">=</span>../instar-testdata<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nv">MATRIX_SET</span><span class="o">=</span>nightly<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span>tools/ci/run-matrix-entry.sh<span class="w"> </span><span class="s1">'Debian 12'</span><span class="w"> </span>debian:12<span class="w"> </span>deb
 </code></pre></div>
 <p>The nightly itself runs in its own workflow,
 <code>.github/workflows/nightly-matrix.yml</code>, once a night across all seven
@@ -17515,19 +17563,19 @@ sends a reader looking for a <code>qemu-img</code> difference that is not there:
   it collects a comment each night until a refresh lands again.</li>
 </ul>
 <p><strong>Driving all of it by hand.</strong> None of this needs CI:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Re-derive the committed timing file from a local full run.</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">cd</span><span class="w"> </span>tests<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>../tests/.venv/bin/stestr<span class="w"> </span>run<span class="w"> </span>--exclude-regex<span class="w"> </span>test_info_malicious
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nb">cd</span><span class="w"> </span>..
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>tests/.venv/bin/python3<span class="w"> </span>tools/ci/generate-stestr-timing.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span>tests/.stestr<span class="w"> </span>tests/stestr-timing.txt
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># Ask what the nightly would do with a measurement, touching neither</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="c1"># git nor the GitHub API.</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>tools/ci/publish-stestr-timing.sh<span class="w"> </span>/path/to/measured-timing.txt<span class="w"> </span>--dry-run
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="c1"># Ask what the reporter would file for a downloaded leg log.</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>tools/ci/report-nightly-matrix-failure.sh<span class="w"> </span><span class="s2">"Rocky 9"</span><span class="w"> </span>rockylinux:9<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">    </span>matrix.log<span class="w"> </span>--dry-run
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Re-derive the committed timing file from a local full run.</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nb">cd</span><span class="w"> </span>tests<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>../tests/.venv/bin/stestr<span class="w"> </span>run<span class="w"> </span>--exclude-regex<span class="w"> </span>test_info_malicious
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="nb">cd</span><span class="w"> </span>..
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>tests/.venv/bin/python3<span class="w"> </span>tools/ci/generate-stestr-timing.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span>tests/.stestr<span class="w"> </span>tests/stestr-timing.txt
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="c1"># Ask what the nightly would do with a measurement, touching neither</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="c1"># git nor the GitHub API.</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>tools/ci/publish-stestr-timing.sh<span class="w"> </span>/path/to/measured-timing.txt<span class="w"> </span>--dry-run
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="c1"># Ask what the reporter would file for a downloaded leg log.</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>tools/ci/report-nightly-matrix-failure.sh<span class="w"> </span><span class="s2">"Rocky 9"</span><span class="w"> </span>rockylinux:9<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="w">    </span>matrix.log<span class="w"> </span>--dry-run
 </code></pre></div>
 <p>A manual <code>workflow_dispatch</code> of <code>nightly-matrix.yml</code> takes a
 <code>force_timing_pr</code> input, which opens the refresh pull request even when
@@ -17606,7 +17654,7 @@ by zero jobs. The only hand-maintained input is the allowlist of
 intentional exclusions in <code>tools/ci/check-test-partition.py</code>
 (currently just the malicious suite); each entry carries a documented
 reason. Run it locally with:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>tools/ci/check-test-partition.sh
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>tools/ci/check-test-partition.sh
 </code></pre></div>
 <p>The same guard checks a <strong>second partition</strong>: the merge-queue distro
 matrix and the nightly matrix, which between them must run everything
@@ -17634,7 +17682,7 @@ selector is <code>$</code>-anchored instead, which means a future parameterised
 variant of one of the six moved tests would stay on the merge gate
 rather than move to the nightly — the safe direction.</p>
 <p>Its own logic is unit-tested (stdlib only, no venv) via:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>discover<span class="w"> </span>-s<span class="w"> </span>tools/ci<span class="w"> </span>-p<span class="w"> </span><span class="s1">'test_*.py'</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>discover<span class="w"> </span>-s<span class="w"> </span>tools/ci<span class="w"> </span>-p<span class="w"> </span><span class="s1">'test_*.py'</span>
 </code></pre></div>
 <p>When you add a new integration job or change a test-container
 selector, the guard validates the new partition automatically; if it
@@ -17642,15 +17690,15 @@ reports an orphan, either add the test to a job or (rarely) to the
 documented allowlist.</p>
 <h2 id="test-image-manifest">Test Image Manifest<a class="headerlink" href="#test-image-manifest" title="Permanent link">&para;</a></h2>
 <p>Test images are defined in <code>tests/manifest.json</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"cirros-qcow2"</span><span class="p">,</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"downloaded/cirros/cirros-0.6.3-x86_64-disk.img"</span><span class="p">,</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">"format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"qcow2"</span><span class="p">,</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="nt">"safety"</span><span class="p">:</span><span class="w"> </span><span class="s2">"safe"</span><span class="p">,</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">    </span><span class="nt">"run_in_ci"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">    </span><span class="nt">"description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"CirrOS minimal cloud image"</span><span class="p">,</span>
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">    </span><span class="nt">"tags"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"qcow2"</span><span class="p">,</span><span class="w"> </span><span class="s2">"cloud-image"</span><span class="p">]</span>
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p">{</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"cirros-qcow2"</span><span class="p">,</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"downloaded/cirros/cirros-0.6.3-x86_64-disk.img"</span><span class="p">,</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span><span class="nt">"format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"qcow2"</span><span class="p">,</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">    </span><span class="nt">"safety"</span><span class="p">:</span><span class="w"> </span><span class="s2">"safe"</span><span class="p">,</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">    </span><span class="nt">"run_in_ci"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">    </span><span class="nt">"description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"CirrOS minimal cloud image"</span><span class="p">,</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">    </span><span class="nt">"tags"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"qcow2"</span><span class="p">,</span><span class="w"> </span><span class="s2">"cloud-image"</span><span class="p">]</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="manifest-fields">Manifest Fields<a class="headerlink" href="#manifest-fields" title="Permanent link">&para;</a></h3>
 <table>
@@ -17704,13 +17752,13 @@ documented allowlist.</p>
 headers or partition tables. In default (secure) mode, instar rejects these
 files as "unknown format" rather than accepting them as raw images.</p>
 <p>To test qemu-img compatibility for these images, use <code>--unsafe-quirks</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Default mode: rejects files without valid structure</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>instar<span class="w"> </span>info<span class="w"> </span>random-garbage.raw
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="c1"># Error: Unknown format (no valid disk image header or partition table)</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="c1"># Unsafe quirks mode: matches qemu-img behavior</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>instar<span class="w"> </span>info<span class="w"> </span>--unsafe-quirks<span class="w"> </span>random-garbage.raw
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="c1"># file format: raw</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Default mode: rejects files without valid structure</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>instar<span class="w"> </span>info<span class="w"> </span>random-garbage.raw
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="c1"># Error: Unknown format (no valid disk image header or partition table)</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="c1"># Unsafe quirks mode: matches qemu-img behavior</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>instar<span class="w"> </span>info<span class="w"> </span>--unsafe-quirks<span class="w"> </span>random-garbage.raw
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1"># file format: raw</span>
 </code></pre></div>
 <p>See <a href="/components/instar/configuration/">configuration.md</a> and <a href="/components/instar/quirks/">quirks.md</a> for details
 on safe vs unsafe quirks.</p>
@@ -17816,7 +17864,7 @@ and <code>coverage-fuzz</code> and <code>test-and-fix</code> are what separate t
 resparsifies but cannot ask for the disk.</p>
 <p>All of them except <code>test-and-fix</code> ask the fleet for that disk with an extra
 <code>runs-on</code> label:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">self-hosted</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">debian-13</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">xl</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">instar</span><span class="p p-Indicator">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">self-hosted</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">debian-13</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">xl</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">instar</span><span class="p p-Indicator">]</span>
 </code></pre></div>
 <p><code>instar</code> means "a runner carrying the pre-seeded instar-testdata dependencies
 disk". The conductor matches labels as a set, so the order does not matter,
@@ -17900,7 +17948,7 @@ convention, and measures allocated blocks before and after rather than
 trusting the exit status.</p>
 <p>Anything narrower therefore arrives as <strong>further optional arguments</strong> after
 the tree path:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>resparsify-testdata.sh &lt;tree&gt; [--files-from &lt;list&gt;]... [--] [&lt;file&gt;...]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>resparsify-testdata.sh &lt;tree&gt; [--files-from &lt;list&gt;]... [--] [&lt;file&gt;...]
 </code></pre></div>
 <p>The caller that needs this is a job whose tree came off a pre-built testdata
 dependencies disk: that tree is a copy-on-write overlay of an image which was
@@ -17949,14 +17997,14 @@ timing the run.</p>
 <h2 id="expected-output-overrides">Expected Output Overrides<a class="headerlink" href="#expected-output-overrides" title="Permanent link">&para;</a></h2>
 <p>For malicious images where running <code>qemu-img</code> would be dangerous, store the
 expected output in <code>tests/expected_outputs/</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>tests/expected_outputs/
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>└── qcow2_backing_etc_passwd.txt
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>tests/expected_outputs/
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>└── qcow2_backing_etc_passwd.txt
 </code></pre></div>
 <p>Reference this file in the manifest:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">{</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"qcow2-backing-passwd"</span><span class="p">,</span>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">    </span><span class="nt">"expected_override"</span><span class="p">:</span><span class="w"> </span><span class="s2">"expected_outputs/qcow2_backing_etc_passwd.txt"</span>
-<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="p">{</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">    </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"qcow2-backing-passwd"</span><span class="p">,</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">    </span><span class="nt">"expected_override"</span><span class="p">:</span><span class="w"> </span><span class="s2">"expected_outputs/qcow2_backing_etc_passwd.txt"</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="p">}</span>
 </code></pre></div>
 <h2 id="image-notes">Image Notes<a class="headerlink" href="#image-notes" title="Permanent link">&para;</a></h2>
 <p>The <code>docs/image_notes/</code> directory documents which test images exposed
@@ -18153,9 +18201,9 @@ per-version <code>qemu-img</code> builds at <code>qemu-img-binaries/x86_64/&lt;v
 covering 6.0.0 to 10.2.0. Run the real binary rather than reasoning
 from the version map or from qemu source — two of the three boundaries
 above were initially recorded wrongly from indirect evidence:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nv">TD</span><span class="o">=</span>../instar-testdata
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="nv">$TD</span>/qemu-img-binaries/x86_64/8.1.5/qemu-img<span class="w"> </span>map<span class="w"> </span>--output<span class="o">=</span>json<span class="w"> </span>image.qcow2
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="nv">$TD</span>/qemu-img-binaries/x86_64/9.0.0/qemu-img<span class="w"> </span>snapshot<span class="w"> </span>-l<span class="w"> </span>image.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nv">TD</span><span class="o">=</span>../instar-testdata
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="nv">$TD</span>/qemu-img-binaries/x86_64/8.1.5/qemu-img<span class="w"> </span>map<span class="w"> </span>--output<span class="o">=</span>json<span class="w"> </span>image.qcow2
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="nv">$TD</span>/qemu-img-binaries/x86_64/9.0.0/qemu-img<span class="w"> </span>snapshot<span class="w"> </span>-l<span class="w"> </span>image.qcow2
 </code></pre></div>
 <p>Both <code>map</code> and <code>snapshot</code> accept <code>--qemu-version</code> (as <code>info</code> already
 did), so both sides of every boundary are exercisable on the dev host
@@ -18393,11 +18441,11 @@ unavailable. That is not true of every use of libvhdi in this suite;
 see the differencing oracle cross-check below, which CI treats as
 mandatory.</p>
 <h3 id="running-locally">Running locally<a class="headerlink" href="#running-locally" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">    </span>--iterations<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">    </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">    </span>--log-dir<span class="w"> </span>./fuzz-logs
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">    </span>--iterations<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">    </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">    </span>--log-dir<span class="w"> </span>./fuzz-logs
 </code></pre></div>
 <p>Add <code>--ops create,convert</code> (comma-separated op names) to restrict a run to
 particular operations.</p>
@@ -18484,11 +18532,11 @@ run is distinguishable from a clean one after the fact.
 <h3 id="reproducing-a-divergence">Reproducing a divergence<a class="headerlink" href="#reproducing-a-divergence" title="Permanent link">&para;</a></h3>
 <p>Each divergence report includes the seed and iteration number. To
 reproduce:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">    </span>--iterations<span class="w"> </span>&lt;ITERATION<span class="w"> </span>+<span class="w"> </span><span class="m">1</span>&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">    </span>--seed<span class="w"> </span>&lt;SEED&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">    </span>--fail-fast
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">    </span>--iterations<span class="w"> </span>&lt;ITERATION<span class="w"> </span>+<span class="w"> </span><span class="m">1</span>&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">    </span>--seed<span class="w"> </span>&lt;SEED&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">    </span>--fail-fast
 </code></pre></div>
 <h2 id="coverage-guided-fuzzing">Coverage-guided fuzzing<a class="headerlink" href="#coverage-guided-fuzzing" title="Permanent link">&para;</a></h2>
 <p>Coverage-guided fuzzing uses <code>cargo-fuzz</code> (libFuzzer) to exercise the
@@ -18850,27 +18898,27 @@ invariants rather than the absence of a panic:</p>
    as the child alone.</li>
 </ol>
 <h3 id="running-locally_1">Running locally<a class="headerlink" href="#running-locally_1" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Inside the instar-build container:</span>
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="c1"># Run a single target for 60 seconds</span>
-<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>--<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
-<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
-<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="c1"># Run with specific corpus</span>
-<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>corpus/fuzz_qcow2_header/
-<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>
-<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="c1"># Minimize a crash</span>
-<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>tmin<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>artifacts/fuzz_qcow2_header/&lt;crash&gt;
-<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>
-<a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a><span class="c1"># Generate coverage report</span>
-<a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>coverage<span class="w"> </span>fuzz_qcow2_header
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Inside the instar-build container:</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="c1"># Run a single target for 60 seconds</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>--<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="c1"># Run with specific corpus</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>corpus/fuzz_qcow2_header/
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>
+<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="c1"># Minimize a crash</span>
+<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>tmin<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>artifacts/fuzz_qcow2_header/&lt;crash&gt;
+<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a>
+<a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a><span class="c1"># Generate coverage report</span>
+<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>coverage<span class="w"> </span>fuzz_qcow2_header
 </code></pre></div>
 <p>Per-function coverage — which functions a target actually reached, not
 just a total — comes from <code>make fuzz-coverage</code>, which runs the same
 coverage build inside the devcontainer and renders the report with
 <code>llvm-cov</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>make<span class="w"> </span>fuzz-coverage<span class="w"> </span><span class="nv">FUZZ_TARGET</span><span class="o">=</span>fuzz_vhd_parent
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>make<span class="w"> </span>fuzz-coverage<span class="w"> </span><span class="nv">FUZZ_TARGET</span><span class="o">=</span>fuzz_vhd_parent<span class="w"> </span><span class="nv">FUZZ_COVERAGE_FILTER</span><span class="o">=</span>locator
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>make<span class="w"> </span>fuzz-coverage<span class="w"> </span><span class="nv">FUZZ_TARGET</span><span class="o">=</span>fuzz_vhd_parent
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>make<span class="w"> </span>fuzz-coverage<span class="w"> </span><span class="nv">FUZZ_TARGET</span><span class="o">=</span>fuzz_vhd_parent<span class="w"> </span><span class="nv">FUZZ_COVERAGE_FILTER</span><span class="o">=</span>locator
 </code></pre></div>
 <p>A filter narrows the report to matching function names across every
 crate; <code>FUZZ_COVERAGE_SOURCES</code> narrows the files. This exists because a
@@ -18880,7 +18928,7 @@ does not use <code>cargo cov</code> to render: cargo-fuzz 0.12 passes
 <code>--no-default-features</code> to a clap parser that rejects it and panics.</p>
 <h3 id="corpus-seeding">Corpus seeding<a class="headerlink" href="#corpus-seeding" title="Permanent link">&para;</a></h3>
 <p>The seed corpus is extracted from <code>instar-testdata</code> using:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>python3<span class="w"> </span>scripts/extract-fuzz-corpus.py<span class="w"> </span>--testdata<span class="w"> </span>/path/to/instar-testdata
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>python3<span class="w"> </span>scripts/extract-fuzz-corpus.py<span class="w"> </span>--testdata<span class="w"> </span>/path/to/instar-testdata
 </code></pre></div>
 <p>This copies test images into per-target corpus directories under
 <code>src/fuzz/corpus/</code>, filtered by format. Header-only targets receive
@@ -18971,9 +19019,9 @@ own arithmetic — a stronger oracle than the emitter target's region
 membership, and the one that catches a map right about its shape and
 wrong about which block an index belongs to.</p>
 <p>Run either by hand with the Makefile, which uses the devcontainer:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>make<span class="w"> </span>fuzz-build<span class="w"> </span><span class="nv">FUZZ_TARGET</span><span class="o">=</span>fuzz_vhdx_fixed_bat
-<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>make<span class="w"> </span>fuzz-run<span class="w"> </span><span class="nv">FUZZ_TARGET</span><span class="o">=</span>fuzz_vhdx_fixed_bat<span class="w"> </span><span class="nv">FUZZ_DURATION</span><span class="o">=</span><span class="m">120</span>
-<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>make<span class="w"> </span>fuzz-coverage<span class="w"> </span><span class="nv">FUZZ_TARGET</span><span class="o">=</span>fuzz_vhdx_fixed_bat
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>make<span class="w"> </span>fuzz-build<span class="w"> </span><span class="nv">FUZZ_TARGET</span><span class="o">=</span>fuzz_vhdx_fixed_bat
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>make<span class="w"> </span>fuzz-run<span class="w"> </span><span class="nv">FUZZ_TARGET</span><span class="o">=</span>fuzz_vhdx_fixed_bat<span class="w"> </span><span class="nv">FUZZ_DURATION</span><span class="o">=</span><span class="m">120</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>make<span class="w"> </span>fuzz-coverage<span class="w"> </span><span class="nv">FUZZ_TARGET</span><span class="o">=</span>fuzz_vhdx_fixed_bat
 </code></pre></div>
 <h4 id="keeping-the-registration-lists-honest">Keeping the registration lists honest<a class="headerlink" href="#keeping-the-registration-lists-honest" title="Permanent link">&para;</a></h4>
 <p>Adding a target means editing several places by hand, and the
@@ -19114,9 +19162,9 @@ new issue every night. Issues filed before <code>dedup_key</code> existed are
 still matched on their <code>signature</code>.</p>
 <p>Run the reporter by hand against a downloaded <code>coverage-fuzz-logs</code>
 artifact to check what an issue would say, without filing anything:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>tools/ci/report-fuzz-crash.sh<span class="w"> </span>fuzz_rebase_planners<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">    </span>src/fuzz/artifacts/fuzz_rebase_planners/crash-&lt;hash&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">    </span>coverage-fuzz-logs/fuzz_rebase_planners.log<span class="w"> </span>--dry-run
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>tools/ci/report-fuzz-crash.sh<span class="w"> </span>fuzz_rebase_planners<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="w">    </span>src/fuzz/artifacts/fuzz_rebase_planners/crash-&lt;hash&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="w">    </span>coverage-fuzz-logs/fuzz_rebase_planners.log<span class="w"> </span>--dry-run
 </code></pre></div>
 <p><code>tools/ci/test-report-fuzz-crash.sh</code> exercises the reporter against
 synthetic logs — the 370KB single line, raw mutated bytes, a missing
@@ -19128,8 +19176,8 @@ tail-anchored excerpt look correct while on a real log it captured 28
 stack frames and no panic.</p>
 <p>Both suites run on pull requests in the <code>ci-tooling</code> job, and need only
 bash and <code>jq</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>tools/ci/test-report-fuzz-crash.sh
-<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>tools/ci/test-pick-fuzz-artifact.sh
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>tools/ci/test-report-fuzz-crash.sh
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>tools/ci/test-pick-fuzz-artifact.sh
 </code></pre></div>
 <h4 id="choosing-which-artifact-to-report">Choosing which artifact to report<a class="headerlink" href="#choosing-which-artifact-to-report" title="Permanent link">&para;</a></h4>
 <p><code>tools/ci/pick-fuzz-artifact.sh</code> decides which file in
@@ -19291,7 +19339,7 @@ deliberately broken emitter is not guarding what its name says it
 guards. See the VHD and VHDX notes in
 <a href="/components/instar/chain-config/#format-specific-notes">chain-config.md</a> for the
 composing path being guarded.</p>
-<p>There are <strong>165 cases</strong>, in fifteen groups.</p>
+<p>There are <strong>172 cases</strong>, in sixteen groups.</p>
 <p>Forty-seven cover the writer. Twenty-four mutate a library crate
 (<code>create</code>, <code>vhd</code>, <code>vhdx</code>) and are caught by a Rust unit or round-trip
 test. Two of those twenty-four guard the region table and metadata table
@@ -19533,17 +19581,19 @@ the buffer unwritten. Its test reads over backing files whose clusters
 are stored in reverse order on the host, so a read that runs on into
 the next host cluster cannot land on the right bytes by accident.</p>
 <p>Then <strong>12 data-device cases</strong>, guarding the fix for issue</p>
-<h1 id="792-the-host-puts-a-qcow2s-external-data-file-and-a-vmdk-flat">792. The host puts a qcow2's external data file, and a VMDK flat<a class="headerlink" href="#792-the-host-puts-a-qcow2s-external-data-file-and-a-vmdk-flat" title="Permanent link">&para;</a></h1>
-<p>descriptor's extents, in the device slots immediately after the image
-that owns them, inside its chain segment. Before the chain config
-marked them, the reader took the slot after a data-file image for the
-layer under it, and a cluster the image left unallocated read the data
-file at the virtual offset instead of the backing file or zeros, under
-success. Now the host sets <code>FLAG_DATA_DEVICE</code> on each data device, the
-reader steps over a marked device at the top of its device loop,
-<code>init_chain_states</code> refuses a config whose marks are not where the host
-puts them (<code>ChainConfig::data_devices_are_owned</code>), and the descriptor's
-extent walk stops at the end of its run of marked devices.</p>
+<h1 id="792-the-host-puts-a-qcow2s-external-data-file-in-the-device-slot">792. The host puts a qcow2's external data file in the device slot<a class="headerlink" href="#792-the-host-puts-a-qcow2s-external-data-file-in-the-device-slot" title="Permanent link">&para;</a></h1>
+<p>immediately after the image that owns it, inside its chain segment.
+Before the chain config marked it, the reader took the slot after a
+data-file image for the layer under it, and a cluster the image left
+unallocated read the data file at the virtual offset instead of the
+backing file or zeros, under success. Now the host sets
+<code>FLAG_DATA_DEVICE</code> on each data device, the reader steps over a marked
+device at the top of its device loop, <code>init_chain_states</code> refuses a
+config whose marks are not where the host puts them
+(<code>ChainConfig::data_devices_are_owned</code>), and a descriptor's extent walk
+is bounded by its own slice of the extent table
+(<code>ChainConfig::device_extents</code>) -- the extents take no device slots of
+their own, so a descriptor and all of them are one device.</p>
 <p>Three cases remove the reader's skip, each caught by a different test
 in the crate's subcluster fixture, which now lays its devices out as the
 host does: a wholly unallocated cluster with a backing file behind the
@@ -19559,6 +19609,31 @@ writing a data device unmarked, and passing an info operation's flags
 through with the mark intact. Both are caught by a <code>vmm</code> unit test that
 reads the host's config back as the guest's own type and checks it
 against the same rule.</p>
+<p>Then <strong>7 descriptor-attachment cases</strong>, on the host side of reading a
+VMDK descriptor made of separate extent files. The extents are laid out
+into the one device they make up twice over -- once for the table the
+guest reads, once to open the files as that device -- so the first case
+measures the files per pass instead of reading the one measurement
+chain discovery took: a file rewritten between the passes then puts the
+same extent at two offsets, and the guest reads inside the wrong extent
+and is told it succeeded. The second reads an extent the host could not
+measure as zero bytes long, which stacks every later extent on top of
+it. The third guesses <code>FLAT</code> for an extent that reached attachment with
+no kind, so a sparse extent's header is served as data. The fourth
+attaches a descriptor for writing, where a write crossing a member
+boundary cannot be routed to a file. The fifth and sixth restore an
+unguarded <code>open</code> on a path the descriptor named -- the allowlist
+constrains where such a path may point, not what kind of file it may
+point at -- in the extent-header read <code>instar info</code> reaches and in the
+device the extents make up; each is caught by a test that opens a FIFO
+on a thread and fails if the answer does not come back, so the
+regression is a failure rather than a suite that stops (issue #936).
+The last stops the device requiring each member to be a regular file.
+Only a regular file has a length to compare against the span the
+descriptor declares, so a FIFO, a block device or a character device
+among the extents would contribute its whole span as zero padding and
+the read would succeed -- a wrong answer reported as a success, where
+qemu-img cannot get the node's length and errors out.</p>
 <p>Then <strong>8 data-file entry cases</strong>, guarding the fix for
 issue #803. qemu applies two rules to the L2 entries of an image with
 an external data file, after an entry has classified as valid: a
@@ -19698,11 +19773,11 @@ of them together measured 1m51s on a warm tree.</p>
 rather than building them. On a machine that has neither, <code>make
 instar-devcontainer</code> and <code>make instar</code> build them first, and that is
 tens of minutes rather than minutes.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>tools/mutate-differencing.sh<span class="w">          </span><span class="c1"># every case</span>
-<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>tools/mutate-differencing.sh<span class="w"> </span>--list<span class="w">   </span><span class="c1"># the case names, run nothing</span>
-<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>tools/mutate-differencing.sh<span class="w"> </span>NAME...<span class="w">  </span><span class="c1"># only the named cases</span>
-<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>tools/mutate-differencing.sh<span class="w"> </span>--self-test<span class="w">        </span><span class="c1"># check the verdict classifier</span>
-<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>tools/mutate-differencing.sh<span class="w"> </span>--check-patterns<span class="w">  </span><span class="c1"># do the mutations still land?</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>tools/mutate-differencing.sh<span class="w">          </span><span class="c1"># every case</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>tools/mutate-differencing.sh<span class="w"> </span>--list<span class="w">   </span><span class="c1"># the case names, run nothing</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>tools/mutate-differencing.sh<span class="w"> </span>NAME...<span class="w">  </span><span class="c1"># only the named cases</span>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>tools/mutate-differencing.sh<span class="w"> </span>--self-test<span class="w">        </span><span class="c1"># check the verdict classifier</span>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>tools/mutate-differencing.sh<span class="w"> </span>--check-patterns<span class="w">  </span><span class="c1"># do the mutations still land?</span>
 </code></pre></div>
 <p>Three things run in the <code>ci-tooling</code> job, because a full run needs
 docker, testdata and <code>/dev/kvm</code> and so never runs on a pull request —
@@ -20068,10 +20143,10 @@ vhdx one; three of the current case names are shared that way. Check
 <code>git status --porcelain expected-outputs</code> after a run to see what
 actually moved rather than assuming the target you had in mind. Run
 from the <code>instar-testdata</code> checkout:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>scripts/generate-baselines.py<span class="w"> </span>--command<span class="w"> </span>map<span class="w"> </span>--no-commit<span class="w"> </span>--image<span class="w"> </span>vhdx-fixed-16M
-<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>scripts/generate-baselines.py<span class="w"> </span>--command<span class="w"> </span>create<span class="w"> </span>--no-commit<span class="w"> </span>--case<span class="w"> </span>16M-fixed
-<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>scripts/detect-profiles.py<span class="w"> </span>--no-commit
-<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>make<span class="w"> </span>validate-profiles
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>scripts/generate-baselines.py<span class="w"> </span>--command<span class="w"> </span>map<span class="w"> </span>--no-commit<span class="w"> </span>--image<span class="w"> </span>vhdx-fixed-16M
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>scripts/generate-baselines.py<span class="w"> </span>--command<span class="w"> </span>create<span class="w"> </span>--no-commit<span class="w"> </span>--case<span class="w"> </span>16M-fixed
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>scripts/detect-profiles.py<span class="w"> </span>--no-commit
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>make<span class="w"> </span>validate-profiles
 </code></pre></div>
 <p><code>make baselines-create</code> and <code>make baselines-map</code> run the unfiltered
 form; neither is part of the umbrella <code>baselines</code> target, because they
@@ -20211,13 +20286,13 @@ build is present that the pin does not list, when 6.0.0, 6.2.0,
 says, and when a VHDX create case gains a second group.</p>
 <p>When instar-testdata gains a qemu build, re-pin every version and
 case (about six minutes at <code>--jobs 2</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>tools/sweep-qemu-create.py<span class="w"> </span>--write<span class="w"> </span>tests/golden/qemu-create-pins.json<span class="w"> </span>--jobs<span class="w"> </span><span class="m">2</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>tools/sweep-qemu-create.py<span class="w"> </span>--write<span class="w"> </span>tests/golden/qemu-create-pins.json<span class="w"> </span>--jobs<span class="w"> </span><span class="m">2</span>
 </code></pre></div>
 <p>To replay a suspected boundary on its own, check a few versions and
 cases against the committed pin; it exits 1 and names each differing
 field:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>tools/sweep-qemu-create.py<span class="w"> </span>--check<span class="w"> </span>tests/golden/qemu-create-pins.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="w">    </span>--versions<span class="w"> </span><span class="m">8</span>.1.5,8.2.0<span class="w"> </span>--cases<span class="w"> </span>vhdx-fixed-64M
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>tools/sweep-qemu-create.py<span class="w"> </span>--check<span class="w"> </span>tests/golden/qemu-create-pins.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="w">    </span>--versions<span class="w"> </span><span class="m">8</span>.1.5,8.2.0<span class="w"> </span>--cases<span class="w"> </span>vhdx-fixed-64M
 </code></pre></div>
 <p>Host load has made qemu commands fail spuriously here before, so
 replay any new boundary before believing it. A new boundary is a
@@ -20287,28 +20362,28 @@ baseline is suspect, diff <code>profiles/</code> against <code>raw/</code> and c
 recorded <code>*_stdout_bytes</code> in each <code>.meta.json</code>, which is what
 <code>detect-profiles.py</code>'s <code>validate_profiles()</code> now does before it will
 commit anything.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="c1"># Set up test environment</span>
-<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>make<span class="w"> </span>test-venv
-<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>
-<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="c1"># Run safe integration tests</span>
-<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>make<span class="w"> </span><span class="nb">test</span>
-<a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a>
-<a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a><span class="c1"># Run tests with verbose output (shows diffs on failure)</span>
-<a id="__codelineno-27-8" name="__codelineno-27-8" href="#__codelineno-27-8"></a>make<span class="w"> </span>test-report
-<a id="__codelineno-27-9" name="__codelineno-27-9" href="#__codelineno-27-9"></a>
-<a id="__codelineno-27-10" name="__codelineno-27-10" href="#__codelineno-27-10"></a><span class="c1"># Run all tests including malicious images (use with caution)</span>
-<a id="__codelineno-27-11" name="__codelineno-27-11" href="#__codelineno-27-11"></a>make<span class="w"> </span>test-malicious
-<a id="__codelineno-27-12" name="__codelineno-27-12" href="#__codelineno-27-12"></a>
-<a id="__codelineno-27-13" name="__codelineno-27-13" href="#__codelineno-27-13"></a><span class="c1"># Run tests inside container (as CI does)</span>
-<a id="__codelineno-27-14" name="__codelineno-27-14" href="#__codelineno-27-14"></a>make<span class="w"> </span>test-container
-<a id="__codelineno-27-15" name="__codelineno-27-15" href="#__codelineno-27-15"></a>
-<a id="__codelineno-27-16" name="__codelineno-27-16" href="#__codelineno-27-16"></a><span class="c1"># CI splits tests into three parallel jobs by format family:</span>
-<a id="__codelineno-27-17" name="__codelineno-27-17" href="#__codelineno-27-17"></a>make<span class="w"> </span>test-container-core<span class="w">              </span><span class="c1"># info, check, security, oslo-crossval</span>
-<a id="__codelineno-27-18" name="__codelineno-27-18" href="#__codelineno-27-18"></a>make<span class="w"> </span>test-container-convert-qcow2<span class="w">    </span><span class="c1"># QCOW2/VMDK/RAW convert + compare</span>
-<a id="__codelineno-27-19" name="__codelineno-27-19" href="#__codelineno-27-19"></a>make<span class="w"> </span>test-container-convert-vhd<span class="w">      </span><span class="c1"># VHD/VHDX convert (slowest)</span>
-<a id="__codelineno-27-20" name="__codelineno-27-20" href="#__codelineno-27-20"></a>
-<a id="__codelineno-27-21" name="__codelineno-27-21" href="#__codelineno-27-21"></a><span class="c1"># Clean test artifacts</span>
-<a id="__codelineno-27-22" name="__codelineno-27-22" href="#__codelineno-27-22"></a>make<span class="w"> </span>clean-tests
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="c1"># Set up test environment</span>
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>make<span class="w"> </span>test-venv
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>
+<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a><span class="c1"># Run safe integration tests</span>
+<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>make<span class="w"> </span><span class="nb">test</span>
+<a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a>
+<a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a><span class="c1"># Run tests with verbose output (shows diffs on failure)</span>
+<a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a>make<span class="w"> </span>test-report
+<a id="__codelineno-28-9" name="__codelineno-28-9" href="#__codelineno-28-9"></a>
+<a id="__codelineno-28-10" name="__codelineno-28-10" href="#__codelineno-28-10"></a><span class="c1"># Run all tests including malicious images (use with caution)</span>
+<a id="__codelineno-28-11" name="__codelineno-28-11" href="#__codelineno-28-11"></a>make<span class="w"> </span>test-malicious
+<a id="__codelineno-28-12" name="__codelineno-28-12" href="#__codelineno-28-12"></a>
+<a id="__codelineno-28-13" name="__codelineno-28-13" href="#__codelineno-28-13"></a><span class="c1"># Run tests inside container (as CI does)</span>
+<a id="__codelineno-28-14" name="__codelineno-28-14" href="#__codelineno-28-14"></a>make<span class="w"> </span>test-container
+<a id="__codelineno-28-15" name="__codelineno-28-15" href="#__codelineno-28-15"></a>
+<a id="__codelineno-28-16" name="__codelineno-28-16" href="#__codelineno-28-16"></a><span class="c1"># CI splits tests into three parallel jobs by format family:</span>
+<a id="__codelineno-28-17" name="__codelineno-28-17" href="#__codelineno-28-17"></a>make<span class="w"> </span>test-container-core<span class="w">              </span><span class="c1"># info, check, security, oslo-crossval</span>
+<a id="__codelineno-28-18" name="__codelineno-28-18" href="#__codelineno-28-18"></a>make<span class="w"> </span>test-container-convert-qcow2<span class="w">    </span><span class="c1"># QCOW2/VMDK/RAW convert + compare</span>
+<a id="__codelineno-28-19" name="__codelineno-28-19" href="#__codelineno-28-19"></a>make<span class="w"> </span>test-container-convert-vhd<span class="w">      </span><span class="c1"># VHD/VHDX convert (slowest)</span>
+<a id="__codelineno-28-20" name="__codelineno-28-20" href="#__codelineno-28-20"></a>
+<a id="__codelineno-28-21" name="__codelineno-28-21" href="#__codelineno-28-21"></a><span class="c1"># Clean test artifacts</span>
+<a id="__codelineno-28-22" name="__codelineno-28-22" href="#__codelineno-28-22"></a>make<span class="w"> </span>clean-tests
 </code></pre></div>
 <p><strong>Test structure:</strong> a guide to the modules a reader is most likely to
 want, not an inventory -- <code>ls tests/test_*.py</code> lists a good many more,
@@ -20428,19 +20503,19 @@ since qemu-img cannot inspect inside LUKS without a secret object.</p>
 <h2 id="testing-prototypes">Testing Prototypes<a class="headerlink" href="#testing-prototypes" title="Permanent link">&para;</a></h2>
 <p>Each prototype has its own devcontainer with the required toolchain. Use the
 Makefile for building and testing:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="c1"># Build a specific prototype</span>
-<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>make<span class="w"> </span>build-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
-<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>
-<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a><span class="c1"># Build the devcontainer for a prototype</span>
-<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>make<span class="w"> </span>build-prototype-devcontainer<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
-<a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a>
-<a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a><span class="c1"># View run instructions</span>
-<a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a>make<span class="w"> </span>run-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="c1"># Build a specific prototype</span>
+<a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>make<span class="w"> </span>build-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
+<a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>
+<a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="c1"># Build the devcontainer for a prototype</span>
+<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a>make<span class="w"> </span>build-prototype-devcontainer<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
+<a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a>
+<a id="__codelineno-29-7" name="__codelineno-29-7" href="#__codelineno-29-7"></a><span class="c1"># View run instructions</span>
+<a id="__codelineno-29-8" name="__codelineno-29-8" href="#__codelineno-29-8"></a>make<span class="w"> </span>run-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
 </code></pre></div>
 <p>For manual testing without the Makefile:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="nb">cd</span><span class="w"> </span>prototypes/&lt;prototype-name&gt;
-<a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>./build.sh<span class="w">                           </span><span class="c1"># Build the prototype</span>
-<a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>sudo<span class="w"> </span>./target/release/vmm<span class="w"> </span>guest.bin<span class="w">  </span><span class="c1"># Run (requires KVM)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="nb">cd</span><span class="w"> </span>prototypes/&lt;prototype-name&gt;
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>./build.sh<span class="w">                           </span><span class="c1"># Build the prototype</span>
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a>sudo<span class="w"> </span>./target/release/vmm<span class="w"> </span>guest.bin<span class="w">  </span><span class="c1"># Run (requires KVM)</span>
 </code></pre></div>
 <h2 id="testing-considerations">Testing Considerations<a class="headerlink" href="#testing-considerations" title="Permanent link">&para;</a></h2>
 <ul>

@@ -14125,6 +14125,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-crate-boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crate boundaries and transcoding out
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -16585,6 +16613,14 @@ qemu-img's:</p>
   agree. (This is about measuring a fixed VHDX as the <em>source</em>; measuring
   one as the <em>target</em>, <code>-O vhdx -o subformat=fixed</code> above, is unaffected by
   <code>block_state_zero</code>.)
+- <strong>VMDK descriptor sources are refused</strong>: a source whose VMDK is a text
+  descriptor — <code>monolithicFlat</code>, or either <code>twoGbMaxExtent</code> subformat —
+  is refused in a host-side pre-check before the guest starts, with
+  <code>measure: VMDK descriptor source images are not yet supported (use
+  convert -f / qemu-img instead)</code>. <code>qemu-img measure</code> reads these images,
+  so it is the workaround. The refusal is policy rather than inability:
+  <code>info</code>, <code>check</code>, <code>compare</code> and <code>convert</code> read the same images. See
+  <a href="/components/instar/quirks/#vmdk-multi-extent-sources-are-refused">quirks.md</a>.
 - <strong>VMDK multi-extent source layouts</strong>: instar's extent map propagation
   differs from qemu-img for some non-trivial layouts.
 - <strong>VHD legacy CHS-only sources</strong>: instar's reported virtual_size differs

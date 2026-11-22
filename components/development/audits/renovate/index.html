@@ -14094,6 +14094,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-crate-boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crate boundaries and transcoding out
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -16354,22 +16382,23 @@ copy of <code>renovate.yml</code> in each repository, running Renovate over that
 repository alone. The fleet is moving to a single workflow that runs
 Renovate over every repository from one place, and that workflow is
 already in this repository as <code>.github/workflows/renovate-fleet.yml</code>.
-It has no schedule yet, and runs only when it is dispatched by hand,
-with a Renovate <code>dryRun</code> mode and an autodiscover filter as inputs, so
-a pass can be read-only or confined to one repository. A schedule here
-while every repository still runs its own hourly copy would have two
-Renovate instances working the same repository, racing on branch
-creation to produce duplicate or half-written pull requests, and the
-runner's concurrency group cannot prevent that because the two runs
-are different workflows in different repositories. Turning the
-schedule on is therefore a step of the cutover rather than part of
-adding the workflow. It will be hourly at minute 23 rather than on the
-hour, because GitHub delays and sometimes drops scheduled events at
-the top of the hour and a dropped run here would delay every
-repository at once. It installs Renovate from npm in a step that holds no
-secret, exactly as the template does, for the reasons given under
+It runs hourly at minute 23, and can also be dispatched by hand with a
+Renovate <code>dryRun</code> mode and an autodiscover filter as inputs, so a pass
+can be read-only or confined to one repository. Minute 23 rather than
+the hour, because GitHub delays and sometimes drops scheduled events
+at the top of the hour and a dropped run here would delay every
+repository at once. It installs Renovate from npm in a step that holds
+no secret, exactly as the template does, for the reasons given under
 <a href="#renovate-without-docker">Renovate without Docker</a> and in the
 template README.</p>
+<p>The schedule was deliberately the last step of the cutover rather than
+part of adding the workflow. A schedule here while every repository
+still ran its own hourly copy would have had two Renovate instances
+working the same repository, racing on branch creation to produce
+duplicate or half-written pull requests, and the runner's concurrency
+group cannot prevent that because the two runs are different workflows
+in different repositories. Every per-repository copy is disabled now,
+so re-enabling one while this schedule is on reintroduces that race.</p>
 <p>Its global configuration is <code>renovate-runner.json</code> at the root of this
 repository. That file decides two things. Which repositories are
 discovered: autodiscovery over <code>shakenfist/*</code>, with <code>requireConfig</code>
@@ -16522,6 +16551,16 @@ repository still runs its own hourly Renovate, which reads
 rule has to lose the <code>templates/renovate/renovate.yml</code> path or the
 pins in the template stop being maintained -- the template outlives
 the deployed copies the rest of the rule is there for.</p>
+<p>One reference in those two files is not pinned, by a second local
+rule in this repository's <code>renovate.json</code>: <code>dtolnay/rust-toolchain</code>
+stays on <code>@stable</code>. That action takes its <code>toolchain</code> input's default
+from the ref name, so a sha needs a <code>with: toolchain: stable</code> block
+that Renovate will not write, and that block in the template would
+make every fleet copy of <code>renovate.yml</code> drift from it under this
+criterion. The fleet runner's own workflow is pinned, with the input
+given. The rule goes when the two files do, and
+<code>scripts/tests/test_packaging_renovate.py</code> fails while either
+reference is pinned or either file is gone.</p>
 <p>The fleet's own actions are the exception, carried as a <code>packageRules</code>
 entry. <code>shakenfist/**</code> references are not pinned: every repository
 consumes them at <code>@main</code> on purpose, so that a fix to a shared
@@ -16531,7 +16570,8 @@ requiring review instead of by a sha. The exception names both the
 <code>action</code> and <code>workflow</code> dep types, because Renovate calls a job-level
 reusable workflow a <code>workflow</code> while every other <code>uses:</code> reference is
 an <code>action</code>. Both names, and the helper's own definition, are read
-from Renovate's source at the version this fleet runs, 44.227.4:
+from Renovate's source at 44.227.4, and re-read unchanged at
+44.251.0:
 the helper is the <code>pinGitHubActionDigests</code> entry in
 <a href="https://github.com/renovatebot/renovate/blob/83794a8993ff455b106ddf1e23ce4deca3f5277d/lib/config/presets/internal/helpers.preset.ts#L118-L126"><code>lib/config/presets/internal/helpers.preset.ts</code></a>,
 and the dep type a reference is given is chosen by
@@ -16539,7 +16579,7 @@ and the dep type a reference is given is chosen by
 <a href="https://github.com/renovatebot/renovate/blob/83794a8993ff455b106ddf1e23ce4deca3f5277d/lib/modules/manager/github-actions/extract.ts#L78-L111"><code>lib/modules/manager/github-actions/extract.ts</code></a>,
 which says <code>workflow</code> when the reference's sub-path matches
 <code>reusableWorkflowPathRe</code> and <code>action</code> otherwise. Both links are pinned
-to the commit that release was tagged from.</p>
+to the commit 44.227.4 was tagged from.</p>
 <p>The preset sets no <code>vulnerabilityAlerts</code>: Renovate's defaults
 already drop the schedule, <code>minimumReleaseAge</code> and grouping for a
 security fix, so a fix for a vulnerability Dependabot reports arrives

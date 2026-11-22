@@ -14078,6 +14078,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-crate-boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crate boundaries and transcoding out
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -16613,6 +16641,20 @@ measurements settle much of 4 and 5.</p>
    stays recorded here so a later reader knows it was weighed and why
    it lost, not to leave the decision open. Phase 8 owns the lifecycle
    cost this choice accepts.</p>
+<p><strong>Amended 2026-11-19, for the read path only.</strong> Phase 3's survey
+   found that this architecture has no guest-to-host request channel:
+   the host writes <code>CHAIN_CONFIG_ADDR</code> before the guest starts and the
+   guest does I/O through virtio, so rotation would have to invent a
+   channel for the guest to say "bind extent k" and block until it was
+   done. Reads do not need one, because a virtio request already
+   carries the offset the guest wants: the host concatenates a
+   descriptor's extents behind one device and publishes an extent table
+   in <code>ChainConfig</code> so the guest can still parse each sparse extent's
+   own header. Phase 3 therefore does not rehearse a rotation
+   mechanism, which was one of the reasons given above for doing the
+   read side first. Whether the write path can also route host-side
+   instead of rotating is left open for phases 6 to 8; this amendment
+   does not decide it.</p>
 <ol>
 <li><strong>Does lifting the read-side ceiling belong in this plan?</strong>
    <em>Recommendation: yes.</em> It is the same mechanism and the same
@@ -16823,13 +16865,13 @@ cannot corrupt an output, before the write path depends on it.</p>
 <tr>
 <td>2. Fixtures and baselines</td>
 <td><a href="/components/instar/plans/PLAN-multi-extent-vmdk-phase-02-fixtures/">PLAN-multi-extent-vmdk-phase-02-fixtures.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>2e8a3022</td>
 </tr>
 <tr>
 <td>3. Read side: lift the extent ceiling</td>
-<td>PLAN-multi-extent-vmdk-phase-03-read-ceiling.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-multi-extent-vmdk-phase-03-read-ceiling/">PLAN-multi-extent-vmdk-phase-03-read-ceiling.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -16987,10 +17029,19 @@ order, and the version gate the array bypassed -- were first deferred
 to this phase and then pulled back into phase 2 by the operator,
 together with the
 single-file substitution in <code>tests/helpers/comparators.py</code> that masked
-the first of them. So this phase inherits a VMM that already sums
-extent allocations. This is where rotation
-is designed and proved; a mistake here fails a read, not an image.
-Includes the guard at <code>src/vmm/src/main.rs:15088</code> and its siblings, and
+the first of them. So this phase inherits a VMM that sums extent
+allocations on the non-chain <code>info</code> paths only: phase 3's survey found
+the chain walk still reporting the descriptor's own apparent length at
+<code>src/vmm/src/main.rs:3809</code>, filed as
+<a href="https://github.com/shakenfist/instar/issues/927">#927</a> and pulled into
+phase 3. That survey also replaced this paragraph's mechanism: the read
+path concatenates a descriptor's extents into one device host-side and
+hands the guest an extent table, rather than rotating a device slot,
+because there is no guest-to-host request channel for a rebind to use
+(open question 1 records the change). A mistake here fails a read, not
+an image. Includes the four over-deep-chain guards at
+<code>src/vmm/src/main.rs:6719</code>, <code>:13573</code>, <code>:14405</code> and <code>:15462</code> -- the
+<code>:15088</code> this section used to cite is now sector-size validation -- and
 <code>DeviceSet::add_device</code>'s panic, which should become unreachable by
 construction rather than by a caller remembering to check.</p>
 <p><strong>4. Multi-extent descriptor emitter.</strong> One <code>no_std</code>, panic-free
@@ -17198,20 +17249,39 @@ Status line above.</p>
   concatenated text of several, which <code>info --chain</code> human output would
   be. No baseline comparison feeds it such text today, so this is latent
   rather than live.</li>
-<li>The read-side device-slot ceiling still needs an issue filed before
-  phase 3 starts: a split image with more extents than <code>MAX_CHAIN_DEPTH</code>
-  (16) device slots cannot be presented to the guest as one device per
-  extent.</li>
+<li>A VMDK descriptor's extents are capped at <code>MAX_CHAIN_EXTENTS</code> (64,
+  set by phase 3), which is 128 GiB at qemu's 2 GiB default. qemu has no
+  equivalent limit. The bound is the 4096-byte config page: <code>ChainConfig</code>
+  sits at <code>CHAIN_CONFIG_ADDR</code> and <code>VMM_PARAMS_ADDR</code> begins one page
+  later, so lifting it means moving the config region rather than
+  changing a constant.</li>
+<li>An extent line with a non-zero start offset is refused
+  (<code>src/vmm/src/chain.rs:967</code>). qemu's split subformats give each extent
+  its own file at offset 0, so nothing this plan writes or reads needs
+  it; a monolithic multi-extent descriptor that packs extents into one
+  file at offsets would still be refused.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<p>Filled in as the plan runs. The read-side ceiling measured in the
-Situation still needs its issue; it is recorded under Future work above.</p>
+<p>Filled in as the plan runs.</p>
 <ul>
-<li><a href="https://github.com/shakenfist/instar/issues/922">#922</a>, <code>info</code>
+<li>
+<p><a href="https://github.com/shakenfist/instar/issues/934">#934</a>, a VMDK with
+  more extents than the 16 device slots cannot be read -- the read-side
+  ceiling measured in the Situation, filed when phase 3 was planned.
+  Phase 3 fixes it by making a descriptor's extents cost one slot
+  between them instead of one each. The issue also records a trap for
+  whoever changes the slot count: the virtqueue-region assert at
+  <code>src/shared/src/lib.rs:664</code> hard-codes its own <code>16</code> rather than
+  deriving it from <code>MAX_CHAIN_DEVICES</code>, so raising the constant does not
+  trip it.</p>
+</li>
+<li>
+<p><a href="https://github.com/shakenfist/instar/issues/922">#922</a>, <code>info</code>
   reports the wrong allocation and child order for a multi-file VMDK.
   Three divergences, all on a VMDK whose descriptor resolves to
   separate extent files, <code>monolithicFlat</code> as much as the
-  <code>twoGbMaxExtent*</code> split subformats:</li>
+  <code>twoGbMaxExtent*</code> split subformats:</p>
+</li>
 <li>The top-level allocation figure was the descriptor's own block count
     alone, where qemu-img reports the sum over the descriptor and every
     extent; <code>vmdk-multi-flat</code> read 4096 bytes against qemu's 1576960.</li>

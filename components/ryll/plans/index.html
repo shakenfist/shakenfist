@@ -14000,6 +14000,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-crate-boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crate boundaries and transcoding out
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -16428,6 +16456,13 @@ from archiving a completed phase plan.</p>
 <td>Publish ryll as a one-click Kasm workspace: a release job pushing the Kasm image to GHCR, a Shaken Fist workspace registry from Kasm's template, and a ryll entry in it. Parked until the hand-registered workspace has seen real use or someone else wants it</td>
 <td>Proposed</td>
 <td>(phases not yet written; the last of them is a push audit)</td>
+</tr>
+<tr>
+<td>2026-11-21</td>
+<td><a href="/components/ryll/plans/PLAN-crate-boundaries/">Crate boundaries and transcoding out</a></td>
+<td>Settle where the web and RDP transcodes belong and whether the <code>shakenfist-spice-*</code> crates should leave ryll. Records the single-session-frontend versus multi-tenant-gateway distinction and the trigger for ever extracting a crate, stops <code>shakenfist-spice-rdp</code>'s IronRDP 1.89 MSRV leaking onto every published crate, gives <code>--web</code> the library crate <code>--rdp</code> already has so a proxy-side web gateway is glue rather than a second implementation, moves andris and Kerbside off git <code>rev</code> pins on ryll <code>develop</code> onto published versions, and gives Kerbside a current statement of direction for serving both web and RDP out of the proxy while ryll keeps its own modes</td>
+<td>Not started</td>
+<td>1. Decision record, 2. MSRV de-leak, 3. Web frontend crate, 4. Release and downstream pins, 5. Kerbside transcoding-out direction, 6. Push audit (phase plans pending)</td>
 </tr>
 </tbody>
 </table>

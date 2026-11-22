@@ -13930,6 +13930,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-crate-boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crate boundaries and transcoding out
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -16138,7 +16166,7 @@ the phase arithmetic and the summary of what happened live in the plan.</p>
 <tr>
 <td>2026-10-02</td>
 <td><a href="/components/development/plans/PLAN-workflow-ref-trust/">Workflow ref trust</a></td>
-<td>Answer #153 with a settled fleet policy on which workflow references may move: finish the <code>secrets: inherit</code> rollout, require a pull request and CI on shakenfist/actions main rather than sha-pinning first-party refs, pin third-party actions to a sha under Renovate and a new criterion, and replace copied workflow templates with callers of shared workflows. Phase 1 (complete) removed every live inherit across eleven repositories and closed 13 issues, with one check deferred because the post-merge <code>pr-fix-tests</code> trigger has never fired. Phase 2 (complete) added the pull-request rule, the four required checks and the review-marks App bypass to <code>actions</code>' one ruleset by hand, and the <code>moving-ref-source-protection</code> criterion so that it cannot regress; a direct push to that branch from the operator's own credential is now refused, and the one reading it could not take -- that the App is the actor of a review-mark push -- is deferred because no prune run has yet had a mark to push. Phase 3 pins third-party actions, and its probe now lands in the shared Renovate preset that PLAN-renovate-cadence phase 1 published rather than in this repository's own config, which collapses its first two steps into one; its criterion step waits on that plan's fleet sweep. #153 itself closed with phase 1, ahead of the policy write-up phase 4 owes it</td>
+<td>Answer #153 with a settled fleet policy on which workflow references may move: finish the <code>secrets: inherit</code> rollout, require a pull request and CI on shakenfist/actions main rather than sha-pinning first-party refs, pin third-party actions to a sha under Renovate and a new criterion, and replace copied workflow templates with callers of shared workflows. Phase 1 (complete) removed every live inherit across eleven repositories and closed 13 issues, with one check deferred because the post-merge <code>pr-fix-tests</code> trigger has never fired. Phase 2 (complete) added the pull-request rule, the four required checks and the review-marks App bypass to <code>actions</code>' one ruleset by hand, and the <code>moving-ref-source-protection</code> criterion so that it cannot regress; a direct push to that branch from the operator's own credential is now refused, and the one reading it could not take -- that the App is the actor of a review-mark push -- is deferred because no prune run has yet had a mark to push. Phase 3 put <code>helpers:pinGitHubActionDigests</code> in the shared Renovate preset, fenced off the fleet's own <code>shakenfist/actions@main</code> references, and had the pin pull request (#407) pin 52 of this repository's 54 third-party references. The last two, <code>dtolnay/rust-toolchain@stable</code> in the per-repository Renovate workflow and its template, were deliberately left unpinned, because the <code>with:</code> block a pin needs would have made 16 fleet copies drift and PLAN-renovate-cadence deletes both files. Phase 4, the <code>third-party-action-pinning</code> criterion and the two-window volume count, was split out of phase 3 on 2026-11-21 and waits for that plan's fleet sweep plus two weeks; the later phases were renumbered 5 to 7. #153 itself closed with phase 1, ahead of the policy write-up phase 5 owes it</td>
 <td>In progress</td>
 </tr>
 <tr>

@@ -13978,6 +13978,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-crate-boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crate boundaries and transcoding out
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -16335,7 +16363,7 @@ maintained document, so it may state things a later phase overturned.</p>
 <td><a href="/components/instar/plans/PLAN-multi-extent-vmdk/">Multi-extent VMDK output: twoGbMaxExtentSparse and twoGbMaxExtentFlat</a></td>
 <td>Write VMDK images split across many extent files, matching qemu-img, at any virtual size qemu-img supports, and lift the device-slot ceiling that caps multi-extent <em>reads</em> at 15 extents (about 30 GiB) today. The goals graph calls the prerequisite a multi-output-device call table; measurement says simultaneous output devices cannot reach parity (16 slots, 2 GiB per extent) and would roughly double the virtio statics in the core <code>.bss</code> region that has twice forced <code>OPERATION_LOAD_ADDR</code> to move, so open question 1 proposes sequential extent rotation instead. Closes the last leaf of the 2026 <em>VHD/VMDK writers done</em> goal</td>
 <td>In progress</td>
-<td><a href="/components/instar/plans/PLAN-multi-extent-vmdk-phase-01-pin/">1: pin</a> ✓, <a href="/components/instar/plans/PLAN-multi-extent-vmdk-phase-02-fixtures/">2: fixtures</a>, 3: read ceiling, 4: descriptor, 5: flat create, 6: ABI, 7: core, 8: VMM, 9: grain tables, 10: sparse create, 11: convert, 12: measure, 13: check/resize, 14: baselines, 15: integration, 16: fuzz, 17: docs, 18: push audit (open questions 1 and 2 resolved 2026-11-16 -- sequential extent rotation, and the read-side ceiling fixed here as phase 3; phase 1 extends the existing 80-build qemu sweep rather than starting one, which is what its survey corrected in the master plan; phase 2 stores only split-sparse fixtures, because a split-flat extent is a full-length sparse file and git-LFS stores holes as bytes, and found a 26-extent real-world split-sparse image already in the corpus with 3.96 GiB extents, and fixed three shipping <code>info</code> divergences on multi-file VMDK -- the allocation sum, the child order and the version gate the children array bypassed -- which no fixture could expose until <code>vmdk-multi-flat</code> was un-flagged and given baselines)</td>
+<td><a href="/components/instar/plans/PLAN-multi-extent-vmdk-phase-01-pin/">1: pin</a> ✓, <a href="/components/instar/plans/PLAN-multi-extent-vmdk-phase-02-fixtures/">2: fixtures</a> ✓, <a href="/components/instar/plans/PLAN-multi-extent-vmdk-phase-03-read-ceiling/">3: read ceiling</a>, 4: descriptor, 5: flat create, 6: ABI, 7: core, 8: VMM, 9: grain tables, 10: sparse create, 11: convert, 12: measure, 13: check/resize, 14: baselines, 15: integration, 16: fuzz, 17: docs, 18: push audit (open questions 1 and 2 resolved 2026-11-16 -- sequential extent rotation, and the read-side ceiling fixed here as phase 3; phase 1 extends the existing 80-build qemu sweep rather than starting one, which is what its survey corrected in the master plan; phase 2 stores only split-sparse fixtures, because a split-flat extent is a full-length sparse file and git-LFS stores holes as bytes, and found a 26-extent real-world split-sparse image already in the corpus with 3.96 GiB extents, and fixed three shipping <code>info</code> divergences on multi-file VMDK -- the allocation sum, the child order and the version gate the children array bypassed -- which no fixture could expose until <code>vmdk-multi-flat</code> was un-flagged and given baselines; phase 3 changed the read-side mechanism after its survey found this architecture has no guest-to-host request channel for a device-slot rebind to use, so a descriptor's extents are concatenated behind one device host-side with an extent table published to the guest, which also means the 16-slot ceiling stops applying to extents rather than being raised -- the ceiling itself is now filed as #934, and its trap is that the virtqueue assert hard-codes its own 16)</td>
 </tr>
 <tr>
 <td>2026-11-18</td>

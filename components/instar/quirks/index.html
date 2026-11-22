@@ -6195,6 +6195,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#vmdk-extents-instar-refuses-and-qemu-img-reads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VMDK extents instar refuses and qemu-img reads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#qcow2-v3-standard-l2-qcow_oflag_zero-honoured-fixed" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -18019,6 +18030,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-crate-boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crate boundaries and transcoding out
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -21179,6 +21218,17 @@
     <span class="md-ellipsis">
       
         VMDK multi-extent sources are refused
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vmdk-extents-instar-refuses-and-qemu-img-reads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VMDK extents instar refuses and qemu-img reads
       
     </span>
   </a>
@@ -25271,13 +25321,74 @@ for the second), for <code>json</code> only: <code>qemu-img map</code> without
 <code>--output=json</code> exits non-zero on these files ("File contains
 external, encrypted or compressed clusters").</p>
 <h3 id="vmdk-multi-extent-sources-are-refused">VMDK multi-extent sources are refused<a class="headerlink" href="#vmdk-multi-extent-sources-are-refused" title="Permanent link">&para;</a></h3>
-<p><code>qemu-img map</code> reads the VMDK descriptor and walks the
-multi-extent layout. instar's <code>VmdkState::init</code> only parses
-the VMDK4 binary header, so descriptor-driven (multi-extent
-monolithicFlat / 2GbMaxExtent…) sources fail init. The
-host CLI also refuses them via <code>peek_is_vmdk_descriptor</code>
-before launching the guest, pointing the user at <code>qemu-img
-map</code> as the workaround.</p>
+<p><strong>This applies to <code>map</code> and <code>measure</code> only.</strong> <code>qemu-img map</code>
+reads the VMDK descriptor and walks the multi-extent layout.
+instar's <code>map</code> and <code>measure</code> refuse a descriptor-driven source
+(monolithicFlat or either <code>twoGbMaxExtent</code> subformat) in a
+host-side pre-check, <code>peek_is_vmdk_descriptor</code>, before launching
+the guest, pointing the user at <code>qemu-img</code> as the workaround. The
+refusal is policy, not inability: the guest reads a descriptor
+through the chain config's extent table for the commands that do
+support it, and what these two would need is the walk each of them
+uses instead -- <code>map</code>'s allocation walk and <code>measure</code>'s source
+scanner -- neither of which has been taught that table. The
+message names the descriptor rather than a subformat, because
+every descriptor-driven source is refused. Other commands do read
+these images:
+<code>info</code>, <code>check</code>, <code>compare</code> and <code>convert</code> attach the descriptor
+and its extents as one device and read through the extent table
+in the chain config.</p>
+<h3 id="vmdk-extents-instar-refuses-and-qemu-img-reads">VMDK extents instar refuses and qemu-img reads<a class="headerlink" href="#vmdk-extents-instar-refuses-and-qemu-img-reads" title="Permanent link">&para;</a></h3>
+<p><strong>Divergence.</strong> The commands that do read a descriptor --
+<code>info</code>, <code>check</code>, <code>compare</code> and <code>convert</code> -- refuse five shapes of
+extent that <code>qemu-img</code> opens. Each is a refusal on a well-formed
+image rather than a parse failure, so the whole image is refused,
+not the extent. Three are caught on the host as the descriptor
+resolves, and name the descriptor, the extent's index and the
+bound:</p>
+<ul>
+<li><strong>A kind other than <code>FLAT</code> or <code>SPARSE</code>.</strong> <code>ZERO</code>, <code>VMFS</code> and
+  <code>VMFSSPARSE</code> are refused with "extent <em>N</em> has kind <em>K</em>; only
+  FLAT and SPARSE extents are supported". <code>FLAT</code> and <code>SPARSE</code> are
+  the kinds the chain config's extent table can describe: <code>ZERO</code>
+  has no file to attach, and the VMFS kinds name a layout on a
+  VMware filesystem rather than a file.</li>
+<li><strong>A non-zero start offset.</strong> An extent line whose optional
+  trailing sector offset is not 0 is refused with "extent <em>N</em> has
+  non-zero offset (<em>S</em> sectors); only offset-0 extents are
+  supported". qemu-img reads the extent from that offset inside
+  the file.</li>
+<li><strong>More than 64 extents.</strong> A descriptor declaring more extents
+  than <code>MAX_CHAIN_EXTENTS</code> is refused with "declares more than
+  the 64 extents a descriptor may have". The bound is instar's
+  own -- it is the size of the extent table the guest reads --
+  and qemu-img has none. It is not the sixteen-device-slot ceiling
+  of #934, which no longer applies to extents at all: a
+  descriptor's extents share its one device.</li>
+</ul>
+<p>The other two are caught in the guest as the extent's own header
+is read, so the operation fails rather than printing a message
+about the extent:</p>
+<ul>
+<li><strong>A compressed sparse extent</strong>, one whose header carries
+  <code>FLAG_COMPRESSED</code>. qemu-img decompresses these; instar's
+  descriptor reader does not reach its compressed-grain path from
+  an extent.</li>
+<li><strong>A sparse extent whose header capacity is not the span the
+  descriptor line declares.</strong> qemu takes the span from the
+  extent's own header and ignores the descriptor line; the host
+  has only the line, and writes it into the extent table. Where
+  the two differ every later extent sits at a different virtual
+  offset for qemu than in instar's table, so the image is refused
+  rather than read in a layout qemu does not see. qemu writes the
+  same number in both places when it creates a split image, so
+  this never fires on a qemu-created one.</li>
+</ul>
+<p>A sparse extent whose header cannot be read, carries no VMDK4
+magic, or declares a zero grain size is refused the same way;
+<code>info</code> reports no cluster size for it rather than guessing, which
+is as close as a description of the descriptor can come to
+qemu-img's refusal to open the image at all.</p>
 <h3 id="qcow2-v3-standard-l2-qcow_oflag_zero-honoured-fixed">qcow2 v3 standard-L2 <code>QCOW_OFLAG_ZERO</code> honoured (fixed)<a class="headerlink" href="#qcow2-v3-standard-l2-qcow_oflag_zero-honoured-fixed" title="Permanent link">&para;</a></h3>
 <p><strong>No divergence from qemu-img.</strong> In qcow2 v3 (compat=1.1) images that
 use <em>standard</em> L2 tables (8-byte entries, not extended L2), the

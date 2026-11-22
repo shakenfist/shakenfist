@@ -14576,6 +14576,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-crate-boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crate boundaries and transcoding out
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -17403,7 +17431,7 @@ required reviewer and restrict it to <code>v*</code> tags. Whether anyone did
 is invisible to the audit: no criterion reads <code>environments</code> or
 <code>deployment-branch-policies</code> (the only planned readers are
 <code>bypass-actor-identity</code> in <code>PLAN-bot-bypass-identity.md:639</code> and
-<code>moving-ref-source-protection</code> in <code>PLAN-workflow-ref-trust.md:519</code>,
+<code>moving-ref-source-protection</code> in <code>PLAN-workflow-ref-trust.md</code>'s phase 2,
 neither started). On the morning of this plan:</p>
 <table>
 <thead>
@@ -17660,9 +17688,10 @@ Nothing records whether that is enough to read an environment or its
 deployment policies. <code>PLAN-bot-bypass-identity.md</code> step 3c assumes it
 can and names <code>AUDIT_TOKEN</code> while doing so, which is the wrong token
 since #278 moved <code>AUDIT_TOKEN</code> into the <code>audit-write</code> environment.</p>
-<p><strong>Relation to other plans.</strong> <code>PLAN-workflow-ref-trust.md</code> phase 5
-(:564-615, not started) may turn copied templates into callers of
-shared workflows. It never names <code>release.yml</code>; step 5a classifies
+<p><strong>Relation to other plans.</strong> <code>PLAN-workflow-ref-trust.md</code> phase 6
+("shared workflows instead of copied templates", not started) may
+turn copied templates into callers of shared workflows. It never
+names <code>release.yml</code>; step 6a classifies
 "every template directory under <code>templates/</code>", so the release
 template is in scope only by implication. <code>PLAN-typescript-onboarding.md</code>
 met the unprotected-environment problem in hunkydory as HD-1
@@ -17701,9 +17730,9 @@ stop depending on someone remembering <code>RELEASE-SETUP.md</code>:</p>
   unable to reach PyPI, which is the half of the problem that is
   ours.</li>
 <li><strong>Turning <code>release.yml</code> into a shared workflow.</strong> That is
-  <code>PLAN-workflow-ref-trust.md</code> phase 5's decision to make. This plan
+  <code>PLAN-workflow-ref-trust.md</code> phase 6's decision to make. This plan
   puts the new logic in shared composite actions, so whichever way
-  phase 5 goes, the logic exists once.</li>
+  phase 6 goes, the logic exists once.</li>
 <li><strong>sdist contents.</strong> An sdist carrying its tests is conventional
   and harmless, and <code>release-artifacts-exclude-plans</code> already guards
   the one thing in it that should not ship.</li>
@@ -18815,7 +18844,7 @@ to its <code>release.yml</code>, never by copying the template over it:</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>In this repository, on this phase's branch. In <code>templates/release-automation/release.yml</code>, add the <code>ci-gate</code> job from Common edits above, with <code>workflows:</code> set to a <code>{{CI_WORKFLOWS}}</code> placeholder. Make <code>build</code> need it under the guard given there, with a comment explaining the guard: a skipped gate may only accompany a run that publishes nothing. The <code>${{ }}</code> wrapper is required, because YAML reads a bare value starting with <code>!</code> as a tag. Add a <code>check-dist</code> step after <code>twine check</code>. In <code>templates/release-automation/README.md</code>: add the placeholder row; add a section on the gate covering what counts as CI, the review-mark walk and why there is no override (link <code>shakenfist/actions</code>' <code>docs/actions.md</code>, do not restate it); add the recovery table from decision 3.6; and add prerequisites for gated CI. Those prerequisites are: CI runs on <code>push</code> to the default branch with a <code>branches:</code> filter, or on <code>merge_group</code>; a concurrency group never cancels a push run, keyed as decision 3.1 says; no named workflow may conclude <code>skipped</code> on the event that counts; and <code>paths-ignore</code> means a tag on a skipped commit fails. State that a converted template must still run <code>ci-gate</code> upstream of <code>build</code>; the cross-reference to <code>PLAN-workflow-ref-trust.md</code> phase 5 stays in this plan. Update <code>templates/release-automation/RELEASE-SETUP.md</code> to say the reviewer approves a release whose CI the gate has already checked, and to name the <code>release-environment-protection</code> criterion. Do not cite plan phases or decision numbers in the template or its docs. Run <code>pre-commit run --all-files</code>, which runs actionlint over the template.</td>
+<td>In this repository, on this phase's branch. In <code>templates/release-automation/release.yml</code>, add the <code>ci-gate</code> job from Common edits above, with <code>workflows:</code> set to a <code>{{CI_WORKFLOWS}}</code> placeholder. Make <code>build</code> need it under the guard given there, with a comment explaining the guard: a skipped gate may only accompany a run that publishes nothing. The <code>${{ }}</code> wrapper is required, because YAML reads a bare value starting with <code>!</code> as a tag. Add a <code>check-dist</code> step after <code>twine check</code>. In <code>templates/release-automation/README.md</code>: add the placeholder row; add a section on the gate covering what counts as CI, the review-mark walk and why there is no override (link <code>shakenfist/actions</code>' <code>docs/actions.md</code>, do not restate it); add the recovery table from decision 3.6; and add prerequisites for gated CI. Those prerequisites are: CI runs on <code>push</code> to the default branch with a <code>branches:</code> filter, or on <code>merge_group</code>; a concurrency group never cancels a push run, keyed as decision 3.1 says; no named workflow may conclude <code>skipped</code> on the event that counts; and <code>paths-ignore</code> means a tag on a skipped commit fails. State that a converted template must still run <code>ci-gate</code> upstream of <code>build</code>; the cross-reference to <code>PLAN-workflow-ref-trust.md</code> phase 6 stays in this plan. Update <code>templates/release-automation/RELEASE-SETUP.md</code> to say the reviewer approves a release whose CI the gate has already checked, and to name the <code>release-environment-protection</code> criterion. Do not cite plan phases or decision numbers in the template or its docs. Run <code>pre-commit run --all-files</code>, which runs actionlint over the template.</td>
 </tr>
 <tr>
 <td>3b</td>
@@ -20892,7 +20921,7 @@ chosen to defer to here, so that we do not forget them.</p>
   environments in the called workflow. <code>release-environment-protection</code>
   reads only <code>release.yml</code>, so it would report that no environment is
   named. That is the closed direction, but the message is wrong. If
-  <code>PLAN-workflow-ref-trust.md</code> phase 5 converts the template into that
+  <code>PLAN-workflow-ref-trust.md</code> phase 6 converts the template into that
   shape, the criterion must follow the <code>uses:</code> reference, in the same
   change that carries the <code>ci-gate</code> job.</li>
 <li><strong><code>check-dist</code> is tested only by its unit tests</strong> in

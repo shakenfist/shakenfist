@@ -14053,6 +14053,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-crate-boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crate boundaries and transcoding out
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -16290,11 +16318,13 @@ See
 <a href="/components/instar/qcow2/qcow2-refcount/#repairing-refcount-inconsistencies">qcow2/qcow2-refcount.md</a>.</p>
 <h2 id="vmdk-validation">VMDK validation<a class="headerlink" href="#vmdk-validation" title="Permanent link">&para;</a></h2>
 <p>For VMDK images (monolithicSparse, streamOptimized, and
-monolithicFlat — including multi-extent twoGbMaxExtentFlat
-and flat-in-backing-chain via parentFileNameHint), check validates:</p>
+monolithicFlat — including the multi-extent twoGbMaxExtentFlat
+and twoGbMaxExtentSparse subformats, and flat-in-backing-chain
+via parentFileNameHint), check validates:</p>
 <ul>
 <li>Full header parsing (version, capacity, grain size, flags, compression)</li>
-<li>Descriptor bounds and multi-extent detection (graceful rejection)</li>
+<li>Descriptor bounds and multi-extent layout (at most 64 extents per
+  descriptor; a larger one is refused)</li>
 <li>Grain directory offset within file bounds</li>
 <li>Full grain directory and grain table walk</li>
 <li>Grain data offsets within file bounds</li>

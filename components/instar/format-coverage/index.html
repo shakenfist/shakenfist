@@ -14586,6 +14586,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-crate-boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crate boundaries and transcoding out
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -18124,17 +18152,17 @@ above.</p>
 <tr>
 <td>vmdk (monolithicFlat)</td>
 <td>Supported</td>
-<td>Two-file descriptor + raw flat extent; descriptor is parsed host-side for extent discovery and allowlist validation, flat extent is opened as a second virtio-block device and reads are redirected via <code>ChainConfig.data_device_idx</code>. Descriptors with <code>parentFileNameHint</code> are followed as a backing chain.</td>
+<td>Two-file descriptor + raw flat extent; descriptor is parsed host-side for extent discovery and allowlist validation, and the descriptor and its flat extent are attached as one virtio-block device whose extent table tells the guest where the extent begins. Descriptors with <code>parentFileNameHint</code> are followed as a backing chain.</td>
 </tr>
 <tr>
 <td>vmdk (twoGbMaxExtentFlat)</td>
 <td>Supported</td>
-<td>Multi-extent flat descriptors with multiple flat extent files; each extent is opened as a separate virtio-block device with reads dispatched by offset.</td>
+<td>Multi-extent flat descriptors with multiple flat extent files. The descriptor and all its extents are attached as one virtio-block device, with the extent boundaries carried in the chain config's extent table; reads are dispatched to the extent covering the offset. A descriptor may name at most 64 extents (<code>MAX_CHAIN_EXTENTS</code>); that bound is instar's own, qemu-img has none, and a larger descriptor is refused with a message naming it. See <a href="/components/instar/chain-config/">chain-config.md</a>.</td>
 </tr>
 <tr>
 <td>vmdk (twoGbMaxExtentSparse)</td>
-<td>Not supported</td>
-<td>Multi-extent descriptors whose extents are themselves sparse VMDKs. Host-side descriptor resolution accepts FLAT extents only, so <code>instar info</code> fails with "only FLAT extents are supported". Unlike the flat case, each extent carries its own sparse header and grain directory, so extents cannot simply be mapped as raw byte ranges. Real-world fixture <code>osboxes-vmdk-split-sparse</code> (26 extents) is registered with baselines captured, and is marked <code>instar_unsupported</code> in <code>tests/manifest.json</code> so parity tests skip until support lands.</td>
+<td>Supported for <code>info</code>, <code>check</code>, <code>compare</code> and <code>convert</code>; <code>map</code> and <code>measure</code> refuse</td>
+<td>Multi-extent descriptors whose extents are themselves sparse VMDKs, attached the same way as <code>twoGbMaxExtentFlat</code> (one device, extents named by the chain config's extent table, at most 64 per descriptor). <code>info</code>, <code>check</code>, <code>compare</code> and <code>convert</code> read the five registered fixtures (<code>vmdk-split-sparse-2049m</code>, <code>-5g</code>, <code>-5g-boundary</code>, <code>-33g</code> and the real-world 26-extent <code>osboxes-vmdk-split-sparse</code>); <code>info</code> agrees with qemu-img 10.2.0, including the virtual size the descriptor declares, the image's cluster size and each extent child's length. <code>convert -O raw</code> writes the size the descriptor declares -- exactly 2049 MiB for the 2049 MiB image, whose last extent holds 2048 sectors -- and <code>qemu-img compare</code> from the pinned build reads the descriptor itself and finds the output identical, for the four custom fixtures and the 26-extent one; <code>instar compare</code> of a descriptor against qemu's own conversion agrees too. The 131072 bytes of <code>0xAB</code> that <code>-5g-boundary</code> straddles its first extent's edge with read back whole, with zeros either side, so a read crosses an extent rather than stopping at the edge or repeating it (<code>tests/test_convert_split_sparse.py</code>). Compressed sparse extents and extents whose header capacity differs from the span the descriptor declares are refused, as are the other three shapes <code>docs/quirks.md</code> lists. <code>map</code> and <code>measure</code> refuse every VMDK descriptor, flat or sparse, naming the descriptor rather than a subformat.</td>
 </tr>
 <tr>
 <td>vhd (fixed)</td>
@@ -18645,7 +18673,7 @@ full reference.</p>
 <td>multi-extent detection</td>
 <td>Multiple extents in descriptor</td>
 <td>N/A</td>
-<td>Supported for twoGbMaxExtentFlat; sparse multi-extent reports FLAG_NOT_SUPPORTED</td>
+<td>Supported for twoGbMaxExtentFlat and twoGbMaxExtentSparse</td>
 <td>vmdk-multi-extent, osboxes-vmdk-split-sparse</td>
 </tr>
 <tr>
