@@ -486,3 +486,522 @@ finishes.
 * Patterns in claim matchers, with anchoring enforced at rule
   creation. Declined on the record in the developer guide and
   untouched by D1, which widens the claim side only.
+
+## Results
+
+Filled in as the steps complete.
+
+### Step 8a — Keycloak, observed
+
+Produced against a real Keycloak run in Docker on the
+development host, loopback only, and removed afterwards. Every
+claim below was read off a token or a document, not remembered.
+Nothing was committed; the two artefacts are left uncommitted
+for the management session.
+
+**Image and version.** `quay.io/keycloak/keycloak:26.8.2`,
+digest
+`sha256:7e66a96e4739239070aeaf72e4c5decf0f7f682cfc725b9f7ea2b336eaba38b3`,
+image created 2026-11-19. The version string the server reports
+on startup is:
+
+```
+Keycloak 26.8.2 on JVM (powered by Quarkus 3.40.1.1) started in 7.6s
+```
+
+and `GET /admin/serverinfo` gives `systemInfo.version` as
+`26.8.2`. That is the string the walkthrough should name.
+
+#### Two things the container needed that are easy to get wrong
+
+**1. The admin bootstrap variables have been renamed.** The old
+spellings still work on 26.8.2 but the server says so:
+
+```
+KC-SERVICES0110: Environment variable 'KEYCLOAK_ADMIN' is deprecated, use 'KC_BOOTSTRAP_ADMIN_USERNAME' instead
+KC-SERVICES0110: Environment variable 'KEYCLOAK_ADMIN_PASSWORD' is deprecated, use 'KC_BOOTSTRAP_ADMIN_PASSWORD' instead
+```
+
+Observed by starting the image once with the old pair. Use
+`KC_BOOTSTRAP_ADMIN_USERNAME` and `KC_BOOTSTRAP_ADMIN_PASSWORD`.
+The log also calls the account it creates a *temporary* admin
+(`KC-SERVICES0077: Created temporary admin user with username
+admin`), which is 26.x behaviour and worth knowing before
+somebody treats it as a permanent account.
+
+**2. `start-dev` does not generate a self-signed certificate.**
+A first attempt with `KC_HOSTNAME=https://localhost:8443` and
+`--https-port=8443` but no certificate started and listened on
+**http only**:
+
+```
+Listening on: http://0.0.0.0:8080
+```
+
+Shaken Fist refuses a non-`https` `issuer_url` and refuses a
+document whose `jwks_uri` or endpoints are not `https`, so a
+plaintext lab cannot produce a usable capture. A certificate has
+to be supplied. The lab generated one:
+
+```bash
+openssl req -x509 -newkey rsa:2048 -nodes \
+  -keyout tls.key -out tls.crt -days 2 -subj '/CN=localhost' \
+  -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1'
+```
+
+With it mounted, the server listens on both:
+
+```
+Listening on: http://0.0.0.0:8080 and https://0.0.0.0:8443
+```
+
+Note that `KC_HTTP_ENABLED=false` was set and `start-dev` served
+http anyway; only 8443 was published to the host, so nothing
+reached the plaintext listener.
+
+#### The container
+
+Throwaway credentials were generated with `openssl rand -hex 16`
+into an environment file outside the repository and are not
+recorded here or anywhere in the tree. `${KC_ADMIN_USER}` was
+`admin`.
+
+```bash
+docker run -d --name sf-idp-keycloak \
+  -p 127.0.0.1:8443:8443 \
+  -v "$PWD/tls.crt:/opt/keycloak/conf/tls.crt:ro" \
+  -v "$PWD/tls.key:/opt/keycloak/conf/tls.key:ro" \
+  -e KC_BOOTSTRAP_ADMIN_USERNAME="${KC_ADMIN_USER}" \
+  -e KC_BOOTSTRAP_ADMIN_PASSWORD="${KC_ADMIN_PASS}" \
+  -e KC_HOSTNAME=https://localhost:8443 \
+  -e KC_HTTP_ENABLED=false \
+  -e KC_HTTPS_CERTIFICATE_FILE=/opt/keycloak/conf/tls.crt \
+  -e KC_HTTPS_CERTIFICATE_KEY_FILE=/opt/keycloak/conf/tls.key \
+  quay.io/keycloak/keycloak:26.8.2 start-dev
+```
+
+`KC_HOSTNAME` is what decides the issuer URL and every endpoint
+in the discovery document, so it is the one setting that has to
+be right before anything is captured.
+
+#### The administrative steps, in order
+
+Every step was done through the admin REST API so that it is
+reproducible; the admin console path is given beside each one,
+because that is what the walkthrough will describe. The token
+below is a `master` realm `admin-cli` password grant:
+
+```bash
+curl -sS -k -X POST https://localhost:8443/realms/master/protocol/openid-connect/token \
+  --data-urlencode 'client_id=admin-cli' \
+  --data-urlencode 'grant_type=password' \
+  --data-urlencode "username=${KC_ADMIN_USER}" \
+  --data-urlencode "password=${KC_ADMIN_PASS}"
+```
+
+1. **Create the realm** `shakenfist`.
+   Console: *Manage realms* -> *Create realm*.
+   `POST /admin/realms` with `{"realm": "shakenfist",
+   "enabled": true}` -> 201.
+   The realm name is the last path element of the issuer URL,
+   which is `https://<host>/realms/shakenfist`.
+
+2. **Create the group** `sf-admins`.
+   Console: *Groups* -> *Create group*.
+   `POST /admin/realms/shakenfist/groups` with
+   `{"name": "sf-admins"}` -> 201.
+
+3. **Create the client** `shakenfist`, **public**.
+   Console: *Clients* -> *Create client*, then *Client
+   authentication* off.
+   `POST /admin/realms/shakenfist/clients` -> 201 with:
+
+   ```json
+   {
+     "clientId": "shakenfist",
+     "name": "Shaken Fist command line client",
+     "enabled": true,
+     "publicClient": true,
+     "standardFlowEnabled": true,
+     "directAccessGrantsEnabled": false,
+     "serviceAccountsEnabled": false,
+     "redirectUris": ["http://127.0.0.1:*"],
+     "webOrigins": [],
+     "attributes": {"oauth2.device.authorization.grant.enabled": "true"}
+   }
+   ```
+
+   **Public, not confidential**, because the thing registering is
+   a command line program on a person's laptop. A confidential
+   client's secret would have to be distributed to every person
+   who logs in, at which point it is not a secret; the public
+   client plus PKCE is what the loopback-redirect shape is for,
+   and the device grant requires a public client anyway. There is
+   also nothing for a secret to protect here: `POST /auth/login`
+   verifies the token's signature and `client_id`, not a client
+   secret.
+
+   `redirectUris` is `http://127.0.0.1:*`. The command line
+   client binds an **ephemeral** loopback port
+   (`_RedirectServer((address, 0), ...)` in `client-python`'s
+   `shakenfist_client/commandline/auth.py`), so the redirect URI
+   it sends is `http://127.0.0.1:<random>/` and cannot be
+   registered exactly. Keycloak's trailing `*` matched
+   `http://127.0.0.1:45678/` in the real flow below. Plaintext
+   `http` on a loopback literal is correct here and is what the
+   device grant exists to avoid needing at all.
+
+   `oauth2.device.authorization.grant.enabled` is the OAuth 2.0
+   Device Authorization Grant. Console: the *OAuth 2.0 Device
+   Authorization Grant* checkbox under *Authentication flow*.
+
+4. **Add the group membership mapper**, which is the step this
+   whole exercise turns on; see the subsection below.
+
+5. **Create the person** and give them a password.
+   Console: *Users* -> *Add user*, then *Credentials* -> *Set
+   password* with *Temporary* off.
+   `POST /admin/realms/shakenfist/users` -> 201 with username,
+   `enabled`, `emailVerified`, `email`, `firstName`,
+   `lastName` and a `"temporary": false` password credential.
+   `emailVerified` and the non-temporary password are both
+   deliberate: each of the alternatives puts a required action
+   on the account, and the login then stops on an extra screen
+   before any token is issued. That consequence was not
+   exercised here -- the lab user was created this way from the
+   start -- so if the walkthrough states it, state it as a
+   reason to set the two fields rather than as an observation.
+
+6. **Put the person in the group.**
+   Console: *Users* -> the user -> *Groups* -> *Join Group*.
+   `PUT /admin/realms/shakenfist/users/<user uuid>/groups/<group uuid>`
+   -> 204. The two uuids come from
+   `GET .../users?username=<name>&exact=true` and
+   `GET .../groups?search=<name>`.
+
+#### Getting a `groups` claim into the ID token
+
+This is the most valuable note in this section, because three
+separate things can each leave the claim out of the **identity**
+token while it is present in the access token or at
+`/userinfo`, and Shaken Fist only ever sees the identity token.
+
+**The mapper.** Keycloak ships no `groups` client scope and no
+group claim by default. What is needed is a protocol mapper of
+type `oidc-group-membership-mapper` ("Group Membership" in the
+console). The least surprising home for it is the client's own
+dedicated scope -- console: *Clients* -> `shakenfist` -> *Client
+scopes* -> `shakenfist-dedicated` -> *Add mapper* -> *By
+configuration* -> *Group Membership*:
+
+```bash
+curl -sS -k -X POST \
+  "https://localhost:8443/admin/realms/shakenfist/clients/<client uuid>/protocol-mappers/models" \
+  -H "Authorization: Bearer ${TOKEN}" -H 'Content-Type: application/json' \
+  -d '{"name": "groups",
+       "protocol": "openid-connect",
+       "protocolMapper": "oidc-group-membership-mapper",
+       "config": {"claim.name": "groups",
+                  "full.path": "true",
+                  "id.token.claim": "true",
+                  "access.token.claim": "true",
+                  "userinfo.token.claim": "true",
+                  "introspection.token.claim": "true"}}'
+```
+
+`"id.token.claim": "true"` is the member that puts it in the
+identity token, and it is the one to check when the claim is
+visible at `/userinfo` but a login is still refused. Console:
+the *Add to ID token* switch.
+
+**`full.path` decides whether the value is `/sf-admins` or
+`sf-admins`, and the two paths disagree about its default.**
+Both were observed:
+
+| How the mapper was created | `groups` in the ID token |
+|---|---|
+| `config` with `"full.path": "true"` | `["/sf-admins"]` |
+| `config` with `"full.path"` **absent** | `["sf-admins"]` |
+
+So a mapper POSTed without the key behaves as if it were false.
+But the key's declared default is `true`, which is what the
+admin console renders and submits --
+`GET /admin/serverinfo` reports, for
+`oidc-group-membership-mapper`:
+
+```
+full.path             type= boolean default= 'true'
+id.token.claim        type= boolean default= 'true'
+access.token.claim    type= boolean default= 'true'
+userinfo.token.claim  type= boolean default= 'true'
+```
+
+**An operator clicking through the console therefore gets the
+full path, with a leading slash.** The captured fixture is the
+full-path form and the string to bind is **`/sf-admins`**, with
+the slash. A walkthrough that says "bind `sf-admins`" is wrong
+for the console path, and one that says the opposite is wrong
+for anybody scripting the API without the key. Both forms are
+plain list elements, so either works once it is bound to the
+string the token actually carries. Note also that the leading
+slash is a *path*: a group nested under another is
+`/parent/child`, which is the real reason to keep full paths on.
+
+**`groups` is not a scope Keycloak knows.** Asking for it is a
+hard refusal from the device endpoint:
+
+```json
+{"error": "invalid_scope", "error_description": "Invalid scopes: openid profile groups"}
+```
+
+(HTTP 400.) `scopes_supported` in a stock realm's discovery
+document is `openid, organization, roles, email, offline_access,
+microprofile-jwt, address, acr, web-origins, kc-admin-api,
+service_account, profile, phone, basic` -- no `groups`. So the
+issuer's `oidc_scopes` for this configuration must be
+**`openid profile`**, not `openid profile groups`. The claim
+arrives anyway, because a dedicated-scope mapper is always in
+scope.
+
+The alternative was tried and works, and is worth a sentence in
+the walkthrough but not the main path: create a realm client
+scope literally named `groups`
+(`POST /admin/realms/shakenfist/client-scopes`, attributes
+`{"include.in.token.scope": "true"}`), put the same mapper in
+it, and assign it to the client. Then `groups` appears in
+`scopes_supported` and `openid profile groups` is accepted.
+Assigned as an **optional** client scope it is a trap:
+
+| Requested scope | Granted scope in the token response | `groups` claim |
+|---|---|---|
+| `openid profile groups` | `openid groups email profile` | `["/sf-admins"]` |
+| `openid profile` | `openid email profile` | **absent** |
+
+An operator who sets up the optional scope and then leaves
+`oidc_scopes` at its `openid` default gets no claim, no rule
+match, and the deliberately uninformative 401. Assigning it as a
+*default* client scope avoids that, at the cost of the claim
+being in every token whether asked for or not.
+
+#### Enabling the device grant
+
+`oauth2.device.authorization.grant.enabled` on the client is the
+whole of it. For Keycloak, unlike the other provider, there is
+nothing at a brand or flow level to configure.
+
+But that setting is **not** what puts the endpoint in the
+discovery document. Checked on a second, empty realm whose only
+clients were Keycloak's six built-ins, none of which has the
+grant enabled -- the document still carried:
+
+```
+"device_authorization_endpoint": "https://localhost:8443/realms/emptyrealm/protocol/openid-connect/auth/device"
+```
+
+So the endpoint is advertised per realm while the grant is
+enabled per client, and Shaken Fist's login metadata reads the
+former. A Keycloak issuer is therefore advertised as
+device-capable whether or not the registered client can use the
+grant: the same shape as survey finding 5 describes for the
+other provider, reached by a different route. The symptom when
+the attribute is missing was observed too -- a public client in
+that realm without it answered the device endpoint with a 400:
+
+```json
+{"error": "unauthorized_client", "error_description": "Client is not allowed to initiate OAuth 2.0 Device Authorization Grant. The flow is disabled for the client."}
+```
+
+That is a one-line check an operator can run before blaming the
+cluster, and it is clearer than anything the cluster says.
+
+**One client setting breaks the device grant and nothing else.**
+Setting *Proof Key for Code Exchange Code Challenge Method* to
+`S256` on the client (`pkce.code.challenge.method`) makes
+Keycloak **require** a challenge on every request, including the
+device authorization request, which has nowhere to put one:
+
+```
+POST .../protocol/openid-connect/auth/device   -> 400
+{"error": "invalid_request", "error_description": "Missing parameter: code_challenge_method"}
+```
+
+Confirmed by setting the attribute, observing the 400, and
+clearing it; with the attribute set, the authorization endpoint
+answered 200 for the same client, so the breakage is specific to
+the device grant. The command line client sends `S256` on the
+authorization code flow of its own accord
+(`PKCE_CHALLENGE_METHOD = 'S256'`), so leaving the client's PKCE
+method **unset** gives PKCE on the browser flow and a working
+device flow. The walkthrough should say to leave it empty and
+say why, because "require PKCE" is exactly the box a careful
+operator ticks.
+
+#### Both logins, completed
+
+Both flows were driven by hand with `curl` against the real
+server, including the HTML login form and the consent page.
+
+**Device code.** Worked.
+
+```bash
+# 1. the client asks for a code
+curl -sS -k -X POST https://localhost:8443/realms/shakenfist/protocol/openid-connect/auth/device \
+  --data-urlencode 'client_id=shakenfist' \
+  --data-urlencode 'scope=openid profile'
+# -> 200 {"device_code": "...", "user_code": "REXP-XPKO",
+#         "verification_uri": "https://localhost:8443/realms/shakenfist/device",
+#         "verification_uri_complete": ".../device?user_code=REXP-XPKO",
+#         "expires_in": 600, "interval": 5}
+
+# 2. the person's browser: the complete URI skips the code entry page and
+#    lands on the login form; posting the form reaches a consent page
+#    ("Yes"/"No", button name="accept"), and accepting it answers
+#    "Device Login Successful".
+
+# 3. the client polls
+curl -sS -k -X POST https://localhost:8443/realms/shakenfist/protocol/openid-connect/token \
+  --data-urlencode 'grant_type=urn:ietf:params:oauth:grant-type:device_code' \
+  --data-urlencode 'client_id=shakenfist' \
+  --data-urlencode "device_code=${DEVICE_CODE}"
+# -> 200 with access_token, refresh_token and id_token
+```
+
+What it required, beyond the client attribute: nothing at the
+realm, the brand or the flows. The **consent page is not
+optional** and is not the client's `consentRequired` setting --
+it is the device grant's own `OAUTH_GRANT` required action, and
+it appeared with `consentRequired` unset. A walkthrough that
+tells a person "sign in and you are done" is wrong; they have to
+press *Yes* afterwards.
+
+**Authorization code with PKCE.** Worked, with a loopback
+redirect URI on an ephemeral port, exactly as the command line
+client builds it:
+
+```bash
+# 1. the authorization request (S256 challenge, no client secret)
+curl -sS -k -G https://localhost:8443/realms/shakenfist/protocol/openid-connect/auth \
+  --data-urlencode 'response_type=code' \
+  --data-urlencode 'client_id=shakenfist' \
+  --data-urlencode 'redirect_uri=http://127.0.0.1:45678/' \
+  --data-urlencode "state=${STATE}" \
+  --data-urlencode "code_challenge=${CHALLENGE}" \
+  --data-urlencode 'code_challenge_method=S256' \
+  --data-urlencode 'scope=openid profile'
+# -> the login form; posting it answers 302 to
+#    http://127.0.0.1:45678/?state=...&session_state=...&iss=...&code=...
+
+# 2. the exchange
+curl -sS -k -X POST https://localhost:8443/realms/shakenfist/protocol/openid-connect/token \
+  --data-urlencode 'grant_type=authorization_code' \
+  --data-urlencode 'client_id=shakenfist' \
+  --data-urlencode "code=${CODE}" \
+  --data-urlencode 'redirect_uri=http://127.0.0.1:45678/' \
+  --data-urlencode "code_verifier=${VERIFIER}"
+# -> 200 with an id_token
+```
+
+No consent page on this flow. The redirect carries an `iss`
+parameter, because the realm advertises
+`authorization_response_iss_parameter_supported: true`.
+
+**The two flows produce the same claim set.** Compared member by
+member: identical keys, and identical values for everything
+except `at_hash`, `auth_time`, `exp`, `iat`, `jti` and `sid`,
+which are per-token by construction. In particular `aud`, `azp`,
+`iss`, `typ` and `groups` are the same. So one fixture is
+enough, and it was taken from the device flow; there is no
+second capture to make and nothing for step 8e to distinguish.
+
+#### What the artefacts say
+
+Left uncommitted in the worktree:
+
+* `shakenfist/tests/files/idp/keycloak-discovery.json`
+* `shakenfist/tests/files/idp/keycloak-id-token-claims.json`
+
+The discovery document is 56 members, 6685 bytes as served
+(under `FEDERATION_DISCOVERY_MAX_BYTES`, 65536). The only
+difference between the committed file and the bytes the server
+sent is JSON whitespace: `json.dump(..., indent=2)` preserving
+the served key order, so that a reviewer can read it. Facts
+taken from it:
+
+* `"issuer": "https://localhost:8443/realms/shakenfist"` --
+  **no trailing slash**, and the string is character for
+  character the issuer URL. `KC_HOSTNAME` is what sets it.
+* `jwks_uri` and all three login endpoints are `https`, which is
+  what makes it usable as a fixture at all.
+* `device_authorization_endpoint` is
+  `.../protocol/openid-connect/auth/device`. **`grep -c
+  device_authorization_endpoint` on this file is 2, not 1**: the
+  second occurrence is inside `mtls_endpoint_aliases`, which
+  Keycloak publishes and the other provider does not. Any
+  mechanical count over the Keycloak fixture has to expect 2.
+* Adding the optional `groups` client scope changed exactly one
+  member of the document -- `scopes_supported` gained `groups`
+  -- and nothing else. The committed capture is from before that
+  experiment, so it matches the configuration described above.
+
+The claim set is the decoded payload of a real identity token,
+with the six person-identifying members replaced:
+
+| Member | Value in the fixture |
+|---|---|
+| `sub` | `00000000-0000-0000-0000-000000000000` |
+| `email` | `person@example.com` |
+| `preferred_username` | `person` |
+| `name` | `Example Person` |
+| `given_name` | `Example` |
+| `family_name` | `Person` |
+
+Everything else is as emitted, including:
+
+```json
+{"aud": "shakenfist", "azp": "shakenfist", "typ": "ID",
+ "iss": "https://localhost:8443/realms/shakenfist",
+ "groups": ["/sf-admins"],
+ "acr": "1", "email_verified": true,
+ "exp": 1795313096, "iat": 1795312796, "auth_time": 1795312796}
+```
+
+Two things in there are evidence for claims the operator guide
+already makes. `aud` is the **client id**, a bare string and not
+a list, and it is not anything resembling an API URL -- which is
+the warning box about `client_id` versus `audience`, confirmed
+against a real token. And `groups` is a **JSON array** even for
+a person in exactly one group, which is survey finding 1 as the
+provider actually emits it: nothing about a single membership
+makes it a scalar.
+
+No signed JWT was written anywhere in the tree. The raw tokens
+stayed in the scratch directory and went with it.
+
+#### Teardown
+
+```bash
+docker rm -f sf-idp-keycloak
+```
+
+Nothing is left running. The image remains in the host's local
+cache, which costs nothing and saves a pull in 8g.
+
+#### Things the plan's row said that did not hold
+
+* "dev mode is fine, no TLS needed because nothing validates it
+  in this step" -- half right. Nothing validates the
+  *certificate*, and the lab's is self-signed with `curl -k`.
+  But the captures have to be `https` or they are not fixtures
+  the discovery code would accept, and `start-dev` will not
+  make a certificate for you.
+* "a confidential-or-public client" -- public, for the reasons
+  in step 3 above. There is no reason to document the
+  confidential shape for a command line client.
+* "`aud`, `iss`, `groups`, `exp` shapes intact" -- `azp`, `typ`
+  and `iat` were kept as well, because `azp` is what a relying
+  party checks when `aud` is multi-valued and `typ: "ID"` is how
+  an identity token is told from an access token. Replacing any
+  of them would have cost a test the ability to assert on them.
+* The row names `shakenfist/tests/files/idp/keycloak-*.json`
+  with "two files per flow". It is two files in total, not four:
+  the flows agree, as recorded above.
