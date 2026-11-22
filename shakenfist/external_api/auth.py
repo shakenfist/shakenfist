@@ -1918,8 +1918,10 @@ class AuthNamespaceRulesEndpoint(api_base.Resource):
             ('bound_claims', 'body', 'dict',
              'Claim name to matcher. A matcher is an exact string, or a '
              'list of acceptable strings. Matching is exact: no globbing, '
-             'no regular expressions, no prefix matching. At least one '
-             'claim must be bound.', True),
+             'no regular expressions, no prefix matching. A claim whose '
+             'value in the token is a list matches when one of its '
+             'elements is exactly the matcher, which is how a group claim '
+             'binds. At least one claim must be bound.', True),
             ('scopes', 'body', 'arrayofstring',
              'The scopes granted to keys minted through this rule. Must be '
              'non-empty.', True),

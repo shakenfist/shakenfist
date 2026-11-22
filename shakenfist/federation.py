@@ -410,23 +410,53 @@ def validate_token(token: str, issuer: TrustedIssuer,
             f'{type(e).__name__}: {e}') from e
 
 
+def matched_claim_values(value: Any, matcher: Any) -> list[str]:
+    """Which values of one claim satisfy one matcher?
+
+    The one comparison this module makes between a token and a rule.
+    A scalar claim contributes itself when it matches; an array claim
+    contributes the elements which match, in the order the token
+    listed them. Nothing matched is an empty list.
+
+    An array claim matching by membership is how a group claim grants
+    a namespace: both Keycloak and Authentik write a person's groups
+    as an array of strings, so refusing an array would mean no group
+    can ever express an entitlement.
+
+    Exact string comparison throughout. No globbing, no regular
+    expressions, no prefix matching, and no coercion: a claim of 1
+    does not match a matcher of "1", a non-string element of an array
+    is skipped rather than stringified, and an array inside an array
+    is not descended into. A federation that compares loosely is a
+    federation that eventually accepts the wrong repository.
+    """
+    if isinstance(value, str):
+        candidates = [value]
+    elif isinstance(value, list):
+        candidates = [element for element in value
+                      if isinstance(element, str)]
+    else:
+        return []
+
+    if isinstance(matcher, str):
+        alternatives = [matcher]
+    elif isinstance(matcher, list):
+        alternatives = [alternative for alternative in matcher
+                        if isinstance(alternative, str)]
+    else:
+        return []
+
+    return [candidate for candidate in candidates
+            if candidate in alternatives]
+
+
 def claim_matches(value: Any, matcher: Any) -> bool:
     """Does one claim value satisfy one matcher?
 
-    Exact string comparison, or membership of a list of exact strings.
-    No globbing, no regular expressions, no prefix matching, and no
-    coercion: a claim of 1 does not match a matcher of "1", because a
-    federation that compares loosely is a federation that eventually
-    accepts the wrong repository.
+    The predicate form of matched_claim_values(), so that the
+    comparison cannot be loosened for one caller and not the other.
     """
-    if not isinstance(value, str):
-        return False
-    if isinstance(matcher, str):
-        return value == matcher
-    if isinstance(matcher, list):
-        return any(value == alternative for alternative in matcher
-                   if isinstance(alternative, str))
-    return False
+    return bool(matched_claim_values(value, matcher))
 
 
 def match_claims(claims: dict[str, Any],
@@ -435,7 +465,9 @@ def match_claims(claims: dict[str, Any],
 
     Returns the satisfied claims, which the exchange records in the
     minted key's provenance so an audit describes the grant as it was
-    actually made rather than as the rule reads later.
+    actually made rather than as the rule reads later. For a scalar
+    claim that is the token's value; for an array claim it is only the
+    elements which matched.
 
     An empty bound_claims set raises rather than matching everything.
     Rule creation refuses to write one, so reaching here with one means
@@ -452,10 +484,18 @@ def match_claims(claims: dict[str, Any],
         if claim not in claims:
             raise exceptions.ClaimMismatch(
                 f'token does not carry the bound claim "{claim}"')
-        if not claim_matches(claims[claim], matcher):
+        matched = matched_claim_values(claims[claim], matcher)
+        if not matched:
             raise exceptions.ClaimMismatch(
                 f'claim "{claim}" does not match what the rule requires')
-        satisfied[claim] = claims[claim]
+        # An array claim records only the elements which matched. A
+        # person's complete group membership is not what the grant was
+        # made on, it is unbounded in a way a scalar claim is not, and
+        # provenance is written onto every key of every login and kept
+        # for the life of the key. A scalar claim records the token's
+        # value, exactly as it always has.
+        satisfied[claim] = (matched if isinstance(claims[claim], list)
+                            else claims[claim])
 
     return satisfied
 
@@ -481,15 +521,17 @@ def matching_rules(claims: dict[str, Any], issuer_name: str,
 
     Returns the matches and a count of rules skipped as unusable. Each
     match is the rule, its policy, and the claims which satisfied it --
-    the token's values rather than the rule's matchers, because a key's
+    the token's values rather than the rule's matchers, and for an
+    array claim only the elements of it which matched, because a key's
     provenance should describe the grant as it was made rather than as
     the rule reads later.
 
     Matching itself is match_claims(), not a comparison written again
-    here. Exact string equality, or membership of a list of exact
-    strings, with no globbing and no coercion, is the property the
-    whole federation rests on, and it stays in one function so that it
-    cannot be loosened in one place and not the other.
+    here. Exact string equality against a matcher, or against any
+    alternative of a list of them, with no globbing and no coercion,
+    is the property the whole federation rests on, and it stays in one
+    function so that it cannot be loosened in one place and not the
+    other.
 
     A rule this identity does not satisfy is an ordinary outcome and
     not an error. Evaluating every rule the cluster holds means most of

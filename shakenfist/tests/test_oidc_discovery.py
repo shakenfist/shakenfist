@@ -14,6 +14,7 @@ check and never finish the body.
 """
 
 import json
+import os
 import ssl
 from unittest import mock
 
@@ -37,6 +38,12 @@ AUTHENTIK_DISCOVERY = (
     'https://auth.example.com/application/o/shakenfist'
     '/.well-known/openid-configuration')
 
+# The issuers the captured documents below belong to, as an operator
+# would configure them -- which for the second one means with the
+# trailing slash the provider puts in its own iss claim.
+CAPTURED_KEYCLOAK = 'https://localhost:8443/realms/shakenfist'
+CAPTURED_AUTHENTIK = 'https://localhost:9443/application/o/sf/'
+
 
 def _document(issuer, **overrides):
     """A conforming document for an issuer, with members overridden."""
@@ -49,6 +56,20 @@ def _document(issuer, **overrides):
     }
     document.update(overrides)
     return document
+
+
+def _captured_document(name):
+    """A discovery document captured from a real identity provider.
+
+    Returns the parsed document and the bytes the provider served, so a
+    test can serve those bytes rather than a re-serialised copy of
+    them: what is being checked is that this code accepts what a
+    provider actually publishes.
+    """
+    with open(os.path.join(os.path.dirname(__file__), 'files', 'idp',
+                           name), 'rb') as f:
+        body = f.read()
+    return json.loads(body), body
 
 
 class FakeResponse:
@@ -548,3 +569,67 @@ class DiscoveryRequestTestCase(OIDCDiscoveryTestCase):
 
         self.assertTrue(self.session.closed)
         self.assertTrue(self.session.response.closed)
+
+
+class CapturedProviderDocumentTestCase(OIDCDiscoveryTestCase):
+    """The documents two real providers actually served.
+
+    Everything above this is a document written here, which proves what
+    the code does with the shapes we thought of. These two are the
+    bytes a real Keycloak and a real Authentik answered a real fetch
+    with, committed under tests/files/idp/, and they are served
+    unaltered. A provider whose document we would refuse is a login
+    nobody can complete, so the thing worth pinning is acceptance.
+    """
+
+    def _accepted(self, name, issuer):
+        document, body = _captured_document(name)
+        self.assertEqual(issuer, document['issuer'])
+
+        self._serve(body)
+        discovered = oidc_discovery.fetch(issuer)
+
+        # Every endpoint comes from the document rather than from
+        # anything this code assembled.
+        self.assertEqual(document['jwks_uri'], discovered['jwks_uri'])
+        for endpoint in oidc_discovery.OPTIONAL_ENDPOINTS:
+            # As a top-level parsed member, so that a name which also
+            # appears somewhere nested does not stand in for one.
+            self.assertIn(endpoint, document)
+            self.assertEqual(document[endpoint], discovered[endpoint])
+
+        return document, discovered
+
+    def test_the_captured_keycloak_document_is_accepted(self):
+        document, discovered = self._accepted(
+            'keycloak-discovery.json', CAPTURED_KEYCLOAK)
+
+        self.assertEqual(CAPTURED_KEYCLOAK, discovered['issuer'])
+        self.assertEqual(
+            CAPTURED_KEYCLOAK + '/.well-known/openid-configuration',
+            self._requested_url())
+
+        # Why the device endpoint has to be read as a parsed member
+        # rather than counted in the text: this provider publishes the
+        # name twice, the second time inside mtls_endpoint_aliases, so
+        # an occurrence count answers a question nobody asked.
+        _, body = _captured_document('keycloak-discovery.json')
+        self.assertEqual(2, body.count(b'"device_authorization_endpoint"'))
+        self.assertIn(
+            'device_authorization_endpoint',
+            document['mtls_endpoint_aliases'])
+
+    def test_the_captured_authentik_document_is_accepted(self):
+        document, discovered = self._accepted(
+            'authentik-discovery.json', CAPTURED_AUTHENTIK)
+
+        # The trailing slash survives: the issuer this provider
+        # advertises carries one, the issuer we store is the same string
+        # character for character, and the document was fetched from a
+        # URL with exactly one slash before the well known path.
+        self.assertTrue(document['issuer'].endswith('/'))
+        self.assertEqual(CAPTURED_AUTHENTIK, discovered['issuer'])
+        self.assertEqual(
+            'https://localhost:9443/application/o/sf'
+            '/.well-known/openid-configuration',
+            self._requested_url())

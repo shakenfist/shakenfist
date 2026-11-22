@@ -50,6 +50,20 @@ def _keypair():
     return rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
 
+def _captured_claims(name):
+    """A claim set captured from a real identity provider.
+
+    These are the decoded identity tokens of real logins against real
+    providers, with the members which identify a person replaced by
+    placeholders. They are read here so that what the matching code is
+    asked to accept is what a provider actually emits, rather than
+    what this repository remembers of it.
+    """
+    with open(os.path.join(os.path.dirname(__file__), 'files', 'idp',
+                           name)) as f:
+        return json.load(f)
+
+
 class FederationTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
@@ -661,7 +675,55 @@ class ClaimMatchingTestCase(base.ShakenFistTestCase):
         self.assertFalse(federation.claim_matches(1, '1'))
         self.assertFalse(federation.claim_matches(True, 'true'))
         self.assertFalse(federation.claim_matches(None, 'None'))
-        self.assertFalse(federation.claim_matches(['a'], 'a'))
+
+    def test_a_list_claim_matches_by_membership(self):
+        # Which is what makes a group claim able to grant anything:
+        # providers write a person's groups as an array of strings.
+        self.assertTrue(federation.claim_matches(['a'], 'a'))
+        self.assertTrue(federation.claim_matches(['a', 'b', 'c'], 'b'))
+        self.assertFalse(federation.claim_matches(['a', 'b'], 'c'))
+
+    def test_a_list_claim_against_an_enumerated_matcher(self):
+        self.assertTrue(federation.claim_matches(['a', 'b'], ['b', 'c']))
+        self.assertFalse(federation.claim_matches(['a', 'b'], ['c', 'd']))
+
+    def test_a_non_string_element_is_skipped_not_stringified(self):
+        # The coercion argument applies element by element too.
+        self.assertFalse(federation.claim_matches([1, 'a'], '1'))
+        self.assertFalse(federation.claim_matches([True, 'a'], 'true'))
+        self.assertFalse(federation.claim_matches([None, 'a'], 'None'))
+        self.assertTrue(federation.claim_matches([1, 'a'], 'a'))
+
+    def test_a_list_inside_a_list_is_not_descended_into(self):
+        # Membership is one level deep. A claim shaped like this is a
+        # provider doing something unexpected, and the safe reading of
+        # an unexpected shape is that it grants nothing.
+        self.assertFalse(federation.claim_matches([['a']], 'a'))
+        self.assertFalse(federation.claim_matches([['a']], ['a']))
+
+    def test_an_empty_list_claim_matches_nothing(self):
+        # A person in no groups is entitled to nothing, the same way an
+        # empty matcher list already accepts nothing.
+        self.assertFalse(federation.claim_matches([], 'a'))
+        self.assertFalse(federation.claim_matches([], ['a']))
+
+    def test_there_is_no_globbing_in_a_list_claim(self):
+        # The same property as the scalar case, which widening the
+        # claim side must not have quietly dropped.
+        self.assertFalse(
+            federation.claim_matches(['shakenfist/evil'], 'shakenfist/*'))
+        self.assertFalse(
+            federation.claim_matches(['shakenfist/ryll'], 'shakenfist/'))
+
+    def test_the_matched_values_are_the_ones_that_matched(self):
+        self.assertEqual(
+            ['a'], federation.matched_claim_values('a', 'a'))
+        self.assertEqual(
+            [], federation.matched_claim_values('a', 'b'))
+        # In the order the claim listed them, not the matcher's order.
+        self.assertEqual(
+            ['b', 'c'],
+            federation.matched_claim_values(['a', 'b', 'c'], ['c', 'b']))
 
     def test_every_bound_claim_must_be_present(self):
         self.assertRaises(
@@ -679,6 +741,44 @@ class ClaimMatchingTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             {'repository': 'shakenfist/ryll', 'ref': 'refs/heads/develop'},
             satisfied)
+
+    def test_only_the_matched_elements_reach_provenance(self):
+        # What the minted key records is the grant as it was actually
+        # made. A person's complete group membership is not that, and
+        # recording it would write every group of every person onto
+        # every key they are ever issued.
+        satisfied = federation.match_claims(
+            {'groups': ['sf-admins', 'everyone', 'accounts-payable']},
+            {'groups': 'sf-admins'})
+
+        self.assertEqual({'groups': ['sf-admins']}, satisfied)
+
+    def test_a_real_keycloak_identity_matches_a_group_rule(self):
+        # Keycloak's group membership mapper writes full paths, so the
+        # group this provider emits carries a leading slash. That is a
+        # fact about the provider, not something to normalise away.
+        claims = _captured_claims('keycloak-id-token-claims.json')
+        self.assertEqual(['/sf-admins'], claims['groups'])
+
+        self.assertEqual(
+            {'groups': ['/sf-admins']},
+            federation.match_claims(claims, {'groups': '/sf-admins'}))
+        self.assertRaises(
+            exceptions.ClaimMismatch, federation.match_claims,
+            claims, {'groups': '/sf-operators'})
+
+    def test_a_real_authentik_identity_matches_a_group_rule(self):
+        # Authentik names the same group without a leading slash,
+        # which is why each walkthrough states its own binding.
+        claims = _captured_claims('authentik-id-token-claims.json')
+        self.assertEqual(['sf-admins'], claims['groups'])
+
+        self.assertEqual(
+            {'groups': ['sf-admins']},
+            federation.match_claims(claims, {'groups': 'sf-admins'}))
+        self.assertRaises(
+            exceptions.ClaimMismatch, federation.match_claims,
+            claims, {'groups': 'sf-operators'})
 
     def test_an_empty_matcher_set_refuses_rather_than_matching(self):
         # Rule creation refuses to write one, so reaching here means a
