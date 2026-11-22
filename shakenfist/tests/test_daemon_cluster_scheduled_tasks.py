@@ -54,10 +54,15 @@ def _reset_sweep_failure_state():
 
     The resume offsets are process-global for the same reason and would
     otherwise silently rotate a later test's expected object ordering.
+    The zombie liveness streak and its resume offset are the same two
+    kinds of state one scale down, so they are reset here too.
     """
     st._SWEEP_FAILURE_STREAK.clear()
     st.SWEEP_WORK_LIST_FAILURE_STREAK.clear()
     st._SWEEP_RESUME_AFTER.clear()
+    st._ZOMBIE_LIVENESS_STREAK.clear()
+    st.ZOMBIE_LIVENESS_FAILURE_STREAK.clear()
+    st._ZOMBIE_RESUME_AFTER.clear()
 
 
 def _reset_deleted_object_sweep_state():
@@ -3159,11 +3164,14 @@ class ReconcileOrphanedObjectsTestCase(base.ShakenFistTestCase):
                 return_value=0)
     @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
                 return_value=0)
-    def test_a_slow_type_cannot_starve_the_types_behind_it(
+    def test_an_unreadable_work_list_cannot_starve_the_types_behind_it(
             self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
             mock_set_state, mock_add_event):
         # Same starvation hazard as the deleted-object sweep: one slow
         # object type must not permanently hide every type after it.
+        #
+        # This is the work-list read. The liveness read is the other way
+        # a pass can stop on a type, and has its own test below.
         zombie_types = [t for t in mariadb.ORPHAN_RECONCILABLE_OBJECT_TYPES
                         if t not in st.ZOMBIE_REPAIR_EXCLUDED_TYPES]
         slow = zombie_types[0]
@@ -3182,6 +3190,178 @@ class ReconcileOrphanedObjectsTestCase(base.ShakenFistTestCase):
 
         read = [str(c.args[0]) for c in mock_stateless.call_args_list]
         self.assertEqual(zombie_types[1:] + [slow], read)
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_stateless_object_uuids')
+    @mock.patch('shakenfist.mariadb.delete_orphaned_artifact_attributes',
+                return_value=0)
+    @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
+                return_value=0)
+    def test_an_unreadable_liveness_read_cannot_starve_the_types_behind_it(
+            self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
+            mock_set_state, mock_add_event):
+        # The same starvation hazard, reached the other way: this type's
+        # work list reads fine and its liveness read is what fails, so
+        # the pass stops after repairing nothing. The resume marker has
+        # to be set on that path too, or the type that failed is read
+        # first again next pass and the types behind it never are.
+        zombie_types = [t for t in mariadb.ORPHAN_RECONCILABLE_OBJECT_TYPES
+                        if t not in st.ZOMBIE_REPAIR_EXCLUDED_TYPES]
+        slow = str(ObjectType.NAMESPACE_KEY)
+        idx = zombie_types.index(slow)
+        mock_stateless.side_effect = self._two_zombies_of(
+            ObjectType.NAMESPACE_KEY)
+
+        with mock.patch('shakenfist.mariadb.get_namespace_key_attributes',
+                        side_effect=DatabaseUnavailable('tier blip')):
+            # The first pass only makes candidates, the second confirms
+            # them and reaches the liveness read.
+            st.reconcile_orphaned_objects()
+            st.reconcile_orphaned_objects()
+            mock_stateless.reset_mock()
+            st.reconcile_orphaned_objects()
+
+        read = [str(c.args[0]) for c in mock_stateless.call_args_list]
+        self.assertEqual(
+            zombie_types[idx + 1:] + zombie_types[:idx + 1], read)
+        mock_set_state.assert_not_called()
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_stateless_object_uuids')
+    @mock.patch('shakenfist.mariadb.delete_orphaned_artifact_attributes',
+                return_value=0)
+    @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
+                return_value=0)
+    def test_a_liveness_stop_is_visible_on_its_own_streak(
+            self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
+            mock_set_state, mock_add_event):
+        # A pass which repairs nothing because its liveness read failed
+        # is invisible to the work-list streak -- that read succeeded,
+        # which is how these zombies were found, so it has just cleared
+        # the streak to zero. Without a streak of its own the reconciler
+        # can repair nothing hour after hour with every failure gauge
+        # reading zero, which is the silence those gauges exist to
+        # break.
+        labels = {'object_type': 'namespace_key'}
+        mock_stateless.side_effect = self._two_zombies_of(
+            ObjectType.NAMESPACE_KEY)
+
+        with mock.patch('shakenfist.mariadb.get_namespace_key_attributes',
+                        side_effect=DatabaseUnavailable('tier blip')):
+            st.reconcile_orphaned_objects()
+            st.reconcile_orphaned_objects()
+            st.reconcile_orphaned_objects()
+
+        self.assertEqual({'namespace_key': 2}, st._ZOMBIE_LIVENESS_STREAK)
+        self.assertEqual(
+            2, REGISTRY.get_sample_value(
+                'cluster_zombie_liveness_failure_streak', labels))
+        # The work-list read never failed, so that streak says nothing.
+        self.assertEqual({}, st._SWEEP_FAILURE_STREAK)
+        self.assertIsNone(
+            REGISTRY.get_sample_value(
+                'cluster_sweep_work_list_failure_streak',
+                {'sweep': 'reconcile_orphans',
+                 'object_type': 'namespace_key'}))
+
+        # A pass which gets through the type clears it: the alertable
+        # signal is "still failing", not "failed once ever".
+        with mock.patch('shakenfist.mariadb.get_namespace_key_attributes',
+                        return_value=mock.sentinel.attributes):
+            st.reconcile_orphaned_objects()
+
+        self.assertEqual({}, st._ZOMBIE_LIVENESS_STREAK)
+        self.assertEqual(
+            0, REGISTRY.get_sample_value(
+                'cluster_zombie_liveness_failure_streak', labels))
+
+        # And a demoted node stops answering for it entirely.
+        with mock.patch('shakenfist.mariadb.get_namespace_key_attributes',
+                        side_effect=DatabaseUnavailable('tier blip')):
+            st.reconcile_orphaned_objects()
+            st.reconcile_orphaned_objects()
+        st.clear_sweep_failure_metrics()
+
+        self.assertEqual({}, st._ZOMBIE_LIVENESS_STREAK)
+        self.assertIsNone(
+            REGISTRY.get_sample_value(
+                'cluster_zombie_liveness_failure_streak', labels))
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_stateless_object_uuids')
+    @mock.patch('shakenfist.mariadb.delete_orphaned_artifact_attributes',
+                return_value=0)
+    @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
+                return_value=0)
+    def test_one_unreadable_zombie_does_not_block_the_rest_of_its_type(
+            self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
+            mock_set_state, mock_add_event):
+        # The pass stops at the zombie whose liveness read failed, so in
+        # a fixed order the first zombie of a type gates every zombie
+        # behind it. One row whose attributes query is the one that
+        # times out would then block its whole type indefinitely. The
+        # next pass begins at the zombie after it instead.
+        first, second = sorted([BLOB_UUID_1, BLOB_UUID_2])
+        mock_stateless.side_effect = self._two_zombies_of(
+            ObjectType.NAMESPACE_KEY)
+
+        def only_the_first_is_unreadable(obj_uuid):
+            if str(obj_uuid) == first:
+                raise DatabaseUnavailable('this row is the slow one')
+            return mock.sentinel.attributes
+
+        with mock.patch('shakenfist.mariadb.get_namespace_key_attributes',
+                        side_effect=only_the_first_is_unreadable):
+            st.reconcile_orphaned_objects()
+            st.reconcile_orphaned_objects()
+            # The marker says where to begin, which is the zombie
+            # after the one that stopped the pass.
+            self.assertEqual(second, st._ZOMBIE_RESUME_AFTER['namespace_key'])
+            mock_set_state.assert_not_called()
+
+            # Second pass: begins at the one behind it, which is
+            # readable, and repairs it.
+            st.reconcile_orphaned_objects()
+
+        self.assertEqual([second],
+                         [c.args[1] for c in mock_set_state.call_args_list])
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_stateless_object_uuids')
+    @mock.patch('shakenfist.mariadb.delete_orphaned_artifact_attributes',
+                return_value=0)
+    @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
+                return_value=0)
+    def test_a_liveness_failure_that_is_not_the_tier_is_counted(
+            self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
+            mock_set_state, mock_add_event):
+        # Such a failure costs only its own object, but it will fail the
+        # same way every pass for as long as the row is that shape, and
+        # the object stays a candidate. A traceback an hour is not
+        # something anyone can alert on, so it is counted as well.
+        labels = {'object_type': 'namespace_key'}
+        before = REGISTRY.get_sample_value(
+            'cluster_zombie_liveness_errors_total', labels) or 0
+        mock_stateless.side_effect = self._two_zombies_of(
+            ObjectType.NAMESPACE_KEY)
+
+        with mock.patch('shakenfist.mariadb.get_namespace_key_attributes',
+                        side_effect=[RuntimeError('odd row'),
+                                     mock.sentinel.attributes]):
+            st.reconcile_orphaned_objects()
+            st.reconcile_orphaned_objects()
+
+        self.assertEqual(
+            before + 1,
+            REGISTRY.get_sample_value(
+                'cluster_zombie_liveness_errors_total', labels))
+        # The pass carried on: the other zombie of this type was still
+        # repaired.
+        mock_set_state.assert_called_once()
 
 
 class ReapFederationRecordsTestCase(base.ShakenFistTestCase):
