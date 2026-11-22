@@ -220,7 +220,9 @@ So the job also runs on a `pull_request` whose diff touches what those
 modules cover — `shakenfist/mariadb*.py`, `shakenfist/schema/**`, the live
 modules themselves, the test-support modules they import
 (`shakenfist/tests/hard_delete_cases.py` decides what the hard delete live
-test asserts), and the job's own three tools files — through the
+test asserts), the object modules a live test drives directly
+(`shakenfist/network/interface.py` for the device index live test), and the
+job's own three tools files — through the
 `live_mariadb` output of a second `dorny/paths-filter` step in
 `check_paths`. It is a second step and not another filter in the first
 because `predicate-quantifier` is a step-level input: the first step needs

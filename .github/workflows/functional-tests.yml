@@ -149,7 +149,9 @@ jobs:
       # EXPECTED_SCHEMA_VERSIONS in shakenfist/mariadb.py, the table shapes
       # under shakenfist/schema/, the live modules themselves, the
       # test-support modules they import (hard_delete_cases.py decides what
-      # the hard delete live test asserts), and the three tools files the
+      # the hard delete live test asserts), the object modules a live test
+      # drives directly (network/interface.py's NetworkInterface is what the
+      # device index live test exercises), and the three tools files the
       # job runs. shakenfist/tests/test_schema_enum_widening_seams.py holds
       # the list to that set -- including every in-repo module a live module
       # imports, bar a short named list of deliberate exclusions -- so a new
@@ -166,6 +168,7 @@ jobs:
               - 'shakenfist/schema/**'
               - 'shakenfist/tests/test_mariadb_*_live.py'
               - 'shakenfist/tests/hard_delete_cases.py'
+              - 'shakenfist/network/interface.py'
               - 'tools/ci-enum-widening-test.sh'
               - 'tools/ci-install-mariadb.sh'
               - 'tools/bootstrap-mariadb.sql'
