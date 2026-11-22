@@ -598,6 +598,38 @@ Departures from the plan are recorded here as they happen.
   Four provider OAuth error bodies tripped it, and were
   reformatted as multi-line JSON -- the escape that test's own
   docstring names -- rather than the test being touched.
+* **Step 8g ran at a heavier model and effort than its row
+  specified**, and the row was written before either provider
+  had been touched. What the two provider steps found -- two
+  device-flow switches, a certificate needing a subject
+  alternative name, renamed bootstrap variables, regex redirect
+  matching, and three provider fields whose API defaults are
+  empty and silently break a login -- is more intricate than
+  `medium` on a lighter model assumed. The step was told not to
+  read its own row as licence to do less.
+* **Automating the lab found three things doing it by hand had
+  not.** The second provider answers its readiness endpoint
+  before its worker has created the brand and flows it ships
+  with; setting that brand's web certificate does not reliably
+  make the server present it; and its flow executor enforces
+  cross-site request forgery protection once authenticated,
+  where following a redirect re-posts the form and answers the
+  *next* stage while looking like a validation error. None of
+  these were in either provider's notes, because a person
+  clicking through does not meet them. This is the argument for
+  the lab in one paragraph.
+* **Two differences between the fixtures and the walkthroughs
+  are known and deliberate**, recorded here so a later reader
+  does not take either for an error. The second provider's
+  captured claim set carries `email` and `email_verified`, which
+  it emits only when the login asks for the email scope, so the
+  lab captures with that scope while the documented `oidc_scopes`
+  stays `openid profile`; the claim the rules bind is unaffected.
+  And that provider's walkthrough names its realm for a reader
+  while the fixture's issuer carries the name the lab uses,
+  because the tests compare issuer strings exactly. Both are
+  overridable in the lab and neither makes a documented
+  statement false.
 * **A definition-of-done item was replaced rather than ticked.**
   It counted occurrences of `device_authorization_endpoint`
   with `grep -c` and expected 1. Keycloak publishes the name
