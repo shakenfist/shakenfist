@@ -129,6 +129,36 @@ def handles_credentials():
 TRANSIENT_RETRY_AFTER_SECONDS = 15
 
 
+# The ``Retry-After`` header as a response declaration carries it, in
+# the form swagger_helper() takes: (name, type token, description).
+#
+# Here rather than beside each endpoint that declares it, and spelling
+# the number from the constant above rather than writing 15 into the
+# prose, because this module is also where the header is *set* --
+# capacity_error() below, and the two 503 arms in external_api/instance.py
+# which read TRANSIENT_RETRY_AFTER_SECONDS from here. One fact, one
+# place: the published specification cannot say a different number from
+# the one the server sends.
+#
+# Two forms because the two responses differ in a way a client has to
+# know about and OpenAPI 2.0 cannot express: a 503 from a database
+# failure always carries the header, while a 507 carries it only when
+# the refusal is transient. A header object has no "sometimes", so the
+# difference is in the description where a reader will see it.
+RETRY_AFTER_HEADER = (
+    'Retry-After', 'unsignedinteger',
+    'How many seconds to wait before retrying this request. Always '
+    'present on this response, and fixed at %d.'
+    % TRANSIENT_RETRY_AFTER_SECONDS)
+
+TRANSIENT_RETRY_AFTER_HEADER = (
+    'Retry-After', 'unsignedinteger',
+    'How many seconds to wait before retrying this request, fixed at '
+    '%d. Present only when the body says `transient` is true; a refusal '
+    'no wait can clear carries no Retry-After at all.'
+    % TRANSIENT_RETRY_AFTER_SECONDS)
+
+
 # The capacity refusal vocabulary, re-exported from shakenfist.constants
 # where it is defined, because this module is where callers (and this
 # repository's own handlers, as api_base.<name>) already look for it.
@@ -1602,6 +1632,101 @@ def _validated_constraints(section: str, name: str,
     return constraints
 
 
+# The keys a response declaration's optional fourth element may carry.
+# One for now. It is a dictionary rather than a fifth positional
+# element so that the next thing a response needs to say -- a body
+# schema, which issue 4240 raised alongside headers -- is an added key
+# rather than another arity change.
+RESPONSE_EXTRA_KEYS = frozenset(['headers'])
+
+
+def _validated_response_headers(section: str, httpcode: Any,
+                                extras: Any) -> dict[str, Any]:
+    """Render a response declaration's headers, or refuse it.
+
+    A response used to be a (httpcode, description, sample) three-tuple
+    and nothing else, so a header a response really carries could only
+    be described in the English of its description string: POST
+    /instances answers a transient capacity refusal with
+    ``Retry-After: 15``, and that -- the part a client is meant to read
+    and act on -- was invisible to a generated client (issue 4240).
+
+    A header is declared as (name, type token, description), reusing
+    ARGTYPES rather than growing a second type vocabulary beside it,
+    because two vocabularies for one thing is how a published
+    specification and the code behind it stop agreeing. OpenAPI 2.0
+    header objects take the same type and format keys a primitive
+    parameter does, which is why the tokens transfer; what they do not
+    take is a schema, so the object-valued tokens are refused here for
+    the same reason they are refused outside a body.
+
+    InvalidAPIDeclaration on every defect, like every other malformed
+    declaration, so sf-api does not start rather than serving a
+    specification nobody checked.
+    """
+    if not isinstance(extras, dict):
+        raise exceptions.InvalidAPIDeclaration(
+            '%s response %r declares extras which are not a dictionary: '
+            '%r' % (section, httpcode, extras))
+
+    unknown = set(extras) - RESPONSE_EXTRA_KEYS
+    if unknown:
+        raise exceptions.InvalidAPIDeclaration(
+            '%s response %r declares unknown response keys %s; the known '
+            'keys are %s'
+            % (section, httpcode, ', '.join(sorted(unknown)),
+               ', '.join(sorted(RESPONSE_EXTRA_KEYS))))
+
+    declarable = set(ARGTYPES) - {'bearer'}
+    out: dict[str, Any] = {}
+    for header in extras.get('headers', []):
+        # Checked before destructuring, for the reason the parameter
+        # loop checks its own arity: a wrong-shaped declaration has to
+        # arrive as an InvalidAPIDeclaration rather than as a ValueError
+        # from unpacking.
+        if not isinstance(header, (tuple, list)) or len(header) != 3:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s response %r declares a header which is not a (name, '
+                'type, description) tuple of three elements: %r'
+                % (section, httpcode, header))
+        (name, argtype, headerdescription) = header
+
+        if not isinstance(name, str) or not name:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s response %r declares a header with no name: %r'
+                % (section, httpcode, header))
+        if name in out:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s response %r declares the header %s twice'
+                % (section, httpcode, name))
+        if argtype not in declarable:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s response %r header %s declares type %r, which is not '
+                'one of %s'
+                % (section, httpcode, name, argtype,
+                   ', '.join(sorted(declarable))))
+
+        rendered = copy.deepcopy(ARGTYPES[argtype])
+        # A header carries a primitive, exactly like a parameter outside
+        # a body: there is no schema object to nest a structure in, so
+        # an object, an array of objects or an unconstrained value
+        # renders an invalid specification. 'any' is named rather than
+        # inspected because it is the one token with no 'type' key at
+        # all, so it would pass both tests below.
+        if (rendered.get('type') == 'object'
+                or rendered.get('items', {}).get('type') == 'object'
+                or argtype == 'any'):
+            raise exceptions.InvalidAPIDeclaration(
+                '%s response %r header %s declares type %r, but a '
+                'header can only carry a primitive value'
+                % (section, httpcode, name, argtype))
+
+        rendered['description'] = headerdescription
+        out[name] = rendered
+
+    return out
+
+
 # https://swagger.io/specification/v2/ defines the schema for this dictionary
 def swagger_helper(section, description, parameters, responses,
                    requires_admin=False, requires_auth=True):
@@ -1809,7 +1934,21 @@ def swagger_helper(section, description, parameters, responses,
             'schema': schema
         })
 
-    for (httpcode, respdescription, sample) in responses:
+    for response in responses:
+        # Explicitly, and first, for the reason the parameter loop
+        # checks its own arity: destructuring raises ValueError on a
+        # wrong-arity tuple, which names neither the endpoint nor the
+        # response it came from, and every malformed declaration has to
+        # arrive as an InvalidAPIDeclaration so there is one exception
+        # type to catch.
+        if not isinstance(response, (tuple, list)) or len(
+                response) not in (3, 4):
+            raise exceptions.InvalidAPIDeclaration(
+                '%s declares a response which is not a (httpcode, '
+                'description, sample[, extras]) tuple of three or four '
+                'elements: %r' % (section, response))
+        (httpcode, respdescription, sample) = response[:3]
+
         out['responses'][httpcode] = {
             'description': respdescription
         }
@@ -1817,6 +1956,11 @@ def swagger_helper(section, description, parameters, responses,
             out['responses'][httpcode]['examples'] = {
                 'application/json': sample
             }
+        if len(response) == 4:
+            headers = _validated_response_headers(
+                section, httpcode, response[3])
+            if headers:
+                out['responses'][httpcode]['headers'] = headers
 
     # The responses the decorators answer before any handler runs.
     # These used to be appended to the endpoint's own list, so an

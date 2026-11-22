@@ -77,3 +77,147 @@ class SwaggerHelperResponsesTestCase(base.ShakenFistTestCase):
         responses = [(200, 'Fine.', None)]
         _helper(responses)
         self.assertEqual([(200, 'Fine.', None)], responses)
+
+
+class SwaggerHelperResponseHeadersTestCase(base.ShakenFistTestCase):
+    """The optional fourth element of a response declaration.
+
+    A response was a (httpcode, description, sample) three-tuple and
+    nothing more, so a header the response really carries could only be
+    written in English in its description -- which is how `POST
+    /instances` came to serve `Retry-After` while publishing it as prose
+    (issue 4240). The parameter side of the same declaration had already
+    grown an optional sixth element for constraints; this is the
+    response side catching up.
+    """
+
+    def test_a_three_tuple_is_still_a_valid_response(self):
+        out = _helper([(200, 'Fine.', None)])
+        self.assertNotIn('headers', out['responses'][200])
+
+    def test_a_declared_header_is_published(self):
+        out = _helper([
+            (503, 'Try later.', None,
+             {'headers': [('Retry-After', 'unsignedinteger', 'Seconds.')]})])
+
+        self.assertEqual(
+            {'Retry-After': {
+                'type': 'integer', 'format': 'int64', 'minimum': 0,
+                'description': 'Seconds.'}},
+            out['responses'][503]['headers'])
+
+    def test_a_response_declaring_no_headers_publishes_none(self):
+        # An empty list is not an empty 'headers' object: OpenAPI 2.0
+        # permits one, but publishing it says something about the
+        # response that is not true.
+        out = _helper([(200, 'Fine.', None, {'headers': []})])
+        self.assertNotIn('headers', out['responses'][200])
+
+    def test_several_headers_on_one_response(self):
+        out = _helper([
+            (200, 'Fine.', None,
+             {'headers': [('X-One', 'string', 'One.'),
+                          ('X-Two', 'integer', 'Two.')]})])
+        self.assertEqual(
+            ['X-One', 'X-Two'], sorted(out['responses'][200]['headers']))
+
+    def test_the_type_vocabulary_is_shared_with_parameters(self):
+        # Not a second mapping of tokens to types. ARGTYPES renders a
+        # header exactly as it renders a primitive parameter, which is
+        # the property that stops the two drifting.
+        out = _helper([
+            (200, 'Fine.', None,
+             {'headers': [('X-When', 'unsignedinteger', 'When.')]})])
+        rendered = dict(out['responses'][200]['headers']['X-When'])
+        del rendered['description']
+        self.assertEqual(api_base.ARGTYPES['unsignedinteger'], rendered)
+
+    def test_the_vocabulary_is_not_mutated_by_rendering(self):
+        # The parameter loop deep copies for this reason: a shallow copy
+        # aliases a module-level mutable into every declaration in the
+        # tree and into the specification flasgger re-reads per request.
+        before = dict(api_base.ARGTYPES['unsignedinteger'])
+        _helper([(200, 'Fine.', None,
+                  {'headers': [('X-When', 'unsignedinteger', 'When.')]})])
+        self.assertEqual(before, api_base.ARGTYPES['unsignedinteger'])
+
+    # ------------------------------------------------------------------
+    # Every malformed declaration arrives as InvalidAPIDeclaration, so
+    # there is one exception type to catch and sf-api does not start.
+    # ------------------------------------------------------------------
+    def test_a_two_element_response_is_refused(self):
+        self.assertRaises(
+            exceptions.InvalidAPIDeclaration, _helper, [(200, 'Fine.')])
+
+    def test_a_five_element_response_is_refused(self):
+        self.assertRaises(
+            exceptions.InvalidAPIDeclaration, _helper,
+            [(200, 'Fine.', None, {}, 'extra')])
+
+    def test_a_response_which_is_not_a_tuple_is_refused(self):
+        self.assertRaises(
+            exceptions.InvalidAPIDeclaration, _helper, ['200'])
+
+    def test_extras_which_are_not_a_dictionary_are_refused(self):
+        self.assertRaises(
+            exceptions.InvalidAPIDeclaration, _helper,
+            [(200, 'Fine.', None, [('X-One', 'string', 'One.')])])
+
+    def test_an_unknown_extras_key_is_refused(self):
+        # Rather than ignored, which is how a response would come to
+        # declare a body schema that nothing published.
+        self.assertRaises(
+            exceptions.InvalidAPIDeclaration, _helper,
+            [(200, 'Fine.', None, {'schema': {'type': 'object'}})])
+
+    def test_a_header_which_is_not_a_triple_is_refused(self):
+        self.assertRaises(
+            exceptions.InvalidAPIDeclaration, _helper,
+            [(200, 'Fine.', None, {'headers': [('X-One', 'string')]})])
+
+    def test_a_header_with_no_name_is_refused(self):
+        self.assertRaises(
+            exceptions.InvalidAPIDeclaration, _helper,
+            [(200, 'Fine.', None, {'headers': [('', 'string', 'One.')]})])
+
+    def test_a_header_declared_twice_is_refused(self):
+        self.assertRaises(
+            exceptions.InvalidAPIDeclaration, _helper,
+            [(200, 'Fine.', None,
+              {'headers': [('X-One', 'string', 'One.'),
+                           ('X-One', 'integer', 'Again.')]})])
+
+    def test_an_unknown_type_token_is_refused(self):
+        self.assertRaises(
+            exceptions.InvalidAPIDeclaration, _helper,
+            [(200, 'Fine.', None, {'headers': [('X-One', 'wat', 'One.')]})])
+
+    def test_the_bearer_token_is_not_a_declarable_header_type(self):
+        # swagger_helper() injects the Authorization parameter itself,
+        # so 'bearer' is not a token an endpoint may declare -- the same
+        # rule the parameter loop applies.
+        self.assertRaises(
+            exceptions.InvalidAPIDeclaration, _helper,
+            [(200, 'Fine.', None,
+              {'headers': [('Authorization', 'bearer', 'One.')]})])
+
+    def test_a_structured_type_is_refused_on_a_header(self):
+        # A header carries a primitive. There is no schema object to
+        # nest a structure in, so this would render an invalid
+        # specification.
+        self.assertRaises(
+            exceptions.InvalidAPIDeclaration, _helper,
+            [(200, 'Fine.', None, {'headers': [('X-One', 'dict', 'One.')]})])
+
+    def test_an_array_of_objects_is_refused_on_a_header(self):
+        self.assertRaises(
+            exceptions.InvalidAPIDeclaration, _helper,
+            [(200, 'Fine.', None,
+              {'headers': [('X-One', 'arrayofdict', 'One.')]})])
+
+    def test_the_any_token_is_refused_on_a_header(self):
+        # Named rather than inspected: 'any' is the one token with no
+        # 'type' key at all, so it passes both structural checks.
+        self.assertRaises(
+            exceptions.InvalidAPIDeclaration, _helper,
+            [(200, 'Fine.', None, {'headers': [('X-One', 'any', 'One.')]})])

@@ -305,9 +305,42 @@ the signature accepts body keys nothing can enumerate (`log_request`
 merges the whole JSON body into the handler's kwargs), so the audit
 refuses to proceed rather than reporting a tree it could not check.
 
-**A note on responses:** nothing validates the response list, and some
-responses are not declared per endpoint at all. Two decorators sit in
-`Resource.method_decorators`, so **every** endpoint can answer `503`
+**A note on responses:** a response is declared as a `(httpcode,
+description, sample)` tuple, with an optional fourth element carrying
+anything else the response has to say about itself. One key is
+understood today:
+
+```python
+(503, 'The database could not be reached; the request can be retried.',
+ None, {'headers': [api_base.RETRY_AFTER_HEADER]}),
+```
+
+A header is `(name, type token, description)`, taking its type from the
+same `ARGTYPES` vocabulary a parameter does, and carrying a primitive
+for the reason a parameter outside a body must: a header object has no
+schema to nest a structure in. The arity, the keys and each header are
+checked when the module is imported, like every other part of a
+declaration, so a malformed one stops sf-api starting rather than
+serving a specification nobody checked.
+
+Declare a header your endpoint really sets. Until
+[issue 4240](https://github.com/shakenfist/shakenfist/issues/4240) a
+response could not express one at all, so `POST /instances` served
+`Retry-After` on a transient capacity refusal and published it only as
+English in the description, where a generated client cannot find it.
+`shakenfist/tests/external_api/test_response_headers.py` now holds every
+header-setting site in the API layer against the declarations that
+publish it, so adding one without declaring it fails the unit suite.
+Where the value is a constant, declare the header beside the constant
+(as `RETRY_AFTER_HEADER` is, in `external_api/base.py`) rather than
+writing the number into the prose twice.
+
+A response declaration still cannot carry a body *schema*, which is the
+other half of 4240 and is not built: publish a `sample` instead, which
+is machine-readable as an example if not as a schema.
+
+Some responses are not declared per endpoint at all. Two decorators sit
+in `Resource.method_decorators`, so **every** endpoint can answer `503`
 without declaring it:
 
 * `handle_database_unavailable`, when the database tier is unreachable.

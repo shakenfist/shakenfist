@@ -712,6 +712,92 @@ def declarations(fn: ast.FunctionDef, path: Optional[str] = None,
     return out
 
 
+def response_headers(
+        fn: ast.FunctionDef,
+        constants: Optional[dict[str, Any]] = None
+) -> dict[Any, Optional[set[str]]]:
+    """The response headers a handler's declaration publishes.
+
+    Keyed by the declared HTTP code, as the declaration writes it. A
+    response declaring none, or declared as the three-tuple which
+    cannot carry one, contributes an empty set rather than being
+    absent, so "declares this code and publishes no header" and "does
+    not declare this code at all" stay distinguishable.
+
+    A declaration this cannot read statically contributes ``None``
+    under the code it could read, or under ``None`` when even that was
+    unreadable, so an unreadable declaration fails an audit rather than
+    escaping every assertion in it.
+
+    A header is declared as (name, type, description) -- see
+    ``base._validated_response_headers()`` -- or as a name bound to
+    such a tuple, which is how the one header in the tree is written so
+    that the published description and the value the server sends come
+    from one place. ``constants`` is where such a name is resolved;
+    ``base_constants()`` by default, which reads base.py's literals
+    from source. A caller which can import the module (a test) should
+    pass its namespace instead, because a constant assembled from
+    another constant is not a literal and source reading cannot see it.
+    """
+    if constants is None:
+        constants = base_constants()
+
+    out: dict[Any, Optional[set[str]]] = {}
+    for dec in fn.decorator_list:
+        if 'swagger_helper' not in ast.unparse(dec):
+            continue
+        call = dec.args[0] if isinstance(dec, ast.Call) and dec.args else None
+        if not (isinstance(call, ast.Call) and len(call.args) >= 4
+                and isinstance(call.args[3], ast.List)):
+            out[None] = None
+            continue
+        for item in call.args[3].elts:
+            if not (isinstance(item, ast.Tuple) and len(item.elts) in (3, 4)):
+                out[None] = None
+                continue
+            httpcode = literal(item.elts[0])
+            names = out.setdefault(httpcode, set())
+            if len(item.elts) == 3 or names is None:
+                continue
+            for name in _declared_header_names(item.elts[3], constants):
+                if name is None:
+                    out[httpcode] = None
+                    break
+                names.add(name)
+    return out
+
+
+def _declared_header_names(extras: ast.expr,
+                           constants: dict[str, Any]) -> list[Optional[str]]:
+    """Each header name in a response's extras, None for an unreadable one."""
+    if not isinstance(extras, ast.Dict):
+        return [None]
+
+    out: list[Optional[str]] = []
+    for key, value in zip(extras.keys, extras.values):
+        if literal(key) != 'headers':
+            continue
+        if not isinstance(value, (ast.List, ast.Tuple)):
+            return [None]
+        for header in value.elts:
+            if isinstance(header, (ast.Name, ast.Attribute)):
+                resolved = constants.get(
+                    ast.unparse(header).split('.')[-1])
+                if (isinstance(resolved, (list, tuple))
+                        and len(resolved) == 3
+                        and isinstance(resolved[0], str)):
+                    out.append(resolved[0])
+                    continue
+                return [None]
+            if not isinstance(header, ast.Tuple) or len(header.elts) != 3:
+                return [None]
+            name = literal(header.elts[0])
+            if not isinstance(name, str):
+                return [None]
+            out.append(name)
+    return out
+
+
 def documented(fn: ast.FunctionDef) -> bool:
     """Does this handler carry a swagger_helper declaration at all?
 

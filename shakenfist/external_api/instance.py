@@ -801,7 +801,8 @@ class InstancesEndpoint(api_base.Resource):
                 'placement or a network interface. The half-built '
                 'instance is torn down (the error body names its uuid) '
                 'and the request can be retried; the response carries a '
-                '`Retry-After` header.', None),
+                '`Retry-After` header.', None,
+                {'headers': [api_base.RETRY_AFTER_HEADER]}),
             (507, 'Unable to allocate resources for the instance. A refusal '
                 'from scheduling carries `stage` (the scheduler filter that '
                 'refused, or `capacity_guard`) and a boolean `transient` in '
@@ -810,7 +811,8 @@ class InstancesEndpoint(api_base.Resource):
                 'to wait before trying again. A refusal no wait can clear -- '
                 'a structural filter stage such as `cpu_max_per_instance`, '
                 'or a congested network -- is not transient and carries no '
-                '`Retry-After`.', instance_post_507_example)
+                '`Retry-After`.', instance_post_507_example,
+                {'headers': [api_base.TRANSIENT_RETRY_AFTER_HEADER]})
          ]))
     @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
@@ -1585,7 +1587,8 @@ class InstanceInterfacesEndpoint(api_base.Resource):
                   'plugs competed for a device index.', None),
             (503, 'The database could not be reached while recording the '
                   'interface. The request can be retried; the response '
-                  'carries a `Retry-After` header.', None)
+                  'carries a `Retry-After` header.', None,
+                  {'headers': [api_base.RETRY_AFTER_HEADER]})
         ]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
