@@ -1431,6 +1431,76 @@ class CapacityCounterTestCase(SchedulerTestCase):
         # the 20 GB config default reservation).
         self.assertEqual(2000 - 20, node2['disk_available'])
 
+    def test_summarize_resources_publishes_the_held_figures(self):
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.set_node_capacity(
+            self._node_uuid('node2'), limit_cpus=16, limit_memory_mb=30000,
+            limit_disk_gb=500, used_cpus=5, used_memory_mb=10000,
+            used_disk_gb=12, held_cpus=3, held_memory_mb=4000,
+            held_disk_gb=40)
+
+        resources = scheduler.Scheduler().summarize_resources()
+        node2 = resources['per_node'][self._node_uuid('node2')]
+        self.assertEqual(3, node2['cpu_held'])
+        self.assertEqual(4000, node2['ram_held_mb'])
+        self.assertEqual(40, node2['disk_held_gb'])
+        # Committed figures are unchanged by the holds beside them.
+        self.assertEqual(5, node2['cpu_committed'])
+        self.assertEqual(10000, node2['ram_committed'])
+        self.assertEqual(12, node2['disk_committed_gb'])
+
+    def test_summarize_resources_nets_held_out_of_cpu_and_ram(self):
+        # Admission refuses against used + held, so headroom must fall
+        # by the held amount: 16 - (5 + 3) cpus and 30000 - (10000 +
+        # 4000) MB, the ledger term being the binding one for RAM.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.set_node_capacity(
+            self._node_uuid('node2'), limit_cpus=16, limit_memory_mb=30000,
+            used_cpus=5, used_memory_mb=10000, held_cpus=3,
+            held_memory_mb=4000)
+
+        resources = scheduler.Scheduler().summarize_resources()
+        node2 = resources['per_node'][self._node_uuid('node2')]
+        self.assertEqual(16.0 - 5 - 3, node2['cpu_available'])
+        self.assertEqual(30000 - 10000 - 4000, node2['ram_available'])
+
+    def test_summarize_resources_does_not_net_held_out_of_disk(self):
+        # disk_available is a filesystem measurement with no ledger
+        # term. The node books held disk (40 GB) so that netting it
+        # out would move the figure: with held disk of zero this
+        # assertion would pass whether or not the netting existed.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.set_node_capacity(
+            self._node_uuid('node2'), limit_cpus=16, limit_memory_mb=100000,
+            limit_disk_gb=500, used_disk_gb=12, held_disk_gb=40)
+
+        resources = scheduler.Scheduler().summarize_resources()
+        node2 = resources['per_node'][self._node_uuid('node2')]
+        self.assertEqual(40, node2['disk_held_gb'])
+        self.assertEqual(2000 - 20, node2['disk_available'])
+
+    def test_summarize_resources_cluster_totals_floor_held_overshoot(self):
+        # A node whose holds exceed its headroom reports negative
+        # per-node figures, which must not eat into the totals other
+        # nodes provide. Nodes 3 and 4 have no row, so the expected
+        # totals are exactly their (unheld) headroom.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.set_node_capacity(
+            self._node_uuid('node2'), limit_cpus=16, limit_memory_mb=30000,
+            used_cpus=10, used_memory_mb=20000, held_cpus=12,
+            held_memory_mb=20000)
+
+        resources = scheduler.Scheduler().summarize_resources()
+        node2 = resources['per_node'][self._node_uuid('node2')]
+        self.assertLess(node2['cpu_available'], 0)
+        self.assertLess(node2['ram_available'], 0)
+        others = [resources['per_node'][self._node_uuid(n)]
+                  for n in ('node3', 'node4')]
+        self.assertEqual(sum(o['cpu_available'] for o in others),
+                         resources['total']['cpu_available'])
+        self.assertEqual(sum(o['ram_available'] for o in others),
+                         resources['total']['ram_available'])
+
     def test_summarize_resources_publishes_capacity_degraded_on_a_failed_read(self):
         # A failed read (D19) is not acted on here -- there is no
         # instance to event against -- but the CI headroom probe (and
@@ -1476,6 +1546,9 @@ class CapacityCounterTestCase(SchedulerTestCase):
         # the signal that this node admits disk unguarded.
         self.assertIsNone(node3['disk_limit_gb'])
         self.assertEqual(0, node3['disk_committed_gb'])
+        self.assertEqual(0, node3['cpu_held'])
+        self.assertEqual(0, node3['ram_held_mb'])
+        self.assertEqual(0, node3['disk_held_gb'])
 
     def test_summarize_resources_takes_the_larger_of_the_two(self):
         # The counters are an allocation ledger and the measurement

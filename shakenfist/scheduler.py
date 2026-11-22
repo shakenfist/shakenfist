@@ -815,7 +815,14 @@ def _summarize_resources(metrics, metrics_unavailable):
         resources['per_node'][n]['domains_enumerated_at'] = \
             metrics[n].get('domains_enumerated_at')
         resources['per_node'][n]['cpu_committed'] = committed_cpus
-        current_cpu = max(measured_cpus, committed_cpus)
+        # Room a claim has booked for instances it has not yet placed.
+        # Admission refuses against used + held, so headroom which did
+        # not net it out would advertise room the guard will deny. The
+        # same zero-without-a-row convention as the committed figures
+        # applies, and cpu_committed_row_present says what it means.
+        held_cpus = row['held_cpus'] if row else 0
+        resources['per_node'][n]['cpu_held'] = held_cpus
+        current_cpu = max(measured_cpus, committed_cpus + held_cpus)
         resources['per_node'][n]['cpu_available'] = hard_max_cpus - current_cpu
         # A node packed beyond the cap (for example after the cap was
         # lowered) reports negative per-node headroom, which is honest,
@@ -843,12 +850,15 @@ def _summarize_resources(metrics, metrics_unavailable):
             config.RAM_OVERCOMMIT_RATIO
         committed_mb = row['used_memory_mb'] if row else 0
         resources['per_node'][n]['ram_committed'] = committed_mb
+        held_mb = row['held_memory_mb'] if row else 0
+        resources['per_node'][n]['ram_held_mb'] = held_mb
         ram_available = \
             (metrics[n].get('memory_max', 0) * config.RAM_OVERCOMMIT_RATIO -
              metrics[n].get('memory_total_instance_actual', 0))
         if row:
             ram_available = min(
-                ram_available, row['limit_memory_mb'] - committed_mb)
+                ram_available,
+                row['limit_memory_mb'] - committed_mb - held_mb)
         resources['per_node'][n]['ram_available'] = ram_available
         resources['total']['ram_available'] += max(
             0, resources['per_node'][n]['ram_available'])
@@ -861,6 +871,11 @@ def _summarize_resources(metrics, metrics_unavailable):
         disk_free = int(metrics[n].get(
             'disk_free_instances', '0')) / GiB
         disk_free -= reservation
+        # Held disk is deliberately not netted out of this figure. It
+        # is a filesystem measurement with no ledger term in it, so
+        # subtracting a booking would make it the first one, and it
+        # would then disagree with the guard, which tests against
+        # disk_limit_gb. disk_held_gb is published below instead.
         resources['per_node'][n]['disk_available'] = disk_free
         # The capacity row's disk counters are published for the same
         # reason cpu_limit and cpu_committed are: disk_available is
@@ -875,6 +890,8 @@ def _summarize_resources(metrics, metrics_unavailable):
             row['limit_disk_gb'] if row else None
         resources['per_node'][n]['disk_committed_gb'] = \
             row['used_disk_gb'] if row else 0
+        resources['per_node'][n]['disk_held_gb'] = \
+            row['held_disk_gb'] if row else 0
 
         # Instance count
         resources['per_node'][n]['instances_total'] = metrics[n].get(

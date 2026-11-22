@@ -121,6 +121,7 @@ admin_resources_get_example = """{
             "cpu_measured": 18,
             "domains_enumerated_at": 1792886390.12,
             "cpu_committed": 24,
+            "cpu_held": 0,
             "cpu_available": 66.0,
             "cpu_load_1": 2.41,
             "cpu_load_5": 2.13,
@@ -129,10 +130,12 @@ admin_resources_get_example = """{
             "ram_max_per_instance": 81920,
             "ram_max": 393216.0,
             "ram_committed": 40960,
+            "ram_held_mb": 0,
             "ram_available": 344064,
             "disk_available": 1780.0,
             "disk_limit_gb": 1900,
             "disk_committed_gb": 700,
+            "disk_held_gb": 0,
             "instances_total": 9,
             "instances_active": 8
         }
