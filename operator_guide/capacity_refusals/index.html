@@ -16645,7 +16645,10 @@ will name a minimum client version once that release is cut.</p>
 <p>The server half of the contract described above is live regardless: the
 <code>Retry-After</code> header and the <code>stage</code> and <code>transient</code> body fields are
 readable by any HTTP client today, and implementing the retry yourself
-needs nothing from the library.</p>
+needs nothing from the library. The header is also published in the
+OpenAPI specification the cluster serves, so a generated client can
+discover it; the <code>stage</code> and <code>transient</code> body fields are published as
+an example rather than as a schema.</p>
 </div>
 <p>The <code>shakenfist-client</code> Python library includes an optional retry for
 transient refusals. It is <strong>off by default</strong>.</p>

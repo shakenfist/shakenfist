@@ -16373,6 +16373,10 @@ are listed in <code>UNDOCUMENTED_BY_DESIGN</code> in
 <td><code>path</code></td>
 </tr>
 <tr>
+<td>parsed by <code>@api_base.use_declared_args(...)</code></td>
+<td><code>query</code></td>
+</tr>
+<tr>
 <td>in a schema bound with <code>@use_kwargs(..., location='query')</code></td>
 <td><code>query</code></td>
 </tr>
@@ -16451,9 +16455,43 @@ exemption path for one at all — so declare it or stop consuming it.</p>
 the signature accepts body keys nothing can enumerate (<code>log_request</code>
 merges the whole JSON body into the handler's kwargs), so the audit
 refuses to proceed rather than reporting a tree it could not check.</p>
-<p><strong>A note on responses:</strong> nothing validates the response list, and some
-responses are not declared per endpoint at all. Two decorators sit in
-<code>Resource.method_decorators</code>, so <strong>every</strong> endpoint can answer <code>503</code>
+<p><strong>A note on responses:</strong> a response is declared as a <code>(httpcode,
+description, sample)</code> tuple, with an optional fourth element carrying
+anything else the response has to say about itself. One key is
+understood today:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">(</span><span class="mi">503</span><span class="p">,</span> <span class="s1">'The database could not be reached; the request can be retried.'</span><span class="p">,</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a> <span class="kc">None</span><span class="p">,</span> <span class="p">{</span><span class="s1">'headers'</span><span class="p">:</span> <span class="p">[</span><span class="n">api_base</span><span class="o">.</span><span class="n">RETRY_AFTER_HEADER</span><span class="p">]}),</span>
+</code></pre></div>
+<p>A header is <code>(name, type token, description)</code>, taking its type from the
+same <code>ARGTYPES</code> vocabulary a parameter does, and carrying a primitive
+for the reason a parameter outside a body must: a header object has no
+schema to nest a structure in. The arity, the keys and each header are
+checked when the module is imported, like every other part of a
+declaration, so a malformed one stops sf-api starting rather than
+serving a specification nobody checked.</p>
+<p>Declare a header your endpoint really sets. Until
+<a href="https://github.com/shakenfist/shakenfist/issues/4240">issue 4240</a> a
+response could not express one at all, so <code>POST /instances</code> served
+<code>Retry-After</code> on a transient capacity refusal and published it only as
+English in the description, where a generated client cannot find it.
+<code>shakenfist/tests/external_api/test_response_headers.py</code> now holds every
+header-setting site in the API layer against the declarations that
+publish it, so adding one without declaring it fails the unit suite. It
+recognises a <code>.headers[...]</code> assignment, a mutator such as
+<code>.headers.add()</code> or <code>.headers.update()</code>, and headers passed to
+<code>flask.Response</code> or <code>make_response</code>; a site it cannot read fails rather
+than being skipped. It does not recognise flask-restful's
+<code>return body, code, headers</code> tuple, which is indistinguishable from the
+three-tuples the API helpers return for other reasons — set the header
+on a response object instead.
+Where the value is a constant, declare the header beside the constant
+(as <code>RETRY_AFTER_HEADER</code> is, in <code>external_api/base.py</code>) rather than
+writing the number into the prose twice.</p>
+<p>A response declaration still cannot carry a body <em>schema</em>, which is the
+other half of 4240 and is not built: publish a <code>sample</code> instead, which
+is machine-readable as an example if not as a schema.</p>
+<p>Some responses are not declared per endpoint at all. Two decorators sit
+in <code>Resource.method_decorators</code>, so <strong>every</strong> endpoint can answer <code>503</code>
 without declaring it:</p>
 <ul>
 <li><code>handle_database_unavailable</code>, when the database tier is unreachable.</li>
@@ -16489,8 +16527,8 @@ than overwriting yours as it once did.</p>
 <h2 id="checking-your-work">Checking your work<a class="headerlink" href="#checking-your-work" title="Permanent link">&para;</a></h2>
 <p>The audit derives the correct location for every declaration and
 compares it against what is declared:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python3<span class="w"> </span>tools/fix-api-parameter-locations.py<span class="w">            </span><span class="c1"># report drift</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>python3<span class="w"> </span>tools/fix-api-parameter-locations.py<span class="w"> </span>--apply<span class="w">    </span><span class="c1"># correct it</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>python3<span class="w"> </span>tools/fix-api-parameter-locations.py<span class="w">            </span><span class="c1"># report drift</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>python3<span class="w"> </span>tools/fix-api-parameter-locations.py<span class="w"> </span>--apply<span class="w">    </span><span class="c1"># correct it</span>
 </code></pre></div>
 <p>The same derivation runs as a pre-commit hook
 (<code>check-api-parameter-locations</code>) and, more importantly, as a unit
@@ -16680,7 +16718,8 @@ the coercion happens before the value is stored; they are deliberately
 not routed through <code>declared_boolean()</code> because it would read an
 omitted parameter as False, and the reason is written at the handler.
 Three more — <code>all</code> on the outstanding-operations routes — arrive
-through a <code>@use_kwargs</code> schema, so marshmallow has already deserialised
+through a webargs schema built from their own declaration by
+<code>@api_base.use_declared_args</code>, so marshmallow has already deserialised
 them. And <code>confirm</code> on the delete-all routes is recorded, with a
 reason, as deliberately reading something <em>narrower</em>: an identity test
 on a destructive route refuses a string spelling rather than acting on
@@ -16746,15 +16785,53 @@ the type vocabulary landed.)</p>
   using one requires an <code>UNDERIVABLE_BY_DESIGN</code> entry in
   <code>test_parameter_declarations.py</code> — otherwise the declaration would be
   a silent opt-out from the whole audit.</li>
-<li>A schema bound with <code>@use_kwargs</code> must be a dict literal defined in
-  the handler's own class or module. The derivation refuses anything it
-  cannot resolve — a schema imported from another module, a marshmallow
-  <code>Schema</code> class — and CI stays red until <code>declarations.py</code> is taught to
-  read the new form. There is deliberately no allowlist for this,
-  unlike locations: an unresolvable schema means the audit does not
-  know which parameters arrive in the query string, so an opt-out
-  entry would have to restate the schema's keys by hand — exactly the
-  second source of truth this machinery exists to remove.</li>
+<li>A webargs schema is normally not written by hand at all. A
+  query-string parameter reaches a handler only through webargs — the
+  compiled validation path is check-only and <code>log_request</code> merges the
+  JSON body but never <code>flask.request.args</code> — and the six endpoints
+  which needed one used to hand-author a marshmallow schema beside the
+  <code>swagger_helper()</code> declaration describing the same parameters, which
+  is two statements of one fact and is why
+  <a href="https://github.com/shakenfist/shakenfist/issues/4098">issue 4098</a>
+  was filed. Instead, hoist the parameter list to a module level name,
+  pass it to both, and parse with <code>@api_base.use_declared_args</code>:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>    <span class="n">BLOB_DATA_PARAMETERS</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>        <span class="p">(</span><span class="s1">'blob_uuid'</span><span class="p">,</span> <span class="s1">'path'</span><span class="p">,</span> <span class="s1">'uuid'</span><span class="p">,</span> <span class="s1">'The UUID of the blob.'</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>        <span class="p">(</span><span class="s1">'offset'</span><span class="p">,</span> <span class="s1">'query'</span><span class="p">,</span> <span class="s1">'unsignedinteger'</span><span class="p">,</span> <span class="s1">'From here.'</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="p">]</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="nd">@swag_from</span><span class="p">(</span><span class="n">api_base</span><span class="o">.</span><span class="n">swagger_helper</span><span class="p">(</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>        <span class="s1">'blobs'</span><span class="p">,</span> <span class="s1">'Get blob data.'</span><span class="p">,</span> <span class="n">BLOB_DATA_PARAMETERS</span><span class="p">,</span> <span class="p">[</span><span class="o">...</span><span class="p">]))</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="nd">@api_base</span><span class="o">.</span><span class="n">use_declared_args</span><span class="p">(</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>        <span class="n">BLOB_DATA_PARAMETERS</span><span class="p">,</span> <span class="p">{</span><span class="s1">'offset'</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span> <span class="n">location</span><span class="o">=</span><span class="s1">'query'</span><span class="p">)</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">blob_uuid</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+</code></pre></div>
+<p>It binds every parameter the list declares at <code>query</code>, with the type
+  the published specification uses and <strong>not</strong> the declared bound. The
+  bound is stated once, in the declaration, and enforced by the
+  compiled path (which answers 400 naming the parameter) and, for the
+  <code>warn</code> and <code>off</code> validation modes, by the handler; a marshmallow
+  validator in the webargs schema would be another copy of it that
+  ignored <code>API_VALIDATION_MODE</code>. A webargs failure that does happen —
+  a value that is not the declared type — answers 400 in this API's
+  error shape through <code>_webargs_error</code> in <code>base.py</code>. The defaults are passed rather than read off the
+  signature because 24 of the 25 per-method decorators in <code>base.py</code> do
+  not use <code>functools.wraps</code>, so by the time the decorator runs
+  <code>inspect.signature()</code> sees a wrapper's <code>(*args, **kwargs)</code>;
+  <code>test_declared_args.py</code> fails if the two disagree.</p>
+<ul>
+<li>A hand-authored schema bound with <code>@use_kwargs</code> is still read, and
+  must be a dict literal defined in the handler's own class or module.
+  The derivation refuses anything it cannot resolve — a schema imported
+  from another module, a marshmallow <code>Schema</code> class — and CI stays red
+  until <code>declarations.py</code> is taught to read the new form. There is
+  deliberately no allowlist for this, unlike locations: an unresolvable
+  schema means the audit does not know which parameters arrive in the
+  query string, so an opt-out entry would have to restate the schema's
+  keys by hand — exactly the second source of truth this machinery
+  exists to remove. <code>test_declared_args.py</code> also fails on a new one,
+  because <code>use_declared_args</code> covers every case in the tree.</li>
 <li>A decorator that consumes a request parameter must be a module level
   function of <code>shakenfist/external_api/</code>, and must consume it with a
   literal <code>kwargs.pop('name', ...)</code> or <code>del kwargs['name']</code> reached

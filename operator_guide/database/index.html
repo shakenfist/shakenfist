@@ -19827,7 +19827,7 @@ in one place and avoids hand-writing SQL.</p>
 <tbody>
 <tr>
 <td><code>str</code></td>
-<td><code>VARCHAR(255)</code></td>
+<td><code>VARCHAR(255)</code>, or <code>VARCHAR(N)</code> where the field declares <code>max_length=N</code> above 255</td>
 </tr>
 <tr>
 <td><code>int</code></td>
@@ -19867,11 +19867,57 @@ in one place and avoids hand-writing SQL.</p>
 </tr>
 </tbody>
 </table>
-<p>A Pydantic <code>Field(max_length=N)</code> constrains the model only; it does not
-change the generated column, which is <code>VARCHAR(255)</code> for every <code>str</code> field.
-A model declaring less than that will accept a write the column stores
-happily and then refuse to read it back, so a field whose limit matters has
-to be checked where it is written as well.</p>
+<p>A Pydantic <code>Field(max_length=N)</code> constrains the model, and where <code>N</code> is
+above the 255 character default it also widens the generated column to
+<code>VARCHAR(N)</code>, so a field cannot accept a value its column will not store.
+Declaring <em>less</em> than 255 leaves the column at 255 deliberately: the model
+refuses the long value first, and narrowing the column would be a migration
+on most tables in the tree to enforce a bound that is already enforced. Ask
+<code>stored_max_length()</code> (<code>shakenfist/schema/sqlalchemy.py</code>) for the limit that
+really applies to a field rather than reading either number on its own; it
+answers from the same call that builds the column.</p>
+<p>Three consequences worth knowing:</p>
+<ul>
+<li>A declaration above 16,383 characters is refused with
+  <code>InvalidSchemaDeclaration</code> when the table definition is built, because
+  that is the widest <code>VARCHAR</code> MariaDB's 65,535 byte row limit allows at
+  utf8mb4. A field which genuinely needs more is marked <code>SQLLongText()</code>,
+  which stores the value away from the row. The refusal is deliberate
+  rather than a silent fall back to <code>LONGTEXT</code>: a <code>LONGTEXT</code> column cannot
+  be indexed without a prefix length.</li>
+<li>The two limits that belong to a whole table are refused the same way.
+  The 65,535 byte row limit is shared by every column, so two fields that
+  each fit can together overflow it (16,383 is the widest a <code>VARCHAR</code> can
+  be alone in its row, not beside an <code>id</code> column). And InnoDB's 3,072 byte
+  index key limit is shared by every column of an index, the primary key
+  included, so an indexed <code>str</code> field can be at most 768 characters, less
+  in a compound index. Either would otherwise fail <code>CREATE TABLE</code> only on
+  a fresh install, which is the hardest place to find it. Both refusals
+  apply to tables built from a model by <code>pydantic_to_sqlalchemy_table()</code>.
+  A table registered by hand as an <code>sa.Table</code> in <code>mariadb.py</code> is not
+  checked, and is still left to <code>CREATE TABLE</code> to refuse. These are the
+  server-level row limit and the index key limit, not a complete model
+  of InnoDB: its on-page row size bound and the extra byte per nullable
+  key column are not counted, so a table close to either limit may
+  still be refused.</li>
+<li>Raising a <code>max_length</code> above 255 on an <em>existing</em> column changes the DDL
+  a fresh install generates, so it needs a schema version bump and a
+  migration like any other column change. <code>test_declared_limits.py</code> holds
+  every model to its column, so a declaration the column cannot hold
+  fails the unit suite rather than production writes, and
+  <code>test_schema_fingerprints.py</code> records what every versioned table
+  compiles to, so DDL that moves without its <code>EXPECTED_SCHEMA_VERSIONS</code>
+  entry moving fails too. After a deliberate bump, re-record with
+  <code>python -m shakenfist.tests.schema.test_schema_fingerprints</code>.</li>
+</ul>
+<p>This was not always so. Until <a href="https://github.com/shakenfist/shakenfist/issues/4901">issue
+4901</a> the generated
+column was <code>VARCHAR(255)</code> for every <code>str</code> field whatever it declared, and
+only the <code>SQLLongText()</code> marker changed that, so four fields accepted
+values MariaDB then refused or silently truncated. A write-time check was
+how a field whose limit mattered defended itself, and
+<code>relationship_value</code>'s is still there because its bound is below 255 rather
+than above it.</p>
 <h3 id="index-annotations">Index Annotations<a class="headerlink" href="#index-annotations" title="Permanent link">&para;</a></h3>
 <p>Indexes can be defined directly in the Pydantic model using Python's
 <code>Annotated</code> types. This keeps index definitions co-located with the schema.</p>

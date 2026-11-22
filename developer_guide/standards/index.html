@@ -16332,8 +16332,8 @@ one raises <code>InvalidAPIDeclaration</code> and <strong>sf-api will not start<
 rules: every handler carries a declaration (an empty parameter list is
 valid, no declaration at all is not); <code>location</code> is one of
 <code>SWAGGER_PARAMETER_LOCATIONS</code> <em>and</em> is where the parameter actually
-arrives (route segment → <code>path</code>, <code>use_kwargs(location='query')</code> key or
-<code>flask.request.args</code> read → <code>query</code>, otherwise <code>body</code>); a <code>path</code>
+arrives (route segment → <code>path</code>, a parameter parsed by webargs or read
+from <code>flask.request.args</code> → <code>query</code>, otherwise <code>body</code>); a <code>path</code>
 parameter must be <code>required=True</code>; a raw body is declared as
 <code>api_base.RAW_BODY_PARAMETER</code> (and cannot be combined with named body
 parameters); and every accepted kwarg is declared, excluding the
@@ -16345,6 +16345,13 @@ schema-carrying body parameter, because Swagger 2.0 allows only one;
 objects and arrays of objects can only be declared in the body, since
 outside one there is no schema object to nest a structure in. The
 token vocabulary is <code>api_base.ARGTYPES</code>.</p>
+<p>A response is a <code>(httpcode, description, sample)</code> tuple plus an
+optional fourth element, today <code>{'headers': [...]}</code>, each header a
+<code>(name, type token, description)</code> triple from the same vocabulary. A
+query-string parameter is parsed with
+<code>@api_base.use_declared_args(PARAMETERS, defaults)</code>, which builds the
+webargs schema from the same declaration list rather than from a
+hand-authored one beside it.</p>
 <p><code>shakenfist/external_api/declarations.py</code> derives the correct answer
 from the source and is shared by the fixer
 (<code>tools/fix-api-parameter-locations.py --apply</code>), the pre-commit hook

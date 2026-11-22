@@ -16873,6 +16873,25 @@ with the spec, since it is the value a run actually validates.
 fields which are secret rather than declaring a structure that contains one,
 and remember that <code>no_log</code> on a <em>task</em> is a different thing -- it suppresses
 that task's own output and registers nothing.</p>
+<h2 id="a-collection-modules-parameters-are-written-down-three-times">A collection module's parameters are written down three times<a class="headerlink" href="#a-collection-modules-parameters-are-written-down-three-times" title="Permanent link">&para;</a></h2>
+<p>Each native module declares its parameters in its <code>argument_spec</code>, which is
+what decides whether a parameter is accepted; in its <code>DOCUMENTATION</code> block,
+which is what <code>ansible-doc</code> renders and what Ansible treats as prose; and as a
+table in <code>docs/user_guide/ansible.md</code>, which is what a user reads. Nothing in
+Ansible compares the first two, and nothing compared any of them to the guide
+until <a href="https://github.com/shakenfist/shakenfist/issues/3270">issue #3270</a>
+reported the guide listing only some of <code>sf_instance</code>'s parameters. That took
+four hand-written corrections to discharge, over three months.</p>
+<p><code>test_ansible_module_docs.py</code> now holds all three together on parameter
+<em>names</em>, in both directions: a parameter the module accepts and the guide does
+not mention is undiscoverable, and one the guide documents and the module does
+not accept is a lie a user will act on. Wording is not compared -- the guide's
+prose is deliberately longer than the module's -- so adding a parameter means
+adding a row, in whatever words suit the audience.</p>
+<p>The guide's per-module section is cut at its <code>### Parameters</code> heading, so a
+return-value field is not read as a parameter. A new module needs an entry in
+that test's <code>GUIDE_SECTIONS</code> and a section of its own; shipping one with no
+user documentation fails the suite rather than the review.</p>
 <h2 id="a-backfill-cannot-finish-while-the-old-writers-are-still-running">A backfill cannot finish while the old writers are still running<a class="headerlink" href="#a-backfill-cannot-finish-while-the-old-writers-are-still-running" title="Permanent link">&para;</a></h2>
 <p>A migration which adds a column, fills it from somewhere else and then
 advances the schema version has only filled the rows that existed when
