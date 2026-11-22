@@ -158,6 +158,38 @@ aggregator.
 Every route which takes a credential lives under `/auth/`. Keep it that way,
 or extend the predicate — never the redaction lists.
 
+## A failed RPC names itself, and says nothing else
+
+The database servicer in `shakenfist/daemons/database/main.py` has two ways
+to report a failure, and both of them leave the database tier: the gRPC status
+detail, which reaches the client inside `str(grpc.RpcError)`, and a reply's
+`error` field, which the `mariadb.py` wrappers read back by name. Neither may
+carry the exception.
+
+`str(e)` on a SQLAlchemy error is the statement which failed followed by its
+bound parameters, and `DatabaseUnavailable` wraps that rendering into its own
+message, so a reader which fails closed carries the SQL too. The client folds
+what it received into its own exception message and log lines, and the
+placement and claim wrappers put a reply's `error` straight into
+`add_event()`'s extra -- a tenant-readable record. That is how a `SELECT` and
+the uuid bound into it got from the database tier to an instance's event log.
+
+So a handler calls `_rpc_error('<RpcName>')`, which is the whole of what a
+client is told, and records the exception here with `ignore_exception()` --
+on the node which can act on it, next to the failing query. A handler with
+something specific and safe to say is free to say it, as long as it wrote the
+message rather than derived it from the exception:
+`GetNamespaceClaims`'s `INVALID_ARGUMENT` arm names the argument the caller
+got wrong.
+
+The habit came back one handler at a time as the service grew -- 194 sites by
+the time anyone counted -- so
+`shakenfist/tests/test_database_servicer_error_details.py` holds it closed
+structurally: inside an `except ... as e` handler in that file, the name the
+handler bound may not appear in a `set_details()` argument or an `error=`
+keyword. `str(e)`, `repr(e)` and `f'...{e}'` all fail it, because what matters
+is the exception reaching the client rather than how it was stringified.
+
 ## A check that runs after the parse is not a check
 
 The endpoint-method decorators are not the outermost thing in a request.

@@ -173,7 +173,8 @@ def Create{Object}(
     except Exception as e:
         util_exceptions.ignore_exception(
             'database Create{Object} failed', e)
-        return database_pb2.StatusReply(success=False, error=str(e))
+        return database_pb2.StatusReply(
+            success=False, error=_rpc_error('Create{Object}'))
 
 
 def Get{Object}(
@@ -200,7 +201,7 @@ def Get{Object}(
         util_exceptions.ignore_exception(
             'database Get{Object} failed', e)
         context.set_code(grpc.StatusCode.INTERNAL)
-        context.set_details(str(e))
+        context.set_details(_rpc_error('Get{Object}'))
         return database_pb2.Get{Object}Reply(found=False)
 
 
@@ -243,7 +244,8 @@ def Delete{Object}(
     except Exception as e:
         util_exceptions.ignore_exception(
             'database Delete{Object} failed', e)
-        return database_pb2.StatusReply(success=False, error=str(e))
+        return database_pb2.StatusReply(
+            success=False, error=_rpc_error('Delete{Object}'))
 ```
 
 #### 3.2 Add Prometheus Counters
@@ -341,8 +343,18 @@ try:
     # ... operation logic ...
 except Exception as e:
     util_exceptions.ignore_exception('database OperationName failed', e)
-    return database_pb2.StatusReply(success=False, error=str(e))
+    return database_pb2.StatusReply(
+        success=False, error=_rpc_error('OperationName'))
 ```
+
+Never `str(e)`, in either the reply's `error` field or the status
+detail. A SQLAlchemy error, and a `DatabaseUnavailable` wrapping one,
+renders as the failing statement and its bound parameters, and both
+fields leave this node for the caller's logs and events.
+`_rpc_error()` in `shakenfist/daemons/database/main.py` is the one
+thing a failed RPC may say, and
+`shakenfist/tests/test_database_servicer_error_details.py` fails the
+build for a handler which says more.
 
 ### Setting gRPC Status Codes
 
@@ -357,8 +369,9 @@ For operations that fail unexpectedly:
 
 ```python
 except Exception as e:
+    util_exceptions.ignore_exception('database Get{Object} failed', e)
     context.set_code(grpc.StatusCode.INTERNAL)
-    context.set_details(str(e))
+    context.set_details(_rpc_error('Get{Object}'))
     return database_pb2.Get{Object}Reply(found=False)
 ```
 

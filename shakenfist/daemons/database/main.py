@@ -78,6 +78,30 @@ from shakenfist.util.caller_identity import set_caller_identity
 LOG, _ = logs.setup(__name__)
 
 
+def _rpc_error(rpc: str) -> str:
+    """The only thing a failed RPC tells its caller: which RPC failed.
+
+    Never ``str(e)``. A SQLAlchemy error -- and a ``DatabaseUnavailable``
+    wrapping one -- renders as the statement which failed followed by its
+    bound parameters, uuids included. Both channels a handler has for
+    reporting a failure leave this node: the gRPC status detail arrives
+    as part of ``str(RpcError)``, and a ``StatusReply.error`` is read
+    back by name. The ``mariadb.py`` wrappers fold either into their own
+    exception messages and log lines, and some of them into an event on
+    the object -- which a tenant can read through the API. So the
+    statement text and its parameters would travel from the database
+    tier to wherever the caller writes (issue 5027).
+
+    The exception itself is not lost: every handler records it here,
+    with ``ignore_exception()`` or a ``LOG`` call, on the node which can
+    act on it.
+
+    ``shakenfist/tests/test_database_servicer_error_details.py`` holds
+    this closed, so the pattern cannot come back one handler at a time.
+    """
+    return f'database {rpc} failed'
+
+
 class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
     """gRPC service implementation for database operations."""
 
@@ -101,7 +125,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database Enqueue failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('Enqueue'))
 
     def Dequeue(
         self,
@@ -154,7 +178,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database Resolve failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('Resolve'))
 
     def GetQueueLength(
         self,
@@ -189,7 +213,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=True, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database RestartQueue failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('RestartQueue'))
 
     def RestartQueueClaimsBy(
         self,
@@ -214,7 +238,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database RestartQueueClaimsBy failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('RestartQueueClaimsBy'))
 
     def ListStuckWorkQueueRows(
         self,
@@ -261,7 +285,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database ClearWorkQueueClaim failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('ClearWorkQueueClaim'))
 
     def DeleteWorkQueueRow(
         self,
@@ -279,7 +303,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteWorkQueueRow failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('DeleteWorkQueueRow'))
 
     def ListOrphanedClusterOperations(
         self,
@@ -481,11 +505,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 f'({request.object_type}/{request.subtype}/{request.name}): '
                 f'{e}')
             context.set_code(grpc.StatusCode.UNAVAILABLE)
-            context.set_details(str(e))
-            return database_pb2.StatusReply(success=False, error=str(e))
+            context.set_details(_rpc_error('ReleaseLock'))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('ReleaseLock'))
         except Exception as e:
             util_exceptions.ignore_exception('database ReleaseLock failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('ReleaseLock'))
 
     def RefreshLock(
         self,
@@ -521,11 +545,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 f'({request.object_type}/{request.subtype}/{request.name}): '
                 f'{e}')
             context.set_code(grpc.StatusCode.UNAVAILABLE)
-            context.set_details(str(e))
-            return database_pb2.StatusReply(success=False, error=str(e))
+            context.set_details(_rpc_error('RefreshLock'))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('RefreshLock'))
         except Exception as e:
             util_exceptions.ignore_exception('database RefreshLock failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('RefreshLock'))
 
     def GetLockHolder(
         self,
@@ -565,7 +589,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database ClearStaleLocks failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('ClearStaleLocks'))
 
     def GetExistingLocks(
         self,
@@ -658,7 +682,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database SetClusterConfig failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('SetClusterConfig'))
 
     def DeleteClusterConfig(
         self,
@@ -676,7 +700,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteClusterConfig failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('DeleteClusterConfig'))
 
     # Object State Operations (MariaDB)
     # These operations provide access to MariaDB state storage for all daemons.
@@ -706,7 +730,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception('database GetObjectState failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetObjectState'))
             return database_pb2.GetObjectStateReply(found=False)
 
     def SetObjectState(
@@ -731,7 +755,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database SetObjectState failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('SetObjectState'))
 
     def DeleteObjectState(
         self,
@@ -750,7 +774,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database DeleteObjectState failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('DeleteObjectState'))
 
     def GetObjectsByState(
         self,
@@ -829,7 +853,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             # client wrapper turns it into None -- a failed read -- which
             # is the whole point.
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetObjectsByState'))
             return database_pb2.GetObjectsByStateReply(object_uuids=[])
 
     def CountObjectsByState(
@@ -871,7 +895,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database CountObjectsByState failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('CountObjectsByState'))
             return database_pb2.CountObjectsByStateReply(count=0)
 
     def HardDeleteObjects(
@@ -923,7 +947,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database HardDeleteObjects failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('HardDeleteObjects'))
             return database_pb2.HardDeleteObjectsReply()
 
     def DeleteOrphanedObjectStates(
@@ -1010,7 +1034,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetStatelessObjectUuids failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetStatelessObjectUuids'))
             return database_pb2.GetStatelessObjectUuidsReply(object_uuids=[])
 
     def DeleteOrphanedArtifactAttributes(
@@ -1069,7 +1093,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database ReserveAddress failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('ReserveAddress'))
 
     def ReleaseAddress(
         self,
@@ -1111,7 +1135,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database ReleaseAddress failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('ReleaseAddress'))
 
     def GetReservation(
         self,
@@ -1147,7 +1171,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception('database GetReservation failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetReservation'))
             return database_pb2.GetReservationReply(found=False)
 
     def GetReservationsForIPAM(
@@ -1196,7 +1220,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database DeleteReservation failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('DeleteReservation'))
 
     def DeleteReservationsForIPAM(
         self,
@@ -1268,7 +1292,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database CreateUpload failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('CreateUpload'))
 
     def GetUpload(
         self,
@@ -1293,7 +1317,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception('database GetUpload failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetUpload'))
             return database_pb2.GetUploadReply(found=False)
 
     def GetUploads(
@@ -1334,7 +1358,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database DeleteUpload failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('DeleteUpload'))
 
     def UpdateUpload(
         self,
@@ -1354,7 +1378,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database UpdateUpload failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('UpdateUpload'))
 
     # =========================================================================
     # Blob Operations (MariaDB)
@@ -1380,7 +1404,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database CreateBlob failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('CreateBlob'))
 
     def GetBlob(
         self,
@@ -1405,7 +1429,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception('database GetBlob failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetBlob'))
             return database_pb2.GetBlobReply(found=False)
 
     def GetAllBlobUuids(
@@ -1434,7 +1458,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database DeleteBlob failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('DeleteBlob'))
 
     def UpdateBlob(
         self,
@@ -1454,7 +1478,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database UpdateBlob failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('UpdateBlob'))
 
     # =========================================================================
     # DnsMasq Operations (MariaDB)
@@ -1484,7 +1508,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database CreateDnsMasq failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('CreateDnsMasq'))
 
     def GetDnsMasq(
         self,
@@ -1514,7 +1538,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception('database GetDnsMasq failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetDnsMasq'))
             return database_pb2.GetDnsMasqReply(found=False)
 
     def GetDnsMasqs(
@@ -1560,7 +1584,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database DeleteDnsMasq failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('DeleteDnsMasq'))
 
     def UpdateDnsMasq(
         self,
@@ -1586,7 +1610,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database UpdateDnsMasq failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('UpdateDnsMasq'))
 
     # =========================================================================
     # Object Reference Operations (MariaDB)
@@ -1624,10 +1648,22 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                         'relationship_value': rel_value
                     })
             return database_pb2.StatusReply(success=success, error='')
+        except ValueError as e:
+            # validate_relationship_value() refusing a value longer than
+            # the column -- the caller's mistake rather than a database
+            # fault, and the only ValueError this handler's own code
+            # raises. It needs to know which field, so the reply names
+            # it; still a written message rather than str(e), for the
+            # reason on _rpc_error().
+            util_exceptions.ignore_exception(
+                'database RecordRelationship refused a value', e)
+            return database_pb2.StatusReply(
+                success=False,
+                error='relationship_value is longer than the column can store')
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database RecordRelationship failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('RecordRelationship'))
 
     def RemoveRelationship(
         self,
@@ -1664,7 +1700,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database RemoveRelationship failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('RemoveRelationship'))
 
     def GetReferencesTo(
         self,
@@ -1763,7 +1799,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             # this handler is a bug, not a transient outage, and retrying
             # it will not help.
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetReferencesFrom'))
             return database_pb2.GetReferencesReply(references=[])
 
     def CountReferencesTo(
@@ -1849,7 +1885,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database UpdateLastActive failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('UpdateLastActive'))
 
     def GetStaleReferences(
         self,
@@ -1913,7 +1949,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database UpsertBlobHash failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('UpsertBlobHash'))
 
     def GetBlobHashes(
         self,
@@ -2004,7 +2040,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database DeleteBlobHashes failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('DeleteBlobHashes'))
 
     # =========================================================================
     # Blob Transfer Operations
@@ -2036,7 +2072,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database CreateBlobTransfer failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('CreateBlobTransfer'))
 
     def GetBlobTransfer(
         self,
@@ -2160,7 +2196,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database UpdateBlobTransfer failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('UpdateBlobTransfer'))
 
     def DeleteBlobTransfer(
         self,
@@ -2176,7 +2212,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database DeleteBlobTransfer failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('DeleteBlobTransfer'))
 
     def DeleteStaleTransfers(
         self,
@@ -2233,7 +2269,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database CreateBlobAttributes failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('CreateBlobAttributes'))
 
     def GetBlobAttributes(
         self,
@@ -2261,7 +2297,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetBlobAttributes failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetBlobAttributes'))
             return database_pb2.GetBlobAttributesReply(found=False)
 
     def UpdateBlobAttributes(
@@ -2287,7 +2323,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database UpdateBlobAttributes failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('UpdateBlobAttributes'))
 
     def UpdateBlobLastUsed(
         self,
@@ -2303,7 +2339,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database UpdateBlobLastUsed failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('UpdateBlobLastUsed'))
 
     def DeleteBlobAttributes(
         self,
@@ -2319,7 +2355,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database DeleteBlobAttributes failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('DeleteBlobAttributes'))
 
     def GetExpiredBlobUuids(
         self,
@@ -2387,7 +2423,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             # only spends the caller's budget. Non-retryable, so the
             # client wrapper turns it into a failed read.
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetBlobUuidsWithInfo'))
             return database_pb2.GetBlobUuidsWithInfoReply(uuids=[])
 
     # =====================================================================
@@ -2415,7 +2451,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database CreateNode failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e)
+                success=False, error=_rpc_error('CreateNode')
             )
 
     def GetNode(
@@ -2444,7 +2480,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetNode failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetNode'))
             return database_pb2.GetNodeReply(found=False)
 
     def GetNodeByFqdn(
@@ -2473,7 +2509,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetNodeByFqdn failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetNodeByFqdn'))
             return database_pb2.GetNodeReply(found=False)
 
     def GetAllNodeUuids(
@@ -2511,7 +2547,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteNode failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e)
+                success=False, error=_rpc_error('DeleteNode')
             )
 
     def UpdateNode(
@@ -2536,7 +2572,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database UpdateNode failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e)
+                success=False, error=_rpc_error('UpdateNode')
             )
 
     # =====================================================================
@@ -2679,7 +2715,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database CreateNodeAttributes failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e)
+                success=False, error=_rpc_error('CreateNodeAttributes')
             )
 
     def GetNodeAttributes(
@@ -2705,7 +2741,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetNodeAttributes failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetNodeAttributes'))
             return database_pb2.GetNodeAttributesReply(
                 found=False
             )
@@ -2729,7 +2765,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database UpdateNodeAttributes failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e)
+                success=False, error=_rpc_error('UpdateNodeAttributes')
             )
 
     def DeleteNodeAttributes(
@@ -2750,7 +2786,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteNodeAttributes failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e)
+                success=False, error=_rpc_error('DeleteNodeAttributes')
             )
 
     # =========================================================
@@ -2777,7 +2813,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database SetNodeDaemonState failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('SetNodeDaemonState'))
 
     def GetNodeDaemonState(
         self,
@@ -2826,7 +2862,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetNodeDaemonState failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetNodeDaemonState'))
             return database_pb2.GetNodeDaemonStateReply(found=False)
 
     def GetAllNodeDaemonStates(
@@ -2857,7 +2893,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetAllNodeDaemonStates failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetAllNodeDaemonStates'))
             return database_pb2.GetAllNodeDaemonStatesReply()
 
     def DeleteNodeDaemonState(
@@ -2874,7 +2910,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database DeleteNodeDaemonState failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('DeleteNodeDaemonState'))
 
     # =========================================================
     # Scheduler Capacity Operations (MariaDB)
@@ -2998,7 +3034,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database AdmitInstancePlacement failed', e)
             return database_pb2.AdmitInstancePlacementReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('AdmitInstancePlacement'))
 
     def ReleaseInstancePlacement(
         self,
@@ -3028,7 +3064,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database ReleaseInstancePlacement failed', e)
             return database_pb2.ReleaseInstancePlacementReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('ReleaseInstancePlacement'))
 
     def GetSchedulerNodeCapacity(
         self,
@@ -3156,7 +3192,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database CreateNamespaceClaim failed', e)
             return database_pb2.CreateNamespaceClaimReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('CreateNamespaceClaim'))
 
     def GetNamespaceClaim(
         self,
@@ -3180,7 +3216,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetNamespaceClaim failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetNamespaceClaim'))
             return database_pb2.GetNamespaceClaimReply(found=False)
 
     def GetNamespaceClaims(
@@ -3196,13 +3232,16 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     request.namespace, request.coverage_state):
                 reply.claims.append(self._claim_message(claim))
             return reply
-        except ValueError as e:
+        except ValueError:
             # A coverage_state the public layer would have refused. This
             # is the caller's mistake, not a database fault, but it is
             # still an error status rather than an empty list, for the
-            # reason given below.
+            # reason given below. The detail names the argument instead
+            # of calling _rpc_error(), which would report a database
+            # failure that did not happen -- and instead of str(e),
+            # which the rest of this file no longer passes on.
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-            context.set_details(str(e))
+            context.set_details('coverage_state is not a valid claim state')
             return database_pb2.GetNamespaceClaimsReply()
         except Exception as e:
             # An empty reply is indistinguishable from "this namespace
@@ -3212,7 +3251,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetNamespaceClaims failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetNamespaceClaims'))
             return database_pb2.GetNamespaceClaimsReply()
 
     def UpdateNamespaceClaim(
@@ -3241,7 +3280,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database UpdateNamespaceClaim failed', e)
             return database_pb2.UpdateNamespaceClaimReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('UpdateNamespaceClaim'))
 
     def DeleteNamespaceClaim(
         self,
@@ -3264,7 +3303,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteNamespaceClaim failed', e)
             return database_pb2.DeleteNamespaceClaimReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('DeleteNamespaceClaim'))
 
     # =========================================================
     # Namespace Operations (MariaDB)
@@ -3280,7 +3319,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database CreateNamespace failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('CreateNamespace'))
 
     def GetNamespace(self, request: database_pb2.GetNamespaceRequest,
                      context: grpc.ServicerContext) -> database_pb2.GetNamespaceReply:
@@ -3296,7 +3335,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception('database GetNamespace failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetNamespace'))
             return database_pb2.GetNamespaceReply(found=False)
 
     def GetAllNamespaceNames(self, request: database_pb2.GetAllNamespaceNamesRequest,
@@ -3320,7 +3359,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database DeleteNamespace failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('DeleteNamespace'))
 
     # =========================================================
     # Namespace Attributes Operations (MariaDB)
@@ -3336,7 +3375,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database CreateNamespaceAttributes failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('CreateNamespaceAttributes'))
 
     def GetNamespaceAttributes(self, request: database_pb2.GetNamespaceAttributesRequest,
                                context: grpc.ServicerContext
@@ -3352,7 +3391,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception('database GetNamespaceAttributes failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetNamespaceAttributes'))
             return database_pb2.GetNamespaceAttributesReply(found=False)
 
     def UpdateNamespaceAttributes(self, request: database_pb2.UpdateNamespaceAttributesRequest,
@@ -3366,7 +3405,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database UpdateNamespaceAttributes failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('UpdateNamespaceAttributes'))
 
     def DeleteNamespaceAttributes(self, request: database_pb2.DeleteNamespaceAttributesRequest,
                                   context: grpc.ServicerContext) -> database_pb2.StatusReply:
@@ -3377,7 +3416,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database DeleteNamespaceAttributes failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('DeleteNamespaceAttributes'))
 
     def _ns_attrs_from_proto(self,
                              d: database_pb2.NamespaceAttributesProto) -> 'NamespaceAttributesData':
@@ -3422,13 +3461,13 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 f'CreateNetworkInterface transient MariaDB error for '
                 f'{request.network_interface.uuid}: {e}')
             context.set_code(grpc.StatusCode.UNAVAILABLE)
-            context.set_details(str(e))
-            return database_pb2.StatusReply(success=False, error=str(e))
+            context.set_details(_rpc_error('CreateNetworkInterface'))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('CreateNetworkInterface'))
         except Exception as e:
             util_exceptions.ignore_exception('database CreateNetworkInterface failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
-            return database_pb2.StatusReply(success=False, error=str(e))
+            context.set_details(_rpc_error('CreateNetworkInterface'))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('CreateNetworkInterface'))
 
     def GetNetworkInterface(
         self,
@@ -3447,7 +3486,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception('database GetNetworkInterface failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetNetworkInterface'))
             return database_pb2.GetNetworkInterfaceReply(found=False)
 
     def GetNetworkInterfacesByInstance(
@@ -3499,7 +3538,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetAllNetworkInterfaces failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetAllNetworkInterfaces'))
             return database_pb2.GetNetworkInterfacesReply(
                 network_interfaces=[])
 
@@ -3536,7 +3575,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database FindNetworkInterfaces failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('FindNetworkInterfaces'))
             return database_pb2.FindNetworkInterfacesReply(
                 network_interfaces=[])
 
@@ -3552,7 +3591,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database DeleteNetworkInterface failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('DeleteNetworkInterface'))
 
     def UpdateNetworkInterface(
         self,
@@ -3567,7 +3606,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database UpdateNetworkInterface failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('UpdateNetworkInterface'))
 
     # =========================================================================
     # NetworkInterface Attributes Operations (MariaDB)
@@ -3587,7 +3626,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database CreateNetworkInterfaceAttributes failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('CreateNetworkInterfaceAttributes'))
 
     def GetNetworkInterfaceAttributes(
         self,
@@ -3606,7 +3645,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetNetworkInterfaceAttributes failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetNetworkInterfaceAttributes'))
             return database_pb2.GetNetworkInterfaceAttributesReply(found=False)
 
     def UpdateNetworkInterfaceAttributes(
@@ -3623,7 +3662,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database UpdateNetworkInterfaceAttributes failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('UpdateNetworkInterfaceAttributes'))
 
     def DeleteNetworkInterfaceAttributes(
         self,
@@ -3638,7 +3677,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database DeleteNetworkInterfaceAttributes failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('DeleteNetworkInterfaceAttributes'))
 
     def _ni_from_proto(self,
                        d: database_pb2.NetworkInterfaceStaticData) -> NetworkInterfaceData:
@@ -3704,7 +3743,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database CreateIPAM failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('CreateIPAM'))
 
     def GetIPAM(
         self,
@@ -3723,7 +3762,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception('database GetIPAM failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetIPAM'))
             return database_pb2.GetIPAMReply(found=False)
 
     def DeleteIPAM(
@@ -3738,7 +3777,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database DeleteIPAM failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('DeleteIPAM'))
 
     def UpdateIPAM(
         self,
@@ -3753,7 +3792,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(success=success, error='')
         except Exception as e:
             util_exceptions.ignore_exception('database UpdateIPAM failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('UpdateIPAM'))
 
     def _ipam_from_proto(self, d: database_pb2.IPAMStaticData) -> IPAMData:
         """Convert a proto IPAMStaticData to model."""
@@ -3793,7 +3832,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database CreateNetwork failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('CreateNetwork'))
 
     def GetNetwork(
         self,
@@ -3814,7 +3853,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetNetwork failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetNetwork'))
             return database_pb2.GetNetworkReply(found=False)
 
     def GetAllNetworks(
@@ -3835,7 +3874,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetAllNetworks failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetAllNetworks'))
             return database_pb2.GetAllNetworksReply(networks=[])
 
     def FindNetworks(
@@ -3865,7 +3904,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database FindNetworks failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('FindNetworks'))
             return database_pb2.FindNetworksReply(networks=[])
 
     def FindNetworkVxids(
@@ -3893,7 +3932,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database FindNetworkVxids failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('FindNetworkVxids'))
             return database_pb2.FindNetworkVxidsReply(claims=[])
 
     def GetNodeInstanceVxids(
@@ -3919,7 +3958,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetNodeInstanceVxids failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetNodeInstanceVxids'))
             return database_pb2.GetNodeInstanceVxidsReply(vxids=[])
 
     def DeleteNetwork(
@@ -3938,7 +3977,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteNetwork failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('DeleteNetwork'))
 
     def _network_from_proto(
             self,
@@ -3996,7 +4035,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database CreateNetworkAttributes failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('CreateNetworkAttributes'))
 
     def GetNetworkAttributes(
         self,
@@ -4019,7 +4058,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetNetworkAttributes failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetNetworkAttributes'))
             return database_pb2.GetNetworkAttributesReply(
                 found=False)
 
@@ -4043,7 +4082,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetNetworkFloatingGateways failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetNetworkFloatingGateways'))
             return database_pb2.GetNetworkFloatingGatewaysReply()
 
     def UpdateNetworkAttributes(
@@ -4064,7 +4103,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database UpdateNetworkAttributes failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('UpdateNetworkAttributes'))
 
     def DeleteNetworkAttributes(
         self,
@@ -4083,7 +4122,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteNetworkAttributes failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('DeleteNetworkAttributes'))
 
     def _network_attrs_from_proto(
             self,
@@ -4127,7 +4166,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database CreateNamespaceKey failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('CreateNamespaceKey'))
 
     def GetNamespaceKey(
         self,
@@ -4147,7 +4186,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetNamespaceKey failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetNamespaceKey'))
             return database_pb2.GetNamespaceKeyReply(found=False)
 
     def GetNamespaceKeyByName(
@@ -4173,7 +4212,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetNamespaceKeyByName failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetNamespaceKeyByName'))
             return database_pb2.GetNamespaceKeyByNameReply(found=False)
 
     def FindNamespaceKeys(
@@ -4199,7 +4238,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database FindNamespaceKeys failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('FindNamespaceKeys'))
             return database_pb2.FindNamespaceKeysReply(keys=[])
 
     def DeleteNamespaceKey(
@@ -4217,7 +4256,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteNamespaceKey failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('DeleteNamespaceKey'))
 
     def DeleteExpiredNamespaceKeys(
         self,
@@ -4253,7 +4292,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database CreateNamespaceKeyAttributes failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('CreateNamespaceKeyAttributes'))
 
     def GetNamespaceKeyAttributes(
         self,
@@ -4275,7 +4314,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetNamespaceKeyAttributes failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetNamespaceKeyAttributes'))
             return database_pb2.GetNamespaceKeyAttributesReply(found=False)
 
     def UpdateNamespaceKeyAttributes(
@@ -4294,7 +4333,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database UpdateNamespaceKeyAttributes failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('UpdateNamespaceKeyAttributes'))
 
     def DeleteNamespaceKeyAttributes(
         self,
@@ -4312,7 +4351,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteNamespaceKeyAttributes failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('DeleteNamespaceKeyAttributes'))
 
     # AgentOperation Operations (MariaDB)
 
@@ -4334,7 +4373,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database CreateTrustedIssuer failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('CreateTrustedIssuer'))
             return database_pb2.StatusReply(success=False)
 
     def GetTrustedIssuer(
@@ -4353,7 +4392,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetTrustedIssuer failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetTrustedIssuer'))
             return database_pb2.GetTrustedIssuerReply(found=False)
 
     def GetTrustedIssuerByName(
@@ -4372,7 +4411,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetTrustedIssuerByName failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetTrustedIssuerByName'))
             return database_pb2.GetTrustedIssuerReply(found=False)
 
     def GetAllTrustedIssuers(
@@ -4390,7 +4429,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetAllTrustedIssuers failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetAllTrustedIssuers'))
             return database_pb2.GetAllTrustedIssuersReply(issuers=[])
 
     def DeleteTrustedIssuer(
@@ -4406,7 +4445,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteTrustedIssuer failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('DeleteTrustedIssuer'))
             return database_pb2.StatusReply(success=False)
 
     def CreateTrustedIssuerAttributes(
@@ -4423,7 +4462,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database CreateTrustedIssuerAttributes failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('CreateTrustedIssuerAttributes'))
             return database_pb2.StatusReply(success=False)
 
     def GetTrustedIssuerAttributes(
@@ -4445,7 +4484,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetTrustedIssuerAttributes failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetTrustedIssuerAttributes'))
             return database_pb2.GetTrustedIssuerAttributesReply(found=False)
 
     def UpdateTrustedIssuerAttributes(
@@ -4463,7 +4502,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database UpdateTrustedIssuerAttributes failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('UpdateTrustedIssuerAttributes'))
             return database_pb2.StatusReply(success=False)
 
     def DeleteTrustedIssuerAttributes(
@@ -4480,7 +4519,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteTrustedIssuerAttributes failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('DeleteTrustedIssuerAttributes'))
             return database_pb2.StatusReply(success=False)
 
     # ------------------------------------------------------------------
@@ -4501,7 +4540,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database CreateMappingRule failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('CreateMappingRule'))
             return database_pb2.StatusReply(success=False)
 
     def GetMappingRule(
@@ -4520,7 +4559,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetMappingRule failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetMappingRule'))
             return database_pb2.GetMappingRuleReply(found=False)
 
     def GetMappingRuleByName(
@@ -4540,7 +4579,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetMappingRuleByName failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetMappingRuleByName'))
             return database_pb2.GetMappingRuleReply(found=False)
 
     def GetMappingRulesInNamespace(
@@ -4558,7 +4597,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetMappingRulesInNamespace failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetMappingRulesInNamespace'))
             return database_pb2.GetMappingRulesReply(rules=[])
 
     def GetAllMappingRules(
@@ -4575,7 +4614,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetAllMappingRules failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetAllMappingRules'))
             return database_pb2.GetMappingRulesReply(rules=[])
 
     def FindMappingRules(
@@ -4604,7 +4643,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             # provider", which the caller cannot tell from a decision,
             # so the status code is what tells it this was a failure.
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('FindMappingRules'))
             return database_pb2.FindMappingRulesReply(rules=[])
 
     def DeleteMappingRule(
@@ -4620,7 +4659,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteMappingRule failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('DeleteMappingRule'))
             return database_pb2.StatusReply(success=False)
 
     def CreateMappingRuleAttributes(
@@ -4637,7 +4676,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database CreateMappingRuleAttributes failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('CreateMappingRuleAttributes'))
             return database_pb2.StatusReply(success=False)
 
     def GetMappingRuleAttributes(
@@ -4674,7 +4713,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetMappingRuleAttributes failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetMappingRuleAttributes'))
             return database_pb2.GetMappingRuleAttributesReply(found=False)
 
     def UpdateMappingRuleAttributes(
@@ -4692,7 +4731,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database UpdateMappingRuleAttributes failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('UpdateMappingRuleAttributes'))
             return database_pb2.StatusReply(success=False)
 
     def DeleteMappingRuleAttributes(
@@ -4709,7 +4748,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteMappingRuleAttributes failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('DeleteMappingRuleAttributes'))
             return database_pb2.StatusReply(success=False)
 
     def CreateAgentOperation(
@@ -4730,7 +4769,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database CreateAgentOperation failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('CreateAgentOperation'))
 
     def GetAgentOperation(
         self,
@@ -4753,7 +4792,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetAgentOperation failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetAgentOperation'))
             return database_pb2.GetAgentOperationReply(
                 found=False)
 
@@ -4774,7 +4813,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteAgentOperation failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('DeleteAgentOperation'))
 
     def _agentop_from_proto(
             self,
@@ -4839,7 +4878,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database CreateAgentOperationAttributes failed',
                 e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('CreateAgentOperationAttributes'))
 
     def GetAgentOperationAttributes(
         self,
@@ -4868,7 +4907,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database GetAgentOperationAttributes failed',
                 e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetAgentOperationAttributes'))
             return (
                 database_pb2
                 .GetAgentOperationAttributesReply(found=False))
@@ -4893,7 +4932,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database UpdateAgentOperationAttributes failed',
                 e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('UpdateAgentOperationAttributes'))
 
     def DeleteAgentOperationAttributes(
         self,
@@ -4915,7 +4954,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database DeleteAgentOperationAttributes failed',
                 e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('DeleteAgentOperationAttributes'))
 
     def _agentop_attrs_from_proto(
             self,
@@ -4977,7 +5016,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database CreateArtifact failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('CreateArtifact'))
 
     def GetArtifact(
         self,
@@ -5005,7 +5044,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetArtifact failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetArtifact'))
             return database_pb2.GetArtifactReply(found=False)
 
     def GetAllArtifacts(
@@ -5074,7 +5113,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             # the caller cannot otherwise tell a database outage from
             # "no artifact by that name" (#3522).
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('FindArtifacts'))
             return database_pb2.FindArtifactsReply(artifacts=[])
 
     def UpdateArtifact(
@@ -5098,7 +5137,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database UpdateArtifact failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('UpdateArtifact'))
 
     def DeleteArtifact(
         self,
@@ -5114,7 +5153,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database DeleteArtifact failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('DeleteArtifact'))
 
     # Artifact Attributes Operations (MariaDB)
 
@@ -5137,7 +5176,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database CreateArtifactAttributes failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('CreateArtifactAttributes'))
 
     def GetArtifactAttributes(
         self,
@@ -5165,7 +5204,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetArtifactAttributes failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetArtifactAttributes'))
             return database_pb2.GetArtifactAttributesReply(found=False)
 
     def UpdateArtifactAttributes(
@@ -5188,7 +5227,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database UpdateArtifactAttributes failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('UpdateArtifactAttributes'))
 
     def DeleteArtifactAttributes(
         self,
@@ -5204,7 +5243,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database DeleteArtifactAttributes failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('DeleteArtifactAttributes'))
 
     # Artifact Index Operations (MariaDB)
 
@@ -5225,7 +5264,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database CreateArtifactIndex failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('CreateArtifactIndex'))
 
     def GetArtifactIndex(
         self,
@@ -5253,7 +5292,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetArtifactIndex failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetArtifactIndex'))
             return database_pb2.GetArtifactIndexReply(found=False)
 
     def GetAllArtifactIndexes(
@@ -5297,7 +5336,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database DeleteArtifactIndex failed', e)
-            return database_pb2.StatusReply(success=False, error=str(e))
+            return database_pb2.StatusReply(success=False, error=_rpc_error('DeleteArtifactIndex'))
 
     def DeleteAllArtifactIndexes(
         self,
@@ -5332,7 +5371,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database CreateInstance failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('CreateInstance'))
 
     def GetInstance(
         self,
@@ -5358,7 +5397,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetInstance failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetInstance'))
             return database_pb2.GetInstanceReply(
                 found=False)
 
@@ -5380,7 +5419,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetAllInstances failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetAllInstances'))
             return database_pb2.GetAllInstancesReply(
                 instances=[])
 
@@ -5411,7 +5450,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database FindInstances failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('FindInstances'))
             return database_pb2.FindInstancesReply(instances=[])
 
     def GetAllInstanceUuids(
@@ -5429,7 +5468,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetAllInstanceUuids failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetAllInstanceUuids'))
             return database_pb2.GetAllInstanceUuidsReply(
                 uuids=[])
 
@@ -5449,7 +5488,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteInstance failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('DeleteInstance'))
 
     def _instance_from_proto(
             self,
@@ -5536,7 +5575,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database CreateInstanceAttributes failed',
                 e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('CreateInstanceAttributes'))
 
     def GetInstanceAttributes(
         self,
@@ -5566,7 +5605,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database GetInstanceAttributes failed',
                 e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetInstanceAttributes'))
             return (
                 database_pb2
                 .GetInstanceAttributesReply(
@@ -5594,7 +5633,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database UpdateInstanceAttributes failed',
                 e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('UpdateInstanceAttributes'))
 
     def DeleteInstanceAttributes(
         self,
@@ -5616,7 +5655,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database DeleteInstanceAttributes failed',
                 e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('DeleteInstanceAttributes'))
 
     def GetConsumedPortsForNode(
         self,
@@ -5695,7 +5734,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetObjectMetadata failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetObjectMetadata'))
             return database_pb2.GetObjectMetadataReply(
                 found=False)
 
@@ -5726,7 +5765,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database SetMetadata failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('SetMetadata'))
 
     def DeleteObjectMetadata(
         self,
@@ -5752,7 +5791,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteObjectMetadata failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('DeleteObjectMetadata'))
 
     # Cluster Operation Target Operations
 
@@ -5820,7 +5859,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database RecordEventBatch failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('RecordEventBatch'))
 
     def PruneEvents(
         self,
@@ -5837,7 +5876,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database PruneEvents failed', e)
             return database_pb2.PruneEventsReply(
-                success=False, error=str(e), rows_pruned=0)
+                success=False, error=_rpc_error('PruneEvents'), rows_pruned=0)
 
     def GetObjectEvents(
         self,
@@ -5895,7 +5934,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteObjectEvents failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('DeleteObjectEvents'))
 
     def GetClusterOperationTarget(
         self,
@@ -5924,7 +5963,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database GetClusterOperationTarget failed',
                 e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetClusterOperationTarget'))
             return database_pb2.GetClusterOperationTargetReply(
                 found=False)
 
@@ -5958,7 +5997,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database GetClusterOperationTargetsForObject'
                 ' failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetClusterOperationTargetsForObject'))
             return database_pb2.GetClusterOperationTargetsForObjectReply(
                 targets=[])
 
@@ -5992,7 +6031,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database GetLatestClusterOperationTarget'
                 ' failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetLatestClusterOperationTarget'))
             return database_pb2.GetClusterOperationTargetReply(
                 found=False)
 
@@ -6023,7 +6062,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database HasPendingClusterOperationTarget'
                 ' failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('HasPendingClusterOperationTarget'))
             # Fail closed: treat unknown as in-flight.
             return database_pb2.HasPendingClusterOperationTargetReply(
                 pending=True)
@@ -6063,7 +6102,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database GetRecentTerminalOpStatesForTarget'
                 ' failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetRecentTerminalOpStatesForTarget'))
             return database_pb2.GetRecentTerminalOpStatesForTargetReply(
                 entries=[])
 
@@ -6086,7 +6125,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database DeleteClusterOperationTarget failed',
                 e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('DeleteClusterOperationTarget'))
 
     def DeleteClusterOperationTargetsForObject(
         self,
@@ -6116,7 +6155,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database DeleteClusterOperationTargetsForObject'
                 ' failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('DeleteClusterOperationTargetsForObject'))
 
     def DeleteStaleClusterOperationTargets(
         self,
@@ -6161,7 +6200,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database UpsertNodeMetrics failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('UpsertNodeMetrics'))
 
     def GetNodeMetrics(
         self,
@@ -6189,7 +6228,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetNodeMetrics failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetNodeMetrics'))
             return database_pb2.GetNodeMetricsReply(
                 found=False)
 
@@ -6236,7 +6275,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteNodeMetrics failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('DeleteNodeMetrics'))
 
     # Cluster Operations (MariaDB)
 
@@ -6264,7 +6303,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database CreateClusterOperation failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('CreateClusterOperation'))
 
     def GetClusterOperation(
         self,
@@ -6287,7 +6326,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetClusterOperation failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetClusterOperation'))
             return database_pb2.GetClusterOperationReply(
                 found=False)
 
@@ -6350,7 +6389,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database ListClusterOperationsForTarget failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('ListClusterOperationsForTarget'))
             return database_pb2.ListClusterOperationsForTargetReply(
                 items=[])
 
@@ -6370,7 +6409,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteClusterOperation failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('DeleteClusterOperation'))
 
     def CreateAndEnqueueClusterOperation(
         self,
@@ -6423,7 +6462,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database CreateAndEnqueueClusterOperation failed',
                 e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('CreateAndEnqueueClusterOperation'))
 
     def SetClusterOperationError(
         self,
@@ -6446,7 +6485,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database SetClusterOperationError failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('SetClusterOperationError'))
 
     def GetClusterOperationError(
         self,
@@ -6470,7 +6509,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database GetClusterOperationError failed', e)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
+            context.set_details(_rpc_error('GetClusterOperationError'))
             return database_pb2.GetClusterOperationErrorReply(
                 found=False)
 
@@ -6489,7 +6528,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database DeleteClusterOperationError failed', e)
             return database_pb2.StatusReply(
-                success=False, error=str(e))
+                success=False, error=_rpc_error('DeleteClusterOperationError'))
 
     def RecordFederatedExchange(
         self,
@@ -6521,7 +6560,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database RecordFederatedExchange failed', e)
             return database_pb2.RecordFederatedExchangeReply(
-                recorded=False, error=str(e), ok=False)
+                recorded=False, error=_rpc_error('RecordFederatedExchange'), ok=False)
 
     def CountFederatedAttempt(
         self,
@@ -6543,7 +6582,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             util_exceptions.ignore_exception(
                 'database CountFederatedAttempt failed', e)
             return database_pb2.CountFederatedAttemptReply(
-                attempts=0, error=str(e), ok=False)
+                attempts=0, error=_rpc_error('CountFederatedAttempt'), ok=False)
 
     def ReapFederationReplay(
         self,

@@ -466,7 +466,13 @@ class FindObjectsFailedReadTestCase(base.ShakenFistTestCase):
 
             context.set_code.assert_called_once_with(
                 grpc.StatusCode.INTERNAL)
-            context.set_details.assert_called_once_with('boom')
+            # The detail names the RPC and nothing else: str(e) on a
+            # database error carries the statement and its parameters
+            # back to the client (issue 5027). What is pinned here is
+            # that a detail is set at all, so the client has something
+            # to log beside the code.
+            context.set_details.assert_called_once_with(
+                f'database {handler} failed')
             self.assertEqual([], list(getattr(reply, field)))
 
     def test_genuinely_empty_is_not_an_error(self):
