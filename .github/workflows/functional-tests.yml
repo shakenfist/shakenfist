@@ -169,6 +169,7 @@ jobs:
               - 'shakenfist/tests/test_mariadb_*_live.py'
               - 'shakenfist/tests/hard_delete_cases.py'
               - 'shakenfist/network/interface.py'
+              - 'shakenfist/scheduler.py'
               - 'tools/ci-enum-widening-test.sh'
               - 'tools/ci-install-mariadb.sh'
               - 'tools/bootstrap-mariadb.sql'
