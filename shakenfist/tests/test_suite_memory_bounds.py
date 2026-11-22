@@ -14,6 +14,7 @@ not reached from tox.ini protects nothing, and the only full-suite runs
 anybody makes go through tox.
 """
 
+import gc
 import os
 import re
 import resource
@@ -195,6 +196,13 @@ class BaseClassEnforcementTestCase(base.ShakenFistTestCase):
             def test_inner(inner_self):
                 body(inner_self)
 
+        # Collect before the inner test samples its starting point.
+        # problem_since() collects before it blames a test, so garbage
+        # an earlier test in this worker left in the oldest generation
+        # would otherwise be resident in the starting sample and freed
+        # before the final one. 64MB of it hid the 64MB leak below
+        # entirely, and failed a pull request's run under coverage.
+        gc.collect()
         result = testtools.TestResult()
         Inner('test_inner').run(result)
         # A result holds the test object, and so whatever that object
@@ -218,6 +226,27 @@ class BaseClassEnforcementTestCase(base.ShakenFistTestCase):
             'should have been failed by ShakenFistTestCase, but the result '
             'holds %r' % (problems,))
         self.assertIn('grew the worker', problems[0])
+
+    def test_garbage_an_earlier_test_left_does_not_hide_a_leak(self):
+        # Cycles which survive a collection while referenced are promoted
+        # to the oldest generation, and once dropped they wait there for
+        # the next full collection -- the state a long-lived stestr worker
+        # is in after any test which left a cycle behind.
+        kept = []
+        for _ in range(2):
+            cycle = {'held': _touch(32)}
+            cycle['self'] = cycle
+            kept.append(cycle)
+        gc.collect()
+        del kept, cycle
+
+        def leak(inner_self):
+            inner_self.leaked = _touch(64)
+
+        self.assertEqual(
+            1, len(self._run_inner(leak, 8)),
+            '64MB of garbage resident when the inner test started hid its '
+            '64MB leak from ShakenFistTestCase.')
 
     def test_a_test_which_releases_what_it_allocated_passes(self):
         def tidy(inner_self):
