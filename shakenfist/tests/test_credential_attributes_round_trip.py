@@ -67,23 +67,31 @@ class CredentialAttributesRoundTripTestCase(base.ShakenFistTestCase):
         self.addCleanup(self.channel.close)
         self.stub = database_pb2_grpc.DatabaseServiceStub(self.channel)
 
+    # What these readers raise when MariaDB goes away: the SQLAlchemy
+    # error in the message, statement text and bound uuid included.
+    BOOM = exceptions.DatabaseUnavailable(
+        'attributes could not be read: (pymysql.err.OperationalError) '
+        'server has gone away [SQL: SELECT namespace_key_attributes.uuid '
+        "...] [parameters: {'uuid_1': '" + str(KEY_UUID) + "'}]")
+
+    def _client_reads(self, wrapper, direct, **direct_behaviour):
+        """Call a client wrapper against the real servicer.
+
+        The server's direct reader is patched with direct_behaviour,
+        and the client's stub is pointed at the in-process server.
+        """
+        with mock.patch(f'shakenfist.mariadb.{direct}', **direct_behaviour), \
+                mock.patch('shakenfist.mariadb._get_database_stub',
+                           return_value=self.stub):
+            return getattr(mariadb, wrapper)(KEY_UUID)
+
     def test_a_failed_read_arrives_as_database_unavailable(self):
         # Not as None, which every one of these callers reads as "no
         # such row" (issue 3836).
         for direct, wrapper, _ in self.READERS:
             with self.subTest(reader=direct):
-                boom = exceptions.DatabaseUnavailable(
-                    'attributes could not be read: (pymysql.err.'
-                    'OperationalError) server has gone away [SQL: SELECT '
-                    'namespace_key_attributes.uuid ...] [parameters: '
-                    "{'uuid_1': '11111111-1111-4111-8111-111111111111'}]")
-                with mock.patch(f'shakenfist.mariadb.{direct}',
-                                side_effect=boom), \
-                        mock.patch('shakenfist.mariadb._get_database_stub',
-                                   return_value=self.stub):
-                    self.assertRaises(
-                        exceptions.DatabaseUnavailable,
-                        getattr(mariadb, wrapper), KEY_UUID)
+                with self.assertRaises(exceptions.DatabaseUnavailable):
+                    self._client_reads(wrapper, direct, side_effect=self.BOOM)
 
     def test_the_failure_does_not_carry_the_statement_back(self):
         # The server's own message names the statement and the bound
@@ -92,31 +100,31 @@ class CredentialAttributesRoundTripTestCase(base.ShakenFistTestCase):
         # its logs and events.
         for direct, wrapper, expected in self.READERS:
             with self.subTest(reader=direct):
-                boom = exceptions.DatabaseUnavailable(
-                    'attributes could not be read: (pymysql.err.'
-                    'OperationalError) server has gone away [SQL: SELECT '
-                    'namespace_key_attributes.uuid ...] [parameters: '
-                    "{'uuid_1': '11111111-1111-4111-8111-111111111111'}]")
-                with mock.patch(f'shakenfist.mariadb.{direct}',
-                                side_effect=boom), \
-                        mock.patch('shakenfist.mariadb._get_database_stub',
-                                   return_value=self.stub):
-                    try:
-                        getattr(mariadb, wrapper)(KEY_UUID)
-                    except exceptions.DatabaseUnavailable as e:
-                        raised = str(e)
+                with self.assertRaises(exceptions.DatabaseUnavailable) as cm:
+                    self._client_reads(wrapper, direct, side_effect=self.BOOM)
 
+                raised = str(cm.exception)
                 self.assertIn(f'{expected} could not be read', raised)
                 self.assertNotIn('SQL:', raised)
                 self.assertNotIn('parameters:', raised)
+
+    def test_a_damaged_rule_arrives_as_a_damaged_rule(self):
+        # The one arm which answers found=True with a sentinel field
+        # rather than a status code, so the one a proto or handler
+        # change is most likely to break. Read as an outage, the API
+        # could no longer mark the rule unusable; read as absent, the
+        # reconciler would mark a live rule deleted.
+        direct, wrapper, _ = self.READERS[2]
+        with self.assertRaises(exceptions.CorruptMappingRule):
+            self._client_reads(
+                wrapper, direct,
+                side_effect=exceptions.CorruptMappingRule(
+                    f'mapping rule {KEY_UUID} has undecodable scopes'))
 
     def test_a_missing_row_is_still_an_answer(self):
         # The negative control. Without it the tests above pass just as
         # well against a client which raises for every reply.
         for direct, wrapper, _ in self.READERS:
             with self.subTest(reader=direct):
-                with mock.patch(f'shakenfist.mariadb.{direct}',
-                                return_value=None), \
-                        mock.patch('shakenfist.mariadb._get_database_stub',
-                                   return_value=self.stub):
-                    self.assertIsNone(getattr(mariadb, wrapper)(KEY_UUID))
+                self.assertIsNone(
+                    self._client_reads(wrapper, direct, return_value=None))

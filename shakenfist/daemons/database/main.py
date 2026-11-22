@@ -4698,9 +4698,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             # uuid, and this detail string travels back to the client
             # and into its own exception message, its logs and any
             # event it writes. The exception is logged above, on the
-            # node that can act on it. The damaged-rule arm in
-            # GetMappingRuleAttributes declines to do this for the same
-            # reason.
+            # node that can act on it. The damaged-rule arm above
+            # declines to do this for the same reason.
             context.set_details('mapping rule attributes could not be read')
             return database_pb2.GetMappingRuleAttributesReply(found=False)
 

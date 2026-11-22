@@ -4,6 +4,7 @@
 # behaviour-preservation tests for the old JSON column implementation
 # live in test_namespace_keys.py and are deliberately left alone.
 import base64
+import contextlib
 import json
 from unittest import mock
 
@@ -274,9 +275,63 @@ class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
         self._drop_state(first)
         first.state = NamespaceKey.STATE_INITIAL
 
-        second = NamespaceKey.new('banana', 'deploy', 'different')
+        with mock.patch.object(NamespaceKey, 'add_event') as mock_add_event:
+            second = NamespaceKey.new('banana', 'deploy', 'different')
 
         self.assertEqual(NamespaceKey.STATE_CREATED, second.state.value)
+        # The key did have a state row, so the audit record must not
+        # say it had none.
+        audits = [c.args[1] for c in mock_add_event.call_args_list
+                  if c.args[0] == EVENT_TYPE_AUDIT]
+        self.assertEqual(
+            ['rotation finished repairing a key which an earlier repair '
+             'left in initial'], audits)
+
+    def _assert_heal_failure_is_contained(self, expected, **patches):
+        """Rotate a stateless key with the given mariadb calls patched.
+
+        Asserts that the rotation still hands back the nonce it minted,
+        which is the whole of what the caller cannot afford to lose,
+        and whether the failure reached the catch-all. A tier outage is
+        expected and gets a warning; only something nobody anticipated
+        should be recorded as an exception.
+        """
+        first = NamespaceKey.new('banana', 'deploy', 'sekrit')
+        self._drop_state(first)
+
+        with contextlib.ExitStack() as stack:
+            for name, side_effect in patches.items():
+                stack.enter_context(mock.patch(
+                    f'shakenfist.mariadb.{name}', side_effect=side_effect))
+            mock_ignore = stack.enter_context(mock.patch(
+                'shakenfist.util.exceptions.ignore_exception'))
+            second = NamespaceKey.new('banana', 'deploy', 'different')
+
+        self.assertIsNotNone(second.minted_nonce)
+        self.assertEqual(self._attributes(second).nonce.get_secret_value(),
+                         second.minted_nonce.get_secret_value())
+        self.assertEqual(not expected, mock_ignore.called)
+        return second
+
+    def test_an_unavailable_tier_on_the_heal_read_does_not_escape(self):
+        """DatabaseUnavailable is not an RpcError, so nothing below catches it.
+
+        The gRPC wrappers map RpcError to a return value and let
+        DatabaseUnavailable through on purpose (issue 3373), which is
+        the shape a tier outage takes on every sf-api worker.
+        """
+        self._assert_heal_failure_is_contained(
+            True, get_state_checked=exceptions.DatabaseUnavailable('tier gone'))
+
+    def test_an_unavailable_tier_on_the_heal_write_does_not_escape(self):
+        second = self._assert_heal_failure_is_contained(
+            True, set_state=exceptions.DatabaseUnavailable('tier gone'))
+        self.assertIsNone(self._stored_state(second))
+
+    def test_an_unexpected_heal_failure_does_not_escape(self):
+        """The catch-all, not the list of expected exceptions, is the guard."""
+        self._assert_heal_failure_is_contained(
+            False, get_state_checked=RuntimeError('something nobody expected'))
 
     def test_the_race_fallback_heals_a_stateless_key(self):
         winner = NamespaceKey.new('banana', 'deploy', 'sekrit')

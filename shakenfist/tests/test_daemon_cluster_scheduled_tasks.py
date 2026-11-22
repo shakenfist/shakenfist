@@ -3296,6 +3296,47 @@ class ReconcileOrphanedObjectsTestCase(base.ShakenFistTestCase):
                 return_value=0)
     @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
                 return_value=0)
+    def test_a_streak_clears_when_its_zombies_go_another_way(
+            self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
+            mock_set_state, mock_add_event):
+        # An operator hard deleting the unreadable row is the action
+        # most likely to answer this alert. The pass after that finds
+        # nothing to confirm and never reaches a liveness read, and it
+        # still has to clear the streak: one left at its last value
+        # keeps the alert firing against a reconciler with nothing
+        # left to fail on.
+        labels = {'object_type': 'namespace_key'}
+        mock_stateless.side_effect = self._two_zombies_of(
+            ObjectType.NAMESPACE_KEY)
+
+        with mock.patch('shakenfist.mariadb.get_namespace_key_attributes',
+                        side_effect=DatabaseUnavailable('tier blip')):
+            st.reconcile_orphaned_objects()
+            st.reconcile_orphaned_objects()
+        self.assertEqual(
+            1, REGISTRY.get_sample_value(
+                'cluster_zombie_liveness_failure_streak', labels))
+
+        mock_stateless.side_effect = lambda objtype: []
+        st.reconcile_orphaned_objects()
+
+        self.assertEqual({}, st._ZOMBIE_LIVENESS_STREAK)
+        self.assertEqual(
+            0, REGISTRY.get_sample_value(
+                'cluster_zombie_liveness_failure_streak', labels))
+        # A type which never had a streak is not given a label set.
+        self.assertIsNone(
+            REGISTRY.get_sample_value(
+                'cluster_zombie_liveness_failure_streak',
+                {'object_type': 'network'}))
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_stateless_object_uuids')
+    @mock.patch('shakenfist.mariadb.delete_orphaned_artifact_attributes',
+                return_value=0)
+    @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
+                return_value=0)
     def test_one_unreadable_zombie_does_not_block_the_rest_of_its_type(
             self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
             mock_set_state, mock_add_event):

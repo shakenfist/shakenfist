@@ -35,6 +35,7 @@ from shakenfist.schema.namespace_key_attributes import NamespaceKeyAttributesDat
 from shakenfist.schema.namespace_key_data import NamespaceKeyData
 from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.util import exceptions as util_exceptions
 
 
 LOG, _ = logs.setup(__name__)
@@ -289,16 +290,32 @@ class NamespaceKey(dbo):
         guard cannot catch that, because it re-reads the same way and
         so misreads it the same way.
 
-        Neither write is allowed to escape. rotate() has already
-        replaced the secret by the time we are called, so raising here
-        would lose the caller a secret which is live in the database --
-        the key would authenticate with a value nobody holds. A key left
-        in initial is in ACTIVE_STATES and is no longer stateless, so
-        expiry governs it normally and the next rotation finishes the
-        job.
+        Nothing is allowed to escape, the read included. rotate() has
+        already replaced the secret by the time we are called, so
+        raising here would lose the caller a secret which is live in the
+        database -- the key would authenticate with a value nobody
+        holds. A key left in initial is in ACTIVE_STATES and is no
+        longer stateless, so expiry governs it normally and the next
+        rotation finishes the job. The expected failures -- the tier
+        going away (DatabaseUnavailable is deliberately not an RpcError,
+        so the gRPC wrappers let it through) and a write the store or
+        the state machine refused -- are logged here; anything else is
+        recorded by the catch-all, which is what makes "nothing escapes"
+        a property of this method rather than of today's callees.
         """
-        readable, state = mariadb.get_state_checked(
-            self.object_type, str(self.uuid))
+        try:
+            self._repair_missing_state()
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                f'state repair of rotated key {self.uuid}', e)
+
+    def _repair_missing_state(self) -> None:
+        """The body of _heal_missing_state(), which contains its raises."""
+        try:
+            readable, state = mariadb.get_state_checked(
+                self.object_type, str(self.uuid))
+        except exceptions.DatabaseUnavailable:
+            readable, state = False, None
         if not readable:
             LOG.with_fields({
                 'namespace': self.namespace,
@@ -317,7 +334,8 @@ class NamespaceKey(dbo):
                 self.state = self.STATE_INITIAL
             self.state = self.STATE_CREATED
         except (exceptions.InvalidStateException,
-                exceptions.StateWriteFailed) as e:
+                exceptions.StateWriteFailed,
+                exceptions.DatabaseUnavailable) as e:
             LOG.with_fields({
                 'namespace': self.namespace,
                 'key': self.name,
@@ -326,8 +344,12 @@ class NamespaceKey(dbo):
             }).warning('Failed to repair the state of a rotated key')
             return
 
-        self.add_event(EVENT_TYPE_AUDIT,
-                       'rotation repaired a key which had no state row')
+        if value is None:
+            audit = 'rotation repaired a key which had no state row'
+        else:
+            audit = ('rotation finished repairing a key which an earlier '
+                     'repair left in initial')
+        self.add_event(EVENT_TYPE_AUDIT, audit)
 
     def rotate(self, plaintext_secret: str, expiry: Optional[float] = None,
                scopes: Optional[list[str]] = None,

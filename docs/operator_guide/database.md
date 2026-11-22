@@ -1398,9 +1398,11 @@ both published by the elected cluster maintainer only:
 - **`cluster_zombie_liveness_failure_streak`** — a gauge on
   `CLUSTER_METRICS_PORT`, labelled by `object_type`: consecutive passes
   that stopped before repairing that type's zombies because a liveness
-  read found the database tier unavailable. Reset to zero by the first
-  pass that gets through the type, and dropped on a leadership change,
-  with the same consequences for alerting as the gauge above.
+  read found the database tier unavailable. Reset to zero by the next
+  pass that reads the type's work list and does not stop on it —
+  including one which finds no zombies left, so a row an operator hard
+  deleted clears the alert — and dropped on a leadership change, with
+  the same consequences for alerting as the gauge above.
 - **`cluster_zombie_liveness_errors_total`** — a counter on
   `CLUSTER_METRICS_PORT`, labelled by `object_type`: liveness reads
   that failed for any other reason, such as a row the object model
@@ -1410,8 +1412,16 @@ both published by the elected cluster maintainer only:
   the row is that shape. A rate that is flat and non-zero is a row
   somebody has to look at; the cluster daemon log names it.
 
+Sample alerts, the first with the same threshold as the work-list
+streak and for the same reason, the second firing on any increase over
+a window longer than the hourly pass:
+
 ```
 max by (object_type) (cluster_zombie_liveness_failure_streak) > 2
+```
+
+```
+sum by (object_type) (increase(cluster_zombie_liveness_errors_total[3h])) > 0
 ```
 
 A deleted-object sweep which reads its work list fine can still fall

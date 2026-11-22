@@ -581,16 +581,24 @@ in the pull request that records that commit above.
 
 `_heal_missing_state()` now reads through `get_state_checked()` and
 leaves the key alone when the read failed, so a read blip during a
-rotation can no longer undelete a revoked key. Neither of its state
-writes may escape either: `rotate()` has already replaced the secret
-by the time the heal runs, so raising there lost the caller a secret
-that was live in the database. A key left in `initial` by a contained
-failure is finished by the next rotation.
+rotation can no longer undelete a revoked key. Nothing in the heal
+may escape, its read included: `rotate()` has already replaced the
+secret by the time the heal runs, so raising there lost the caller a
+secret that was live in the database. The first review of that pull
+request found the read and a tier outage on either write still could
+(`DatabaseUnavailable` is deliberately not an `RpcError`, so the gRPC
+wrappers let it through), so the heal is now guarded by a catch-all
+rather than by a list of the exceptions its callees are known to raise.
+A key left in `initial` by a contained failure is finished by the next
+rotation.
 
 The liveness stop became visible. It has its own streak gauge
 (`cluster_zombie_liveness_failure_streak`), because the work-list
 streak cannot carry it -- that read succeeded, which is how the
-zombies were found, so it had just been reset to zero. Liveness
+zombies were found, so it had just been reset to zero. Every pass that
+reads a type's work list and does not stop on it resets the streak,
+including one that finds no zombies left, so a row an operator hard
+deletes clears the alert. Liveness
 failures that are not the tier are counted
 (`cluster_zombie_liveness_errors_total`) rather than only logged.
 Repairs also resume at the zombie after the one that stopped the last

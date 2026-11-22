@@ -1694,8 +1694,14 @@ _ZOMBIE_RESUME_AFTER: dict[str, str] = {}
 def _record_zombie_liveness(objtype: str, stopped: bool) -> None:
     """Account one object type's zombie repairs against its streak.
 
-    A pass which got through a type's zombies clears that type's
-    streak; one which stopped on an unavailable tier extends it.
+    Called once for every type whose work list this pass read. A pass
+    which stopped on an unavailable tier extends the streak; any other
+    pass which read the type clears it, including one which found no
+    zombies to confirm -- the zombie may have been repaired or deleted
+    by some other route, and a streak left at its last value would keep
+    an alert firing against a healthy reconciler. A type whose work list
+    could not be read is left alone: nothing about its liveness reads
+    is known, and the work-list streak is already speaking for it.
     """
     if not stopped:
         if _ZOMBIE_LIVENESS_STREAK.pop(objtype, None):
@@ -1727,8 +1733,13 @@ def _repair_zombies(objtype: str, cls: type[dbo], confirmed: set[str]) -> bool:
     reached first every pass and would block every zombie of its type
     that sorts after it, indefinitely.
 
-    Any other failure costs only that one object, and is counted:
-    nothing resolves it on its own, and the object stays a candidate.
+    A liveness read which fails any other way costs only that one
+    object, and is counted: it is about the row's shape, so nothing
+    resolves it on its own and the object stays a candidate forever.
+    The write arm below is deliberately not counted. Its zombie has
+    already been read, so the row is not the problem; a write which
+    fails is the tier failing, and the next zombie's liveness read is
+    what notices that, stops the pass and extends the streak.
     """
     order = _resume_from(sorted(confirmed), _ZOMBIE_RESUME_AFTER.get(objtype))
     for obj_uuid in order:
@@ -1782,6 +1793,40 @@ def _repair_zombies(objtype: str, cls: type[dbo], confirmed: set[str]) -> bool:
                 f'zombie repair of {objtype} {obj_uuid}', e)
     _ZOMBIE_RESUME_AFTER.pop(objtype, None)
     return True
+
+
+def _reconcile_zombies_of(objtype: str, stateless: list[str]) -> bool:
+    """Confirm and repair one object type's zombies from its work list.
+
+    Returns False only if a liveness read found the database tier
+    unavailable, which is the one outcome that extends the type's
+    liveness streak. Every other way through -- no zombie confirmed yet,
+    the zombies having gone by some other route, a class lookup that
+    failed -- is a pass which reached the type and did not stop on it,
+    so it has to read as one. Keeping the confirmation inside this
+    function is what lets the caller account every type it read exactly
+    once; an early return in the caller is how a streak gets stranded at
+    its last value after the zombie it was counting has been deleted.
+    """
+    current = set(stateless)
+    confirmed = current & _ZOMBIE_CANDIDATES.get(objtype, set())
+    _ZOMBIE_CANDIDATES[objtype] = current
+    if not confirmed:
+        return True
+
+    # Which state a zombie is repaired to is the class's decision, not
+    # ours (issue 3836). Without the class there is no way to ask, and
+    # falling back to deleted is the one answer that can destroy a live
+    # object, so this type's zombies are left alone. They stay
+    # candidates, so they are confirmed again next pass.
+    try:
+        cls = get_object_class(objtype)
+    except Exception as e:
+        util_exceptions.ignore_exception(
+            f'zombie repair class lookup for {objtype}', e)
+        return True
+
+    return _repair_zombies(objtype, cls, confirmed)
 
 
 @util_general.recorded_method
@@ -1838,25 +1883,7 @@ def reconcile_orphaned_objects():
                 break
             continue
 
-        current = set(work.uuids)
-        confirmed = current & _ZOMBIE_CANDIDATES.get(objtype, set())
-        _ZOMBIE_CANDIDATES[objtype] = current
-        if not confirmed:
-            continue
-
-        # Which state a zombie is repaired to is the class's decision,
-        # not ours (issue 3836). Without the class there is no way to
-        # ask, and falling back to deleted is the one answer that can
-        # destroy a live object, so this type's zombies are left alone.
-        # They stay candidates, so they are confirmed again next pass.
-        try:
-            cls = get_object_class(objtype)
-        except Exception as e:
-            util_exceptions.ignore_exception(
-                f'zombie repair class lookup for {objtype}', e)
-            continue
-
-        stopped = not _repair_zombies(objtype, cls, confirmed)
+        stopped = not _reconcile_zombies_of(objtype, work.uuids)
         _record_zombie_liveness(objtype, stopped)
         if stopped:
             # The tier went away mid-pass. Same treatment as a
