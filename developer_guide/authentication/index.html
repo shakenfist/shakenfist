@@ -17242,6 +17242,17 @@ definition, public.</p>
 meaning "any of these". There is no globbing, no regular expressions,
 no prefix matching and no type coercion: a claim of <code>1</code> does not match
 a matcher of <code>"1"</code>.</p>
+<p>A claim whose <em>value</em> is a list matches by membership: the rule is
+satisfied when one of the claim's elements is a string exactly equal
+to the matcher, or to one of the matcher's alternatives. That is how a
+group claim grants a namespace, because a provider writes a person's
+groups as an array of strings rather than as one string. Nothing else
+is relaxed. A non-string element is skipped rather than stringified, a
+list inside a list is not descended into, an empty list matches
+nothing, and the matcher side is exactly as it was: still an exact
+string or a list of exact strings. The minted key's provenance records
+only the elements which matched, which is the grant as it was made
+rather than everything the person happens to be a member of.</p>
 <p>This is deliberate and is the most likely thing to feel restrictive.
 Prefix matching on <code>repository</code> reads naturally right up until someone
 registers <code>shakenfist-evil</code>, and the anchored patterns needed to make
@@ -17350,7 +17361,16 @@ matches a rule.</p>
 <p>Configuring an issuer and writing a mapping rule are operator tasks, and
 the worked end to end example -- registering GitHub as an issuer, writing
 a rule, and the workflow YAML that exchanges a token -- lives with them in
-the <a href="/operator_guide/authentication/#a-worked-github-actions-example">operator guide</a>.</p>
+the <a href="/operator_guide/authentication/#a-worked-github-actions-example">operator guide</a>.
+So do the two worked examples for human login, one per self hosted
+identity provider.</p>
+<p>Those two were produced by configuring the providers rather than from
+documentation, and <code>tools/idp-lab/</code> is what they were produced with: it
+stands both up from pinned images, configures them through their
+administrative APIs, and regenerates the captured provider documents the
+unit tests assert against. An instruction in them which has rotted can
+therefore be found out by running it, which is the only way a walkthrough
+stays true.</p>
 <h2 id="inter-node-authentication">Inter-node authentication<a class="headerlink" href="#inter-node-authentication" title="Permanent link">&para;</a></h2>
 <p>Requests between Shaken Fist nodes use the same authentication system and REST API
 as external API requests. When a node makes an API request to another node, the

@@ -14344,6 +14344,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#logging-in-as-a-person" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging in as a person
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#reading-your-own-keys" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16198,6 +16209,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#logging-in-as-a-person" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging in as a person
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#reading-your-own-keys" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16314,6 +16336,18 @@ the same way, and is subject to the same scopes and expiry as any other. It
 will simply be one that was created automatically, is scoped narrowly, and
 expires fairly quickly.</p>
 <p>Setting this up is an administrator's job, and is covered in the
+<a href="/operator_guide/authentication/#federated-identity">operator guide</a>.</p>
+<h2 id="logging-in-as-a-person">Logging in as a person<a class="headerlink" href="#logging-in-as-a-person" title="Permanent link">&para;</a></h2>
+<p>If your identity lives at an identity provider your cluster trusts, you do not
+need an administrator to hand you a key. Run <code>sf-client login</code> and sign in at
+the provider. The cluster then mints one namespace key for every namespace
+your identity entitles you to, so if you are entitled to three namespaces you
+receive three keys.</p>
+<p>The client caches those keys locally, and <code>sf-client logout</code> discards them.
+The <a href="https://github.com/shakenfist/client-python/blob/develop/docs/human-login.md">client documentation</a>
+covers the rest: the ways of logging in, where the cache lives, and how to
+choose between credentials. Whether a person can log in at all depends on an
+administrator having set up a provider for it, which is covered in the
 <a href="/operator_guide/authentication/#federated-identity">operator guide</a>.</p>
 <h2 id="reading-your-own-keys">Reading your own keys<a class="headerlink" href="#reading-your-own-keys" title="Permanent link">&para;</a></h2>
 <p>You can ask Shaken Fist what your own keys expire at and what they are scoped
