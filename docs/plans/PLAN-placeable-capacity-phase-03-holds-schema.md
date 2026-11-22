@@ -851,11 +851,15 @@ between deadlock-free and livelock.
    invariant and not a capacity answer, and reporting it as a refusal
    would need a reason token that means nothing to a caller.
 3. **Four refusal reasons were minted** -- `claim_capacity`,
-   `node_capacity`, `not_found`, `not_active` -- none of which is in
-   `auth.py`'s `CLAIM_REFUSAL_STATUS`. Harmless while `D6` keeps every
-   route out of this phase, and **phase 4 must map them when it adds
-   the API**, or a booking refusal reaches a caller as an unmapped
-   token.
+   `node_capacity`, `not_found` and `not_active` -- of which the last
+   two are already mapped in `auth.py`'s `CLAIM_REFUSAL_STATUS` (404
+   and 409) and in `CLAIM_REFUSAL_MESSAGE`. This note previously said
+   none of the four was mapped, which was wrong; step 3h checked the
+   constant and corrected it. The two genuinely new tokens are
+   `claim_capacity` and `node_capacity`. Harmless while `D6` keeps
+   every route out of this phase, and **phase 4 must map those two
+   when it adds the API**, or a booking refusal reaches a caller as an
+   unmapped token.
 
 **An earlier execution note was wrong.** It said each of steps 3c, 3d
 and 3f must fix *its own* live fixture. Adding the invariant to the
@@ -1088,3 +1092,42 @@ held from the cpu term and from the ram term each fail the netting
 test and the cluster-totals test. The disk test books 40 GB of held
 disk on the node it asserts over, which is what makes it bite: with
 held disk at zero it would pass whether or not the netting existed.
+
+### Step 3h, the documentation
+
+**The step read the code rather than this plan, and caught two false
+claims in it.** Both were this session's.
+
+`D10` and the `3h` row describe the held counters as "recomputed and
+never adjusted". That is not what was built. Booking increments
+`held_*` in its guarded `UPDATE` and release decrements it with a
+floor; the reconciler recomputes from the hold rows and overwrites
+whatever it finds. The thing that never touches `held_*` is
+admission, which charges `used_*`. The documentation says the latter.
+The recompute-not-adjust principle still holds where it matters -- the
+reconciler never reads a counter to derive it -- but the blanket form
+of the sentence was wrong and would have been copied forward.
+
+The execution note on the refusal reasons said none of the four was
+in `CLAIM_REFUSAL_STATUS`. `not_found` (404) and `not_active` (409)
+are in it, and in `CLAIM_REFUSAL_MESSAGE` as well. Only
+`claim_capacity` and `node_capacity` are new. The note has been
+corrected; as written it would have had phase 4 map twice the tokens
+it owes.
+
+**What the review corrected in the step's own work.** The holds
+section said a hold ends in "exactly three ways" and then described a
+fourth two paragraphs later: there are four callers of
+`_release_hold_rows()` -- an explicit release, claim delete, the
+expiry sweep, and a shrink. The count is now four, with a sentence
+saying all four share the helper, which is why the counters come back
+the same way however a hold ended. A rewrap had also left a CI
+docstring line ragged, and a new paragraph had run into the sentence
+after it.
+
+**Checked against the tree, not taken on report:** holds last in the
+canonical order (`_release_hold_rows()` decrements node capacity in
+uuid order and deletes the hold rows after it), 1213 in
+`_TRANSIENT_TRANSACTION_ERRNOS`, the pre-filter's `committed + held`
+and its live-memory term, and `NamespaceClaim.book_holds()` as the
+only reachable booking path.
