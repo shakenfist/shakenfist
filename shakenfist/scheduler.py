@@ -1032,7 +1032,10 @@ class Scheduler:
         was a 507 rather than a fall-through). The counters are
         therefore read alongside the metrics and the node is charged
         whichever of the two is larger, which is the same arithmetic
-        summarize_resources() publishes.
+        summarize_resources() publishes. The ledger side of that
+        comparison is everything the guard charges: room instances
+        occupy plus room a capacity claim has booked and nothing has
+        consumed yet.
 
         ``snapshot`` carries both, charged for anything this decision
         has already placed. A node with no committed row is charged
@@ -1053,15 +1056,23 @@ class Scheduler:
         row = snapshot.capacity_row(node)
         limit_cpus = row['limit_cpus'] if row else hard_max_cpus
         committed_cpus = row['used_cpus'] if row else 0
+        # Room booked on this node by a capacity claim is charged by the
+        # guard too, so it is charged here or the two disagree about the
+        # same row -- which is the disagreement this filter exists to
+        # prevent, one dimension further on.
+        held_cpus = row['held_cpus'] if row else 0
 
         # An instance already placed here is in used_cpus, and a
         # reschedule which lands it back on the same node does not
         # charge it a second time (place_instance() early-outs on an
-        # unchanged placement), so neither does this filter.
+        # unchanged placement), so neither does this filter. The
+        # exemption is the committed account's alone: a booking is not
+        # the instance being replaced, and excusing it would let a
+        # reschedule in on room somebody else has reserved.
         if committed_cpus and shape.placed_on == node:
             committed_cpus = max(0, committed_cpus - cpus)
 
-        current_cpu = max(measured_cpus, committed_cpus)
+        current_cpu = max(measured_cpus, committed_cpus + held_cpus)
 
         if current_cpu + cpus > limit_cpus:
             reason = {
@@ -1069,6 +1080,7 @@ class Scheduler:
                 'current_cpus': current_cpu,
                 'measured_cpus': measured_cpus,
                 'committed_cpus': committed_cpus,
+                'held_cpus': held_cpus,
                 'capacity_row_present': row is not None,
                 'requested_cpus': cpus,
                 'limit_cpus': limit_cpus,
@@ -1091,13 +1103,32 @@ class Scheduler:
         node_metrics = snapshot.node_metrics(node)
         memory = shape.memory_mb
         reserved = _memory_reserved_mb(node_metrics)
-        available = node_metrics.get('memory_available', 0) - reserved
+        # The row is read once for both of this filter's ledger terms. A
+        # node with no row is unguarded at admission and must not be
+        # refused on a ledger which does not exist, here or below.
+        row = snapshot.capacity_row(node)
+        # Memory a capacity claim has booked and nothing has consumed is
+        # treated as resident, which is the one place a ledger quantity
+        # deliberately enters a measured figure. It belongs here where
+        # the same subtraction would not belong in the disk filter: a
+        # booked instance's memory *will* be resident the moment it
+        # boots, and this check exists to predict the OOM kills that put
+        # RAM_OVERCOMMIT_RATIO at 1.0, so a booking is exactly the
+        # future residency it should fear. A booked disk, by contrast,
+        # occupies no blocks until something writes to it. The counter
+        # nets a consumed hold's room off already -- what is left of one
+        # is the residue beyond the instance that took it -- so an
+        # instance which has booted is not charged twice.
+        held_mb = row['held_memory_mb'] if row else 0
+        available = (node_metrics.get('memory_available', 0) - reserved
+                     - held_mb)
         if available - memory < 0.0:
             reason = {
                 'reason': 'insufficient memory',
                 'available_mb': available,
                 'requested_memory_mb': memory,
                 'memory_reserved_mb': reserved,
+                'held_memory_mb': held_mb,
             }
             log_ctx.with_fields({'node': node, **reason}).debug(
                 'Insufficient memory')
@@ -1135,21 +1166,22 @@ class Scheduler:
         # already records, against the ledger's own limit -- exactly the
         # arithmetic the guard will apply -- so a node whose RAM is fully
         # committed leaves the candidate list here rather than surviving
-        # to attract, and then be refused, an entire burst. A node with
-        # no row is guarded by nothing and must not be refused on a
-        # ledger which does not exist.
-        row = snapshot.capacity_row(node)
+        # to attract, and then be refused, an entire burst. Booked room
+        # is charged for the same reason and against the same limit,
+        # because the guard charges it too.
         if row:
             committed_mb = row['used_memory_mb']
             # An instance already placed here is in used_memory_mb, and a
             # reschedule which lands it back on the same node does not
-            # charge it a second time.
+            # charge it a second time. Booked room is not exempted:
+            # a hold is not the instance being replaced.
             if committed_mb and shape.placed_on == node:
                 committed_mb = max(0, committed_mb - memory)
-            if committed_mb + memory > row['limit_memory_mb']:
+            if committed_mb + held_mb + memory > row['limit_memory_mb']:
                 reason = {
                     'reason': 'would exceed committed memory',
                     'committed_memory_mb': committed_mb,
+                    'held_memory_mb': held_mb,
                     'requested_memory_mb': memory,
                     'limit_memory_mb': row['limit_memory_mb'],
                 }
@@ -1160,6 +1192,17 @@ class Scheduler:
         return True, None
 
     def _has_sufficient_disk(self, log_ctx, shape, node, snapshot):
+        # Note what this stage does not read: the node's capacity row.
+        # Neither the disk an admitted instance is charged nor the disk
+        # a capacity claim has booked appears here, so both are
+        # invisible until the guard tests them. That is the one
+        # dimension where this pre-filter and the guard knowingly
+        # disagree, and closing it would change the verdict of every
+        # create in the cluster -- booked or not -- on the stage that
+        # refuses more of them than any other, so it wants a
+        # measurement rather than a change made on the way past. The
+        # cost of the disagreement is bounded: a guard denial walks to
+        # the next candidate rather than refusing the create.
         requested_disk = shape.disk_gb
         node_metrics = snapshot.node_metrics(node)
 

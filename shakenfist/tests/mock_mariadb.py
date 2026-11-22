@@ -3361,9 +3361,16 @@ class MockMariaDB():
             for dimension, requested in (('cpus', cpus),
                                          ('memory_mb', memory_mb),
                                          ('disk_gb', disk_gb)):
+                # The real guard charges booked room alongside occupied
+                # room, so this double has to as well: a mock which
+                # admitted what production refuses would send every
+                # caller-side test down a walk the real code does not
+                # take. The booked half is reported separately for the
+                # same reason the real denial reports it.
+                held = row['held_' + dimension]
                 dimensions.append(mariadb._capacity_dimension(
                     dimension, row['limit_' + dimension],
-                    row['used_' + dimension], requested))
+                    row['used_' + dimension] + held, requested, held=held))
             if enforce_demand and row['demand_limit'] is not None:
                 # Check-then-charge, as the real clause does: the
                 # incoming placement's demand_add is reported but

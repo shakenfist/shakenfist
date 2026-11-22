@@ -2573,12 +2573,84 @@ class HasSufficientCPUPredicateTestCase(SchedulerTestCase):
             log_ctx, scheduler.PlacementShape.from_instance(inst), node,
             self._snapshot(s, capacity))
 
+    def _call_shape(self, shape, node, capacity, **metrics_overrides):
+        """The same call for a request with no instance row behind it.
+
+        The reschedule exemption is a property of the shape's
+        ``placed_on``, which a shape built from scratch can set without
+        having to stage a placement on a fake instance.
+        """
+        self.mock_mariadb.set_node_metrics_same(
+            self._baseline(**metrics_overrides))
+        s = scheduler.Scheduler()
+        log_ctx = s.log.with_fields({'instance': None})
+        return s._has_sufficient_cpu(
+            log_ctx, shape, node, self._snapshot(s, capacity))
+
+    def _shape(self, cpus, placed_on=None):
+        return scheduler.PlacementShape(
+            cpus=cpus, memory_mb=1024, disk_gb=0, affinity={},
+            namespace='unittest', placed_on=placed_on)
+
+    def test_booked_room_is_charged_beside_committed_room(self):
+        # The ledger side of the comparison is committed + held, so a
+        # node with two of its eight cpus placed and four booked has two
+        # left: a four cpu request is refused although the committed
+        # term alone (2 + 4) would have fitted it.
+        node = self._node_uuid('node2')
+        capacity = {node: {'limit_cpus': 8, 'used_cpus': 2,
+                           'held_cpus': 4}}
+
+        ok, reason = self._call_shape(self._shape(4), node, capacity)
+
+        self.assertFalse(ok)
+        self.assertEqual(6, reason['current_cpus'])
+        self.assertEqual(2, reason['committed_cpus'])
+        self.assertEqual(4, reason['held_cpus'])
+        # The same row with nothing booked admits the same request, so
+        # it is the held term that refused and not the limit.
+        ok, _ = self._call_shape(
+            self._shape(4), node,
+            {node: {'limit_cpus': 8, 'used_cpus': 2, 'held_cpus': 0}})
+        self.assertTrue(ok)
+
+    def test_a_reschedule_excuses_its_own_charge_and_not_the_holds(self):
+        # A reschedule landing back on the node it is already on is not
+        # charged its own used_cpus a second time. A hold is not the
+        # instance being replaced, so the same exemption must not reach
+        # it: excusing four booked cpus here would admit a request the
+        # guard then refuses, which is the disagreement this filter
+        # exists to avoid.
+        node = self._node_uuid('node2')
+        capacity = {node: {'limit_cpus': 8, 'used_cpus': 4,
+                           'held_cpus': 8}}
+
+        ok, reason = self._call_shape(
+            self._shape(4, placed_on=node), node, capacity)
+
+        self.assertFalse(ok)
+        self.assertEqual(0, reason['committed_cpus'])
+        self.assertEqual(8, reason['held_cpus'])
+        self.assertEqual(8, reason['current_cpus'])
+
+    def test_a_node_with_no_capacity_row_is_charged_no_holds(self):
+        # The fail-open case, for the new term: a node the reconciler
+        # has not sized has no held counter to read, and inventing a
+        # zeroed row would be a ledger that does not exist.
+        node = self._node_uuid('node2')
+
+        ok, reason = self._call_shape(self._shape(1), node, {})
+
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
+
     def test_exactly_at_the_capacity_row_limit_is_sufficient(self):
         # committed (4) + requested (4) == limit (8). Landing exactly on
         # the limit still admits, because the check is strictly
         # greater-than.
         node = self._node_uuid('node2')
-        capacity = {node: {'limit_cpus': 8, 'used_cpus': 4}}
+        capacity = {node: {'limit_cpus': 8, 'used_cpus': 4,
+                           'held_cpus': 0}}
         fake_inst = self.mock_mariadb.create_instance('fake-inst', cpus=4)
 
         ok, reason = self._call(fake_inst, node, capacity)
@@ -2588,7 +2660,8 @@ class HasSufficientCPUPredicateTestCase(SchedulerTestCase):
 
     def test_one_vcpu_over_the_capacity_row_limit_is_refused(self):
         node = self._node_uuid('node2')
-        capacity = {node: {'limit_cpus': 8, 'used_cpus': 5}}
+        capacity = {node: {'limit_cpus': 8, 'used_cpus': 5,
+                           'held_cpus': 0}}
         fake_inst = self.mock_mariadb.create_instance('fake-inst', cpus=4)
 
         ok, reason = self._call(fake_inst, node, capacity)
@@ -2599,6 +2672,7 @@ class HasSufficientCPUPredicateTestCase(SchedulerTestCase):
             'current_cpus': 5,
             'measured_cpus': 0,
             'committed_cpus': 5,
+            'held_cpus': 0,
             'capacity_row_present': True,
             'requested_cpus': 4,
             'limit_cpus': 8,
@@ -2652,6 +2726,7 @@ class HasSufficientCPUPredicateTestCase(SchedulerTestCase):
             'current_cpus': 0,
             'measured_cpus': 0,
             'committed_cpus': 0,
+            'held_cpus': 0,
             'capacity_row_present': False,
             'requested_cpus': int(hard_max) + 1,
             'limit_cpus': hard_max,
@@ -2830,6 +2905,128 @@ class HasSufficientRAMPredicateTestCase(SchedulerTestCase):
             log_ctx, scheduler.PlacementShape.from_instance(inst), node,
             self._snapshot(s, capacity))
 
+    def _call_shape(self, shape, node, capacity, **metrics_overrides):
+        """The same call for a request with no instance row behind it."""
+        self.mock_mariadb.set_node_metrics_same(
+            self._baseline(**metrics_overrides))
+        s = scheduler.Scheduler()
+        log_ctx = s.log.with_fields({'instance': None})
+        return s._has_sufficient_ram(
+            log_ctx, shape, node, self._snapshot(s, capacity))
+
+    def _shape(self, memory_mb, placed_on=None):
+        return scheduler.PlacementShape(
+            cpus=1, memory_mb=memory_mb, disk_gb=0, affinity={},
+            namespace='unittest', placed_on=placed_on)
+
+    def _row(self, limit_memory_mb=1000000, used_memory_mb=0,
+             held_memory_mb=0):
+        return {'limit_memory_mb': limit_memory_mb,
+                'used_memory_mb': used_memory_mb,
+                'held_memory_mb': held_memory_mb}
+
+    def test_unconsumed_booked_memory_counts_as_resident(self):
+        # The one place in this filter where a ledger quantity enters a
+        # measured figure. A booked instance's memory will be resident
+        # the moment it boots and this check is what predicts the OOM
+        # kills that put the overcommit ratio at 1.0, so the booking is
+        # taken off the measured headroom: 2048 MB available with 1024
+        # booked leaves 1024, which a 1536 MB request does not fit.
+        node = self._node_uuid('node2')
+
+        ok, reason = self._call_shape(
+            self._shape(1536), node, {node: self._row(held_memory_mb=1024)},
+            memory_available=2048)
+
+        self.assertFalse(ok)
+        self.assertEqual('insufficient memory', reason['reason'])
+        self.assertEqual(1024, reason['available_mb'])
+        self.assertEqual(1024, reason['held_memory_mb'])
+
+        # The same measurement with nothing booked admits it, so the
+        # booking is what refused.
+        ok, _ = self._call_shape(
+            self._shape(1536), node, {node: self._row()},
+            memory_available=2048)
+        self.assertTrue(ok)
+
+    def test_a_consumed_holds_residue_is_not_counted_twice(self):
+        # Consumption moves a hold's room from the held counter to the
+        # used one and leaves only the residue booked, and this check
+        # reads the counter rather than the hold's size. So a hold of
+        # 1024 MB consumed by a 1024 MB instance charges the live check
+        # nothing at all: the instance's memory is becoming resident
+        # and the measurement is what accounts for it. Charging the
+        # hold's full size here as well would refuse the request below.
+        node = self._node_uuid('node2')
+        consumed = {node: self._row(used_memory_mb=1024, held_memory_mb=0)}
+
+        ok, reason = self._call_shape(
+            self._shape(2048), node, consumed, memory_available=2048)
+
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
+
+        # And a hold only half consumed charges the live check its
+        # residue and not its size: 1024 booked, 256 of it taken by an
+        # instance, so 768 is still waiting to become resident.
+        partly = {node: self._row(used_memory_mb=256, held_memory_mb=768)}
+        ok, reason = self._call_shape(
+            self._shape(2048), node, partly, memory_available=2048)
+        self.assertFalse(ok)
+        self.assertEqual(768, reason['held_memory_mb'])
+        self.assertEqual(2048 - 768, reason['available_mb'])
+
+    def test_booked_room_is_charged_against_the_committed_limit(self):
+        # The ledger sub-check, which is the one the guard mirrors:
+        # committed + held + request <= limit. 500 placed and 400 booked
+        # of 1000 leaves 100, so a 200 MB request is refused where the
+        # committed term alone would have fitted it.
+        node = self._node_uuid('node2')
+        capacity = {node: self._row(limit_memory_mb=1000,
+                                    used_memory_mb=500, held_memory_mb=400)}
+
+        ok, reason = self._call_shape(self._shape(200), node, capacity)
+
+        self.assertFalse(ok)
+        self.assertEqual('would exceed committed memory', reason['reason'])
+        self.assertEqual(500, reason['committed_memory_mb'])
+        self.assertEqual(400, reason['held_memory_mb'])
+
+        ok, _ = self._call_shape(
+            self._shape(200), node,
+            {node: self._row(limit_memory_mb=1000, used_memory_mb=500)})
+        self.assertTrue(ok)
+
+    def test_a_reschedule_excuses_its_own_charge_and_not_the_holds(self):
+        # As for cpus: the instance being replaced is already in
+        # used_memory_mb and is not charged twice, while a booking
+        # belongs to somebody else and stays charged.
+        node = self._node_uuid('node2')
+        capacity = {node: self._row(limit_memory_mb=1000,
+                                    used_memory_mb=200, held_memory_mb=900)}
+
+        ok, reason = self._call_shape(
+            self._shape(200, placed_on=node), node, capacity)
+
+        self.assertFalse(ok)
+        self.assertEqual('would exceed committed memory', reason['reason'])
+        self.assertEqual(0, reason['committed_memory_mb'])
+        self.assertEqual(900, reason['held_memory_mb'])
+
+    def test_a_node_with_no_capacity_row_is_charged_no_holds(self):
+        # Both of this filter's new terms fall away with the row: the
+        # live check subtracts nothing and the ledger check does not
+        # run, because a node the reconciler has not sized is guarded by
+        # nothing at admission either.
+        node = self._node_uuid('node2')
+
+        ok, reason = self._call_shape(
+            self._shape(2048), node, {}, memory_available=2048)
+
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
+
     def test_exactly_the_available_memory_is_sufficient(self):
         # available - memory == 0.0, not < 0.0, so landing exactly on the
         # available figure still admits.
@@ -2853,6 +3050,7 @@ class HasSufficientRAMPredicateTestCase(SchedulerTestCase):
             'available_mb': 1023,
             'requested_memory_mb': 1024,
             'memory_reserved_mb': 0,
+            'held_memory_mb': 0,
         }, reason)
 
     def test_missing_memory_max_is_refused(self):
@@ -2896,7 +3094,8 @@ class HasSufficientRAMPredicateTestCase(SchedulerTestCase):
         # The capacity-row ledger check: committed (900) + requested
         # (100) == limit_memory_mb (1000) exactly still admits.
         node = self._node_uuid('node2')
-        capacity = {node: {'limit_memory_mb': 1000, 'used_memory_mb': 900}}
+        capacity = {node: {'limit_memory_mb': 1000, 'used_memory_mb': 900,
+                           'held_memory_mb': 0}}
         fake_inst = self.mock_mariadb.create_instance('fake-inst', memory=100)
 
         ok, reason = self._call(fake_inst, node, capacity)
@@ -2906,7 +3105,8 @@ class HasSufficientRAMPredicateTestCase(SchedulerTestCase):
 
     def test_one_mb_over_the_committed_memory_limit_is_refused(self):
         node = self._node_uuid('node2')
-        capacity = {node: {'limit_memory_mb': 1000, 'used_memory_mb': 901}}
+        capacity = {node: {'limit_memory_mb': 1000, 'used_memory_mb': 901,
+                           'held_memory_mb': 0}}
         fake_inst = self.mock_mariadb.create_instance('fake-inst', memory=100)
 
         ok, reason = self._call(fake_inst, node, capacity)
@@ -2915,6 +3115,7 @@ class HasSufficientRAMPredicateTestCase(SchedulerTestCase):
         self.assertEqual({
             'reason': 'would exceed committed memory',
             'committed_memory_mb': 901,
+            'held_memory_mb': 0,
             'requested_memory_mb': 100,
             'limit_memory_mb': 1000,
         }, reason)
@@ -2994,6 +3195,35 @@ class HasSufficientDiskPredicateTestCase(SchedulerTestCase):
             'disk_free_gb': 100.0,
             'minimum_free_disk_gb': 0,
         }, reason)
+
+    def test_this_stage_reads_no_disk_ledger_at_all(self):
+        """The one dimension where the pre-filter and the guard differ.
+
+        Neither placed nor booked disk reaches this stage: it is a
+        filesystem measurement less the node's own reservation, and a
+        node whose disk ledger is exhausted several times over still
+        passes it. Pinned deliberately rather than left to be noticed,
+        because adding a ledger term here would change the verdict of
+        every create in the cluster on the stage that refuses most of
+        them, and that is a decision for a measurement rather than for
+        a change made while passing. The guard still refuses, and a
+        guard denial walks to the next candidate.
+        """
+        node = self._node_uuid('node2')
+        self.mock_mariadb.set_node_capacity(
+            node, limit_disk_gb=10, used_disk_gb=10, held_disk_gb=100)
+        fake_inst = self.mock_mariadb.create_instance(
+            'fake-inst', disk_spec=[{'base': 'cirros', 'size': 50}])
+
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        s = scheduler.Scheduler()
+        capacity, _ = s._capacity_by_node()
+        ok, reason = s._has_sufficient_disk(
+            s.log, scheduler.PlacementShape.from_instance(fake_inst), node,
+            scheduler.PlacementSnapshot(s.metrics, lambda: (capacity, False)))
+
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
 
 
 class HasIdleDiskBandwidthPredicateTestCase(SchedulerTestCase):

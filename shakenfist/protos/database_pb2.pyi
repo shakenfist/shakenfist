@@ -9806,6 +9806,7 @@ class CapacityDimensionDetail(_message.Message):
     CPU_LOAD_1_FIELD_NUMBER: _builtins.int
     EXPECTED_DEMAND_FIELD_NUMBER: _builtins.int
     SHORTFALL_FIELD_NUMBER: _builtins.int
+    HELD_FIELD_NUMBER: _builtins.int
     dimension: _builtins.str
     """cpus, memory_mb, disk_gb or demand"""
     limit: _builtins.float
@@ -9836,6 +9837,19 @@ class CapacityDimensionDetail(_message.Message):
     from an sf-database predating this field must read as "not
     reported" rather than as a refusal which was not actually over.
     """
+    held: _builtins.float
+    """Set only on the node stage's three allocation dimensions: the part
+    of used which is room booked by a capacity claim and not yet
+    consumed by an instance. The node guard charges booked room as well
+    as occupied room, so used is their sum and this reports the booked
+    part on its own: a node refused because it is full and a node
+    refused because it is booked are different facts, and a counter
+    which has drifted from the hold rows it is recomputed from is a
+    third. optional for the same reason as the fields above -- zero is
+    an honest value for a node holding nothing, so a reply from an
+    sf-database predating this field must read as "not reported" rather
+    than as a node with no bookings.
+    """
     def __init__(
         self,
         *,
@@ -9847,21 +9861,26 @@ class CapacityDimensionDetail(_message.Message):
         cpu_load_1: _builtins.float | None = ...,
         expected_demand: _builtins.float | None = ...,
         shortfall: _builtins.float | None = ...,
+        held: _builtins.float | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1", "_expected_demand", b"_expected_demand", "_shortfall", b"_shortfall", "cpu_load_1", b"cpu_load_1", "expected_demand", b"expected_demand", "shortfall", b"shortfall"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1", "_expected_demand", b"_expected_demand", "_held", b"_held", "_shortfall", b"_shortfall", "cpu_load_1", b"cpu_load_1", "expected_demand", b"expected_demand", "held", b"held", "shortfall", b"shortfall"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1", "_expected_demand", b"_expected_demand", "_shortfall", b"_shortfall", "cpu_load_1", b"cpu_load_1", "dimension", b"dimension", "exceeded", b"exceeded", "expected_demand", b"expected_demand", "limit", b"limit", "requested", b"requested", "shortfall", b"shortfall", "used", b"used"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1", "_expected_demand", b"_expected_demand", "_held", b"_held", "_shortfall", b"_shortfall", "cpu_load_1", b"cpu_load_1", "dimension", b"dimension", "exceeded", b"exceeded", "expected_demand", b"expected_demand", "held", b"held", "limit", b"limit", "requested", b"requested", "shortfall", b"shortfall", "used", b"used"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     _WhichOneofReturnType__cpu_load_1: _TypeAlias = _typing.Literal["cpu_load_1"]  # noqa: Y015
     _WhichOneofArgType__cpu_load_1: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1"]  # noqa: Y015
     _WhichOneofReturnType__expected_demand: _TypeAlias = _typing.Literal["expected_demand"]  # noqa: Y015
     _WhichOneofArgType__expected_demand: _TypeAlias = _typing.Literal["_expected_demand", b"_expected_demand"]  # noqa: Y015
+    _WhichOneofReturnType__held: _TypeAlias = _typing.Literal["held"]  # noqa: Y015
+    _WhichOneofArgType__held: _TypeAlias = _typing.Literal["_held", b"_held"]  # noqa: Y015
     _WhichOneofReturnType__shortfall: _TypeAlias = _typing.Literal["shortfall"]  # noqa: Y015
     _WhichOneofArgType__shortfall: _TypeAlias = _typing.Literal["_shortfall", b"_shortfall"]  # noqa: Y015
     @_typing.overload
     def WhichOneof(self, oneof_group: _WhichOneofArgType__cpu_load_1) -> _WhichOneofReturnType__cpu_load_1 | None: ...
     @_typing.overload
     def WhichOneof(self, oneof_group: _WhichOneofArgType__expected_demand) -> _WhichOneofReturnType__expected_demand | None: ...
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__held) -> _WhichOneofReturnType__held | None: ...
     @_typing.overload
     def WhichOneof(self, oneof_group: _WhichOneofArgType__shortfall) -> _WhichOneofReturnType__shortfall | None: ...
 

@@ -3013,6 +3013,18 @@ message CapacityDimensionDetail {
   // from an sf-database predating this field must read as "not
   // reported" rather than as a refusal which was not actually over.
   optional double shortfall = 8;
+  // Set only on the node stage's three allocation dimensions: the part
+  // of used which is room booked by a capacity claim and not yet
+  // consumed by an instance. The node guard charges booked room as well
+  // as occupied room, so used is their sum and this reports the booked
+  // part on its own: a node refused because it is full and a node
+  // refused because it is booked are different facts, and a counter
+  // which has drifted from the hold rows it is recomputed from is a
+  // third. optional for the same reason as the fields above -- zero is
+  // an honest value for a node holding nothing, so a reply from an
+  // sf-database predating this field must read as "not reported" rather
+  // than as a node with no bookings.
+  optional double held = 9;
 }
 
 // One counter a floored decrement had to clamp at zero: the ledger

@@ -18,6 +18,7 @@ actually matter -- is test_mariadb_capacity_admission_live.py.
 
 import ast
 import inspect
+import re
 import textwrap
 from types import SimpleNamespace
 from unittest import mock
@@ -31,6 +32,7 @@ from shakenfist.daemons.database import main as database_main
 from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.protos import database_pb2
+from shakenfist import scheduler
 from shakenfist.tests import base
 from shakenfist.tests import mock_mariadb as mock_mariadb_fixture
 
@@ -512,6 +514,33 @@ class AdmitGuardTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertIn('node_metrics.cpu_schedulable', update)
         self.assertIn('expected_demand', update)
 
+    def test_the_node_guard_charges_booked_room_as_well_as_used(self):
+        # Room a capacity claim has booked on this node binds every
+        # namespace's creates, including the holder's own unheld ones,
+        # so each allocation clause tests the sum of the two counters.
+        router = _PlacementRouter()
+        self._run(router)
+        where = self._node_update(router).split('WHERE', 1)[1]
+        for dimension in ('cpus', 'memory_mb', 'disk_gb'):
+            self.assertIn(
+                f'scheduler_node_capacity.used_{dimension} + '
+                f'scheduler_node_capacity.held_{dimension} + %s '
+                f'<= scheduler_node_capacity.limit_{dimension}', where)
+
+    def test_the_guard_charges_booked_room_and_moves_none_of_it(self):
+        # An admission records an instance arriving, which charges the
+        # used counters. Nothing in it consumes a hold -- a create that
+        # does is a different statement which does not exist yet -- so a
+        # held counter which moved here would hand the same room out
+        # twice, once to this instance and once to whoever booked it.
+        router = _PlacementRouter()
+        self._run(router)
+        sets = self._node_update(router).split('SET', 1)[1].split(
+            'WHERE', 1)[0]
+        self.assertIn('used_cpus=', sets)
+        for dimension in ('cpus', 'memory_mb', 'disk_gb'):
+            self.assertNotIn(f'held_{dimension}=', sets)
+
     def test_demand_clause_passes_when_metrics_are_null(self):
         # A node whose resources daemon has not published typed columns
         # has no bound to compute, so the clause must not deny it.
@@ -885,6 +914,59 @@ class AdmitDenialTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertEqual(8.5, detail['demand']['expected_demand'])
         self.assertNotIn('cpu_load_1', detail['cpus'])
         self.assertNotIn('expected_demand', detail['cpus'])
+
+    def test_a_node_denial_names_the_held_term(self):
+        # A node with five of its twelve cpus placed and four booked
+        # refuses a four cpu request, where the placed term alone (5 + 4
+        # of 12) would have fitted it. The detail has to recompute the
+        # comparison the guard made, or a refusal arrives naming no
+        # exceeded dimension at all -- and it has to say how much of
+        # used was a booking, because "this node is full" and "this node
+        # is booked" are different facts for whoever reads the event.
+        router = _PlacementRouter(node_row=_capacity_row(
+            limit_cpus=12, used_cpus=5, held_cpus=4, expected_demand=0.0),
+            rowcounts={'node_claim': 0})
+        result = self._run(router)
+
+        self.assertEqual('node', result['failing_stage'])
+        detail = {d['dimension']: d for d in result['dimensions']}
+        self.assertEqual(12.0, detail['cpus']['limit'])
+        self.assertEqual(9.0, detail['cpus']['used'])
+        self.assertEqual(4.0, detail['cpus']['held'])
+        self.assertEqual(4.0, detail['cpus']['requested'])
+        self.assertTrue(detail['cpus']['exceeded'])
+        self.assertEqual(1.0, detail['cpus']['shortfall'])
+        # The placed term on its own does fit, which is what makes this
+        # a refusal the held term caused.
+        self.assertLessEqual(
+            detail['cpus']['used'] - detail['cpus']['held']
+            + detail['cpus']['requested'], detail['cpus']['limit'])
+
+    def test_the_held_term_is_reported_only_where_there_is_one(self):
+        # The node stage has a held account; the claim and cluster
+        # stages do not, and the demand dimension is not an allocation
+        # at all. A zero on any of those would say a guard weighed a
+        # term it never read.
+        router = _PlacementRouter(rowcounts={'node_claim': 0})
+        node = {d['dimension']: d for d in self._run(router)['dimensions']}
+        for dimension in ('cpus', 'memory_mb', 'disk_gb'):
+            self.assertIn('held', node[dimension])
+        self.assertNotIn('held', node['demand'])
+
+        router = _PlacementRouter(claim=_claim_row(limit_cpus=8, used_cpus=6),
+                                  rowcounts={'claim_update': 0})
+        with mock.patch.object(mariadb, 'CLAIM_ENFORCEMENT_HARD', True):
+            claim = self._run(router)
+        self.assertEqual('claim', claim['failing_stage'])
+        for dimension in claim['dimensions']:
+            self.assertNotIn('held', dimension)
+
+        router = _PlacementRouter(claim=None,
+                                  rowcounts={'cluster_update': 0})
+        cluster = self._run(router)
+        self.assertEqual('cluster', cluster['failing_stage'])
+        for dimension in cluster['dimensions']:
+            self.assertNotIn('held', dimension)
 
     def test_an_allocation_denial_with_quiet_demand_is_not_waivable(self):
         # The converse of the demand-only case, and the one that decides
@@ -1799,6 +1881,31 @@ class DimensionDetailTestCase(base.ShakenFistTestCase):
         self.assertNotIn('cpu_load_1', detail)
         self.assertNotIn('expected_demand', detail)
 
+    def test_the_held_term_is_present_only_when_supplied(self):
+        # The node stage's used is two terms as well -- room instances
+        # occupy and room a claim has booked -- and which one bound
+        # decides whether a refusal means "full", "booked" or "the
+        # counter has drifted". Zero is an honest value for a node
+        # holding nothing, so a stage with no held account at all must
+        # report no key rather than a zero.
+        detail = mariadb._capacity_dimension('cpus', 48.0, 46.0, 4.0, held=6.0)
+        self.assertEqual(6.0, detail['held'])
+        self.assertEqual(46.0, detail['used'])
+        self.assertTrue(detail['exceeded'])
+
+        self.assertNotIn('held', mariadb._capacity_dimension(
+            'cpus', 48.0, 40.0, 4.0))
+        self.assertNotIn('held', mariadb._capacity_dimension(
+            'demand', 12.0, 12.5, 10.0, charged=False))
+
+    def test_the_held_term_cannot_be_supplied_by_position(self):
+        # Keyword-only for the same reason charged is: the value decides
+        # how a refusal reads, and landing in the right argument slot by
+        # accident is not a decision anybody made.
+        self.assertRaises(
+            TypeError, mariadb._capacity_dimension,
+            'cpus', 48.0, 46.0, 4.0, 6.0)
+
     def test_shortfall_is_floored_at_zero_when_it_fits(self):
         # used + requested (46 + 4 = 50) is under the limit (100), so
         # there is no shortfall -- and, critically, not a negative one:
@@ -1874,11 +1981,16 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
         'success': True, 'error': '', 'admitted': False, 'unguarded': False,
         'clamped': False, 'clamps': [], 'failing_stage': 'node',
         'dimensions': [
+            # used is the sum the node guard tested and held is the
+            # booked part of it, so an operator reading the refusal can
+            # tell a full node from a booked one.
             {'dimension': 'cpus', 'limit': 48.0, 'used': 46.0,
-             'requested': 4.0, 'exceeded': True, 'shortfall': 2.0},
+             'requested': 4.0, 'exceeded': True, 'shortfall': 2.0,
+             'held': 6.0},
             # The demand breakdown keys (issue 3913) ride along; the
-            # cpus dimension above must come back without them, which
-            # the dict-equality assertions check exactly.
+            # cpus dimension above must come back without them, and the
+            # demand dimension without the held term, which the
+            # dict-equality assertions check exactly.
             {'dimension': 'demand', 'limit': 12.0, 'used': 12.5,
              'requested': 10.0, 'exceeded': True, 'shortfall': 0.5,
              'cpu_load_1': 4.0, 'expected_demand': 8.5},
@@ -2008,6 +2120,20 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
               'requested': 4.0, 'exceeded': True}],
             unpacked['dimensions'])
         self.assertNotIn('shortfall', unpacked['dimensions'][0])
+
+    def test_a_reply_without_a_held_term_reads_as_absent_not_zero(self):
+        # The mixed-version window again. An sf-database predating the
+        # field reports a node's used without saying how much of it was
+        # booked, and that has to read as "not reported" rather than as
+        # a node which has booked nothing -- the second would say the
+        # whole of used is instances, which is a claim the old server
+        # never made.
+        reply = database_pb2.AdmitInstancePlacementReply(
+            success=True, admitted=False, failing_stage='node')
+        reply.dimensions.add(dimension='cpus', limit=8.0, used=6.0,
+                             requested=4.0, exceeded=True, shortfall=2.0)
+        unpacked, _ = self._unpack(reply)
+        self.assertNotIn('held', unpacked['dimensions'][0])
 
     def test_over_claim_round_trip_preserves_the_advisory_detail(self):
         # An admitted placement carrying advisory over-limit detail: the
@@ -2769,3 +2895,198 @@ class DemandOnlyDenialTestCase(base.ShakenFistTestCase):
 
     def test_no_exceeded_dimension_is_not_waivable(self):
         self.assertFalse(self._denial('node', set()).demand_only)
+
+
+class GuardAndPrefilterAgreementTestCase(_PlacementMixin,
+                                         base.ShakenFistTestCase):
+    """The scheduler's pre-filter and the SQL guard answer alike.
+
+    These are two implementations of one comparison, in two languages,
+    on two tiers. When they disagree in the permissive direction the
+    pre-filter keeps a node in the candidate list that the guard then
+    refuses, and a burst of creates is attracted to that node and
+    refused one at a time -- which is issue 3636, and is why the ledger
+    terms are in the filters at all. So the agreement is asserted
+    directly, for one row and one shape at a time, rather than inferred
+    from each side passing its own tests.
+
+    The guard's side is read out of the statement it actually compiles:
+    the clause for each dimension is located in the UPDATE's WHERE,
+    every term in it is resolved against the row, and the comparison is
+    evaluated here. A term the guard stops charging disappears from the
+    parse and the verdicts diverge; a term it starts charging appears
+    and has to be a column of the row or the parse fails.
+
+    Two deliberate limits. The measured figures are made generous,
+    because the guard has no measured term for the pre-filter to agree
+    with -- what can disagree is the ledger arithmetic, and that is what
+    is compared. And disk is exempt: the disk pre-filter reads no
+    capacity row at all, so on that dimension the two knowingly
+    disagree (see _has_sufficient_disk()).
+    """
+
+    # The dimensions the guard and the pre-filter both charge, each
+    # with the predicate which charges it. Disk is absent on purpose,
+    # per the class docstring.
+    AGREED = (('cpus', '_has_sufficient_cpu'),
+              ('memory_mb', '_has_sufficient_ram'))
+
+    # Generous enough that the ledger is what decides. cpu_schedulable
+    # keeps the live CPU ceiling out of the comparison and memory_max
+    # keeps the KSM ratio out of it.
+    METRICS = {
+        'cpu_schedulable': 1024,
+        'cpu_total_instance_vcpus': 0,
+        'memory_available': 1 << 30,
+        'memory_reserved_mb': 0,
+        'memory_max': 1 << 30,
+        'memory_total_instance_actual': 0,
+    }
+
+    def _call(self, **kwargs):
+        args = {
+            'instance_uuid': str(INST1), 'namespace': 'ci-1',
+            'node_uuid': str(NODE1), 'old_node_uuid': '', 'cpus': 4,
+            'memory_mb': 4096, 'disk_gb': 20, 'demand_add': 10.0,
+            'target_load': 0.75, 'enforce': True,
+            'placement_json': PLACEMENT_JSON,
+        }
+        args.update(kwargs)
+        return mariadb._direct_admit_instance_placement(**args)
+
+    def _guard_where(self):
+        """The node guard's compiled WHERE, as the admission sends it."""
+        router = _PlacementRouter()
+        self._run(router)
+        [update] = [text for text in router.statements('UPDATE')
+                    if 'UPDATE scheduler_node_capacity' in text]
+        return update.split('WHERE', 1)[1]
+
+    def _guard_admits(self, where, row, request, dimension):
+        """Evaluate the guard's clause for one dimension against one row.
+
+        One dimension at a time, because the statement's verdict is the
+        conjunction of its clauses: a term dropped from the cpus clause
+        is invisible in the whole-statement answer whenever the memory
+        clause refuses too.
+
+        The clause is ``used_<dimension> + <terms> <= limit_``, and the
+        terms are resolved by name: a column of the row, or the bind
+        carrying this dimension's request. Anything else is a term this
+        test cannot account for, and fails rather than being ignored.
+        """
+        clause = re.search(
+            rf'scheduler_node_capacity\.used_{dimension} \+ (.*?) '
+            rf'<= scheduler_node_capacity\.limit_{dimension}', where)
+        self.assertIsNotNone(
+            clause, f'no {dimension} clause in the guard: {where}')
+        charged = row[f'used_{dimension}']
+        for term in clause.group(1).split(' + '):
+            if term == '%s':
+                charged += request[dimension]
+                continue
+            column = term.replace('scheduler_node_capacity.', '')
+            self.assertIn(
+                column, row,
+                f'the guard charges {column}, which is not a counter '
+                f'this test knows how to resolve')
+            charged += row[column]
+        return charged <= row[f'limit_{dimension}']
+
+    def _prefilter_admits(self, row, request, predicate):
+        """One ledger-denominated pre-filter stage, on the same row.
+
+        ``Scheduler`` is built without running __init__ so that nothing
+        has to be mocked for a metrics refresh these predicates do not
+        read. They take everything they read from the snapshot and the
+        shape, so a future one that reaches for ``self`` instead fails
+        here loudly rather than being silently satisfied by a mock.
+        """
+        node = str(NODE1)
+        snapshot = scheduler.PlacementSnapshot(
+            {node: dict(self.METRICS)}, lambda: ({node: dict(row)}, False))
+        shape = scheduler.PlacementShape(
+            cpus=request['cpus'], memory_mb=request['memory_mb'],
+            disk_gb=request['disk_gb'], affinity={}, namespace='ci-1')
+        s = scheduler.Scheduler.__new__(scheduler.Scheduler)
+        ok, _ = getattr(s, predicate)(
+            mock.MagicMock(), shape, node, snapshot)
+        return ok
+
+    def _row(self, used=0, held=0, dimension='cpus'):
+        """A capacity row tight on one dimension and roomy on the others.
+
+        The limits are 12 cpus and 12288 MB; ``used`` and ``held`` are
+        in whole vCPUs and are scaled to 1024 MB each for the memory
+        dimension, so one table of cases drives both.
+        """
+        row = {
+            'node_uuid': str(NODE1),
+            'limit_cpus': 12, 'used_cpus': 0, 'held_cpus': 0,
+            'limit_memory_mb': 12288, 'used_memory_mb': 0,
+            'held_memory_mb': 0,
+            'limit_disk_gb': 120, 'used_disk_gb': 0, 'held_disk_gb': 0,
+            'expected_demand': 0.0,
+        }
+        scale = 1 if dimension == 'cpus' else 1024
+        row[f'used_{dimension}'] = used * scale
+        row[f'held_{dimension}'] = held * scale
+        return row
+
+    def test_the_guard_and_the_prefilter_agree_on_the_same_row(self):
+        where = self._guard_where()
+        # Each case is (used, held, requested, the verdict both sides
+        # must reach), in whole vCPUs against a limit of 12. The
+        # expected verdict is written out as well as compared, so a
+        # change which made both sides wrong in the same direction
+        # still fails.
+        cases = [
+            ('room for it', 4, 4, 4, True),
+            ('exactly at the limit, all booked', 0, 8, 4, True),
+            ('exactly at the limit, both terms', 4, 4, 4, True),
+            ('one over, on the booked term', 5, 4, 4, False),
+            ('full of placements', 12, 0, 1, False),
+            ('full of bookings', 0, 12, 1, False),
+            ('neither term alone would refuse it', 7, 4, 2, False),
+        ]
+        for dimension, predicate in self.AGREED:
+            for name, used, held, wanted, expected in cases:
+                row = self._row(used, held, dimension)
+                scale = 1 if dimension == 'cpus' else 1024
+                request = {'cpus': 0, 'memory_mb': 0, 'disk_gb': 0}
+                request[dimension] = wanted * scale
+                guard = self._guard_admits(where, row, request, dimension)
+                prefilter = self._prefilter_admits(row, request, predicate)
+                self.assertEqual(
+                    expected, guard, f'guard, {dimension}, {name}')
+                self.assertEqual(
+                    guard, prefilter,
+                    f'the guard and the pre-filter disagree about '
+                    f'"{name}" on {dimension}: guard says {guard}, '
+                    f'pre-filter says {prefilter}')
+
+    def test_a_node_with_no_capacity_row_is_neither_guarded_nor_filtered(self):
+        # The fail-open both sides have to take together. A node the
+        # reconciler has not sized is admitted unguarded, so a
+        # pre-filter that refused it would prune a candidate the cluster
+        # is willing to place on -- and it has no held counter to read
+        # either way.
+        router = _PlacementRouter(node_row=None)
+        result = self._run(router)
+        self.assertTrue(result['admitted'])
+        self.assertTrue(result['unguarded'])
+        self.assertEqual(mariadb.UNGUARDED_NODE_NOT_SIZED,
+                         result['unguarded_reason'])
+
+        node = str(NODE1)
+        snapshot = scheduler.PlacementSnapshot(
+            {node: dict(self.METRICS)}, lambda: ({}, False))
+        shape = scheduler.PlacementShape(
+            cpus=4, memory_mb=4096, disk_gb=20, affinity={},
+            namespace='ci-1')
+        s = scheduler.Scheduler.__new__(scheduler.Scheduler)
+        for _, predicate in self.AGREED:
+            ok, reason = getattr(s, predicate)(
+                mock.MagicMock(), shape, node, snapshot)
+            self.assertTrue(ok, f'{predicate} refused an unsized node')
+            self.assertIsNone(reason)

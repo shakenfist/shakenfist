@@ -28924,6 +28924,17 @@ class CapacityDimensionDetailDict(TypedDict):
     # and zero is a value this field cannot honestly take on a dimension
     # which is flagged exceeded. Absent means "not reported".
     shortfall: NotRequired[float]
+    # Present only on the node stage's allocation dimensions: the part
+    # of used which is room booked by a capacity claim rather than room
+    # an instance is occupying. The node guard charges both, so used is
+    # their sum and this says how much of it a holder has reserved --
+    # the distinction between a node which is full and a node which is
+    # booked, which an operator acts on differently. Absent rather than
+    # zero where there is no held account to report: zero is an honest
+    # value for a node holding nothing, so a zero on the claim or
+    # cluster stage would claim those guards weighed a term they never
+    # read.
+    held: NotRequired[float]
     # Present only on the demand dimension: the two terms whose sum is
     # used. cpu_load_1 is measured ground truth, expected_demand is the
     # D13 feedforward estimate, and which one made used exceed the limit
@@ -29288,6 +29299,7 @@ def _retry_transaction(fn: Callable[[], _T], op_name: str) -> _T:
 def _capacity_dimension(
         dimension: str, limit: float, used: float, requested: float, *,
         charged: bool = True,
+        held: Optional[float] = None,
         cpu_load_1: Optional[float] = None,
         expected_demand: Optional[float] = None
 ) -> CapacityDimensionDetailDict:
@@ -29325,6 +29337,23 @@ def _capacity_dimension(
     (not zero) on the three allocation dimensions, which have no such
     split.
 
+    ``held`` is the same kind of breakdown for the node stage, whose
+    guard charges room booked by a capacity claim as well as room an
+    instance is using: the caller passes the sum as ``used`` so
+    ``exceeded`` recomputes the comparison the guard actually made, and
+    passes the booked part again here so a reader can tell which term
+    bound. A node refused because it is full is a correct refusal; a
+    node refused because it is booked is a different fact an operator
+    acts on differently, and a counter which has drifted away from the
+    hold rows it is recomputed from is a defect. None of those three can
+    be told apart from the sum alone. Keyword-only and absent rather
+    than zero for the same reasons as the demand terms above: zero is a
+    value this field can honestly take on a node with no bookings, so
+    reporting it where there is no held account at all -- the claim and
+    cluster stages, which hold nothing, and the demand dimension, which
+    is not an allocation -- would assert something those stages never
+    tested.
+
     ``shortfall`` is reported, never tested: it is derived from the same
     effective-used value ``exceeded`` compares against ``limit``, floored
     at zero, so the two fields never disagree about which dimensions are
@@ -29339,6 +29368,8 @@ def _capacity_dimension(
         'exceeded': bool(effective_used > limit),
         'shortfall': max(0.0, float(effective_used) - float(limit)),
     }
+    if held is not None:
+        detail['held'] = float(held)
     if cpu_load_1 is not None:
         detail['cpu_load_1'] = float(cpu_load_1)
     if expected_demand is not None:
@@ -29349,12 +29380,13 @@ def _capacity_dimension(
 def _dimension_from_proto(d: Any) -> CapacityDimensionDetailDict:
     """One CapacityDimensionDetail proto message back into dict form.
 
-    The demand breakdown fields and the shortfall are optional in the
-    proto so that explicit presence, not the proto3 zero default,
-    decides whether the dict carries them: a reply from an sf-database
-    predating the fields must read as "not reported" rather than as a
-    breakdown of zeroes under a non-zero used (issue 3913), or as a
-    refusal which was not actually over its limit.
+    The demand breakdown fields, the held term and the shortfall are
+    optional in the proto so that explicit presence, not the proto3 zero
+    default, decides whether the dict carries them: a reply from an
+    sf-database predating the fields must read as "not reported" rather
+    than as a breakdown of zeroes under a non-zero used (issue 3913), as
+    a node which has booked nothing, or as a refusal which was not
+    actually over its limit.
     """
     detail: CapacityDimensionDetailDict = {
         'dimension': d.dimension,
@@ -29365,6 +29397,8 @@ def _dimension_from_proto(d: Any) -> CapacityDimensionDetailDict:
     }
     if d.HasField('shortfall'):
         detail['shortfall'] = float(d.shortfall)
+    if d.HasField('held'):
+        detail['held'] = float(d.held)
     if d.HasField('cpu_load_1'):
         detail['cpu_load_1'] = float(d.cpu_load_1)
     if d.HasField('expected_demand'):
@@ -29961,11 +29995,20 @@ def _admission_denial_dimensions(
                     capacity.c.node_uuid == node_key)).first()
                 if row is not None:
                     for dimension in CAPACITY_DIMENSIONS:
+                        # The node guard charges room booked by a
+                        # capacity claim alongside room instances
+                        # occupy, so the sum is what ``used`` has to
+                        # carry here or ``exceeded`` recomputes a
+                        # comparison the guard did not make and a
+                        # refusal arrives with no dimension named. The
+                        # booked part travels separately as well, so a
+                        # reader can tell which term bound.
+                        held = float(getattr(row, f'held_{dimension}'))
                         dimensions.append(_capacity_dimension(
                             dimension,
                             getattr(row, f'limit_{dimension}'),
-                            getattr(row, f'used_{dimension}'),
-                            requested[dimension]))
+                            getattr(row, f'used_{dimension}') + held,
+                            requested[dimension], held=held))
 
                     # The D13 demand clause is the other way the node
                     # guard can refuse, and a denial with no exceeded
@@ -30268,12 +30311,24 @@ def _direct_admit_instance_placement(
                     return
                 where = [capacity.c.node_uuid == node_key]
                 if node_guarded:
+                    # Room booked on this node by a capacity claim is
+                    # charged alongside room instances already occupy,
+                    # so a booking binds every other namespace's creates
+                    # and not only the holder's own. The SET below
+                    # deliberately moves nothing out of held_*: an
+                    # admission records an instance arriving, which
+                    # charges used_*, and a create that is *consuming* a
+                    # hold -- the one case where room moves from one
+                    # counter to the other -- does not exist yet. Until
+                    # it does, decrementing held_* here would hand the
+                    # same room out twice.
                     where += [
-                        capacity.c.used_cpus + cpus <= capacity.c.limit_cpus,
-                        (capacity.c.used_memory_mb + memory_mb
-                         <= capacity.c.limit_memory_mb),
-                        (capacity.c.used_disk_gb + disk_gb
-                         <= capacity.c.limit_disk_gb),
+                        (capacity.c.used_cpus + capacity.c.held_cpus + cpus
+                         <= capacity.c.limit_cpus),
+                        (capacity.c.used_memory_mb + capacity.c.held_memory_mb
+                         + memory_mb <= capacity.c.limit_memory_mb),
+                        (capacity.c.used_disk_gb + capacity.c.held_disk_gb
+                         + disk_gb <= capacity.c.limit_disk_gb),
                     ]
                     demand = _demand_guard_clause(node_key, target_load)
                     if demand is not None:
@@ -32374,7 +32429,8 @@ def _hold_denial_dimensions(
     what the claim has already booked; at the node stage it is
     ``used_* + held_*``, which is the term the node guard actually
     tested -- reporting ``used_*`` alone there would describe a refusal
-    that did not happen.
+    that did not happen. The booked half travels separately as well, so
+    a reader of the refusal can tell which of the two bound.
     """
     engine = _get_engine()
     dimensions: list[CapacityDimensionDetailDict] = []
@@ -32406,12 +32462,12 @@ def _hold_denial_dimensions(
                 if row is None:
                     return dimensions
                 for dimension in CAPACITY_DIMENSIONS:
+                    held = float(getattr(row, f'held_{dimension}'))
                     dimensions.append(_capacity_dimension(
                         dimension,
                         getattr(row, f'limit_{dimension}'),
-                        (getattr(row, f'used_{dimension}')
-                         + getattr(row, f'held_{dimension}')),
-                        requested[dimension]))
+                        getattr(row, f'used_{dimension}') + held,
+                        requested[dimension], held=held))
     except OperationalError as e:
         # The detail is diagnostic, not load bearing: the refusal is
         # already decided and rolled back either way.
