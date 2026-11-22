@@ -10,8 +10,6 @@ import os
 import flask
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api
-from webargs import fields
-from webargs.flaskparser import use_kwargs
 
 from shakenfist import locks
 from shakenfist import mariadb
@@ -225,26 +223,36 @@ admin_claims_get_example = """[
 COVERAGE_STATE_PATTERN = '^(%s)$' % '|'.join(mariadb.CLAIM_COVERAGE_STATES)
 
 
-class AdminClaimsEndpoint(api_base.Resource):
-    # The shipped client sends GET parameters as a JSON body, and a raw
-    # ?coverage_state= must work too, so the schema is bound where both
-    # are read.
-    get_args = {
-        'coverage_state': fields.String(load_default='')
-    }
+# Declared once and read twice: swagger_helper() publishes this and
+# use_declared_args() builds the webargs schema which is how the value
+# reaches the handler (issue 4098). The declared pattern is published
+# and compiled into request validation; it deliberately does not reach
+# the webargs schema, where it would be another copy of the bound and
+# one which ignored API_VALIDATION_MODE -- the handler below is the
+# refusal for the modes validation only warns in.
+ADMIN_CLAIMS_PARAMETERS = [
+    ('coverage_state', 'query', 'string',
+     'Only list claims in this coverage state, active or expired. '
+     'When omitted, every claim is listed.', False,
+     {'pattern': COVERAGE_STATE_PATTERN})
+]
 
+
+class AdminClaimsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'admin', 'List the capacity claims held by every namespace.',
-        [('coverage_state', 'query', 'string',
-          'Only list claims in this coverage state, active or expired. '
-          'When omitted, every claim is listed.', False,
-          {'pattern': COVERAGE_STATE_PATTERN})],
+        ADMIN_CLAIMS_PARAMETERS,
         [(200, 'Every capacity claim in the cluster.',
           admin_claims_get_example),
          (400, 'coverage_state is neither active nor expired.', None),
          (401, 'The caller is not a cluster administrator.', None)],
         requires_admin=True))
-    @use_kwargs(get_args, location='json_or_query')
+    # The shipped client sends GET parameters as a JSON body, and a raw
+    # ?coverage_state= must work too, so the schema is bound where both
+    # are read.
+    @api_base.use_declared_args(
+        ADMIN_CLAIMS_PARAMETERS, {'coverage_state': ''},
+        location='json_or_query')
     @api_base.caller_is_admin
     @api_base.log_token_use
     def get(self, coverage_state=''):

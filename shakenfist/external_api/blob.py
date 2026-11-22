@@ -15,8 +15,6 @@ import requests
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
-from webargs import fields
-from webargs.flaskparser import use_kwargs
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
@@ -200,38 +198,47 @@ class BlobEndpoint(api_base.Resource):
         return out
 
 
-class BlobDataEndpoint(api_base.Resource):
-    # NOTE(mikal): note that arguments from URL routes (blob_uuid for example),
-    # are not included in the webargs schema because webargs doesn't appear to
-    # know how to find them.
-    # NOTE(mikal): a marshmallow validate=Range(min=0) here would be
-    # the obvious place for the bound, but webargs raises
-    # UnprocessableEntity and the app's error handler renders that as a
-    # 500 -- the same serialisation hazard the json_or_query loader in
-    # base.py documents. So the bound is checked in the handler, where
-    # it can answer 400 like every other malformed argument in the
-    # tree. The compiled declaration (external_api/validation.py) now
-    # refuses a negative value too, but only when API_VALIDATION_MODE is
-    # enforce; the handler check holds the bound under warn and off.
-    get_args = {
-        'offset': fields.Int(load_default=0),
-        'limit': fields.Int(load_default=0)
-    }
+# The parameters of GET /blobs/<blob_uuid>/data, declared once and read
+# twice: swagger_helper() publishes them, and use_declared_args() builds
+# the webargs schema which is how a query parameter reaches the handler
+# at all. They used to be two lists, which is why this one is hoisted to
+# module level (issue 4098).
+#
+# NOTE(mikal): note that arguments from URL routes (blob_uuid for
+# example) are not included in the webargs schema because webargs
+# doesn't appear to know how to find them. use_declared_args() takes the
+# query-located declarations for the same reason.
+#
+# NOTE(mikal): a marshmallow validate=Range(min=0) in that schema would
+# be the obvious place for the bound, but it would be a third copy of
+# it. The compiled declaration (external_api/validation.py) refuses a
+# negative value when API_VALIDATION_MODE is enforce, and the handler
+# check holds the bound under warn and off; a webargs validator would
+# refuse in every mode regardless of that setting. So the generated
+# schema carries the declared type and deliberately not the declared
+# bound. (It once could not have held the bound anyway: webargs' 422
+# reached clients as a 500 until _webargs_error in base.py gave it a
+# 400 in this API's shape.)
+BLOB_DATA_PARAMETERS = [
+    ('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True),
+    ('offset', 'query', 'unsignedinteger',
+     'The offset into the file to start reading from.', False),
+    ('limit', 'query', 'unsignedinteger',
+     ('The maximum amount of data to return in one response. '
+      '0 means no limit.'), False)
+]
 
+
+class BlobDataEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'blobs', 'Get blob data.',
-        [
-            ('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True),
-            ('offset', 'query', 'unsignedinteger',
-             'The offset into the file to start reading from.', False),
-            ('limit', 'query', 'unsignedinteger',
-             ('The maximum amount of data to return in one response. '
-              '0 means no limit.'), False)
-        ],
+        BLOB_DATA_PARAMETERS,
         [(200, 'Content of a blob as a streaming binary HTTP result.', 'n/a'),
          (400, 'The offset or limit is negative.', None),
          (404, 'Blob not found.', None)]))
-    @use_kwargs(get_args, location='query')
+    @api_base.use_declared_args(
+        BLOB_DATA_PARAMETERS, {'offset': 0, 'limit': 0},
+        location='query')
     @api_base.log_token_use
     @arg_is_blob_uuid
     def get(self, blob_uuid=None, offset=0, limit=0, blob_from_db=None):

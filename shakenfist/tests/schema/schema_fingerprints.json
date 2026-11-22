@@ -1,0 +1,856 @@
+{
+  "agent_operation_attributes": {
+    "columns": {
+      "attempts": "BIGINT NOT NULL",
+      "dependency_failure": "LONGTEXT NULL",
+      "dependency_wait_started": "DOUBLE NULL",
+      "expiry_reason": "VARCHAR(255) NULL",
+      "last_progress": "DOUBLE NULL",
+      "results": "LONGTEXT NOT NULL",
+      "uuid": "CHAR(32) NOT NULL"
+    },
+    "indexes": {},
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 6
+  },
+  "agent_operations": {
+    "columns": {
+      "commands": "LONGTEXT NOT NULL",
+      "deadline": "DOUBLE NULL",
+      "depends_on": "LONGTEXT NOT NULL",
+      "instance_uuid": "CHAR(32) NOT NULL",
+      "namespace": "VARCHAR(255) NOT NULL",
+      "progress_timeout": "DOUBLE NULL",
+      "runs_after": "LONGTEXT NOT NULL",
+      "uuid": "CHAR(32) NOT NULL",
+      "version": "BIGINT NOT NULL"
+    },
+    "indexes": {
+      "idx_agent_operations_instance_uuid": "(instance_uuid)"
+    },
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 4
+  },
+  "artifact_attributes": {
+    "columns": {
+      "highest_index": "INTEGER NOT NULL",
+      "max_versions": "INTEGER NOT NULL",
+      "shared": "BOOL NOT NULL",
+      "uuid": "CHAR(32) NOT NULL"
+    },
+    "indexes": {
+      "idx_artifact_attrs_shared": "(shared)"
+    },
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 2
+  },
+  "artifact_indexes": {
+    "columns": {
+      "artifact_uuid": "CHAR(32) NOT NULL",
+      "blob_uuid": "CHAR(32) NOT NULL",
+      "index_number": "INTEGER NOT NULL"
+    },
+    "indexes": {
+      "idx_artifact_idx_blob_uuid": "(blob_uuid)"
+    },
+    "primary_key": [
+      "artifact_uuid",
+      "index_number"
+    ],
+    "version": 2
+  },
+  "artifacts": {
+    "columns": {
+      "artifact_type": "VARCHAR(255) NOT NULL",
+      "name": "VARCHAR(255) NOT NULL",
+      "namespace": "VARCHAR(255) NOT NULL",
+      "source_url": "VARCHAR(255) NOT NULL",
+      "uuid": "CHAR(32) NOT NULL",
+      "version": "BIGINT NOT NULL"
+    },
+    "indexes": {
+      "idx_artifacts_artifact_type": "(artifact_type)",
+      "idx_artifacts_name": "(name)",
+      "idx_artifacts_namespace": "(namespace)",
+      "idx_artifacts_source_url": "(source_url)"
+    },
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 3
+  },
+  "blob_attributes": {
+    "columns": {
+      "expires_at": "DOUBLE NOT NULL",
+      "info": "JSON NULL",
+      "last_used": "DOUBLE NULL",
+      "size": "BIGINT NOT NULL",
+      "uuid": "CHAR(32) NOT NULL"
+    },
+    "indexes": {
+      "idx_blob_attrs_expires_at": "(expires_at)",
+      "idx_blob_attrs_last_used": "(last_used)"
+    },
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 1
+  },
+  "blob_hashes": {
+    "columns": {
+      "algorithm": "VARCHAR(255) NOT NULL",
+      "blob_uuid": "VARCHAR(255) NOT NULL",
+      "computed_at": "DOUBLE NOT NULL",
+      "error_message": "VARCHAR(255) NULL",
+      "file_size": "BIGINT NOT NULL",
+      "hash_value": "VARCHAR(255) NOT NULL",
+      "last_verified_at": "DOUBLE NOT NULL",
+      "node": "VARCHAR(255) NOT NULL",
+      "verification_status": "VARCHAR(255) NOT NULL"
+    },
+    "indexes": {
+      "idx_blob_hashes_algorithm_hash_value": "(algorithm, hash_value)",
+      "idx_blob_hashes_blob_uuid_verification_status": "(blob_uuid, verification_status)",
+      "idx_blob_hashes_last_verified_at": "(last_verified_at)",
+      "idx_blob_hashes_node": "(node)",
+      "idx_blob_hashes_verification_status": "(verification_status)"
+    },
+    "primary_key": [
+      "blob_uuid",
+      "node",
+      "algorithm"
+    ],
+    "version": 2
+  },
+  "blob_transfers": {
+    "columns": {
+      "blob_uuid": "VARCHAR(255) NOT NULL",
+      "created_at": "DOUBLE NOT NULL",
+      "percentage": "DOUBLE NOT NULL",
+      "port": "BIGINT NULL",
+      "requesting_node": "VARCHAR(255) NOT NULL",
+      "server_state": "VARCHAR(255) NOT NULL",
+      "source_node": "VARCHAR(255) NOT NULL",
+      "token": "VARCHAR(255) NOT NULL",
+      "transfer_name": "VARCHAR(255) NOT NULL",
+      "updated_at": "DOUBLE NOT NULL"
+    },
+    "indexes": {
+      "idx_blob_transfers_blob_uuid": "(blob_uuid)",
+      "idx_blob_transfers_source_node": "(source_node)",
+      "idx_blob_transfers_updated_at": "(updated_at)"
+    },
+    "primary_key": [
+      "source_node",
+      "transfer_name"
+    ],
+    "version": 2
+  },
+  "blobs": {
+    "columns": {
+      "fetched_at": "DOUBLE NOT NULL",
+      "modified": "DOUBLE NOT NULL",
+      "uuid": "CHAR(32) NOT NULL",
+      "version": "BIGINT NOT NULL"
+    },
+    "indexes": {
+      "idx_blobs_fetched_at": "(fetched_at)",
+      "idx_blobs_modified": "(modified)"
+    },
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 2
+  },
+  "cluster_capacity": {
+    "columns": {
+      "claimed_cpus": "BIGINT NOT NULL",
+      "claimed_disk_gb": "BIGINT NOT NULL",
+      "claimed_memory_mb": "BIGINT NOT NULL",
+      "id": "INTEGER NOT NULL",
+      "total_cpus": "BIGINT NOT NULL",
+      "total_disk_gb": "BIGINT NOT NULL",
+      "total_memory_mb": "BIGINT NOT NULL",
+      "unclaimed_used_cpus": "BIGINT NOT NULL",
+      "unclaimed_used_disk_gb": "BIGINT NOT NULL",
+      "unclaimed_used_memory_mb": "BIGINT NOT NULL",
+      "updated_at": "DATETIME NOT NULL"
+    },
+    "indexes": {},
+    "primary_key": [
+      "id"
+    ],
+    "version": 1
+  },
+  "cluster_config": {
+    "columns": {
+      "key_name": "VARCHAR(128) NOT NULL",
+      "updated_at": "DOUBLE NOT NULL",
+      "value_json": "JSON NOT NULL"
+    },
+    "indexes": {},
+    "primary_key": [
+      "key_name"
+    ],
+    "version": 2
+  },
+  "cluster_locks": {
+    "columns": {
+      "acquired_at": "DOUBLE NOT NULL",
+      "expires_at": "DATETIME NOT NULL",
+      "holder_json": "JSON NOT NULL",
+      "lock_id": "VARCHAR(64) NOT NULL",
+      "lock_key": "VARCHAR(255) NOT NULL",
+      "node_uuid": "VARCHAR(255) NOT NULL",
+      "pid": "INTEGER NOT NULL"
+    },
+    "indexes": {
+      "idx_cluster_locks_node": "(node_uuid)"
+    },
+    "primary_key": [
+      "lock_key"
+    ],
+    "version": 4
+  },
+  "cluster_operation_errors": {
+    "columns": {
+      "created_at": "DOUBLE NOT NULL",
+      "error_report": "JSON NOT NULL",
+      "op_uuid": "CHAR(32) NOT NULL"
+    },
+    "indexes": {},
+    "primary_key": [
+      "op_uuid"
+    ],
+    "version": 1
+  },
+  "cluster_operation_targets": {
+    "columns": {
+      "created_at": "DOUBLE NOT NULL",
+      "observational": "BOOL NOT NULL",
+      "operation_type": "VARCHAR(64) NOT NULL",
+      "operation_uuid": "VARCHAR(36) NOT NULL",
+      "sequence_number": "BIGINT NOT NULL",
+      "target_object_type": "ENUM('AGENTOPERATION','ARTIFACT','BLOB','DHCP','INSTANCE','INTERFACE','IPAM','NAMESPACE','NETWORK','NODE','UPLOAD','ARTIFACT_FETCH_OP','IMGCACHE_OP','NET_IFACE_OP','NET_IFACE_IP_OP','NET_IP_OP','NET_MACADDR_IP_OP','NET_OP','NODE_AOP_OP','NODE_BLOB_OP','NODE_INST_NET_IFACE_OP','NODE_INST_NETDESC_OP','NODE_INST_OP','NODE_INST_SNAP_OP','NODE_NET_OP','API_REQUESTS','UNKNOWN','UNKNOWN_MANAGED_EXECUTABLE','NAMESPACE_KEY','TRUSTED_ISSUER','MAPPING_RULE','NAMESPACE_CLAIM') NOT NULL",
+      "target_uuid": "VARCHAR(63) NOT NULL"
+    },
+    "indexes": {
+      "idx_cot_created": "(created_at)",
+      "idx_cot_operation": "(operation_uuid)",
+      "idx_cot_target": "(target_object_type, target_uuid, observational)"
+    },
+    "primary_key": [
+      "sequence_number"
+    ],
+    "version": 4
+  },
+  "cluster_operations": {
+    "columns": {
+      "created_at": "DOUBLE NOT NULL",
+      "instance_uuid": "CHAR(32) NULL",
+      "metadata_json": "JSON NOT NULL",
+      "network_uuid": "CHAR(32) NULL",
+      "node_uuid": "CHAR(32) NULL",
+      "operation_type": "VARCHAR(64) NOT NULL",
+      "priority": "VARCHAR(32) NULL",
+      "uuid": "CHAR(32) NOT NULL"
+    },
+    "indexes": {
+      "ix_cluster_ops_instance": "(instance_uuid)",
+      "ix_cluster_ops_network": "(network_uuid)",
+      "ix_cluster_ops_node": "(node_uuid)",
+      "ix_cluster_ops_type_created": "(operation_type, created_at)"
+    },
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 2
+  },
+  "dnsmasq": {
+    "columns": {
+      "namespace": "VARCHAR(255) NOT NULL",
+      "owner_type": "VARCHAR(64) NOT NULL",
+      "owner_uuid": "VARCHAR(36) NOT NULL",
+      "provide_dhcp": "BOOL NOT NULL",
+      "provide_dns": "BOOL NOT NULL",
+      "uuid": "CHAR(32) NOT NULL",
+      "version": "BIGINT NOT NULL"
+    },
+    "indexes": {
+      "idx_dnsmasq_namespace": "(namespace)",
+      "idx_dnsmasq_owner_type": "(owner_type)",
+      "idx_dnsmasq_owner_uuid": "(owner_uuid)"
+    },
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 2
+  },
+  "event_objects": {
+    "columns": {
+      "event_uuid": "CHAR(36) NOT NULL",
+      "object_type": "VARCHAR(32) NOT NULL",
+      "object_uuid": "VARCHAR(63) NOT NULL",
+      "timestamp": "DOUBLE NOT NULL"
+    },
+    "indexes": {
+      "idx_event_objects_event": "(event_uuid)",
+      "idx_event_objects_object_timestamp": "(object_type, object_uuid, timestamp)"
+    },
+    "primary_key": [
+      "object_type",
+      "object_uuid",
+      "event_uuid"
+    ],
+    "version": 3
+  },
+  "events": {
+    "columns": {
+      "duration": "DOUBLE NULL",
+      "event_type": "VARCHAR(32) NOT NULL",
+      "event_uuid": "CHAR(36) NOT NULL",
+      "extra": "JSON NULL",
+      "fqdn": "VARCHAR(255) NOT NULL",
+      "message": "TEXT NOT NULL",
+      "request_id": "VARCHAR(64) NULL",
+      "timestamp": "DOUBLE NOT NULL"
+    },
+    "indexes": {
+      "idx_events_request_id": "(request_id)",
+      "idx_events_type_timestamp": "(event_type, timestamp)"
+    },
+    "primary_key": [
+      "event_uuid"
+    ],
+    "version": 1
+  },
+  "federation_rate_limits": {
+    "columns": {
+      "attempts": "INTEGER NOT NULL",
+      "source": "VARCHAR(64) NOT NULL",
+      "window_start": "BIGINT NOT NULL"
+    },
+    "indexes": {
+      "idx_federation_rate_limits_window": "(window_start)"
+    },
+    "primary_key": [
+      "source",
+      "window_start"
+    ],
+    "version": 1
+  },
+  "federation_replay": {
+    "columns": {
+      "expires_at": "DOUBLE NOT NULL",
+      "rule_uuid": "CHAR(32) NOT NULL",
+      "token_id": "VARCHAR(128) COLLATE utf8mb4_nopad_bin NOT NULL"
+    },
+    "indexes": {
+      "idx_federation_replay_expires": "(expires_at)"
+    },
+    "primary_key": [
+      "token_id",
+      "rule_uuid"
+    ],
+    "version": 1
+  },
+  "instance_attributes": {
+    "columns": {
+      "agent_attributes": "LONGTEXT NULL",
+      "agent_operations": "LONGTEXT NULL",
+      "agent_state": "LONGTEXT NULL",
+      "block_devices": "LONGTEXT NULL",
+      "enforced_deletes": "LONGTEXT NULL",
+      "error_message": "VARCHAR(255) NULL",
+      "kvm_pid": "BIGINT NULL",
+      "placement": "LONGTEXT NULL",
+      "ports": "LONGTEXT NULL",
+      "power_state": "LONGTEXT NULL",
+      "uuid": "CHAR(32) NOT NULL",
+      "vsock_cids": "LONGTEXT NULL"
+    },
+    "indexes": {},
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 3
+  },
+  "instances": {
+    "columns": {
+      "configdrive": "VARCHAR(255) NOT NULL",
+      "cpus": "BIGINT NOT NULL",
+      "disk_spec": "LONGTEXT NOT NULL",
+      "machine_type": "VARCHAR(255) NOT NULL",
+      "memory": "BIGINT NOT NULL",
+      "name": "VARCHAR(255) NOT NULL",
+      "namespace": "VARCHAR(255) NOT NULL",
+      "nvram_template": "VARCHAR(255) NULL",
+      "requested_placement": "LONGTEXT NULL",
+      "secure_boot": "BOOL NOT NULL",
+      "side_channels": "LONGTEXT NOT NULL",
+      "ssh_key": "LONGTEXT NULL",
+      "uefi": "BOOL NOT NULL",
+      "user_data": "LONGTEXT NULL",
+      "uuid": "CHAR(32) NOT NULL",
+      "version": "BIGINT NOT NULL",
+      "video": "LONGTEXT NOT NULL"
+    },
+    "indexes": {
+      "idx_instances_name": "(name)",
+      "idx_instances_namespace": "(namespace)"
+    },
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 3
+  },
+  "ipam_reservations": {
+    "columns": {
+      "address": "INET4 NOT NULL",
+      "comment": "TEXT NULL",
+      "ipam_uuid": "CHAR(32) NOT NULL",
+      "reservation_type": "ENUM('NETWORK','BROADCAST','GATEWAY','FLOATING','ROUTED','INSTANCE','DELETION_HALO','UNKNOWN','MANUAL') NOT NULL",
+      "reserved_at": "DOUBLE NOT NULL",
+      "user_type": "ENUM('AGENTOPERATION','ARTIFACT','BLOB','DHCP','INSTANCE','INTERFACE','IPAM','NAMESPACE','NETWORK','NODE','UPLOAD','ARTIFACT_FETCH_OP','IMGCACHE_OP','NET_IFACE_OP','NET_IFACE_IP_OP','NET_IP_OP','NET_MACADDR_IP_OP','NET_OP','NODE_AOP_OP','NODE_BLOB_OP','NODE_INST_NET_IFACE_OP','NODE_INST_NETDESC_OP','NODE_INST_OP','NODE_INST_SNAP_OP','NODE_NET_OP','API_REQUESTS','UNKNOWN','UNKNOWN_MANAGED_EXECUTABLE','NAMESPACE_KEY','TRUSTED_ISSUER','MAPPING_RULE','NAMESPACE_CLAIM') NULL",
+      "user_uuid": "CHAR(32) NULL"
+    },
+    "indexes": {
+      "idx_ipam_reservations_ipam": "(ipam_uuid)",
+      "idx_ipam_reservations_type": "(reservation_type)",
+      "idx_ipam_reservations_user": "(user_type, user_uuid)"
+    },
+    "primary_key": [
+      "ipam_uuid",
+      "address"
+    ],
+    "version": 2
+  },
+  "ipams": {
+    "columns": {
+      "ipblock": "VARCHAR(255) NOT NULL",
+      "namespace": "VARCHAR(255) NULL",
+      "network_uuid": "CHAR(32) NOT NULL",
+      "uuid": "CHAR(32) NOT NULL",
+      "version": "BIGINT NOT NULL"
+    },
+    "indexes": {
+      "idx_ipams_network_uuid": "(network_uuid)"
+    },
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 2
+  },
+  "mapping_rule_attributes": {
+    "columns": {
+      "bound_claims": "LONGTEXT NOT NULL",
+      "issuer": "VARCHAR(255) NOT NULL",
+      "key_name_prefix": "VARCHAR(255) NOT NULL",
+      "key_ttl": "BIGINT NOT NULL",
+      "scopes": "LONGTEXT NOT NULL",
+      "uuid": "CHAR(32) NOT NULL"
+    },
+    "indexes": {},
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 1
+  },
+  "mapping_rules": {
+    "columns": {
+      "name": "VARCHAR(255) NOT NULL",
+      "namespace": "VARCHAR(255) NOT NULL",
+      "uuid": "CHAR(32) NOT NULL",
+      "version": "BIGINT NOT NULL"
+    },
+    "indexes": {},
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 1
+  },
+  "namespace_attributes": {
+    "columns": {
+      "keys": "JSON NULL",
+      "name": "VARCHAR(255) NOT NULL",
+      "trust": "JSON NULL"
+    },
+    "indexes": {},
+    "primary_key": [
+      "name"
+    ],
+    "version": 2
+  },
+  "namespace_claims": {
+    "columns": {
+      "expires_at": "DATETIME NOT NULL",
+      "limit_cpus": "BIGINT NOT NULL",
+      "limit_disk_gb": "BIGINT NOT NULL",
+      "limit_memory_mb": "BIGINT NOT NULL",
+      "namespace": "VARCHAR(255) NOT NULL",
+      "peak_used_cpus": "BIGINT NOT NULL",
+      "peak_used_disk_gb": "BIGINT NOT NULL",
+      "peak_used_memory_mb": "BIGINT NOT NULL",
+      "state": "VARCHAR(32) NOT NULL",
+      "updated_at": "DATETIME NOT NULL",
+      "used_cpus": "BIGINT NOT NULL",
+      "used_disk_gb": "BIGINT NOT NULL",
+      "used_memory_mb": "BIGINT NOT NULL",
+      "uuid": "CHAR(32) NOT NULL"
+    },
+    "indexes": {
+      "idx_namespace_claims_namespace": "(namespace)"
+    },
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 2
+  },
+  "namespace_key_attributes": {
+    "columns": {
+      "expiry": "DOUBLE NULL",
+      "key": "VARCHAR(255) NOT NULL",
+      "nonce": "VARCHAR(255) NOT NULL",
+      "provenance": "LONGTEXT NULL",
+      "scopes": "LONGTEXT NULL",
+      "uuid": "CHAR(32) NOT NULL"
+    },
+    "indexes": {},
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 1
+  },
+  "namespace_keys": {
+    "columns": {
+      "name": "VARCHAR(255) NOT NULL",
+      "namespace": "VARCHAR(255) NOT NULL",
+      "uuid": "CHAR(32) NOT NULL",
+      "version": "BIGINT NOT NULL"
+    },
+    "indexes": {},
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 2
+  },
+  "namespaces": {
+    "columns": {
+      "name": "VARCHAR(255) NOT NULL",
+      "version": "INTEGER NOT NULL"
+    },
+    "indexes": {},
+    "primary_key": [
+      "name"
+    ],
+    "version": 2
+  },
+  "network_attributes": {
+    "columns": {
+      "floating_gateway": "VARCHAR(255) NULL",
+      "hosteddns": "LONGTEXT NOT NULL",
+      "uuid": "CHAR(32) NOT NULL"
+    },
+    "indexes": {},
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 3
+  },
+  "network_interface_attributes": {
+    "columns": {
+      "floating_address": "VARCHAR(255) NULL",
+      "uuid": "CHAR(32) NOT NULL"
+    },
+    "indexes": {},
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 2
+  },
+  "network_interfaces": {
+    "columns": {
+      "active": "BOOL NULL",
+      "instance_uuid": "CHAR(32) NOT NULL",
+      "ipv4": "VARCHAR(255) NULL",
+      "macaddr": "VARCHAR(255) NOT NULL",
+      "model": "VARCHAR(255) NULL",
+      "network_uuid": "CHAR(32) NOT NULL",
+      "order": "BIGINT NOT NULL",
+      "uuid": "CHAR(32) NOT NULL",
+      "version": "BIGINT NOT NULL"
+    },
+    "indexes": {
+      "idx_network_interfaces_instance_uuid": "(instance_uuid)",
+      "idx_network_interfaces_macaddr": "(macaddr)",
+      "idx_network_interfaces_network_uuid": "(network_uuid)"
+    },
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 4
+  },
+  "networks": {
+    "columns": {
+      "egress_nic": "VARCHAR(255) NULL",
+      "mesh_nic": "VARCHAR(255) NULL",
+      "name": "VARCHAR(255) NOT NULL",
+      "namespace": "VARCHAR(255) NULL",
+      "netblock": "VARCHAR(255) NOT NULL",
+      "provide_dhcp": "BOOL NOT NULL",
+      "provide_dns": "BOOL NOT NULL",
+      "provide_nat": "BOOL NOT NULL",
+      "uuid": "CHAR(32) NOT NULL",
+      "version": "BIGINT NOT NULL",
+      "vxid": "BIGINT NOT NULL"
+    },
+    "indexes": {
+      "idx_networks_name": "(name)",
+      "idx_networks_namespace": "(namespace)"
+    },
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 3
+  },
+  "node_attributes": {
+    "columns": {
+      "daemon_states": "JSON NULL",
+      "daemons": "JSON NULL",
+      "dependency_versions": "JSON NULL",
+      "installed_version": "VARCHAR(255) NULL",
+      "instances": "JSON NULL",
+      "is_database_node": "BOOL NOT NULL",
+      "is_etcd_master": "BOOL NOT NULL",
+      "is_eventlog_node": "BOOL NOT NULL",
+      "is_hypervisor": "BOOL NOT NULL",
+      "is_network_node": "BOOL NOT NULL",
+      "last_seen": "DOUBLE NOT NULL",
+      "libvirt_version": "JSON NULL",
+      "process_metrics": "JSON NULL",
+      "python_implementation": "VARCHAR(255) NULL",
+      "python_version": "JSON NULL",
+      "qemu_version": "JSON NULL",
+      "spice_server_cert_subject": "VARCHAR(1024) NULL",
+      "uuid": "CHAR(32) NOT NULL"
+    },
+    "indexes": {
+      "idx_node_attrs_last_seen": "(last_seen)"
+    },
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 4
+  },
+  "node_daemon_states": {
+    "columns": {
+      "daemon": "VARCHAR(32) NOT NULL",
+      "message": "VARCHAR(255) NULL",
+      "node_uuid": "CHAR(32) NOT NULL",
+      "update_time": "DOUBLE NOT NULL",
+      "value": "VARCHAR(32) NULL"
+    },
+    "indexes": {
+      "idx_node_daemon_states_daemon_value": "(daemon, value)"
+    },
+    "primary_key": [
+      "node_uuid",
+      "daemon"
+    ],
+    "version": 2
+  },
+  "node_metrics": {
+    "columns": {
+      "cpu_load_1": "DOUBLE NULL",
+      "cpu_load_15": "DOUBLE NULL",
+      "cpu_load_5": "DOUBLE NULL",
+      "cpu_max": "INTEGER NULL",
+      "cpu_max_per_instance": "INTEGER NULL",
+      "cpu_schedulable": "INTEGER NULL",
+      "cpu_total_instance_vcpus": "INTEGER NULL",
+      "disk_busy_time_delta_per_second": "DOUBLE NULL",
+      "disk_free_instances": "BIGINT NULL",
+      "disk_reservation_gb": "INTEGER NULL",
+      "fqdn": "VARCHAR(255) NOT NULL",
+      "is_hypervisor": "BOOL NULL",
+      "memory_available": "INTEGER NULL",
+      "memory_max": "INTEGER NULL",
+      "memory_reserved_mb": "INTEGER NULL",
+      "memory_total_instance_actual": "INTEGER NULL",
+      "metrics_json": "JSON NULL",
+      "node_queue_waiting": "INTEGER NULL",
+      "node_uuid": "CHAR(32) NOT NULL",
+      "timestamp": "DOUBLE NOT NULL"
+    },
+    "indexes": {},
+    "primary_key": [
+      "node_uuid"
+    ],
+    "version": 4
+  },
+  "nodes": {
+    "columns": {
+      "fqdn": "VARCHAR(255) NOT NULL",
+      "ip": "VARCHAR(255) NOT NULL",
+      "uuid": "CHAR(32) NOT NULL",
+      "version": "BIGINT NOT NULL"
+    },
+    "indexes": {
+      "uidx_nodes_fqdn": "UNIQUE (fqdn)"
+    },
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 2
+  },
+  "object_metadata": {
+    "columns": {
+      "metadata_json": "TEXT NULL",
+      "object_type": "ENUM('AGENTOPERATION','ARTIFACT','BLOB','DHCP','INSTANCE','INTERFACE','IPAM','NAMESPACE','NETWORK','NODE','UPLOAD','ARTIFACT_FETCH_OP','IMGCACHE_OP','NET_IFACE_OP','NET_IFACE_IP_OP','NET_IP_OP','NET_MACADDR_IP_OP','NET_OP','NODE_AOP_OP','NODE_BLOB_OP','NODE_INST_NET_IFACE_OP','NODE_INST_NETDESC_OP','NODE_INST_OP','NODE_INST_SNAP_OP','NODE_NET_OP','API_REQUESTS','UNKNOWN','UNKNOWN_MANAGED_EXECUTABLE','NAMESPACE_KEY','TRUSTED_ISSUER','MAPPING_RULE','NAMESPACE_CLAIM') NOT NULL",
+      "object_uuid": "VARCHAR(63) NOT NULL"
+    },
+    "indexes": {},
+    "primary_key": [
+      "object_type",
+      "object_uuid"
+    ],
+    "version": 4
+  },
+  "object_references": {
+    "columns": {
+      "created": "DOUBLE NOT NULL",
+      "last_active": "DOUBLE NOT NULL",
+      "relationship": "VARCHAR(64) NOT NULL",
+      "relationship_value": "VARCHAR(255) NULL",
+      "source_object_type": "VARCHAR(64) NOT NULL",
+      "source_uuid": "VARCHAR(255) NOT NULL",
+      "target_object_type": "VARCHAR(64) NOT NULL",
+      "target_uuid": "VARCHAR(255) NOT NULL"
+    },
+    "indexes": {
+      "idx_object_references_created": "(created)",
+      "idx_object_references_last_active": "(last_active)",
+      "idx_object_references_relationship_relationship_value": "(relationship, relationship_value)",
+      "idx_object_references_source_object_type_source_uuid": "(source_object_type, source_uuid)",
+      "idx_object_references_target_object_type_target_uuid": "(target_object_type, target_uuid)"
+    },
+    "primary_key": [
+      "source_object_type",
+      "source_uuid",
+      "relationship",
+      "target_object_type",
+      "target_uuid"
+    ],
+    "version": 3
+  },
+  "object_states": {
+    "columns": {
+      "message": "VARCHAR(255) NULL",
+      "object_type": "ENUM('AGENTOPERATION','ARTIFACT','BLOB','DHCP','INSTANCE','INTERFACE','IPAM','NAMESPACE','NETWORK','NODE','UPLOAD','ARTIFACT_FETCH_OP','IMGCACHE_OP','NET_IFACE_OP','NET_IFACE_IP_OP','NET_IP_OP','NET_MACADDR_IP_OP','NET_OP','NODE_AOP_OP','NODE_BLOB_OP','NODE_INST_NET_IFACE_OP','NODE_INST_NETDESC_OP','NODE_INST_OP','NODE_INST_SNAP_OP','NODE_NET_OP','API_REQUESTS','UNKNOWN','UNKNOWN_MANAGED_EXECUTABLE','NAMESPACE_KEY','TRUSTED_ISSUER','MAPPING_RULE','NAMESPACE_CLAIM') NOT NULL",
+      "object_uuid": "VARCHAR(63) NOT NULL",
+      "state_value": "VARCHAR(32) NULL",
+      "update_time": "DOUBLE NOT NULL"
+    },
+    "indexes": {
+      "idx_object_states_type_state": "(object_type, state_value)",
+      "idx_object_states_uuid": "(object_uuid)"
+    },
+    "primary_key": [
+      "object_type",
+      "object_uuid"
+    ],
+    "version": 4
+  },
+  "scheduler_node_capacity": {
+    "columns": {
+      "expected_demand": "DOUBLE NOT NULL",
+      "limit_cpus": "BIGINT NOT NULL",
+      "limit_disk_gb": "BIGINT NOT NULL",
+      "limit_memory_mb": "BIGINT NOT NULL",
+      "node_uuid": "CHAR(32) NOT NULL",
+      "updated_at": "DATETIME NOT NULL",
+      "used_cpus": "BIGINT NOT NULL",
+      "used_disk_gb": "BIGINT NOT NULL",
+      "used_memory_mb": "BIGINT NOT NULL"
+    },
+    "indexes": {},
+    "primary_key": [
+      "node_uuid"
+    ],
+    "version": 1
+  },
+  "trusted_issuer_attributes": {
+    "columns": {
+      "audience": "VARCHAR(1024) NOT NULL",
+      "authorization_endpoint": "LONGTEXT NULL",
+      "client_id": "VARCHAR(255) NULL",
+      "device_authorization_endpoint": "LONGTEXT NULL",
+      "discovered_at": "DOUBLE NULL",
+      "issuer_url": "VARCHAR(1024) NOT NULL",
+      "jwks_uri": "VARCHAR(1024) NULL",
+      "oidc_scopes": "VARCHAR(255) NULL",
+      "token_endpoint": "LONGTEXT NULL",
+      "uuid": "CHAR(32) NOT NULL"
+    },
+    "indexes": {},
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 3
+  },
+  "trusted_issuers": {
+    "columns": {
+      "name": "VARCHAR(255) NOT NULL",
+      "uuid": "CHAR(32) NOT NULL",
+      "version": "BIGINT NOT NULL"
+    },
+    "indexes": {
+      "uidx_trusted_issuers_name": "UNIQUE (name)"
+    },
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 1
+  },
+  "uploads": {
+    "columns": {
+      "created_at": "DOUBLE NOT NULL",
+      "node": "VARCHAR(255) NOT NULL",
+      "uuid": "CHAR(32) NOT NULL",
+      "version": "BIGINT NOT NULL"
+    },
+    "indexes": {
+      "idx_uploads_created_at": "(created_at)",
+      "idx_uploads_node": "(node)"
+    },
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 2
+  },
+  "work_queue": {
+    "columns": {
+      "attempts": "INTEGER NOT NULL",
+      "claimed_at": "DOUBLE NULL",
+      "claimed_by": "VARCHAR(255) NULL",
+      "created_at": "DOUBLE NOT NULL",
+      "id": "BIGINT NOT NULL",
+      "payload": "JSON NOT NULL",
+      "queue_name": "VARCHAR(255) NOT NULL",
+      "scheduled_at": "DOUBLE NOT NULL"
+    },
+    "indexes": {
+      "ix_work_queue_ready": "(queue_name, claimed_at, scheduled_at)"
+    },
+    "primary_key": [
+      "id"
+    ],
+    "version": 2
+  }
+}

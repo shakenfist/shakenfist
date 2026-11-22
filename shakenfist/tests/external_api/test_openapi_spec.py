@@ -726,12 +726,12 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
         self.assertEqual([], offenders, '\n'.join(offenders))
 
     def test_post_instances_507_describes_the_transient_contract(self):
-        # The three-tuple response declaration format has no way
-        # to express a response header or a body schema, so the
-        # ``Retry-After`` header and the ``stage``/``transient`` body
-        # fields are published in prose rather than structurally. This
-        # is what keeps that prose from silently drifting away from the
-        # helper it describes.
+        # The ``Retry-After`` header is published structurally since
+        # issue 4240 gave a response declaration an optional fourth
+        # element; the ``stage``/``transient`` body fields are still
+        # prose plus a sample, because a response declaration cannot
+        # carry a body schema. The prose is asserted as well as the
+        # header, so neither drifts from the helper it describes.
         spec = self._fetch_spec()
         response = spec['paths']['/instances']['post']['responses']['507']
 
@@ -739,11 +739,44 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
         self.assertIn('Retry-After', description)
         self.assertIn('transient', description)
 
+        header = response['headers']['Retry-After']
+        self.assertEqual('integer', header['type'])
+        self.assertEqual(0, header['minimum'])
+        # The number comes from the constant the server sends, so the
+        # published contract cannot name a different one.
+        self.assertIn(str(api_base.TRANSIENT_RETRY_AFTER_SECONDS),
+                      header['description'])
+        # And that it is conditional, which no header object can say.
+        self.assertIn('transient', header['description'])
+
         # The sample published alongside it is a real body, not None,
-        # so the shape is discoverable machine-readably even though the
-        # header is not.
+        # so the body shape is discoverable machine-readably too -- by
+        # example, since a response declaration still cannot carry a
+        # schema.
         example = response['examples']['application/json']
         decoded = example if isinstance(example, dict) else json.loads(example)
         self.assertEqual(
             {'error', 'status', 'stage', 'transient'}, set(decoded))
         self.assertIs(True, decoded['transient'])
+
+    def test_every_published_response_header_is_a_primitive(self):
+        # A header object has no schema, so an object-valued one would
+        # be an invalid specification. swagger_helper() refuses those at
+        # import time; this is the published end of the same rule, and
+        # it also proves some header is published at all, which the
+        # assertion above would not notice if headers stopped rendering.
+        spec = self._fetch_spec()
+        published = []
+        for path, operations in spec['paths'].items():
+            for method, operation in operations.items():
+                for code, response in (operation.get('responses')
+                                       or {}).items():
+                    for name, header in (response.get('headers')
+                                         or {}).items():
+                        published.append((path, method, code, name))
+                        self.assertIn(
+                            header.get('type'),
+                            ('string', 'integer', 'number', 'boolean'),
+                            '%s %s %s header %s is not a primitive'
+                            % (path, method, code, name))
+        self.assertNotEqual([], published)

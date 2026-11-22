@@ -755,6 +755,44 @@ def _field(spec: dict[str, Any], required: bool = False) -> fields.Field[Any]:
     return field_class(**kwargs)
 
 
+def coercing_field(spec: dict[str, Any], load_default: Any,
+                   what: str) -> fields.Field[Any]:
+    """The webargs field for a declared scalar: coerces, checks nothing.
+
+    This is for the ``@use_kwargs`` schemas, which is a different job
+    from ``_field()`` below. ``_field()`` builds the *check-only*
+    compiled path, where a bound renders as a marshmallow validator and
+    a failure becomes a 400 naming the parameter. A ``@use_kwargs``
+    schema is the only mechanism by which a query-string parameter
+    reaches a handler at all, so the declared *type* has to be honoured
+    here. The declared *bounds* are not, because they already have
+    their enforcement: the compiled path refuses them when
+    API_VALIDATION_MODE is enforce, and the handler holds them in the
+    modes where that path only warns. A validator here would be a third
+    copy of the bound, and one which ignored API_VALIDATION_MODE.
+    (A failure here would answer 400 in this API's shape like any
+    other -- ``_webargs_error`` in base.py sees to that -- so this is
+    about the bound being stated once, not about the status code.)
+
+    ``load_default`` is what the field answers when the caller sends
+    nothing, and its caller reads it off the handler's own signature so
+    that the default is written once.
+
+    Scalars only. Every parameter which reaches a handler this way is
+    one, and an array or object has no meaning in a query string; one
+    arriving here is a declaration mistake rather than something to
+    render as best it can.
+    """
+    argtype = spec.get('type')
+    if argtype not in _SCALARS or argtype == 'object':
+        raise exceptions.InvalidAPIDeclaration(
+            '%s declares type %r, which cannot be parsed from a query '
+            'string; the parsable types are %s'
+            % (what, argtype,
+               ', '.join(sorted(set(_SCALARS) - {'object'}))))
+    return _SCALARS[argtype](load_default=load_default)
+
+
 def _schema(properties: dict[str, dict[str, Any]]) -> marshmallow.Schema:
     return marshmallow.Schema.from_dict(
         {name: _field(spec) for name, spec in properties.items()})()

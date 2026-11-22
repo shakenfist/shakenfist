@@ -29,6 +29,7 @@ from shakenfist import federation
 from shakenfist.external_api import app as external_api
 from shakenfist.external_api import auth as api_auth
 from shakenfist.tests import base
+from shakenfist.schema.sqlalchemy import stored_max_length
 from shakenfist.schema.trusted_issuer_attributes import (
     TrustedIssuerAttributesData)
 from shakenfist.tests.mock_mariadb import MockMariaDB
@@ -725,29 +726,35 @@ class IssuerDiscoveryTestCase(base.ShakenFistTestCase):
         self.assertEqual(422, resp.status_code)
 
     def test_every_issuer_field_is_refused_at_its_real_column_width(self):
-        # These three declare max_length=1024 on the model and are
-        # stored in VARCHAR(255) columns, because a declared limit never
-        # reaches the generated DDL. The validator used to take the
-        # declared number, so a 300 character value was accepted here
-        # and then refused by MariaDB -- a 500 -- or silently truncated
-        # where strict mode is off. Nothing which ever worked is refused
-        # by checking the real width: a longer value could not have been
-        # stored in the first place.
+        # These three declare max_length=1024, and since issue 4901 the
+        # column builder reads that declaration, so the column really
+        # is VARCHAR(1024) and the refusal lands there rather than at
+        # the 255 a str field used to get regardless. The boundary is
+        # taken from stored_max_length() instead of written down here,
+        # because this test asserted 255 for as long as that was true
+        # and would have gone on asserting it.
         for name in ('issuer_url', 'jwks_uri', 'audience'):
+            limit = stored_max_length(TrustedIssuerAttributesData, name)
+            self.assertEqual(1024, limit)
             long_value = 'https://example.com/' + (
-                'x' * (256 - len('https://example.com/')))
-            self.assertEqual(256, len(long_value))
+                'x' * (limit + 1 - len('https://example.com/')))
+            self.assertEqual(limit + 1, len(long_value))
             resp = self._create(**{name: long_value})
             self.assertEqual(
-                422, resp.status_code, f'{name} was not refused at 256')
-            self.assertIn('255 characters', resp.get_json()['error'])
+                422, resp.status_code,
+                f'{name} was not refused at {limit + 1}')
+            self.assertIn(
+                f'{limit} characters', resp.get_json()['error'])
 
     def test_an_issuer_field_at_its_column_width_is_accepted(self):
         # The boundary from below, so the refusal above is not passing
-        # by refusing everything.
+        # by refusing everything. A 1024 character audience is also a
+        # value this API accepted and could not store before 4901, so
+        # this is the fix itself and not only the boundary.
+        limit = stored_max_length(TrustedIssuerAttributesData, 'audience')
         at_limit = 'https://example.com/' + (
-            'x' * (255 - len('https://example.com/')))
-        self.assertEqual(255, len(at_limit))
+            'x' * (limit - len('https://example.com/')))
+        self.assertEqual(limit, len(at_limit))
         self.assertEqual(200, self._create(audience=at_limit).status_code)
 
     def test_the_jwks_cache_is_dropped_when_an_issuer_is_written(self):

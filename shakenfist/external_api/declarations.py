@@ -271,7 +271,11 @@ def query_parameters(fn: ast.FunctionDef, scopes: list[Scope],
     for dec in fn.decorator_list:
         if not isinstance(dec, ast.Call) or not dec.args:
             continue
-        if ast.unparse(dec.func).split('.')[-1] != 'use_kwargs':
+        decorator = ast.unparse(dec.func).split('.')[-1]
+        if decorator == 'use_declared_args':
+            out |= _declared_args_keys(dec, scopes, fn, problems)
+            continue
+        if decorator != 'use_kwargs':
             continue
 
         declared = [k for k in dec.keywords if k.arg == 'location']
@@ -302,6 +306,56 @@ def query_parameters(fn: ast.FunctionDef, scopes: list[Scope],
                     'resolve (%s)' % (fn.name, ast.unparse(dec.args[0])))
             continue
         out |= keys
+    return out
+
+
+def _declared_args_keys(dec: ast.Call, scopes: list['Scope'],
+                        fn: ast.FunctionDef,
+                        problems: Optional[list[str]] = None) -> set[str]:
+    """Which names a ``@use_declared_args`` decorator binds.
+
+    It builds its webargs schema from the endpoint's own declaration
+    list, taking the parameters that list declares at ``'query'`` -- so
+    the keys are read from that list rather than from a schema literal
+    (issue 4098). Reading them from the list is not circular: the
+    audit's question is whether the schema an endpoint *parses with*
+    and the parameters it *publishes* agree, and an endpoint which
+    passed a different list to each would still be caught, because this
+    reads the one the decorator was given.
+
+    The location keyword is not consulted here. It says where a value
+    may arrive on the wire, which ``query_parameters()`` has already
+    decided it cares about; the declarations themselves are what say
+    the parameter is in the query string.
+    """
+    elements = declaration_elements(dec.args[0], scopes=scopes)
+    if elements is None:
+        if problems is not None:
+            problems.append(
+                '%s parses declared query parameters from a list this '
+                'cannot resolve (%s)' % (fn.name, ast.unparse(dec.args[0])))
+        return set()
+
+    out: set[str] = set()
+    for item in elements:
+        if not (isinstance(item, ast.Tuple) and len(item.elts) >= 3):
+            if problems is not None:
+                problems.append(
+                    '%s parses declared query parameters from a list '
+                    'holding something which is not a declaration tuple '
+                    '(%s)' % (fn.name, ast.unparse(item)))
+            continue
+        name = literal(item.elts[0])
+        location = literal(item.elts[1])
+        if name is None or location is None:
+            if problems is not None:
+                problems.append(
+                    '%s parses declared query parameters from a list '
+                    'with a declaration this cannot read (%s)'
+                    % (fn.name, ast.unparse(item)))
+            continue
+        if location == 'query':
+            out.add(name)
     return out
 
 
@@ -677,6 +731,77 @@ def handlers(api_dir: str = API_DIR,
                 yield path, tree, cls, fn
 
 
+@functools.cache
+def package_lists(api_dir: str = API_DIR
+                  ) -> dict[str, list[tuple[ast.expr, ...]]]:
+    """Module level names bound to a list or tuple, by bare name.
+
+    Six endpoints hoist their parameter list to a module level name and
+    pass it both to ``swagger_helper()`` and to
+    ``base.use_declared_args()``, which is what stops the published
+    declaration and the webargs schema built from it drifting apart
+    (issue 4098). Reading either therefore means resolving such a name,
+    and a decoration site carries nothing but the name.
+
+    Keyed on the bare name and keeping every definition of it, exactly
+    as ``package_functions()`` does and for the same reason: a name
+    defined twice is an ambiguity the caller must see rather than one
+    resolved by whichever file sorted first.
+
+    Only module level definitions, again as ``package_functions()``
+    does: a list built inside a class or a function is not something a
+    name in another module could be referring to.
+    """
+    out: dict[str, list[tuple[ast.expr, ...]]] = collections.defaultdict(list)
+    for path in sorted(glob.glob(os.path.join(api_dir, '*.py'))):
+        for node in _parse(path).body:
+            if not isinstance(node, ast.Assign):
+                continue
+            if not isinstance(node.value, (ast.List, ast.Tuple)):
+                continue
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    out[target.id].append(tuple(node.value.elts))
+    return out
+
+
+def declaration_elements(
+        node: ast.expr, scopes: Optional[list['Scope']] = None
+) -> Optional[tuple[ast.expr, ...]]:
+    """The elements of a declaration list, literal or named.
+
+    A name is resolved from ``scopes`` when the caller has them -- the
+    innermost scope defining it wins, as ``_schema_keys()`` resolves a
+    schema -- and otherwise from the package index, which is all a
+    reader holding only the decorator has.
+
+    None when it cannot be read: a name nothing defines as a list, a
+    name two modules define differently, or something which is neither
+    a list nor a name. Never an empty tuple for those, because a
+    declaration list which legitimately declares nothing is also empty
+    and the two answers must not be the same.
+    """
+    if isinstance(node, (ast.List, ast.Tuple)):
+        return tuple(node.elts)
+    if not isinstance(node, ast.Name):
+        return None
+    if scopes is not None:
+        for scope in scopes:
+            for statement in scope.body:
+                if not isinstance(statement, ast.Assign):
+                    continue
+                if not any(ast.unparse(target) == node.id
+                           for target in statement.targets):
+                    continue
+                if isinstance(statement.value, (ast.List, ast.Tuple)):
+                    return tuple(statement.value.elts)
+                return None
+    defined = package_lists().get(node.id, [])
+    if len(defined) != 1:
+        return None
+    return defined[0]
+
+
 def declarations(fn: ast.FunctionDef, path: Optional[str] = None,
                  cls: Optional[str] = None) -> list[Declaration]:
     """The parameters a handler declares, as Declaration tuples.
@@ -685,18 +810,26 @@ def declarations(fn: ast.FunctionDef, path: Optional[str] = None,
     in the offending field rather than skipped, so that a declaration
     this module cannot check fails the audit instead of silently
     escaping every assertion in it.
+
+    A parameter list which is a module level name rather than an inline
+    literal -- which is how the six endpoints that also build a webargs
+    schema from the same list are written -- is resolved through
+    ``package_lists()``, because a decoration site carries nothing but
+    the name.
     """
     out = []
     for dec in fn.decorator_list:
         if 'swagger_helper' not in ast.unparse(dec):
             continue
         call = dec.args[0] if isinstance(dec, ast.Call) and dec.args else None
-        if not (isinstance(call, ast.Call) and len(call.args) >= 3
-                and isinstance(call.args[2], ast.List)):
+        elements = None
+        if isinstance(call, ast.Call) and len(call.args) >= 3:
+            elements = declaration_elements(call.args[2])
+        if elements is None:
             out.append(
                 Declaration(path, cls, fn.name, None, None, None, None, None))
             continue
-        for item in call.args[2].elts:
+        for item in elements:
             # swagger_helper() destructures five fixed elements plus an
             # optional constraints dictionary, so a tuple of any other
             # length is malformed however readable its parts are.
@@ -709,6 +842,100 @@ def declarations(fn: ast.FunctionDef, path: Optional[str] = None,
                 path, cls, fn.name, literal(item.elts[0]),
                 literal(item.elts[1]), literal(item.elts[2]),
                 literal(item.elts[4]), item.elts[1]))
+    return out
+
+
+def response_headers(
+        fn: ast.FunctionDef,
+        constants: dict[str, Any]
+) -> dict[Any, Optional[set[str]]]:
+    """The response headers a handler's declaration publishes.
+
+    Keyed by the declared HTTP code, as the declaration writes it. A
+    response declaring none, or declared as the three-tuple which
+    cannot carry one, contributes an empty set rather than being
+    absent, so "declares this code and publishes no header" and "does
+    not declare this code at all" stay distinguishable.
+
+    A declaration this cannot read statically contributes ``None``
+    under the code it could read, or under ``None`` when even that was
+    unreadable, so an unreadable declaration fails an audit rather than
+    escaping every assertion in it.
+
+    A header is declared as (name, type, description) -- see
+    ``base._validated_response_headers()`` -- or as a name bound to
+    such a tuple, which is how the one header in the tree is written so
+    that the published description and the value the server sends come
+    from one place. ``constants`` is where such a name is resolved,
+    and it is required: pass the imported module's namespace,
+    ``vars(api_base)``. ``base_constants()``, which reads base.py's
+    literals from source, is not offered as a default because it cannot
+    resolve either header constant in the tree -- both are assembled
+    with ``%`` from another constant, so neither is a literal -- and a
+    default which reports every real declaration as unreadable is one a
+    later caller would trust.
+    """
+    out: dict[Any, Optional[set[str]]] = {}
+    for dec in fn.decorator_list:
+        if 'swagger_helper' not in ast.unparse(dec):
+            continue
+        call = dec.args[0] if isinstance(dec, ast.Call) and dec.args else None
+        elements = None
+        if isinstance(call, ast.Call) and len(call.args) >= 4:
+            elements = declaration_elements(call.args[3])
+        if elements is None:
+            out[None] = None
+            continue
+        for item in elements:
+            if not (isinstance(item, ast.Tuple) and len(item.elts) in (3, 4)):
+                out[None] = None
+                continue
+            httpcode = literal(item.elts[0])
+            if not isinstance(httpcode, int):
+                # The None key means "unreadable" and nothing else; a
+                # code that is not a literal must not land there as an
+                # empty set, which reads as "publishes no header".
+                out[None] = None
+                continue
+            names = out.setdefault(httpcode, set())
+            if len(item.elts) == 3 or names is None:
+                continue
+            for name in _declared_header_names(item.elts[3], constants):
+                if name is None:
+                    out[httpcode] = None
+                    break
+                names.add(name)
+    return out
+
+
+def _declared_header_names(extras: ast.expr,
+                           constants: dict[str, Any]) -> list[Optional[str]]:
+    """Each header name in a response's extras, None for an unreadable one."""
+    if not isinstance(extras, ast.Dict):
+        return [None]
+
+    out: list[Optional[str]] = []
+    for key, value in zip(extras.keys, extras.values):
+        if literal(key) != 'headers':
+            continue
+        if not isinstance(value, (ast.List, ast.Tuple)):
+            return [None]
+        for header in value.elts:
+            if isinstance(header, (ast.Name, ast.Attribute)):
+                resolved = constants.get(
+                    ast.unparse(header).split('.')[-1])
+                if (isinstance(resolved, (list, tuple))
+                        and len(resolved) == 3
+                        and isinstance(resolved[0], str)):
+                    out.append(resolved[0])
+                    continue
+                return [None]
+            if not isinstance(header, ast.Tuple) or len(header.elts) != 3:
+                return [None]
+            name = literal(header.elts[0])
+            if not isinstance(name, str):
+                return [None]
+            out.append(name)
     return out
 
 

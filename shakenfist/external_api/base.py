@@ -7,6 +7,7 @@ import sys
 import time
 import traceback
 from typing import Any
+from typing import Callable
 from typing import NoReturn
 from typing import Optional
 
@@ -29,6 +30,7 @@ from jwt.exceptions import ExpiredSignatureError
 import marshmallow
 import requests
 from webargs.flaskparser import parser as webargs_parser
+from webargs.flaskparser import use_kwargs
 from werkzeug.exceptions import HTTPException
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
@@ -127,6 +129,41 @@ def handles_credentials():
 # margin. See
 # docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md.
 TRANSIENT_RETRY_AFTER_SECONDS = 15
+
+
+# The ``Retry-After`` header as a response declaration carries it, in
+# the form swagger_helper() takes: (name, type token, description).
+#
+# Here rather than beside each endpoint that declares it, and spelling
+# the number from the constant above rather than writing 15 into the
+# prose, because this module is also where the header is *set* --
+# capacity_error() below, and the two 503 arms in external_api/instance.py
+# which read TRANSIENT_RETRY_AFTER_SECONDS from here. One fact, one
+# place: the published specification cannot say a different number from
+# the one the server sends.
+#
+# Neither header is always present, and OpenAPI 2.0 has no way to say
+# "sometimes": a header object is published per status code, so the
+# condition is in the description where a reader will see it. The 503
+# form carries the header when the refusal comes from the recording
+# step the endpoint's own 503 description names -- but every endpoint
+# can also answer 503 from handle_database_unavailable, which sets no
+# Retry-After, and a client cannot tell the two apart by status code.
+# The 507 form carries it only when the refusal is transient.
+RETRY_AFTER_HEADER = (
+    'Retry-After', 'unsignedinteger',
+    'How many seconds to wait before retrying this request, fixed at '
+    '%d. Present when the refusal comes from the recording step this '
+    'response describes; a 503 from the generic database-unavailable '
+    'path, which any endpoint can answer, carries no Retry-After.'
+    % TRANSIENT_RETRY_AFTER_SECONDS)
+
+TRANSIENT_RETRY_AFTER_HEADER = (
+    'Retry-After', 'unsignedinteger',
+    'How many seconds to wait before retrying this request, fixed at '
+    '%d. Present only when the body says `transient` is true; a refusal '
+    'no wait can clear carries no Retry-After at all.'
+    % TRANSIENT_RETRY_AFTER_SECONDS)
 
 
 # The capacity refusal vocabulary, re-exported from shakenfist.constants
@@ -1602,6 +1639,214 @@ def _validated_constraints(section: str, name: str,
     return constraints
 
 
+def declared_args_schema(parameters: list[Any],
+                         defaults: dict[str, Any]) -> dict[str, Any]:
+    """The webargs schema for the query parameters a declaration names.
+
+    Separate from the decorator below so that what it builds can be
+    read back and asserted; the decorator is the only caller.
+    """
+    schema = {}
+    for parameter in parameters:
+        # Shape, location and type are all checked by swagger_helper()
+        # against this same list, which every endpoint using this
+        # decorator also calls. Reading a malformed declaration here
+        # would report it from the wrong place, so this checks only
+        # what it needs: that a query parameter has a default and a
+        # type a query string can carry.
+        if not (isinstance(parameter, (tuple, list)) and len(parameter) >= 3):
+            continue
+        (name, declared_location, argtype) = parameter[:3]
+        if declared_location != 'query':
+            continue
+
+        what = 'the declared query parameter %r' % name
+        if name not in defaults:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s is parsed by webargs and has no default; pass the '
+                'one its handler signature gives it' % what)
+        schema[name] = validation.coercing_field(
+            ARGTYPES.get(argtype, {}), defaults[name], what)
+
+    unknown = set(defaults) - set(schema)
+    if unknown:
+        raise exceptions.InvalidAPIDeclaration(
+            'defaults are given for %s, which this endpoint does not '
+            'declare in the query string'
+            % ', '.join(sorted(repr(name) for name in unknown)))
+
+    if not schema:
+        raise exceptions.InvalidAPIDeclaration(
+            'an endpoint parses declared query parameters and declares '
+            'none')
+
+    return schema
+
+
+# The webargs locations a declared query parameter may be parsed from:
+# the query string, or the json_or_query loader above for the shipped
+# client which sends it in the body. Anything else would read the value
+# from somewhere the published declaration, and the audit which derives
+# it, do not say -- the parameters are declared 'query' either way.
+DECLARED_ARGS_LOCATIONS = ('query', 'json_or_query')
+
+
+def use_declared_args(parameters: list[Any], defaults: dict[str, Any],
+                      location: str = 'query') -> Callable[..., Any]:
+    """``@use_kwargs`` built from the endpoint's own declaration list.
+
+    ``@use_kwargs`` is the only mechanism by which a query-string
+    parameter reaches a handler at all: the compiled validation path is
+    check-only, and ``log_request`` merges the JSON body into kwargs
+    but never ``flask.request.args``. So six endpoints carried a
+    webargs schema *and* a ``swagger_helper()`` declaration describing
+    the same parameters -- two statements of one fact, and decision D2
+    of the API input validation work noted at the time that the
+    endpoints which hand-authored a schema were exactly the ones whose
+    documentation had drifted (issue 4098).
+
+    This builds the schema from the declaration list the endpoint
+    already passes to ``swagger_helper()``, taking every parameter it
+    declares at ``'query'``. The field's type comes from the same
+    ARGTYPES rendering the published specification uses. The declared
+    *bounds* deliberately do not come along -- see
+    ``validation.coercing_field()`` for why they already have an
+    enforcement and a webargs validator would be another copy.
+
+    ``defaults`` is what each field answers when the caller sends
+    nothing, and has to be passed rather than read off the handler's
+    signature, which is where it is also written. The 24 of 25
+    per-method decorators in this module which do not use
+    ``functools.wraps`` sit between this decorator and the handler, so
+    by the time this runs ``inspect.signature()`` sees a wrapper's
+    ``(*args, **kwargs)`` and the real defaults are unreachable.
+    ``test_declared_args.py`` reads both out of the source and fails if
+    they disagree, which is the same guarantee one call site away.
+
+    ``location`` is where the value may arrive on the wire, which is a
+    different question from where the parameter is declared:
+    ``'json_or_query'`` is the custom loader (issue 3629, decision D6)
+    for a query parameter the shipped client sends in the JSON body
+    instead. Its parameters are still declared ``'query'``, because
+    that is what the audit in declarations.py derives and what the
+    published specification says.
+    """
+    if location not in DECLARED_ARGS_LOCATIONS:
+        raise exceptions.InvalidAPIDeclaration(
+            'declared query parameters are parsed from location %r, '
+            'which is not one of %s; they would arrive somewhere the '
+            'published declaration does not say'
+            % (location, ', '.join(DECLARED_ARGS_LOCATIONS)))
+    schema = declared_args_schema(parameters, defaults)
+
+    def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+        return use_kwargs(schema, location=location)(fn)
+
+    return decorator
+
+
+# The keys a response declaration's optional fourth element may carry.
+# One for now. It is a dictionary rather than a fifth positional
+# element so that the next thing a response needs to say -- a body
+# schema, which issue 4240 raised alongside headers -- is an added key
+# rather than another arity change.
+RESPONSE_EXTRA_KEYS = frozenset(['headers'])
+
+
+def _validated_response_headers(section: str, httpcode: Any,
+                                extras: Any) -> dict[str, Any]:
+    """Render a response declaration's headers, or refuse it.
+
+    A response used to be a (httpcode, description, sample) three-tuple
+    and nothing else, so a header a response really carries could only
+    be described in the English of its description string: POST
+    /instances answers a transient capacity refusal with
+    ``Retry-After: 15``, and that -- the part a client is meant to read
+    and act on -- was invisible to a generated client (issue 4240).
+
+    A header is declared as (name, type token, description), reusing
+    ARGTYPES rather than growing a second type vocabulary beside it,
+    because two vocabularies for one thing is how a published
+    specification and the code behind it stop agreeing. OpenAPI 2.0
+    header objects take the same type and format keys a primitive
+    parameter does, which is why the tokens transfer; what they do not
+    take is a schema, so the object-valued tokens are refused here for
+    the same reason they are refused outside a body.
+
+    InvalidAPIDeclaration on every defect, like every other malformed
+    declaration, so sf-api does not start rather than serving a
+    specification nobody checked.
+    """
+    if not isinstance(extras, dict):
+        raise exceptions.InvalidAPIDeclaration(
+            '%s response %r declares extras which are not a dictionary: '
+            '%r' % (section, httpcode, extras))
+
+    unknown = set(extras) - RESPONSE_EXTRA_KEYS
+    if unknown:
+        raise exceptions.InvalidAPIDeclaration(
+            '%s response %r declares unknown response keys %s; the known '
+            'keys are %s'
+            % (section, httpcode, ', '.join(sorted(unknown)),
+               ', '.join(sorted(RESPONSE_EXTRA_KEYS))))
+
+    headers = extras.get('headers', [])
+    if not isinstance(headers, (tuple, list)):
+        raise exceptions.InvalidAPIDeclaration(
+            '%s response %r declares headers which are not a list of '
+            '(name, type, description) tuples: %r'
+            % (section, httpcode, headers))
+
+    declarable = set(ARGTYPES) - {'bearer'}
+    out: dict[str, Any] = {}
+    for header in headers:
+        # Checked before destructuring, for the reason the parameter
+        # loop checks its own arity: a wrong-shaped declaration has to
+        # arrive as an InvalidAPIDeclaration rather than as a ValueError
+        # from unpacking.
+        if not isinstance(header, (tuple, list)) or len(header) != 3:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s response %r declares a header which is not a (name, '
+                'type, description) tuple of three elements: %r'
+                % (section, httpcode, header))
+        (name, argtype, headerdescription) = header
+
+        if not isinstance(name, str) or not name:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s response %r declares a header with no name: %r'
+                % (section, httpcode, header))
+        if name in out:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s response %r declares the header %s twice'
+                % (section, httpcode, name))
+        if argtype not in declarable:
+            raise exceptions.InvalidAPIDeclaration(
+                '%s response %r header %s declares type %r, which is not '
+                'one of %s'
+                % (section, httpcode, name, argtype,
+                   ', '.join(sorted(declarable))))
+
+        rendered = copy.deepcopy(ARGTYPES[argtype])
+        # A header carries a primitive, exactly like a parameter outside
+        # a body: there is no schema object to nest a structure in, so
+        # an object, an array of objects or an unconstrained value
+        # renders an invalid specification. 'any' is named rather than
+        # inspected because it is the one token with no 'type' key at
+        # all, so it would pass both tests below.
+        if (rendered.get('type') == 'object'
+                or rendered.get('items', {}).get('type') == 'object'
+                or argtype == 'any'):
+            raise exceptions.InvalidAPIDeclaration(
+                '%s response %r header %s declares type %r, but a '
+                'header can only carry a primitive value'
+                % (section, httpcode, name, argtype))
+
+        rendered['description'] = headerdescription
+        out[name] = rendered
+
+    return out
+
+
 # https://swagger.io/specification/v2/ defines the schema for this dictionary
 def swagger_helper(section, description, parameters, responses,
                    requires_admin=False, requires_auth=True):
@@ -1613,6 +1858,17 @@ def swagger_helper(section, description, parameters, responses,
         raise exceptions.InvalidAPIDeclaration(
             '%s declares requires_admin without requires_auth, but '
             'caller_is_admin reads the verified token' % section)
+
+    # The two lists are iterated below, and a value which is not one --
+    # None, say -- would escape as a TypeError naming neither the
+    # endpoint nor the argument, rather than as the one exception type
+    # every other malformed declaration raises.
+    for argument, value in (('parameters', parameters),
+                            ('responses', responses)):
+        if not isinstance(value, (tuple, list)):
+            raise exceptions.InvalidAPIDeclaration(
+                '%s declares %s which are not a list: %r'
+                % (section, argument, value))
 
     out = {
         'tags': [section],
@@ -1809,7 +2065,21 @@ def swagger_helper(section, description, parameters, responses,
             'schema': schema
         })
 
-    for (httpcode, respdescription, sample) in responses:
+    for response in responses:
+        # Explicitly, and first, for the reason the parameter loop
+        # checks its own arity: destructuring raises ValueError on a
+        # wrong-arity tuple, which names neither the endpoint nor the
+        # response it came from, and every malformed declaration has to
+        # arrive as an InvalidAPIDeclaration so there is one exception
+        # type to catch.
+        if not isinstance(response, (tuple, list)) or len(
+                response) not in (3, 4):
+            raise exceptions.InvalidAPIDeclaration(
+                '%s declares a response which is not a (httpcode, '
+                'description, sample[, extras]) tuple of three or four '
+                'elements: %r' % (section, response))
+        (httpcode, respdescription, sample) = response[:3]
+
         out['responses'][httpcode] = {
             'description': respdescription
         }
@@ -1817,6 +2087,11 @@ def swagger_helper(section, description, parameters, responses,
             out['responses'][httpcode]['examples'] = {
                 'application/json': sample
             }
+        if len(response) == 4:
+            headers = _validated_response_headers(
+                section, httpcode, response[3])
+            if headers:
+                out['responses'][httpcode]['headers'] = headers
 
     # The responses the decorators answer before any handler runs.
     # These used to be appended to the endpoint's own list, so an

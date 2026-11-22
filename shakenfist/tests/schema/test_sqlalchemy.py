@@ -8,6 +8,8 @@
 from typing import Annotated
 from typing import Optional
 
+import annotated_types
+import pydantic
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
@@ -16,6 +18,8 @@ from pydantic import UUID4
 import sqlalchemy as sa
 from sqlalchemy.dialects import mysql
 
+from shakenfist import exceptions
+from shakenfist.schema import sqlalchemy as sqlalchemy_module
 from shakenfist.schema.namespace_key_attributes import (
     NamespaceKeyAttributesData)
 from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
@@ -258,12 +262,14 @@ class StoredMaxLengthTestCase(base.ShakenFistTestCase):
     than with the declaration.
     """
 
-    def test_a_plain_str_field_is_bounded_by_its_column(self):
+    def test_a_plain_str_field_gets_a_column_for_its_declaration(self):
         class Model(BaseModel):
             value: Annotated[str, Field(max_length=4096)]
 
-        # Declared 4096, stored in a VARCHAR(255).
-        self.assertEqual(255, stored_max_length(Model, 'value'))
+        # Declared 4096 and stored in a VARCHAR(4096), because the
+        # column builder reads the declaration. This asserted 255 until
+        # it did, which is the defect issue 4901 describes.
+        self.assertEqual(4096, stored_max_length(Model, 'value'))
 
     def test_a_longtext_field_is_bounded_by_its_declaration(self):
         class Model(BaseModel):
@@ -323,3 +329,223 @@ class StoredMaxLengthTestCase(base.ShakenFistTestCase):
                 min(expected) if expected else None,
                 stored_max_length(TrustedIssuerAttributesData, name),
                 f'{name} disagrees with its own column')
+
+
+class DeclaredColumnWidthTestCase(base.ShakenFistTestCase):
+    """The column a str field's declared max_length builds.
+
+    Before issue 4901 every str field got VARCHAR(255) whatever it
+    declared, so a field declaring more accepted values its column could
+    not hold, and nothing but an author remembering SQLLongText() held
+    the two numbers together.
+    """
+
+    def _column_type(self, model, field_name='value'):
+        table = pydantic_to_sqlalchemy_table(
+            model, 'probe_%s' % field_name, sa.MetaData(),
+            include_id_column=True)
+        return table.c[field_name].type
+
+    def test_a_declaration_over_the_default_widens_the_column(self):
+        class Model(BaseModel):
+            value: Annotated[str, Field(max_length=1024)]
+
+        self.assertEqual(1024, self._column_type(Model).length)
+
+    def test_a_declaration_under_the_default_keeps_the_default(self):
+        """Narrowing is not done, deliberately.
+
+        It would be a migration on most tables in the tree to enforce a
+        bound the model enforces first, and MariaDB would then refuse a
+        value the model has already refused.
+        """
+        class Model(BaseModel):
+            value: Annotated[str, Field(max_length=16)]
+
+        self.assertEqual(255, self._column_type(Model).length)
+
+    def test_an_undeclared_field_keeps_the_default(self):
+        class Model(BaseModel):
+            value: str
+
+        self.assertEqual(255, self._column_type(Model).length)
+
+    def test_the_strictest_declaration_is_the_one_built(self):
+        class Model(BaseModel):
+            value: Annotated[str, Field(max_length=2048),
+                             annotated_types.MaxLen(1024)]
+
+        self.assertEqual(1024, self._column_type(Model).length)
+
+    def test_an_optional_field_is_widened_too(self):
+        class Model(BaseModel):
+            value: Annotated[Optional[str], Field(max_length=1024)] = None
+
+        self.assertEqual(1024, self._column_type(Model).length)
+
+    def test_a_secret_field_is_widened_too(self):
+        class Model(BaseModel):
+            value: Annotated[SecretStr, Field(max_length=1024)]
+
+        self.assertEqual(1024, self._column_type(Model).length)
+
+    def test_the_longtext_marker_still_wins(self):
+        """A marked field is LONGTEXT however wide its declaration.
+
+        The marker is how a field says it wants its value stored away
+        from the row, which is not the same question as how long the
+        value may be.
+        """
+        class Model(BaseModel):
+            value: Annotated[str, SQLLongText(), Field(max_length=1024)]
+
+        self.assertIsInstance(self._column_type(Model), mysql.LONGTEXT)
+
+    def test_a_declaration_wider_than_a_varchar_is_refused(self):
+        """Rather than silently emitting LONGTEXT.
+
+        A LONGTEXT column cannot be indexed without a prefix length, so
+        the choice stays with whoever writes the model.
+        """
+        class Model(BaseModel):
+            value: Annotated[str, Field(
+                max_length=sqlalchemy_module.MAX_VARCHAR_LENGTH + 1)]
+
+        self.assertRaises(
+            exceptions.InvalidSchemaDeclaration, self._column_type, Model)
+
+    def test_the_widest_varchar_is_allowed(self):
+        class Model(BaseModel):
+            value: Annotated[str, Field(
+                max_length=sqlalchemy_module.MAX_VARCHAR_LENGTH)]
+
+        # Alone in its row: with the BIGINT id column beside it the row
+        # is 65,542 bytes, which MariaDB refuses and so does the row
+        # check below.
+        table = pydantic_to_sqlalchemy_table(
+            Model, 'probe_widest', sa.MetaData(), include_id_column=False)
+        self.assertEqual(
+            sqlalchemy_module.MAX_VARCHAR_LENGTH, table.c['value'].type.length)
+
+
+class TableLimitsTestCase(base.ShakenFistTestCase):
+    """The limits a table has that none of its fields has alone.
+
+    MAX_VARCHAR_LENGTH bounds one field. MariaDB also bounds the sum of
+    a row's columns, and InnoDB the sum of an index's key parts, and
+    once a declaration can widen a column both are reachable from a
+    model. CREATE TABLE refusing them would only ever happen on a fresh
+    install, so the builder refuses them first.
+    """
+
+    def _build(self, model, **kwargs):
+        return pydantic_to_sqlalchemy_table(
+            model, 'probe_limits', sa.MetaData(), **kwargs)
+
+    def test_an_indexed_field_wider_than_an_index_key_is_refused(self):
+        class Model(BaseModel):
+            value: Annotated[str, SQLIndex(), Field(max_length=1024)]
+
+        with self.assertRaises(exceptions.InvalidSchemaDeclaration) as ctx:
+            self._build(Model)
+        self.assertIn('idx_probe_limits_value', str(ctx.exception))
+        self.assertIn('768', str(ctx.exception))
+
+    def test_a_unique_index_is_held_to_the_same_limit(self):
+        class Model(BaseModel):
+            value: Annotated[str, SQLUniqueIndex(), Field(max_length=769)]
+
+        self.assertRaises(
+            exceptions.InvalidSchemaDeclaration, self._build, Model)
+
+    def test_the_widest_indexable_field_is_allowed(self):
+        class Model(BaseModel):
+            value: Annotated[str, SQLIndex(), Field(max_length=768)]
+
+        table = self._build(Model)
+        self.assertEqual(768, table.c['value'].type.length)
+
+    def test_a_compound_index_is_limited_by_the_sum_of_its_columns(self):
+        """Each column fits a key alone; together they do not."""
+        class Model(BaseModel):
+            model_config = ConfigDict(
+                json_schema_extra={'sql_indexes': [('first', 'second')]})
+            first: Annotated[str, Field(max_length=512)]
+            second: Annotated[str, Field(max_length=512)]
+
+        with self.assertRaises(exceptions.InvalidSchemaDeclaration) as ctx:
+            self._build(Model)
+        self.assertIn('idx_probe_limits_first_second', str(ctx.exception))
+
+    def test_an_index_passed_by_the_caller_is_checked(self):
+        class Model(BaseModel):
+            value: Annotated[str, Field(max_length=1024)]
+
+        self.assertRaises(
+            exceptions.InvalidSchemaDeclaration, self._build, Model,
+            indexes=[('value',)])
+
+    def test_a_primary_key_is_an_index_too(self):
+        class Model(BaseModel):
+            value: Annotated[str, Field(max_length=1024)]
+
+        with self.assertRaises(exceptions.InvalidSchemaDeclaration) as ctx:
+            self._build(Model, primary_key_fields=['value'])
+        self.assertIn('PRIMARY', str(ctx.exception))
+
+    def test_an_indexed_longtext_field_is_refused(self):
+        class Model(BaseModel):
+            value: Annotated[str, SQLIndex(), SQLLongText()]
+
+        self.assertRaises(
+            exceptions.InvalidSchemaDeclaration, self._build, Model)
+
+    def test_columns_which_each_fit_but_together_overflow_are_refused(self):
+        class Model(BaseModel):
+            first: Annotated[str, Field(max_length=10000)]
+            second: Annotated[str, Field(max_length=10000)]
+
+        with self.assertRaises(exceptions.InvalidSchemaDeclaration) as ctx:
+            self._build(Model)
+        self.assertIn('row limit', str(ctx.exception))
+
+    def test_a_longtext_column_costs_the_row_only_its_pointer(self):
+        """Which is why marking a field SQLLongText() is the way out."""
+        class Model(BaseModel):
+            first: Annotated[str, Field(max_length=10000)]
+            second: Annotated[str, SQLLongText(), Field(max_length=10000)]
+
+        self._build(Model)
+
+    def test_the_row_limit_counts_the_null_bitmap(self):
+        """At the boundary, where the bitmap's bytes decide it.
+
+        VARCHAR(16365) is 65,460 bytes plus a two byte length prefix,
+        and nine booleans are costed at eight bytes each: 65,534. Nine
+        nullable booleans need a two byte null bitmap, and 65,536 is
+        one byte over.
+        """
+        flags = ['flag%d' % i for i in range(9)]
+        fits = pydantic.create_model(
+            'Fits', first=(Annotated[str, Field(max_length=16365)], ...),
+            **{flag: (bool, ...) for flag in flags})
+        one_over = pydantic.create_model(
+            'OneOver', first=(Annotated[str, Field(max_length=16365)], ...),
+            **{flag: (Optional[bool], None) for flag in flags})
+
+        self._build(fits, include_id_column=False)
+        self.assertRaises(
+            exceptions.InvalidSchemaDeclaration, self._build, one_over,
+            include_id_column=False)
+
+    def test_a_column_type_with_no_cost_is_refused_not_guessed(self):
+        """A guess would be a check that silently stopped checking.
+
+        DATETIME is the shape that reaches this: the builder does not
+        make one today, so a hand-registered table moved onto it would
+        land here, and the message says what to add.
+        """
+        with self.assertRaises(exceptions.InvalidSchemaDeclaration) as ctx:
+            sqlalchemy_module._check_table_limits(
+                'probe', [sa.Column('when', sa.DateTime())], [])
+        self.assertIn('_column_bytes()', str(ctx.exception))

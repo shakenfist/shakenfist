@@ -18,8 +18,6 @@ import validators
 from flasgger import swag_from
 from shakenfist_utilities import api as sf_api  # noreorder
 from shakenfist_utilities import logs  # noreorder
-from webargs import fields
-from webargs.flaskparser import use_kwargs
 
 from shakenfist import baseobject
 from shakenfist.schema.operations.baseclusteroperation import dependency
@@ -801,7 +799,9 @@ class InstancesEndpoint(api_base.Resource):
                 'placement or a network interface. The half-built '
                 'instance is torn down (the error body names its uuid) '
                 'and the request can be retried; the response carries a '
-                '`Retry-After` header.', None),
+                '`Retry-After` header. A 503 from the generic '
+                'database-unavailable path does not.', None,
+                {'headers': [api_base.RETRY_AFTER_HEADER]}),
             (507, 'Unable to allocate resources for the instance. A refusal '
                 'from scheduling carries `stage` (the scheduler filter that '
                 'refused, or `capacity_guard`) and a boolean `transient` in '
@@ -810,7 +810,8 @@ class InstancesEndpoint(api_base.Resource):
                 'to wait before trying again. A refusal no wait can clear -- '
                 'a structural filter stage such as `cpu_max_per_instance`, '
                 'or a congested network -- is not transient and carries no '
-                '`Retry-After`.', instance_post_507_example)
+                '`Retry-After`.', instance_post_507_example,
+                {'headers': [api_base.TRANSIENT_RETRY_AFTER_HEADER]})
          ]))
     @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
@@ -1585,7 +1586,9 @@ class InstanceInterfacesEndpoint(api_base.Resource):
                   'plugs competed for a device index.', None),
             (503, 'The database could not be reached while recording the '
                   'interface. The request can be retried; the response '
-                  'carries a `Retry-After` header.', None)
+                  'carries a `Retry-After` header. A 503 from the generic '
+                  'database-unavailable path does not.', None,
+                  {'headers': [api_base.RETRY_AFTER_HEADER]})
         ]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -2829,28 +2832,36 @@ instance_outstanding_operations_example = """[
 ]"""
 
 
-class InstanceOutstandingOperationsEndpoint(api_base.Resource):
-    # NOTE(mikal): note that arguments from URL routes (object uuid for example),
-    # are not included in the webargs schema because webargs doesn't appear to
-    # know how to find them.
-    get_args = {
-        'all': fields.Boolean(load_default=False)
-    }
+# Declared once and read twice: swagger_helper() publishes these and
+# use_declared_args() builds the webargs schema which is how `all`
+# reaches the handler (issue 4098).
+#
+# NOTE(mikal): note that arguments from URL routes (object uuid for
+# example) are not included in the webargs schema because webargs
+# doesn't appear to know how to find them. use_declared_args() takes
+# the query-located declarations for the same reason.
+INSTANCE_OUTSTANDING_OPERATIONS_PARAMETERS = [
+    ('instance_ref', 'path', 'uuidorname',
+     'The UUID or name of the instance.', True),
+    ('namespace', 'body', 'namespace',
+     api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
+    ('all', 'query', 'boolean',
+     api_base.CLUSTER_OPERATIONS_ALL_DESCRIPTION, False)
+]
 
+
+class InstanceOutstandingOperationsEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Get the outstanding cluster operations for an instance.',
-        [('instance_ref', 'path', 'uuidorname',
-          'The UUID or name of the instance.', True),
-         ('namespace', 'body', 'namespace',
-          api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
-         ('all', 'query', 'boolean',
-          api_base.CLUSTER_OPERATIONS_ALL_DESCRIPTION, False)],
+        INSTANCE_OUTSTANDING_OPERATIONS_PARAMETERS,
         [(
             200,
             'The cluster operations targeting this instance, newest first.',
             instance_outstanding_operations_example),
          (404, 'Instance not found.', None)]))
-    @use_kwargs(get_args, location='json_or_query')
+    @api_base.use_declared_args(
+        INSTANCE_OUTSTANDING_OPERATIONS_PARAMETERS, {'all': False},
+        location='json_or_query')
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.log_token_use

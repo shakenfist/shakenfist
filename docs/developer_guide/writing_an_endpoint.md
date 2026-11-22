@@ -230,6 +230,7 @@ are listed in `UNDOCUMENTED_BY_DESIGN` in
 | The parameter is | Its location is |
 |---|---|
 | a segment of the mounted route in `app.py` | `path` |
+| parsed by `@api_base.use_declared_args(...)` | `query` |
 | in a schema bound with `@use_kwargs(..., location='query')` | `query` |
 | read from `flask.request.args` | `query` |
 | popped out of kwargs by one of the handler's decorators | `body` |
@@ -305,9 +306,49 @@ the signature accepts body keys nothing can enumerate (`log_request`
 merges the whole JSON body into the handler's kwargs), so the audit
 refuses to proceed rather than reporting a tree it could not check.
 
-**A note on responses:** nothing validates the response list, and some
-responses are not declared per endpoint at all. Two decorators sit in
-`Resource.method_decorators`, so **every** endpoint can answer `503`
+**A note on responses:** a response is declared as a `(httpcode,
+description, sample)` tuple, with an optional fourth element carrying
+anything else the response has to say about itself. One key is
+understood today:
+
+```python
+(503, 'The database could not be reached; the request can be retried.',
+ None, {'headers': [api_base.RETRY_AFTER_HEADER]}),
+```
+
+A header is `(name, type token, description)`, taking its type from the
+same `ARGTYPES` vocabulary a parameter does, and carrying a primitive
+for the reason a parameter outside a body must: a header object has no
+schema to nest a structure in. The arity, the keys and each header are
+checked when the module is imported, like every other part of a
+declaration, so a malformed one stops sf-api starting rather than
+serving a specification nobody checked.
+
+Declare a header your endpoint really sets. Until
+[issue 4240](https://github.com/shakenfist/shakenfist/issues/4240) a
+response could not express one at all, so `POST /instances` served
+`Retry-After` on a transient capacity refusal and published it only as
+English in the description, where a generated client cannot find it.
+`shakenfist/tests/external_api/test_response_headers.py` now holds every
+header-setting site in the API layer against the declarations that
+publish it, so adding one without declaring it fails the unit suite. It
+recognises a `.headers[...]` assignment, a mutator such as
+`.headers.add()` or `.headers.update()`, and headers passed to
+`flask.Response` or `make_response`; a site it cannot read fails rather
+than being skipped. It does not recognise flask-restful's
+`return body, code, headers` tuple, which is indistinguishable from the
+three-tuples the API helpers return for other reasons — set the header
+on a response object instead.
+Where the value is a constant, declare the header beside the constant
+(as `RETRY_AFTER_HEADER` is, in `external_api/base.py`) rather than
+writing the number into the prose twice.
+
+A response declaration still cannot carry a body *schema*, which is the
+other half of 4240 and is not built: publish a `sample` instead, which
+is machine-readable as an example if not as a schema.
+
+Some responses are not declared per endpoint at all. Two decorators sit
+in `Resource.method_decorators`, so **every** endpoint can answer `503`
 without declaring it:
 
 * `handle_database_unavailable`, when the database tier is unreachable.
@@ -560,7 +601,8 @@ the coercion happens before the value is stored; they are deliberately
 not routed through `declared_boolean()` because it would read an
 omitted parameter as False, and the reason is written at the handler.
 Three more — `all` on the outstanding-operations routes — arrive
-through a `@use_kwargs` schema, so marshmallow has already deserialised
+through a webargs schema built from their own declaration by
+`@api_base.use_declared_args`, so marshmallow has already deserialised
 them. And `confirm` on the delete-all routes is recorded, with a
 reason, as deliberately reading something *narrower*: an identity test
 on a destructive route refuses a string spelling rather than acting on
@@ -634,15 +676,55 @@ the type vocabulary landed.)
   using one requires an `UNDERIVABLE_BY_DESIGN` entry in
   `test_parameter_declarations.py` — otherwise the declaration would be
   a silent opt-out from the whole audit.
-* A schema bound with `@use_kwargs` must be a dict literal defined in
-  the handler's own class or module. The derivation refuses anything it
-  cannot resolve — a schema imported from another module, a marshmallow
-  `Schema` class — and CI stays red until `declarations.py` is taught to
-  read the new form. There is deliberately no allowlist for this,
-  unlike locations: an unresolvable schema means the audit does not
-  know which parameters arrive in the query string, so an opt-out
-  entry would have to restate the schema's keys by hand — exactly the
-  second source of truth this machinery exists to remove.
+* A webargs schema is normally not written by hand at all. A
+  query-string parameter reaches a handler only through webargs — the
+  compiled validation path is check-only and `log_request` merges the
+  JSON body but never `flask.request.args` — and the six endpoints
+  which needed one used to hand-author a marshmallow schema beside the
+  `swagger_helper()` declaration describing the same parameters, which
+  is two statements of one fact and is why
+  [issue 4098](https://github.com/shakenfist/shakenfist/issues/4098)
+  was filed. Instead, hoist the parameter list to a module level name,
+  pass it to both, and parse with `@api_base.use_declared_args`:
+
+```python
+    BLOB_DATA_PARAMETERS = [
+        ('blob_uuid', 'path', 'uuid', 'The UUID of the blob.', True),
+        ('offset', 'query', 'unsignedinteger', 'From here.', False),
+    ]
+
+    @swag_from(api_base.swagger_helper(
+        'blobs', 'Get blob data.', BLOB_DATA_PARAMETERS, [...]))
+    @api_base.use_declared_args(
+        BLOB_DATA_PARAMETERS, {'offset': 0}, location='query')
+    def get(self, blob_uuid=None, offset=0):
+```
+
+  It binds every parameter the list declares at `query`, with the type
+  the published specification uses and **not** the declared bound. The
+  bound is stated once, in the declaration, and enforced by the
+  compiled path (which answers 400 naming the parameter) and, for the
+  `warn` and `off` validation modes, by the handler; a marshmallow
+  validator in the webargs schema would be another copy of it that
+  ignored `API_VALIDATION_MODE`. A webargs failure that does happen —
+  a value that is not the declared type — answers 400 in this API's
+  error shape through `_webargs_error` in `base.py`. The defaults are passed rather than read off the
+  signature because 24 of the 25 per-method decorators in `base.py` do
+  not use `functools.wraps`, so by the time the decorator runs
+  `inspect.signature()` sees a wrapper's `(*args, **kwargs)`;
+  `test_declared_args.py` fails if the two disagree.
+
+* A hand-authored schema bound with `@use_kwargs` is still read, and
+  must be a dict literal defined in the handler's own class or module.
+  The derivation refuses anything it cannot resolve — a schema imported
+  from another module, a marshmallow `Schema` class — and CI stays red
+  until `declarations.py` is taught to read the new form. There is
+  deliberately no allowlist for this, unlike locations: an unresolvable
+  schema means the audit does not know which parameters arrive in the
+  query string, so an opt-out entry would have to restate the schema's
+  keys by hand — exactly the second source of truth this machinery
+  exists to remove. `test_declared_args.py` also fails on a new one,
+  because `use_declared_args` covers every case in the tree.
 * A decorator that consumes a request parameter must be a module level
   function of `shakenfist/external_api/`, and must consume it with a
   literal `kwargs.pop('name', ...)` or `del kwargs['name']` reached

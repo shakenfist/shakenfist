@@ -879,6 +879,29 @@ fields which are secret rather than declaring a structure that contains one,
 and remember that `no_log` on a *task* is a different thing -- it suppresses
 that task's own output and registers nothing.
 
+## A collection module's parameters are written down three times
+
+Each native module declares its parameters in its `argument_spec`, which is
+what decides whether a parameter is accepted; in its `DOCUMENTATION` block,
+which is what `ansible-doc` renders and what Ansible treats as prose; and as a
+table in `docs/user_guide/ansible.md`, which is what a user reads. Nothing in
+Ansible compares the first two, and nothing compared any of them to the guide
+until [issue #3270](https://github.com/shakenfist/shakenfist/issues/3270)
+reported the guide listing only some of `sf_instance`'s parameters. That took
+four hand-written corrections to discharge, over three months.
+
+`test_ansible_module_docs.py` now holds all three together on parameter
+*names*, in both directions: a parameter the module accepts and the guide does
+not mention is undiscoverable, and one the guide documents and the module does
+not accept is a lie a user will act on. Wording is not compared -- the guide's
+prose is deliberately longer than the module's -- so adding a parameter means
+adding a row, in whatever words suit the audience.
+
+The guide's per-module section is cut at its `### Parameters` heading, so a
+return-value field is not read as a parameter. A new module needs an entry in
+that test's `GUIDE_SECTIONS` and a section of its own; shipping one with no
+user documentation fails the suite rather than the review.
+
 ## A backfill cannot finish while the old writers are still running
 
 A migration which adds a column, fills it from somewhere else and then

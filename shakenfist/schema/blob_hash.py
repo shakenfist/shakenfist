@@ -59,13 +59,27 @@ class BlobHash(BaseModel):
         }
     )
 
-    # Primary key fields
+    # Primary key fields. Each is a VARCHAR(255) column whatever it
+    # declares -- narrower declarations keep the default width -- so the
+    # key costs 3,060 of InnoDB's 3,072 byte index key limit at utf8mb4.
+    # None of the three can be widened past 255 without restructuring
+    # the key, and pydantic_to_sqlalchemy_table() refuses the attempt.
     blob_uuid: Annotated[str, Field(max_length=36)]
     node: Annotated[str, Field(max_length=255)]
     algorithm: Annotated[str, Field(max_length=32)]
 
-    # Hash data
-    hash_value: Annotated[str, Field(max_length=256)]
+    # Hash data. 255 rather than the 256 this declared until the column
+    # builder started reading max_length, which would have widened the
+    # column to VARCHAR(256) and made that a migration. It is not worth
+    # one: 256 was a generous bound on a hex digest rather than a
+    # requirement, the longest digest anything stores is sha512's 128
+    # characters, and this column is half of
+    # idx_blob_hashes_algorithm_hash_value on a table carrying a row per
+    # blob per node per algorithm, where widening a VARCHAR past 255
+    # changes the stored length prefix and so rebuilds the table. A
+    # digest longer than this would need the number and a migration
+    # raised together, which is now the only way to do it.
+    hash_value: Annotated[str, Field(max_length=255)]
     file_size: int
 
     # Timestamps

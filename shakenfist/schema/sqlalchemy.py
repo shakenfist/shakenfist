@@ -49,6 +49,8 @@ from sqlalchemy.dialects.mysql import mariadb
 from sqlalchemy.engine.interfaces import Dialect
 from shakenfist_utilities import logs
 
+from shakenfist import exceptions
+
 
 LOG, _ = logs.setup(__name__)
 
@@ -291,6 +293,60 @@ PYTHON_TO_SQLALCHEMY: dict[type[Any], sa.types.TypeEngine[Any]] = {
 }
 
 
+# The width a str field gets when it declares nothing wider, which is the
+# entry above and the number every existing VARCHAR column in the tree was
+# created at.
+DEFAULT_STRING_LENGTH = 255
+
+# The widest VARCHAR a declaration may ask for. MariaDB's limit is a
+# 65,535 byte maximum row size shared by every column in the row, and at
+# utf8mb4 a character costs four bytes, so 16,383 characters is the most
+# a single VARCHAR can occupy even in a row holding nothing else. A field
+# which genuinely needs more is a LONGTEXT, which is stored away from the
+# row and costs it only a pointer, and SQLLongText() is how a field says
+# so. Refusing above this bound rather than silently emitting LONGTEXT
+# keeps the decision with the person writing the model: a LONGTEXT column
+# cannot be indexed without a prefix length, which is not a thing to
+# acquire by accident.
+MAX_VARCHAR_LENGTH = 16383
+
+# The two limits MAX_VARCHAR_LENGTH cannot enforce, because each is a
+# property of a whole table rather than of one field. A per-field bound
+# lets two VARCHAR(16383) columns each pass while together they exceed
+# the row, and lets a widened column pass while an index over it cannot
+# be built. Both failures happen only when the table is created, which
+# is only on a fresh install -- every upgraded cluster already has the
+# table -- so _check_table_limits() refuses them when the definition is
+# built instead, where the unit suite sees them.
+#
+# MAX_ROW_BYTES is MariaDB's server-level row size limit, which every
+# engine shares. MAX_INDEX_KEY_BYTES is InnoDB's index key limit with
+# the DYNAMIC row format MariaDB 10.11 defaults to: 3072 bytes, which at
+# four bytes per utf8mb4 character is 768 characters for a lone
+# VARCHAR, and is shared by every column of a compound index.
+MAX_ROW_BYTES = 65535
+MAX_INDEX_KEY_BYTES = 3072
+UTF8MB4_BYTES_PER_CHARACTER = 4
+
+# The numeric column types the builder makes, costed as an upper bound:
+# BIGINT and DOUBLE are eight bytes and BOOLEAN is one. Over-counting
+# here can only refuse a table that would have fitted, and by seven
+# bytes at most per column.
+FIXED_WIDTH_COLUMN_TYPES = (sa.BigInteger, sa.Integer, sa.Double, sa.Float,
+                            sa.Boolean)
+FIXED_WIDTH_COLUMN_BYTES = 8
+
+# The types stored off the page, which cost the row only a pointer and
+# length -- 9 to 12 bytes depending on the type; 12 is the LONGTEXT and
+# LONGBLOB figure. Named rather than found through sa.Text, because
+# mysql.LONGTEXT is not an sa.Text subclass: it derives from sa.String,
+# and would otherwise be costed as a VARCHAR with no length.
+OFF_PAGE_COLUMN_TYPES = (sa.Text, sa.LargeBinary, mysql.TINYTEXT,
+                         mysql.TEXT, mysql.MEDIUMTEXT, mysql.LONGTEXT,
+                         mysql.LONGBLOB, mysql.MEDIUMBLOB)
+OFF_PAGE_COLUMN_ROW_BYTES = 12
+
+
 def _unwrap_annotated(annotation: Any) -> Any:
     """Unwrap an Annotated type to get the base type.
 
@@ -348,6 +404,27 @@ def _is_complex_type(annotation: Any) -> bool:
     return False
 
 
+def _declared_max_length(
+        field_metadata: Optional[list[Any]]) -> Optional[int]:
+    """The character limit a field's own declaration asks for.
+
+    Field(max_length=...) arrives as an annotated_types.MaxLen in the
+    field's metadata, and a field may carry more than one -- an
+    Annotated chain can name two -- in which case the strictest is the
+    one Pydantic enforces. None means the field declares no limit.
+    """
+    if not field_metadata:
+        return None
+
+    declared = None
+    for item in field_metadata:
+        candidate = getattr(item, 'max_length', None)
+        if candidate is None:
+            continue
+        declared = candidate if declared is None else min(declared, candidate)
+    return declared
+
+
 def _get_sqlalchemy_type(
         annotation: Any,
         field_metadata: Optional[list[Any]] = None) -> sa.types.TypeEngine[Any]:
@@ -391,6 +468,31 @@ def _get_sqlalchemy_type(
             _has_longtext_marker(field_metadata)):
         return mysql.LONGTEXT()
 
+    # A str field declaring more than the default width gets a column
+    # wide enough to hold it. Without this the declared limit and the
+    # column were independent numbers: the model accepted a value
+    # MariaDB then refused, or -- with strict mode off -- truncated, and
+    # the only thing holding them together was whoever remembered to add
+    # SQLLongText() as well. The declaration is now what the column is
+    # built from, so the two cannot disagree.
+    #
+    # Only upwards. A field declaring less than the default keeps its
+    # VARCHAR(255), because narrowing a column is a migration on every
+    # table in the tree to enforce a bound the model already enforces
+    # first, and the model refuses the over-long value before MariaDB
+    # ever sees it. stored_max_length() is how a validator asks which of
+    # the two numbers is the real bound.
+    if annotation in (str, SecretStr):
+        declared = _declared_max_length(field_metadata)
+        if declared is not None and declared > DEFAULT_STRING_LENGTH:
+            if declared > MAX_VARCHAR_LENGTH:
+                raise exceptions.InvalidSchemaDeclaration(
+                    'a str field declares max_length=%d, which is wider '
+                    'than the %d characters a VARCHAR can hold; mark it '
+                    'SQLLongText() if it really needs that much'
+                    % (declared, MAX_VARCHAR_LENGTH))
+            return sa.String(declared)
+
     # Basic Python types
     if annotation in PYTHON_TO_SQLALCHEMY:
         return PYTHON_TO_SQLALCHEMY[annotation]
@@ -400,17 +502,95 @@ def _get_sqlalchemy_type(
     return mysql.LONGTEXT()
 
 
+def _column_bytes(
+        col_type: sa.types.TypeEngine[Any]) -> tuple[Optional[int], int]:
+    """(index key bytes, row bytes) for one column type.
+
+    The key bytes are None for a TEXT or BLOB column, which InnoDB will
+    not index without a prefix length the builder has no way to say.
+
+    A type this does not recognise is refused rather than given a
+    guessed cost: a guess is a check that silently stops checking.
+    """
+    if isinstance(col_type, OFF_PAGE_COLUMN_TYPES):
+        return None, OFF_PAGE_COLUMN_ROW_BYTES
+    if isinstance(col_type, sa.Uuid):
+        # uuid_column_type() is CHAR(32) of undashed hex.
+        stored = 32 * UTF8MB4_BYTES_PER_CHARACTER
+        return stored, stored
+    if isinstance(col_type, sa.String) and col_type.length is not None:
+        stored = col_type.length * UTF8MB4_BYTES_PER_CHARACTER
+        # A VARCHAR spends one length byte on a value of up to 255
+        # bytes and two above that.
+        return stored, stored + (1 if stored <= 255 else 2)
+    if isinstance(col_type, FIXED_WIDTH_COLUMN_TYPES):
+        return FIXED_WIDTH_COLUMN_BYTES, FIXED_WIDTH_COLUMN_BYTES
+    raise exceptions.InvalidSchemaDeclaration(
+        'cannot cost a %r column against the row and index key limits; '
+        'add its storage size to _column_bytes()' % col_type)
+
+
+def _check_table_limits(
+        table_name: str, columns: list[sa.Column[Any]],
+        indexes: list[tuple[str, tuple[str, ...]]]) -> None:
+    """Refuse a table over MariaDB's row or InnoDB's index key limit.
+
+    ``indexes`` is every index the table will carry, the primary key
+    included, as (name, column names). See MAX_ROW_BYTES for why this
+    is checked here rather than left to CREATE TABLE.
+
+    This catches the two limits a widened declaration reaches, and is
+    not a complete model of what InnoDB refuses: its on-page row size
+    bound (roughly half a page) and the extra byte it spends per
+    nullable key column are not counted. Passing here is therefore
+    necessary for CREATE TABLE to succeed, not sufficient.
+    """
+    by_name = {column.name: _column_bytes(column.type) for column in columns}
+
+    # Plus the row's null bitmap, a bit per nullable column.
+    nullable = sum(1 for column in columns if column.nullable)
+    row_bytes = (sum(row for _, row in by_name.values())
+                 + (nullable + 7) // 8)
+    if row_bytes > MAX_ROW_BYTES:
+        raise exceptions.InvalidSchemaDeclaration(
+            'table %s would need %d bytes per row at utf8mb4, over the '
+            '%d byte row limit MariaDB applies to the sum of its columns; '
+            'lower a str field\'s max_length or mark it SQLLongText(), '
+            'which is stored off the row'
+            % (table_name, row_bytes, MAX_ROW_BYTES))
+
+    for idx_name, idx_columns in indexes:
+        key_bytes = 0
+        for col in idx_columns:
+            column_key_bytes = by_name[col][0]
+            if column_key_bytes is None:
+                raise exceptions.InvalidSchemaDeclaration(
+                    'index %s on table %s includes %s, a TEXT or BLOB '
+                    'column, which InnoDB cannot index without a prefix '
+                    'length' % (idx_name, table_name, col))
+            key_bytes += column_key_bytes
+        if key_bytes > MAX_INDEX_KEY_BYTES:
+            raise exceptions.InvalidSchemaDeclaration(
+                'index %s on table %s (%s) would need a %d byte key at '
+                'utf8mb4, over InnoDB\'s %d byte index key limit; lower '
+                'the max_length of its str fields (%d characters is the '
+                'most a lone VARCHAR may index) or index a shorter column'
+                % (idx_name, table_name, ', '.join(idx_columns), key_bytes,
+                   MAX_INDEX_KEY_BYTES,
+                   MAX_INDEX_KEY_BYTES // UTF8MB4_BYTES_PER_CHARACTER))
+
+
 def stored_max_length(
         model: type[BaseModel], field_name: str) -> Optional[int]:
     """How many characters this field's generated column can really hold.
 
-    Field(max_length=...) constrains what the model accepts. It does not
-    reach the generated DDL: _get_sqlalchemy_type() maps str to
-    VARCHAR(255) whatever the declared limit says, and only the
-    SQLLongText() marker changes that. The declared limit and the
-    column's capacity are therefore independent numbers, so a field
-    declaring more than its column holds accepts a value which MariaDB
-    then refuses or, with strict mode off, silently truncates.
+    Field(max_length=...) constrains what the model accepts, and
+    _get_sqlalchemy_type() now builds a column wide enough to hold it,
+    so a declaration over the 255 character default is no longer a
+    number the column knows nothing about. The two can still differ in
+    the other direction, which is deliberate and harmless: a field
+    declaring less than its column holds is refused by the model before
+    MariaDB sees it.
 
     This returns the smaller of the two, taken from the same
     _get_sqlalchemy_type() call pydantic_to_sqlalchemy_table() builds the
@@ -419,20 +599,19 @@ def stored_max_length(
     declares no limit.
 
     Validate operator or third party supplied strings against this
-    rather than against the declared limit, which is the number a reader
-    of the model sees and the one that is wrong.
+    rather than against either number in isolation.
+
+    It answers from the column the *current model* would build, not from
+    the column the database has, so it does not and cannot describe a
+    cluster whose migration has not run yet. What protects that window
+    is mariadb.verify_schema_versions(), which refuses to start a daemon
+    against a table at the wrong version.
     """
     field_info = model.model_fields[field_name]
     column_limit = getattr(
         _get_sqlalchemy_type(field_info.annotation, field_info.metadata),
         'length', None)
-
-    declared = None
-    for item in field_info.metadata:
-        candidate = getattr(item, 'max_length', None)
-        if candidate is None:
-            continue
-        declared = candidate if declared is None else min(declared, candidate)
+    declared = _declared_max_length(field_info.metadata)
 
     limits = [limit for limit in (column_limit, declared) if limit is not None]
     return min(limits) if limits else None
@@ -531,6 +710,14 @@ def pydantic_to_sqlalchemy_table(
                 idx_columns = (idx_columns,)
             idx_name = f'idx_{table_name}_{"_".join(idx_columns)}'
             all_indexes.append((idx_name, idx_columns, False))
+
+    checked_indexes = [(idx_name, tuple(idx_columns))
+                       for idx_name, idx_columns, _ in all_indexes]
+    primary_key = tuple(
+        column.name for column in columns if column.primary_key)
+    if primary_key:
+        checked_indexes.append(('PRIMARY', primary_key))
+    _check_table_limits(table_name, columns, checked_indexes)
 
     # Serialise table creation; if the table was registered while we
     # were waiting on the lock, hand back the existing Table object

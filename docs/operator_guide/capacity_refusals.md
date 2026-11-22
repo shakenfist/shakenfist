@@ -213,7 +213,10 @@ library or operator tooling that wraps the API, not in the server.
     The server half of the contract described above is live regardless: the
     `Retry-After` header and the `stage` and `transient` body fields are
     readable by any HTTP client today, and implementing the retry yourself
-    needs nothing from the library.
+    needs nothing from the library. The header is also published in the
+    OpenAPI specification the cluster serves, so a generated client can
+    discover it; the `stage` and `transient` body fields are published as
+    an example rather than as a schema.
 
 The `shakenfist-client` Python library includes an optional retry for
 transient refusals. It is **off by default**.

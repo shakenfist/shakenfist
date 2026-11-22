@@ -11,6 +11,7 @@ from uuid import uuid4
 from pydantic import ValidationError
 import sqlalchemy as sa
 
+from shakenfist import mariadb
 from shakenfist.schema.object_reference import ObjectReference
 from shakenfist.schema.object_reference import RELATIONSHIP_VALUE_MAX_LENGTH
 from shakenfist.schema.object_reference import references_to_grouped_dict
@@ -203,18 +204,17 @@ class ObjectReferenceModelTestCase(base.ShakenFistTestCase):
 
 
 class ObjectReferenceTableGenerationTestCase(base.ShakenFistTestCase):
-    """Tests for generating the object_references table."""
+    """Tests for generating the object_references table.
+
+    Built through mariadb's own getter rather than a copy of its
+    arguments here: these used to pass a primary key including
+    relationship_value, which production never used and which MariaDB
+    would refuse -- a 3,828 byte key, over InnoDB's 3,072 byte limit.
+    """
 
     def test_table_schema(self):
         """Test that ObjectReference generates correct table schema."""
-        metadata = sa.MetaData()
-        table = pydantic_to_sqlalchemy_table(
-            ObjectReference, 'object_references', metadata,
-            primary_key_fields=[
-                'source_object_type', 'source_uuid', 'relationship',
-                'relationship_value', 'target_object_type', 'target_uuid'
-            ],
-            include_id_column=False)
+        table = mariadb._get_object_references_table()
 
         # Check all columns exist
         expected_cols = [
@@ -228,14 +228,7 @@ class ObjectReferenceTableGenerationTestCase(base.ShakenFistTestCase):
 
     def test_primary_key_columns(self):
         """Test that primary key columns are correct."""
-        metadata = sa.MetaData()
-        table = pydantic_to_sqlalchemy_table(
-            ObjectReference, 'object_references', metadata,
-            primary_key_fields=[
-                'source_object_type', 'source_uuid', 'relationship',
-                'relationship_value', 'target_object_type', 'target_uuid'
-            ],
-            include_id_column=False)
+        table = mariadb._get_object_references_table()
 
         pk_cols = [c.name for c in table.primary_key.columns]
         self.assertIn('source_object_type', pk_cols)
@@ -250,14 +243,7 @@ class ObjectReferenceTableGenerationTestCase(base.ShakenFistTestCase):
         The columns are named 'uuid' for historical reasons, but they store
         strings (VARCHAR 255) to accommodate both UUIDs and Node FQDNs.
         """
-        metadata = sa.MetaData()
-        table = pydantic_to_sqlalchemy_table(
-            ObjectReference, 'object_references', metadata,
-            primary_key_fields=[
-                'source_object_type', 'source_uuid', 'relationship',
-                'relationship_value', 'target_object_type', 'target_uuid'
-            ],
-            include_id_column=False)
+        table = mariadb._get_object_references_table()
 
         # Both identifier columns should use String type
         self.assertIsInstance(table.c.source_uuid.type, sa.String)
@@ -288,14 +274,7 @@ class ObjectReferenceTableGenerationTestCase(base.ShakenFistTestCase):
 
     def test_indexes_exist(self):
         """Test that expected indexes are created."""
-        metadata = sa.MetaData()
-        table = pydantic_to_sqlalchemy_table(
-            ObjectReference, 'object_references', metadata,
-            primary_key_fields=[
-                'source_object_type', 'source_uuid', 'relationship',
-                'relationship_value', 'target_object_type', 'target_uuid'
-            ],
-            include_id_column=False)
+        table = mariadb._get_object_references_table()
 
         index_names = [idx.name for idx in table.indexes]
         # Check for compound indexes from model_config
