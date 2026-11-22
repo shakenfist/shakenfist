@@ -294,6 +294,50 @@ another plan. If you find yourself about to do something similar, check
 this section first, and check the install path itself rather than a
 description of it.
 
+## Balancing the functional suites across their workers
+
+stestr splits a suite across its workers once, before any test runs, and
+never moves a test afterwards. How it splits depends on whether its
+repository knows how long each test takes. Knowing, it deals the tests
+longest first onto whichever worker has the least work so far, which keeps
+the workers within a test or two of each other. Not knowing, it deals them
+round robin, so every worker gets the same *number* of tests whatever they
+cost -- and a CI node's repository never knows, because the node is built
+for the job.
+
+The functional suites are dominated by a few tests which take several
+minutes each, so round robin decides the step's wall clock by luck. Issue
+#5010 found the cluster suite with 136 minutes of work across five workers,
+one of which drew 55 of them and ran the step out of its 60 minute budget
+while the other four sat idle; the smoke tier did the same on pull request
+#5026, with one worker carrying 43 minutes of a 45 minute budget and the
+other two finished after 23. Neither run had a failing test.
+
+So the durations are kept in the tree, in `shakenfist/deploy/stestr-times.json`,
+and the `Run functional tests` step of `shakenfist/actions`'s
+`smoke-cluster.yml` runs `tools/ci_stestr_times.py seed` on the node
+immediately before `stestr run`. It writes the durations into the empty
+repository's times database and reads them back through stestr's own API
+to prove stestr sees them. A seeding failure is printed and the suite runs
+anyway, unbalanced: slower to finish, never wrong. Seeding records no run,
+so `stestr failing` after a timed out step still says there is no run
+rather than reporting a made up one in which everything passed.
+
+The file is regenerated from CI, not edited by hand:
+
+```
+tools/ci_stestr_times.py harvest
+```
+
+reads the per-test durations printed by the functional jobs of the last
+fifteen completed runs of `functional-tests.yml` and `scheduled-tests.yml`
+from the last thirty days (`--runs` and `--days` change those), takes each
+test's median, and rewrites the file. It needs `gh`. Refresh it when the
+suites change shape, for instance after adding or substantially slowing a
+long test. Until then nothing breaks: a test the file does not name is
+still run, and stestr deals the tests it does not know round robin after
+placing the ones it does.
+
 ## Running commands from the functional suite
 
 `shakenfist_ci/process.py` is how the functional suite shells out. It is
