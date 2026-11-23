@@ -39,7 +39,7 @@ class TestNetworkPlumbingLifecycle(base.BaseNamespacedTestCase):
     The test skips loudly if the nodes cannot be reached, or if the
     cluster lacks two hypervisors distinct from the network node (which it
     needs to keep the presence assertions sharp). See
-    docs/plans/PLAN-ci-node-exec-assertions.md.
+    docs/developer_guide/ci.md.
     """
 
     def __init__(self, *args, **kwargs):

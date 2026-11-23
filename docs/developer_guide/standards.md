@@ -112,6 +112,23 @@ belongs in a table with per-row inserts and deletes — see the
 `instance_location` rows in `object_references` — never in a JSON list
 on an attributes row.
 
+A per-attribute lock is not protection against this. The locks are named
+for one attribute while the write is the whole row, so two writers which
+each take the correct lock -- `add_instance()` under `instances` and
+`register_daemon()` under `daemons`, say -- still clobber each other, and
+neither is holding anything the unlocked 15-second `observe_this_node()`
+heartbeat would wait on. That is how a tagged instance disappeared from its
+node's list 55 seconds after placement wrote it there, which made the
+affinity scheduler score every node zero and the `test_affinity` functional
+test fail (PR #3425). The lock does not make the write narrow; the mask
+does.
+
+During a rolling upgrade an `sf-database` from before a mask shipped ignores
+the unknown `fields` on the request and writes the whole row. That is
+accepted rather than guarded: it degrades to exactly the previous release's
+behaviour until the daemon rolls, which is how the instance, artifact and
+network masks shipped before it.
+
 "The caller writes every column anyway" is not a reason to pass `None`.
 `TrustedIssuer.update` and `MappingRule.update` both replace their whole
 attribute set, because an issuer's URL and key source are one

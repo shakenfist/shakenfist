@@ -377,6 +377,63 @@ redacted" in `coding_rules.md`: it silently starts leaking the day somebody
 adds a name it has not heard of. It cannot match a short option, a positional
 secret, or a flag nobody thought of. Keep the credential out of the string.
 
+### Assertions that run on a named cluster node
+
+A functional assertion about host state -- a network namespace, a
+`flt-<hex>` veth, a DNAT rule, a VXLAN bridge, a libvirt domain -- has to run
+on the node that state is on, and that is usually not the node running the
+suite. The suite runs on `primary`, which the collection's multi-node
+topologies deploy with `SHAKENFIST_NODE_IS_NETWORK_NODE=False`, so a floating
+IP's plumbing is on some other node entirely.
+
+The floating-IP lifecycle test was written when those were one machine, and
+when they stopped being one machine it broke in both directions at once.
+`ping <floating>` ran locally on a host with no interface or route onto the
+floating network, so it could never succeed and the test failed after its
+300 second timeout. Worse, the plumbing and cleanup assertions guarded on a
+local `/var/run/netns/<net>` check, which on `primary` is simply false, so
+they skipped themselves without saying so: the regression coverage for the
+floating leak of issues #3378 to #3383 had not run for as long as the
+topology had been multi-node. One false negative and one hidden false
+positive, from the same assumption.
+
+So the suite discovers nodes and runs commands on them, rather than
+special-casing the network node:
+
+* **Discovery is API-native, never hardcoded.** `GET /nodes` reports each
+  node's name, mesh address and role flags, so a test carries no knowledge of
+  the CI IP plan or of node names.
+* **Local versus remote is decided by address, not by name.** `_node_exec()`
+  compares the target's mesh address against the addresses on this host, runs
+  the command directly on a match and over ssh otherwise. A node's Shaken Fist
+  name (`sf1`) and its operating system hostname (`t-6dFds-1`) are different
+  strings in CI, and comparing those instead is what makes the placement tests
+  skip.
+* **An unreachable node skips loudly.** `_require_node_exec()` calls
+  `skipTest` naming the node and the error. A silent no-op is the failure
+  above; a skip in the run output is not.
+
+The API's own `ping` endpoint is not a substitute for the reachability half.
+It runs `ip netns exec <net> ping`, and inside that namespace the floating
+address is local and the DNAT PREROUTING path is never traversed, so it
+answers yes for a floating IP no outside caller can reach. Only the network
+node's root namespace is an egress-side vantage point.
+
+The network lifecycle test rests on an invariant worth stating on its own: a
+network is present on a node **iff** that node hosts an instance on it, or
+the node is the network node, which always carries it for DHCP and NAT. Its
+instances are pinned with `force_placement` rather than trusting the scheduler
+to spread them, because an assertion about which nodes carry the network is
+only deterministic if the test chose those nodes.
+
+These assertions read kernel and libvirt state directly and never Shaken
+Fist's own bookkeeping, which would hide exactly the drift between the two
+that they exist to catch. The primitive generalises past networking -- disk
+bus and cache mode from `virsh dumpxml`, per-node resource accounting against
+libvirt, daemon-local on-disk state after a teardown are all "discover the
+node, run a command, assert on the output" -- and none of that needs new
+Shaken Fist API surface.
+
 ### Node-exec commands have a timeout
 
 `_node_exec()` passes `SF_CI_NODE_EXEC_TIMEOUT` (seconds, default 300) to

@@ -143,6 +143,15 @@ does not reset the way the operator note below describes for `sf-net`; the
 trade-off is that a chained wait (the same op deferring on a second
 dependency) carries its depth over rather than starting again at 100 ms.
 
+The same persisted count is the retry budget `defer_with_backoff()` spends.
+It takes a tuple of delays -- `(15, 30, 60)` by default -- indexes it by the
+count the work item carried in, and returns False once the tuple is spent,
+leaving the caller to error the operation out. Keeping the count in the work
+item is what made a per-operation retry budget a change with no schema in
+it: `defer()` writes the incremented count into the item it enqueues, so
+nothing has to be migrated onto `cluster_operations` or mutated on a row
+that is already executing.
+
 ### Single-worker safety invariant
 
 **The back-off schedule is only correct because each queue is drained by

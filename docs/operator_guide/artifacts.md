@@ -131,6 +131,50 @@ does not carry the mirror's digest: that blob was verified when it was
 originally fetched, and the mirror's digest describes the mirror's
 copy rather than this one.
 
+## A transient fetch failure is retried
+
+An artifact fetch reaches outside the cluster, so it can fail for reasons
+which say nothing about the URL: the serving host rebooting to apply
+patches, a DNS hiccup, a 5xx blip. Such a failure used to move the artifact
+straight to `error` with zero blobs, and because a fetch is often part of an
+instance create, `enqueue_delete_due_error()` then tore the instance down.
+A one second outage cost a user their instance and left them to clean up by
+hand. It was not a theoretical failure mode either -- it is what a CI
+download test hit when ansible restarted the upstream mirror to patch it,
+and the very next test against the same URL succeeded.
+
+`artifact_fetch_op` now calls `defer_with_backoff()` on a transient
+exception -- `HTTPError`, and `requests`' `RequestException` and
+`ConnectionError` -- before taking the error path. The operation returns to
+`queued` and runs again after 15, then 30, then 60 seconds; only the fourth
+failure errors the artifact as before. The ceiling is a little under two
+minutes, which covers a service restart for an operating system patch while
+staying short enough that a genuinely broken URL is still reported quickly
+rather than hanging an instance create behind it.
+
+Each retry records `scheduling retry after transient failure` on the
+operation, carrying the delay, the attempt number and the exception, and
+`transient fetch failure, will retry` on the artifact; a spent budget
+records `retry budget exhausted, will not defer further`. So a slow fetch
+says what it is waiting for rather than appearing stalled, and the
+functional suite's no-progress timer, which renews on an object's events,
+does not fire while a retry is pending.
+
+Replicating a blob from inside the cluster retries on the same budget, for
+the same reason: every source node timing out while this node was too loaded
+to accept the transfer is a load spike, not a bad artifact.
+
+The fall back to an already cached version runs ahead of all of this and is
+unchanged. An artifact which has downloaded successfully before is served
+from its cached version when the source cannot be reached, and only an
+artifact which has never had a good version is errored at the end of the
+budget.
+
+The retry budget itself is generic, on `BaseClusterOperation` rather than on
+artifacts, and `net_op` and `node_blob_op` use it as well. It needed no
+schema change -- the spent count rides in the work item payload, so it
+survives a re-enqueue without a column to migrate or a row to mutate.
+
 ## Sharing artifacts
 
 Artifacts in the system namespace can be shared with all other namespaces.

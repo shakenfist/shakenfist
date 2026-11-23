@@ -118,7 +118,7 @@ AGENT_OPERATION_FAILURES = (
 # namespaces, links, iptables, libvirt) on a *specific* cluster node, which is
 # not necessarily the node running the suite. The node-exec helpers on
 # BaseTestCase reach those nodes over the management mesh as this user with
-# this key. See docs/plans/PLAN-ci-node-exec-assertions.md.
+# this key. See docs/developer_guide/ci.md.
 SF_CI_SSH_USER = os.environ.get('SF_CI_SSH_USER', 'debian')
 SF_CI_SSH_KEY = os.environ.get(
     'SF_CI_SSH_KEY', os.path.expanduser('~/.ssh/id_rsa'))
@@ -734,7 +734,7 @@ class BaseTestCase(testtools.TestCase):
     # carry no knowledge of the CI IP plan or node names -- and run a
     # command on a chosen node, directly if it is this host and otherwise
     # over ssh on the management mesh. See
-    # docs/plans/PLAN-ci-node-exec-assertions.md.
+    # docs/developer_guide/ci.md.
     # -----------------------------------------------------------------
     def _get_cluster_nodes(self):
         """Return the cluster's nodes as reported by the API."""
@@ -917,7 +917,7 @@ class BaseTestCase(testtools.TestCase):
         except process.ProcessExecutionError as e:
             self.skipTest(
                 'Cannot exec on node %s (%s) over the mesh: %s. See '
-                'docs/plans/PLAN-ci-node-exec-assertions.md for the deploy '
+                'docs/developer_guide/ci.md for the deploy '
                 'prerequisite.' % (node.get('name'), node.get('ip'), e))
 
     def _node_link_names(self, node):

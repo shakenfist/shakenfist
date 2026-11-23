@@ -20,6 +20,8 @@ These things are checked:
   the phases beneath it in either direction;
 * each index row's `N of M` recomputes from the linked plan's Execution
   table, and no Execution row is too short to be counted;
+* every name in `HAND_COUNTED` and `PROVISIONAL` is a master plan which is
+  still here;
 * every master plan in `docs/plans/` is registered in both `index.md` and
   `order.yml`, and neither names a plan that is not there, nor names one
   twice -- a second index row for a plan is never read, so it is free to
@@ -93,12 +95,14 @@ in the canonical block (which lives in shakenfist/development, at
 `templates/shared-blocks/plan-status-vocabulary.md`) cannot leave this
 checker rejecting a status the template tells authors to write.
 
-Three plans predate the Execution-table convention and are counted by hand,
+Two plans predate the Execution-table convention and are counted by hand,
 and three more keep a table which is a placeholder rather than a phase list.
 They are named in `HAND_COUNTED` and `PROVISIONAL` rather than detected, so
 that a plan cannot join them by quietly omitting or stubbing its table:
 adding a name is a deliberate edit, and the index preamble names the same
-six for readers.
+five for readers. A name in either set must still be a plan that is here:
+retiring a plan deletes its files, and an exemption left behind then
+exempts nothing while reading as a standing claim about the tree.
 
 `order.yml` is registration, not navigation. Nothing in this repository
 renders it -- `mkdocs.yml.tmpl` lists the Plans nav by hand -- but the format
@@ -123,6 +127,7 @@ INDEX = os.path.join(PLANS_DIR, 'index.md')
 ORDER = os.path.join(PLANS_DIR, 'order.yml')
 
 TEMPLATE = 'PLAN-TEMPLATE.md'
+CHECKER = os.path.join('tools', 'check-plan-status.py')
 
 # The vocabulary block lists its terms as backticked bullets. Reading them
 # from the template keeps this checker and the document authors are handed
@@ -133,11 +138,10 @@ VOCABULARY_BLOCK_RE = re.compile(
 VOCABULARY_TERM_RE = re.compile(r'^- `([^`]+)`', re.MULTILINE)
 
 # Plans whose phases are not in an Execution table, so their index arithmetic
-# cannot be recomputed. See the index preamble, which names the same three.
+# cannot be recomputed. See the index preamble, which names the same two.
 HAND_COUNTED = {
     'blob-storage-roadmap.md',          # phases as headings
     'api-query-batching-roadmap.md',    # phases as headings
-    'PLAN-attribute-field-masks.md',    # phases as headings
 }
 
 # Plans whose Execution table is explicitly a placeholder, so its row count
@@ -519,6 +523,18 @@ def problems():
     for stale in sorted(set(rows) - set(plans)):
         found.append('%s: %s is listed but is not a master plan in %s'
                      % (index, stale, plans_dir))
+
+    # An exemption is a claim about a plan which is here. Retiring a plan
+    # deletes its files and leaves its index row as a permalink, which
+    # registers no local plan, so a name left behind in either set stops
+    # exempting anything -- and would re-arm, against whatever a later plan
+    # of that name does, if the name were ever reused.
+    for attribute, names in (('HAND_COUNTED', HAND_COUNTED),
+                             ('PROVISIONAL', PROVISIONAL)):
+        for stale in sorted(set(names) - set(plans)):
+            found.append(
+                '%s: %s exempts %r, which is not a master plan in %s'
+                % (CHECKER, attribute, stale, plans_dir))
 
     targets, inbound = plan_links(plans_dir)
     for source, lineno, target in targets:
