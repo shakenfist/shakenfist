@@ -166,6 +166,15 @@ metrics. The headlines:
   the schema, so a handler which does arithmetic on one, or hands it to
   an object which keeps it, reads it first.
 
+- **An import needs a declaration, not a transitive pin.** Everything
+  we import is declared in `pyproject.toml` above the
+  `# START_OF_INDIRECT_DEPS` marker, test-only imports included. The
+  block below that marker is regenerated from whatever the direct
+  dependencies resolve to, so an import resting on it fails the day the
+  intermediate library drops the requirement, on a branch which changed
+  nothing. See
+  [docs/developer_guide/standards.md](docs/developer_guide/standards.md#an-import-needs-a-declaration-not-a-transitive-pin).
+
 - **Events and logs are different channels.** An event is a durable,
   queryable record on an object; a log line is not. See
   [docs/operator_guide/events.md](docs/operator_guide/events.md).

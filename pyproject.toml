@@ -133,6 +133,15 @@ dependencies = [
     "pydantic-settings==2.16.3",          # mit
     "pydantic-extra-types==2.11.1",       # mit
 
+    # Imported directly by the schema unit tests, which build
+    # annotated_types.MaxLen metadata to exercise the column widths
+    # shakenfist/schema/sqlalchemy.py derives from a declaration. pydantic
+    # requires it as well, but only as a floor it is free to drop, so
+    # declaring it here is what keeps it installed -- an import resting on
+    # the generated block below is a breakage dated by somebody else's
+    # dependency list.
+    "annotated-types==0.8.0",             # mit
+
     # Is difficult to get install working, use system packages instead.
     # libvirt-python                      # lgpl
     # mysqlclient                         # gpl
@@ -142,7 +151,6 @@ dependencies = [
     # it by hand -- add direct dependencies above the marker instead.
     # START_OF_INDIRECT_DEPS
     "aniso8601==10.0.1",
-    "annotated-types==0.8.0",
     "attrs==26.1.0",
     "blinker==1.9.0",
     "certifi==2026.10.23",
