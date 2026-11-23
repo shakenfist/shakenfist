@@ -1209,6 +1209,24 @@ landing across partially implemented plans and having to be unpicked
 (see the step 3 note in
 `docs/plans/PLAN-scheduler-reservations-phase-01-node-metrics-columns.md`).
 
+`issue-fix.yml` will not publish a fix whose non-test diff exceeds
+`max_diff_lines` (400 by default); an over-budget fix is pushed to its
+`issue-fix-<N>` branch for a human instead. Files that `.gitattributes`
+marks `linguist-generated` are not counted. That attribute covers the
+protobuf stubs `tox -e genprotos` writes, because adding one field to a
+message rewrites every serialized offset in the regenerated `_pb2.py`
+and once made a fix of about 200 lines measure 1800. The count is made
+by `tools/measure-change-size.sh`, a copy of the script in
+shakenfist/development's `templates/issue-fix/`. It reads both the
+attributes and the diff base from the commit recorded before the model
+ran, so a fix cannot mark its own code generated. It also fails closed:
+an inline `git diff | awk` without pipefail would measure a failing git
+as zero lines. `shakenfist/tests/test_measure_change_size.py` pins those
+rules, and `test_issue_fix_workflow_seams.py` checks that every stub
+under `shakenfist/protos/` is still covered. Mark only files a
+generator writes: the attribute is an exemption from the cap as well as
+a display hint.
+
 `issue-fix.yml` asks the model for two marker delimited blocks on
 stdout: a commit message and a pull request description. The commit
 message is pushed and its first line becomes the pull request title;

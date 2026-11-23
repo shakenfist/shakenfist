@@ -103,7 +103,7 @@ on:
         default: '200'
         type: string
       max_diff_lines:
-        description: 'Maximum non-test lines changed before the fix is too large for an automated PR'
+        description: 'Maximum non-test, non-generated lines changed before the fix is too large for an automated PR'
         required: false
         default: '400'
         type: string
@@ -136,7 +136,9 @@ env:
   PIP_EXTRA_INDEX_URL: https://pypi.org/simple/
 
   # Regular expression matching paths that are test changes. Lines
-  # changed in matching files do not count against max_diff_lines.
+  # changed in matching files do not count against max_diff_lines,
+  # and nor do files marked linguist-generated (see "Measure change
+  # size").
   TEST_PATH_PATTERN: '^shakenfist/tests/|^shakenfist/deploy/shakenfist_ci/'
   RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
@@ -211,7 +213,8 @@ jobs:
              clear statement of expected behaviour, looks fixable at
              the root cause without major refactoring, and you
              estimate the fix at under 100 changed lines excluding
-             tests. The fix must be coverable by unit tests.
+             tests and generated files (regenerated protobuf stubs do
+             not count). The fix must be coverable by unit tests.
           2. Not already owned by a plan: this repository plans
              significant work in advance as plan documents in
              docs/plans/. Skim docs/plans/index.md. If an issue is
@@ -372,10 +375,18 @@ jobs:
 
           The \`automated-fix-attempted\` label has been applied; remove it to allow a future re-attempt."
 
+      # The base is recorded as a step output before the model runs.
+      # Later steps read the trusted scripts, and the attributes the
+      # size cap honours, from this commit rather than from HEAD: the
+      # prompt tells the model not to commit, but a commit would move
+      # HEAD onto the model's own work, and a step output is the one
+      # place a later step cannot rewrite.
       - name: Create working branch
+        id: branch
         run: |
           git branch -D "issue-fix-${ISSUE_NUMBER}" 2>/dev/null || true
           git checkout -b "issue-fix-${ISSUE_NUMBER}"
+          echo "base_sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
       # No apt step here: the claude-code runners have no passwordless
       # sudo, and none is needed -- the unit tests mock the database, so
@@ -539,10 +550,11 @@ jobs:
              functional coverage in shakenfist/deploy/shakenfist_ci/
              as well.
           3. Keep the non-test portion of the change small -- the
-             target is under 100 changed lines excluding tests. If a
-             correct fix genuinely requires major refactoring, do
-             NOT attempt it: output "NO_FIX: <one line reason>",
-             leave the tree unchanged, and stop.
+             target is under 100 changed lines excluding tests and
+             generated files (regenerated protobuf stubs do not
+             count). If a correct fix genuinely requires major
+             refactoring, do NOT attempt it: output "NO_FIX: <one
+             line reason>", leave the tree unchanged, and stop.
           4. Run the test suite and ensure it passes:
              ```bash
              . ~/sf-venv/bin/activate
@@ -728,6 +740,8 @@ jobs:
       - name: Extract commit summary and PR description
         id: extract_summary
         if: steps.assess.outputs.has_changes == 'true'
+        env:
+          BASE_SHA: ${{ steps.branch.outputs.base_sha }}
         run: |
           # Both blocks are pulled out by tools/extract-model-block.sh,
           # which is unit tested in test_extract_model_block.py. The
@@ -735,19 +749,21 @@ jobs:
           # blocks, fences the model was told not to emit -- that having
           # it inline here means having it untested here.
           #
-          # These come from HEAD rather than from the workspace, which
-          # is NOT the reason the model wrapper above is copied. That
-          # one is copied before Claude runs, because bash reads a
-          # script lazily and an edit mid-run would corrupt it. Here
-          # Claude has already exited and the danger is the opposite:
-          # the fix under test may have edited these very files -- the
-          # extractor's own header calls that out as a plausible
-          # subject for an automated fix -- and the workflow must not
-          # parse the model's output with the untested version the
-          # model just wrote. Nothing is committed until the "Commit
-          # changes" step below, so HEAD is still the pre-fix tree.
+          # These come from the base commit rather than from the
+          # workspace, which is NOT the reason the model wrapper above
+          # is copied. That one is copied before Claude runs, because
+          # bash reads a script lazily and an edit mid-run would
+          # corrupt it. Here Claude has already exited and the danger
+          # is the opposite: the fix under test may have edited these
+          # very files -- the extractor's own header calls that out as
+          # a plausible subject for an automated fix -- and the
+          # workflow must not parse the model's output with the
+          # untested version the model just wrote. The base is the
+          # commit recorded in "Create working branch", not HEAD,
+          # because a model which committed despite being told not to
+          # would have moved HEAD onto its own edits.
           for script in extract-model-block.sh neutralise-pr-body.sh; do
-            git show "HEAD:tools/${script}" \
+            git show "${BASE_SHA}:tools/${script}" \
               > "${{ runner.temp }}/${script}"
             chmod +x "${{ runner.temp }}/${script}"
           done
@@ -793,15 +809,37 @@ jobs:
       # The triage estimate of fix size is only an estimate. This is
       # the hard cap: an over-budget fix is never published as a PR,
       # but the branch is pushed for human inspection.
+      #
+      # Files the base commit's .gitattributes marks linguist-generated
+      # are not counted: regenerated protobuf stubs, for one, rewrite
+      # every serialized offset when a single field is added, and once
+      # held back a ~200 line fix as 1800. The count is made by
+      # tools/measure-change-size.sh, read from the base commit like
+      # the extraction scripts above and pinned by
+      # shakenfist/tests/test_measure_change_size.py; its header
+      # explains why each of its rules exists. It fails closed: a
+      # measurement which cannot be made stops this step rather than
+      # reading as zero lines.
       - name: Measure change size
         id: measure
         if: steps.assess.outputs.has_changes == 'true'
+        env:
+          BASE_SHA: ${{ steps.branch.outputs.base_sha }}
         run: |
+          git show "${BASE_SHA}:tools/measure-change-size.sh" \
+            > "${{ runner.temp }}/measure-change-size.sh"
+          chmod +x "${{ runner.temp }}/measure-change-size.sh"
+
           git add -A
-          nontest=$(git diff --cached --numstat | \
-            awk -v pat="${TEST_PATH_PATTERN}" \
-              '$3 !~ pat { if ($1 != "-") s += $1 + $2 } END { print s + 0 }')
-          echo "Non-test lines changed: ${nontest} (cap: ${MAX_DIFF_LINES})"
+          nontest=$(${{ runner.temp }}/measure-change-size.sh \
+            "${BASE_SHA}" "${TEST_PATH_PATTERN}")
+          case "${nontest}" in
+            ''|*[!0-9]*)
+              echo "Could not measure the change (got '${nontest}')." >&2
+              exit 1
+              ;;
+          esac
+          echo "Non-test, non-generated lines changed: ${nontest} (cap: ${MAX_DIFF_LINES})"
           echo "nontest_lines=${nontest}" >> $GITHUB_OUTPUT
 
           if [ "${nontest}" -le "${MAX_DIFF_LINES}" ]; then
@@ -937,7 +975,7 @@ jobs:
 
           gh issue comment "${ISSUE_NUMBER}" \
             --repo ${{ github.repository }} \
-            --body "An automated fix was produced and passes tests, but it changes ${{ steps.measure.outputs.nontest_lines }} non-test lines (cap: ${MAX_DIFF_LINES}), which is too large to propose automatically.
+            --body "An automated fix was produced and passes tests, but it changes ${{ steps.measure.outputs.nontest_lines }} non-test, non-generated lines (cap: ${MAX_DIFF_LINES}), which is too large to propose automatically.
 
           The changes have been pushed to the \`issue-fix-${ISSUE_NUMBER}\` branch for human review. No PR was created.
 
