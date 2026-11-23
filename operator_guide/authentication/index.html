@@ -15637,6 +15637,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#watching-for-a-namespace-with-no-usable-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Watching for a namespace with no usable key
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cluster-generated-key-secrets" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16471,6 +16482,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#watching-for-a-namespace-with-no-usable-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Watching for a namespace with no usable key
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cluster-generated-key-secrets" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16864,11 +16886,51 @@ there is no scope which arranges that today.</p>
 <p>Even so, the forensic window above is worth keeping in mind: setting
 <code>NAMESPACE_KEY_REAP_GRACE</code> to <code>0</code> while investigating keeps an expired key
 readable indefinitely.</p>
+<h2 id="watching-for-a-namespace-with-no-usable-key">Watching for a namespace with no usable key<a class="headerlink" href="#watching-for-a-namespace-with-no-usable-key" title="Permanent link">&para;</a></h2>
+<p>A namespace with no key which can authenticate cannot be reached at all,
+and nothing in Shaken Fist can refuse to let that happen: an operator may
+delete the last key by hand, and the expiry sweep above soft-deletes the
+last key if nothing replaced it. When the namespace is <code>system</code>, every
+deploy, every <code>sf-ctl</code> call and every piece of automation holding a system
+credential loses it at the same moment -- which once took 66 minutes to
+diagnose, because the first symptom was an outage rather than an alert.</p>
+<p>The elected cluster daemon therefore counts, every fifteen minutes, how
+many keys could authenticate right now:</p>
+<ul>
+<li><strong><code>namespace_usable_keys</code></strong> — a gauge on <code>CLUSTER_METRICS_PORT</code>
+  (default <code>13007</code>), labelled by <code>namespace</code>. A key counts when its
+  object state is active, its attributes row is present and its expiry
+  has not lapsed, which are the three terms the authentication read path
+  itself joins on. Every active namespace is published, zeros included,
+  so an alert can rely on the series existing.</li>
+</ul>
+<p>Only the node holding the cluster maintenance lock publishes it, so scrape
+every node which runs <code>sf-cluster</code>. Like the other leader-only gauges it is
+dropped on a lost election, and a pass whose count fails drops it too
+rather than publishing a zero it cannot vouch for -- zero is the condition
+you are alerting on, so a database blip must not be able to manufacture
+one. That means the absence of the series is its own alert, and the
+shipped rules in
+<a href="https://github.com/shakenfist/shakenfist/blob/develop/examples/prometheus-namespace-key-alert.yaml"><code>examples/prometheus-namespace-key-alert.yaml</code></a>
+cover both:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>max by (namespace) (namespace_usable_keys{namespace="system"}) == 0
+</code></pre></div>
+<p>A namespace with no keys at all is unremarkable -- a federated one mints
+them per login -- so only <code>system</code> is worth alerting on by default. The
+cluster daemon log says so as well, once per pass, for <code>system</code> alone.</p>
+<p><code>sf-ctl namespace-key-health</code> asks the same question of the database
+directly and exits non-zero when <code>system</code> has no usable key. That is the
+surface to reach for once the condition has arrived, because by then the
+API cannot be asked anything; recover with <code>sf-ctl bootstrap-system-key</code>,
+which also heals a key whose state row has gone missing.</p>
+<p>Rotating a single-key namespace by deleting before creating can be caught
+mid-rotation. That is a true reading rather than a false alarm, but it is
+avoidable: create the new key first, then delete the old one.</p>
 <h2 id="cluster-generated-key-secrets">Cluster generated key secrets<a class="headerlink" href="#cluster-generated-key-secrets" title="Permanent link">&para;</a></h2>
 <p>Secrets Shaken Fist generates itself — the short-lived service keys
 used between nodes, keys minted by the federated exchange, and any key
 you ask the cluster to generate for you — carry a recognisable format:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sfk_&lt;32 random characters&gt;&lt;6 character checksum&gt;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sfk_&lt;32 random characters&gt;&lt;6 character checksum&gt;
 </code></pre></div>
 <p>The prefix makes a leaked credential greppable in logs and
 repositories; the checksum lets a secret scanner reject lookalikes
@@ -16883,11 +16945,11 @@ only its bcrypt hash is stored, so it cannot be recovered afterwards.</p>
 <code>sf-client namespace add-key</code> takes the secret as a mandatory argument,
 so there is no way to omit it. Until that changes, generation means
 <code>curl</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/namespaces/myproject/keys<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_TOKEN</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"key_name": "deploy"}'</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="o">{</span><span class="s2">"key_name"</span>:<span class="w"> </span><span class="s2">"deploy"</span>,<span class="w"> </span><span class="s2">"key"</span>:<span class="w"> </span><span class="s2">"sfk_..."</span><span class="o">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/namespaces/myproject/keys<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_TOKEN</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"key_name": "deploy"}'</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="o">{</span><span class="s2">"key_name"</span>:<span class="w"> </span><span class="s2">"deploy"</span>,<span class="w"> </span><span class="s2">"key"</span>:<span class="w"> </span><span class="s2">"sfk_..."</span><span class="o">}</span>
 </code></pre></div>
 <p>The same applies to <code>expiry</code>, which is also body-only.</p>
 <h3 id="the-prefix-is-reserved">The prefix is reserved<a class="headerlink" href="#the-prefix-is-reserved" title="Permanent link">&para;</a></h3>
@@ -17119,8 +17181,8 @@ JWKS path redirects to a CDN.</p>
 <p>To skip the fetch entirely, send <code>"discover": false</code>. A <code>jwks_uri</code> is
 then mandatory, since nothing else could supply it.</p>
 <h4 id="re-running-discovery">Re-running discovery<a class="headerlink" href="#re-running-discovery" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/issuers/corporate/discover<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_ADMIN_TOKEN</span><span class="si">}</span><span class="s2">"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/issuers/corporate/discover<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_ADMIN_TOKEN</span><span class="si">}</span><span class="s2">"</span>
 </code></pre></div>
 <p>This fetches the document again and returns the issuer. It changes
 the three endpoints and <code>discovered_at</code>, and fills in a <code>jwks_uri</code> the
@@ -17336,59 +17398,59 @@ a namespace.</p>
 <p>The <code>sf-client</code> command line does not wrap these routes yet, so the
 examples below call the REST API directly.</p>
 <p>Configure the issuer once, as an administrator:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/issuers<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_ADMIN_TOKEN</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="s1">        "name": "github",</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="s1">        "issuer_url": "https://token.actions.githubusercontent.com",</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="s1">        "jwks_uri": "https://token.actions.githubusercontent.com/.well-known/jwks",</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="s1">        "audience": "https://sf.example.com"</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="s1">      }'</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/issuers<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_ADMIN_TOKEN</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="s1">        "name": "github",</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="s1">        "issuer_url": "https://token.actions.githubusercontent.com",</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="s1">        "jwks_uri": "https://token.actions.githubusercontent.com/.well-known/jwks",</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="s1">        "audience": "https://sf.example.com"</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="s1">      }'</span>
 </code></pre></div>
 <p>Then, as the owner of the namespace the workflow should reach, write a
 rule saying which jobs qualify and what they get:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/namespaces/ci/rules<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_TOKEN</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="s1">        "name": "ryll",</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="s1">        "issuer": "github",</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="s1">        "bound_claims": {</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="s1">          "repository": "shakenfist/ryll",</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="s1">          "ref": ["refs/heads/develop", "refs/heads/main"]</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="s1">        },</span>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="s1">        "scopes": ["blob.read", "artifact.*"],</span>
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="s1">        "key_ttl": 3600,</span>
-<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="s1">        "key_name_prefix": "ryll-ci"</span>
-<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="s1">      }'</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/namespaces/ci/rules<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_TOKEN</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="s1">        "name": "ryll",</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="s1">        "issuer": "github",</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="s1">        "bound_claims": {</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="s1">          "repository": "shakenfist/ryll",</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="s1">          "ref": ["refs/heads/develop", "refs/heads/main"]</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="s1">        },</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="s1">        "scopes": ["blob.read", "artifact.*"],</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="s1">        "key_ttl": 3600,</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="s1">        "key_name_prefix": "ryll-ci"</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="s1">      }'</span>
 </code></pre></div>
 <p>The workflow needs <code>id-token: write</code> permission to ask GitHub for a
 token, and nothing else:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">permissions</span><span class="p">:</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">id-token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="nt">jobs</span><span class="p">:</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Get a Shaken Fist key</span>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">          </span><span class="no">IDENTITY=$(curl -sS \</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">            </span><span class="no">-H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \</span>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">            </span><span class="no">"${ACTIONS_ID_TOKEN_REQUEST_URL}&amp;audience=https://sf.example.com" \</span>
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">            </span><span class="no">| jq -r .value)</span>
-<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>
-<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="w">          </span><span class="no">RESPONSE=$(curl -sS -X POST https://sf.example.com/auth/federated \</span>
-<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">            </span><span class="no">-H "Content-Type: application/json" \</span>
-<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="w">            </span><span class="no">-d "{\"token\": \"${IDENTITY}\",</span>
-<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="w">                 </span><span class="no">\"namespace\": \"ci\",</span>
-<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="w">                 </span><span class="no">\"rule\": \"ryll\"}")</span>
-<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>
-<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a><span class="w">          </span><span class="no">echo "::add-mask::$(echo "${RESPONSE}" | jq -r .key)"</span>
-<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="w">          </span><span class="no">echo "SHAKENFIST_KEY=$(echo "${RESPONSE}" | jq -r .key)" &gt;&gt; "${GITHUB_ENV}"</span>
-<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a><span class="w">          </span><span class="no">echo "SHAKENFIST_NAMESPACE=ci" &gt;&gt; "${GITHUB_ENV}"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">permissions</span><span class="p">:</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">id-token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="nt">jobs</span><span class="p">:</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Get a Shaken Fist key</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">          </span><span class="no">IDENTITY=$(curl -sS \</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">            </span><span class="no">-H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="w">            </span><span class="no">"${ACTIONS_ID_TOKEN_REQUEST_URL}&amp;audience=https://sf.example.com" \</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="w">            </span><span class="no">| jq -r .value)</span>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="w">          </span><span class="no">RESPONSE=$(curl -sS -X POST https://sf.example.com/auth/federated \</span>
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="w">            </span><span class="no">-H "Content-Type: application/json" \</span>
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a><span class="w">            </span><span class="no">-d "{\"token\": \"${IDENTITY}\",</span>
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a><span class="w">                 </span><span class="no">\"namespace\": \"ci\",</span>
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a><span class="w">                 </span><span class="no">\"rule\": \"ryll\"}")</span>
+<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>
+<a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a><span class="w">          </span><span class="no">echo "::add-mask::$(echo "${RESPONSE}" | jq -r .key)"</span>
+<a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a><span class="w">          </span><span class="no">echo "SHAKENFIST_KEY=$(echo "${RESPONSE}" | jq -r .key)" &gt;&gt; "${GITHUB_ENV}"</span>
+<a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a><span class="w">          </span><span class="no">echo "SHAKENFIST_NAMESPACE=ci" &gt;&gt; "${GITHUB_ENV}"</span>
 </code></pre></div>
 <p>The <code>audience</code> in the token request must match the issuer's
 configured <code>audience</code> exactly, and the <code>add-mask</code> line matters: the
@@ -17470,10 +17532,10 @@ which is the real reason to leave full paths on. Whichever form you choose,
 the rule below has to bind the string the token actually carries.</p>
 <p><code>groups</code> is <strong>not</strong> a scope Keycloak knows, and asking for one is a hard
 refusal rather than a quietly ignored request:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="s2">"invalid_scope"</span><span class="p">,</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">"error_description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Invalid scopes: openid profile groups"</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="s2">"invalid_scope"</span><span class="p">,</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">"error_description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Invalid scopes: openid profile groups"</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="p">}</span>
 </code></pre></div>
 <p>So the issuer's <code>oidc_scopes</code> is <code>openid profile</code>. The claim arrives anyway,
 because a mapper on the client's own dedicated scope is always in scope. A
@@ -17486,20 +17548,20 @@ or not the client you registered has the grant enabled, so the issuer is
 advertised as device capable either way. The device endpoint itself is clear
 about it when asked, which is more than the cluster can be, and running that
 one request is quicker than suspecting the cluster:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="s2">"unauthorized_client"</span><span class="p">,</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">"error_description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Client is not allowed to initiate OAuth 2.0 Device Authorization Grant. The flow is disabled for the client."</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="s2">"unauthorized_client"</span><span class="p">,</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">"error_description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Client is not allowed to initiate OAuth 2.0 Device Authorization Grant. The flow is disabled for the client."</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="p">}</span>
 </code></pre></div>
 <details class="warning" open="open">
 <summary>Requiring PKCE at the client breaks only the device flow</summary>
 <p>Setting the client's <em>PKCE Method</em> (<code>pkce.code.challenge.method</code>) to
 <code>S256</code> makes Keycloak <strong>require</strong> a challenge on every request,
 including the device authorization request, which has nowhere to put one:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="s2">"invalid_request"</span><span class="p">,</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">"error_description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Missing parameter: code_challenge_method"</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p">{</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="s2">"invalid_request"</span><span class="p">,</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">"error_description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Missing parameter: code_challenge_method"</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="p">}</span>
 </code></pre></div>
 <p>The authorization endpoint is unaffected, so the symptom is a device
 login which cannot start on a client whose browser login works.
@@ -17509,16 +17571,16 @@ working device flow needs. "Require PKCE" is exactly the box a careful
 operator ticks, which is why it is worth naming.</p>
 </details>
 <p>Configure the issuer once, as a cluster administrator:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/issuers<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_ADMIN_TOKEN</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="s1">        "name": "corporate",</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="s1">        "issuer_url": "https://idp.example.com/realms/sf",</span>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="s1">        "audience": "https://sf.example.com",</span>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="s1">        "client_id": "shakenfist",</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="s1">        "oidc_scopes": "openid profile"</span>
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="s1">      }'</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/issuers<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_ADMIN_TOKEN</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="s1">        "name": "corporate",</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="s1">        "issuer_url": "https://idp.example.com/realms/sf",</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="s1">        "audience": "https://sf.example.com",</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="s1">        "client_id": "shakenfist",</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="s1">        "oidc_scopes": "openid profile"</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="s1">      }'</span>
 </code></pre></div>
 <p>No <code>jwks_uri</code> is sent, so <a href="#discovery">discovery</a> supplies it along with the
 three login endpoints. <code>audience</code> is mandatory, and a login does not check
@@ -17526,17 +17588,17 @@ it: a real Keycloak identity token's <code>aud</code> is the bare client id, whi
 why <code>client_id</code> is set here as well and why <a href="#human-login-mints-credentials">human login verifies the
 <code>client_id</code></a> rather than the audience.</p>
 <p>Then, as the owner of the namespace those people should reach:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/namespaces/ops/rules<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_TOKEN</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="s1">        "name": "corporate-admins",</span>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="s1">        "issuer": "corporate",</span>
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="s1">        "bound_claims": {"groups": "/sf-admins"},</span>
-<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="s1">        "scopes": ["instance.*"],</span>
-<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="s1">        "key_ttl": 3600,</span>
-<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="s1">        "key_name_prefix": "corporate"</span>
-<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="s1">      }'</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/namespaces/ops/rules<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_TOKEN</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="s1">        "name": "corporate-admins",</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="s1">        "issuer": "corporate",</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="s1">        "bound_claims": {"groups": "/sf-admins"},</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="s1">        "scopes": ["instance.*"],</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="s1">        "key_ttl": 3600,</span>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="s1">        "key_name_prefix": "corporate"</span>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="s1">      }'</span>
 </code></pre></div>
 <p><code>bound_claims</code> names <code>/sf-admins</code> with its leading slash, because that is
 what this provider's token says. The claim is an array even for a person in
@@ -17544,7 +17606,7 @@ exactly one group, and a rule matches when any element of it equals the
 string bound, so one group out of a person's twenty is enough; only the
 elements which matched are recorded in the key's provenance.</p>
 <p>The person then runs:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>sf-client<span class="w"> </span>login
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>sf-client<span class="w"> </span>login
 </code></pre></div>
 <p>which prints a short code and a URL for them to open. Tell them that
 Keycloak asks them to confirm <strong>after</strong> they have signed in: a <em>Yes</em> / <em>No</em>
@@ -17567,8 +17629,8 @@ are that release's, and each field is given with the API name it sets.</p>
     that certificate carries no <code>subjectAltName</code> — so a cluster fetching its
     discovery document refuses it by hostname even when that same certificate
     is the trust anchor:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>certificate verify failed: Hostname mismatch, certificate is not valid
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>for 'idp.example.com'
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>certificate verify failed: Hostname mismatch, certificate is not valid
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>for 'idp.example.com'
 </code></pre></div>
 <p>Pointing <code>FEDERATION_JWKS_CA_BUNDLE</code> at the certificate does not help,
 because trusting a certificate does not give it a name; only replacing it
@@ -17675,35 +17737,35 @@ the verification URL sends them through an ordinary login; and the page
 they are returned to answers a bare <strong>404 with an empty body</strong>. No
 message, no error page. The reason is in Authentik's log and nowhere
 else:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>"event": "Brand has no device code flow configured",
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>"logger": "authentik.providers.oauth2.views.device_init",
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>"status": 404
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>"event": "Brand has no device code flow configured",
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>"logger": "authentik.providers.oauth2.views.device_init",
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>"status": 404
 </code></pre></div>
 <p>Meanwhile the client polls with <code>authorization_pending</code> until the code
 expires, which by default is sixty seconds later.</p>
 <p>With the <strong>provider's grant types</strong> missing the device grant, the device
 code request itself is refused, at the client rather than at the person,
 with a message that names something else entirely:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="p">{</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="s2">"invalid_client"</span><span class="p">,</span>
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span><span class="nt">"error_description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Client authentication failed (e.g., unknown client, no client authentication included, or unsupported authentication method)"</span>
-<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="p">{</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="s2">"invalid_client"</span><span class="p">,</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="nt">"error_description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Client authentication failed (e.g., unknown client, no client authentication included, or unsupported authentication method)"</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="p">}</span>
 </code></pre></div>
 <p>Neither state is visible from here, so when a device login fails against
 an Authentik issuer, check those two settings at the provider before
 suspecting anything about the cluster.</p>
 </details>
 <p>Configure the issuer once, as a cluster administrator:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/issuers<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_ADMIN_TOKEN</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
-<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="s1">        "name": "directory",</span>
-<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="s1">        "issuer_url": "https://idp.example.com/application/o/sf/",</span>
-<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="s1">        "audience": "https://sf.example.com",</span>
-<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="s1">        "client_id": "shakenfist",</span>
-<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="s1">        "oidc_scopes": "openid profile"</span>
-<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="s1">      }'</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/issuers<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_ADMIN_TOKEN</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="s1">        "name": "directory",</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="s1">        "issuer_url": "https://idp.example.com/application/o/sf/",</span>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="s1">        "audience": "https://sf.example.com",</span>
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="s1">        "client_id": "shakenfist",</span>
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="s1">        "oidc_scopes": "openid profile"</span>
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="s1">      }'</span>
 </code></pre></div>
 <p>As with the other provider, <code>jwks_uri</code> is left to <a href="#discovery">discovery</a>,
 and the <code>aud</code> of a real Authentik identity token is the bare client id
@@ -17713,23 +17775,23 @@ from the <code>Host</code> header of the request rather than from a setting, so 
 issuer configured from a document fetched through the wrong name is silently
 wrong; fetch it the way your users will reach it.</p>
 <p>Then, as the owner of the namespace those people should reach:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/namespaces/ops/rules<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_TOKEN</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
-<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="s1">        "name": "directory-admins",</span>
-<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="s1">        "issuer": "directory",</span>
-<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="s1">        "bound_claims": {"groups": "sf-admins"},</span>
-<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="s1">        "scopes": ["instance.*"],</span>
-<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="s1">        "key_ttl": 3600,</span>
-<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="s1">        "key_name_prefix": "directory"</span>
-<a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a><span class="s1">      }'</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://sf.example.com/auth/namespaces/ops/rules<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="si">${</span><span class="nv">SF_TOKEN</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="s1">        "name": "directory-admins",</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="s1">        "issuer": "directory",</span>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="s1">        "bound_claims": {"groups": "sf-admins"},</span>
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="s1">        "scopes": ["instance.*"],</span>
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="s1">        "key_ttl": 3600,</span>
+<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="s1">        "key_name_prefix": "directory"</span>
+<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a><span class="s1">      }'</span>
 </code></pre></div>
 <p><code>sf-admins</code> here, with no leading slash, is the whole of the difference from
 the other provider's rule: a rule binds the string its provider emits, and a
 value copied between the two matches nothing.</p>
 <p>The person then runs:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>sf-client<span class="w"> </span>login
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>sf-client<span class="w"> </span>login
 </code></pre></div>
 <p>Using the URL with the code already in it, they never see a code entry page
 — but the brand's device code flow is still what makes that route exist,

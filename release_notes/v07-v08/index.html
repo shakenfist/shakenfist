@@ -18177,6 +18177,10 @@ for the multi-phase rollout details.</p>
   which no longer exists. Combined with the namespace delete refusal above,
   such an instance made its namespace undeletable with no operator recovery
   path short of editing the database.</li>
+<li><code>sf-ctl namespace-key-health</code> reports how many keys can authenticate in
+  each namespace and exits non-zero when the <code>system</code> namespace has none.
+  It reads the database rather than the API, because the condition it
+  reports is one which takes the API away.</li>
 <li><code>cluster_config</code> row names are case-insensitive identifiers, stored in upper
   case. <code>sf-ctl set-config kerbside_url ...</code> now writes a <code>KERBSIDE_URL</code> row,
   and <code>unset-config</code> deletes by the same spelling. The daemons always read
@@ -18427,6 +18431,18 @@ daemon process:</p>
   type the sweep takes, zeros included, by the elected cluster maintainer
   only, and dropped when that node loses the election. There is no <code>node</code>
   series: nodes are never hard deleted, so they are not swept.</li>
+<li><code>namespace_usable_keys{namespace}</code> — gauge, sf-cluster: keys which
+  could authenticate right now, counted every fifteen minutes per
+  namespace: an active object state, an attributes row, and an expiry
+  which has not lapsed. A namespace reading zero cannot be reached at
+  all, and <code>system</code> reading zero locks out every deploy, <code>sf-ctl</code> call
+  and credential-holding automation at once. Published for every active
+  namespace, zeros included, by the elected cluster maintainer only;
+  dropped when that node loses the election, and dropped rather than
+  zeroed when the count itself fails, so alert on the absence of the
+  series as well. <code>examples/prometheus-namespace-key-alert.yaml</code> ships
+  both rules, and see <a href="/operator_guide/authentication/">the operator guide on
+  authentication</a>.</li>
 <li><code>cluster_deleted_object_seconds{object_type,outcome}</code> — histogram,
   sf-cluster: wall time spent on each entry of the deleted-object
   queue, by how the entry ended (<code>gone</code>, <code>not_final</code>, <code>too_young</code>,
