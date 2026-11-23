@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://shakenfist.com/components/development/plans/PLAN-push-audit-phase/">
       
       
-        <link rel="prev" href="../PLAN-llm-doc-structure/">
+        <link rel="prev" href="../PLAN-size-ratchet/">
       
       
         <link rel="next" href="../PLAN-typescript-onboarding/">
@@ -3501,34 +3501,6 @@
                 
   
   
-  
-  
-    <li class="md-nav__item">
-      <a href="../PLAN-llm-doc-structure/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plan: an `llm-doc-structure` consistency audit for AGENTS.md and ARCHITECTURE.md
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
     
   
   
@@ -4084,34 +4056,6 @@
     
   
     Review import
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../PLAN-consistency/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Shaken Fist Project Consistency Plan
   
 
     
@@ -17635,7 +17579,7 @@ one plan and four cells, not two plans and seven. Two plans a phrase
 grep flags are correctly untouched:
 <code>PLAN-stestr-testtools.md</code> carries a <code>## Push audit</code> section but has
 no phases, so there is no range to record, and
-<code>PLAN-llm-doc-structure.md</code> names <code>PUSH-AUDIT.md</code> only in prose, has
+<a href="https://github.com/shakenfist/development/blob/3b546d6e617026705f4f5dc994e9cc996a892410/docs/plans/PLAN-llm-doc-structure.md"><code>PLAN-llm-doc-structure.md</code></a> names <code>PUSH-AUDIT.md</code> only in prose, has
 no audit phase, and is <code>Complete</code>, so the carve-out exempts it --
 that plan is decision 1's worked case for why naming the file is not
 carrying the phase.</p>
@@ -17741,7 +17685,7 @@ plans that do not carry it.</p>
 wrong in the first draft of this section:</p>
 <ul>
 <li><strong>Naming <code>PUSH-AUDIT.md</code> in prose is not carrying the phase.</strong>
-  <code>PLAN-llm-doc-structure.md</code> in this repository is the worked case:
+  <a href="https://github.com/shakenfist/development/blob/3b546d6e617026705f4f5dc994e9cc996a892410/docs/plans/PLAN-llm-doc-structure.md"><code>PLAN-llm-doc-structure.md</code></a> in this repository is the worked case:
   it names the runbook once, is <code>Complete</code>, and
   <code>plan_audit_phase_state</code> returns <code>('problem', 'no push audit
   phase; phase 6 is "Regenerate and document"')</code>. It has no audit
@@ -17758,7 +17702,7 @@ wrong in the first draft of this section:</p>
 <code>plan_audit_phase_state</code> returns <code>problem</code> both for a plan whose
 audit phase is outrun and for a plan that has no audit phase at all,
 so <code>ok</code>-or-<code>problem</code> is <em>not</em> the test and would sweep
-<code>PLAN-llm-doc-structure.md</code> in. A sweep determines it by reading the
+<a href="https://github.com/shakenfist/development/blob/3b546d6e617026705f4f5dc994e9cc996a892410/docs/plans/PLAN-llm-doc-structure.md"><code>PLAN-llm-doc-structure.md</code></a> in. A sweep determines it by reading the
 plan's phases, and the post-condition is mechanical: after 4c-4e
 every in-scope plan returns <code>ok</code>.</p>
 <p><strong>2. A missing status makes a plan unjudgeable, not incomplete.</strong>

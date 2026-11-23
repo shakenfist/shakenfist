@@ -3584,34 +3584,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/PLAN-llm-doc-structure/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plan: an `llm-doc-structure` consistency audit for AGENTS.md and ARCHITECTURE.md
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../plans/PLAN-push-audit-phase/" class="md-nav__link">
         
   
@@ -3984,34 +3956,6 @@
     
   
     Review import
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../plans/PLAN-consistency/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Shaken Fist Project Consistency Plan
   
 
     
@@ -16270,6 +16214,14 @@ and 2262 lines -- around 21,000 words, or roughly 28k tokens of context
 <code>docs/control-socket-protocol.md</code> in a section that names that file as
 the canonical source, carrying a <code>make test-qemu</code> runbook, and
 duplicating a <code>## Code Organisation</code> section between the two.</p>
+<p>Part of the cause was the instruction agents worked from. A standing
+rule to update <code>AGENTS.md</code> and <code>ARCHITECTURE.md</code> for every
+user-visible change directed both files to grow on every task. Agent
+instructions now send user-visible changes to <code>docs/</code>, and touch
+<code>AGENTS.md</code> only when a convention changes and <code>ARCHITECTURE.md</code> only
+when the shape of the system does; an instruction anywhere that tells
+an agent to update either file as a matter of course reintroduces the
+growth this audit measures.</p>
 <p>The judgment half of the policy is enforced where the bloat is created:
 the documentation-review section of each repository's pre-push audit
 file carries the canonical <code>llm-doc-discipline</code> shared block (see the

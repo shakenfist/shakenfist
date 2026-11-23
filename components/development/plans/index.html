@@ -3514,34 +3514,6 @@
   
   
     <li class="md-nav__item">
-      <a href="PLAN-llm-doc-structure/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plan: an `llm-doc-structure` consistency audit for AGENTS.md and ARCHITECTURE.md
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="PLAN-push-audit-phase/" class="md-nav__link">
         
   
@@ -3914,34 +3886,6 @@
     
   
     Review import
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="PLAN-consistency/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Shaken Fist Project Consistency Plan
   
 
     
@@ -16119,6 +16063,10 @@ this page carries only the one-line status.</p>
 list the <code>plan-index</code> audit enforces across the fleet. A status says
 whether the plan still wants attention and nothing else -- the dates,
 the phase arithmetic and the summary of what happened live in the plan.</p>
+<p>A plan linked by a pinned <code>blob/&lt;sha&gt;/</code> URL has been retired, and its
+row is marked <code>(retired)</code>. Its reasoning now lives in the <code>docs/</code> page
+that owns the topic; the pinned copy is frozen history rather than a
+maintained document, so it may state things a later phase overturned.</p>
 <table>
 <thead>
 <tr>
@@ -16131,7 +16079,7 @@ the phase arithmetic and the summary of what happened live in the plan.</p>
 <tbody>
 <tr>
 <td>2026-02-18</td>
-<td><a href="/components/development/plans/PLAN-consistency/">Project consistency</a></td>
+<td><a href="https://github.com/shakenfist/development/blob/7be8a9922dae7bdeafa9e19ae7d3af97836ef86e/docs/plans/PLAN-consistency.md">Project consistency</a> (retired)</td>
 <td>The original per-project audit of every Shaken Fist repository, and the cleanup backlog it produced</td>
 <td>Superseded</td>
 </tr>
@@ -16161,7 +16109,7 @@ the phase arithmetic and the summary of what happened live in the plan.</p>
 </tr>
 <tr>
 <td>2026-08-15</td>
-<td><a href="/components/development/plans/PLAN-llm-doc-structure/">LLM doc structure</a></td>
+<td><a href="https://github.com/shakenfist/development/blob/3b546d6e617026705f4f5dc994e9cc996a892410/docs/plans/PLAN-llm-doc-structure.md">LLM doc structure</a> (retired)</td>
 <td>An audit keeping AGENTS.md and ARCHITECTURE.md a summary and an index rather than a second copy of docs/</td>
 <td>Complete</td>
 </tr>
@@ -16228,7 +16176,7 @@ the phase arithmetic and the summary of what happened live in the plan.</p>
 <tr>
 <td>2026-10-03</td>
 <td><a href="/components/development/plans/PLAN-renovate-cadence/">Renovate cadence</a></td>
-<td>Cut the pull requests Renovate opens, and the CI they cost, to 100 a month from the 417 Renovate now opens across the organisation, without slowing security fixes: one central runner instead of a copy per repository, the fleet policy in a shared preset with tiered schedules, and CI-tooling updates grouped monthly</td>
+<td>Cut the pull requests Renovate opens, and the CI they cost, to 100 a month from the 417 Renovate now opens across the organisation, without slowing security fixes: one central runner instead of a copy per repository, dispatched by the private-ci conductor because GitHub delivers few of its scheduled events, the fleet policy in a shared preset with tiered schedules, and CI-tooling updates grouped monthly</td>
 <td>In progress</td>
 </tr>
 <tr>

@@ -3678,34 +3678,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../plans/PLAN-llm-doc-structure/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plan: an `llm-doc-structure` consistency audit for AGENTS.md and ARCHITECTURE.md
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../plans/PLAN-push-audit-phase/" class="md-nav__link">
         
   
@@ -4078,34 +4050,6 @@
     
   
     Review import
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../plans/PLAN-consistency/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Shaken Fist Project Consistency Plan
   
 
     
@@ -16439,26 +16383,34 @@
 <h3 id="the-central-runner">The central runner<a class="headerlink" href="#the-central-runner" title="Permanent link">&para;</a></h3>
 <p>Everything above describes the arrangement the criterion checks: a
 copy of <code>renovate.yml</code> in each repository, running Renovate over that
-repository alone. The fleet is moving to a single workflow that runs
-Renovate over every repository from one place, and that workflow is
-already in this repository as <code>.github/workflows/renovate-fleet.yml</code>.
-It runs hourly at minute 23, and can also be dispatched by hand with a
-Renovate <code>dryRun</code> mode and an autodiscover filter as inputs, so a pass
-can be read-only or confined to one repository. Minute 23 rather than
-the hour, because GitHub delays and sometimes drops scheduled events
-at the top of the hour and a dropped run here would delay every
-repository at once. It installs Renovate from npm in a step that holds
-no secret, exactly as the template does, for the reasons given under
-<a href="#renovate-without-docker">Renovate without Docker</a> and in the
-template README.</p>
-<p>The schedule was deliberately the last step of the cutover rather than
-part of adding the workflow. A schedule here while every repository
-still ran its own hourly copy would have had two Renovate instances
-working the same repository, racing on branch creation to produce
-duplicate or half-written pull requests, and the runner's concurrency
-group cannot prevent that because the two runs are different workflows
-in different repositories. Every per-repository copy is disabled now,
-so re-enabling one while this schedule is on reintroduces that race.</p>
+repository alone. The fleet has moved to a single workflow that runs
+Renovate over every repository from one place, in this repository as
+<code>.github/workflows/renovate-fleet.yml</code>. The conductor's periodic tier in
+shakenfist/private-ci dispatches it about once an hour. The workflow has
+no <code>schedule:</code> trigger, because GitHub's own cron delivered roughly one
+hourly event in seven: over 35.6 hours of an hourly schedule it started 5
+runs, created at whatever minute it chose. The conductor sends no inputs,
+so every scheduled run gets the dispatch defaults, a real write pass over
+the whole fleet. It can still be dispatched by hand with a Renovate
+<code>dryRun</code> mode and an autodiscover filter as inputs, so a pass can be
+read-only or confined to one repository. The conductor's own
+documentation is private-ci's <code>docs/periodic-ci.md</code>.</p>
+<p>The consequence is a dependency: if the conductor is down the runner
+stops, and with it dependency updates and security pull requests for
+the whole fleet. There is no fallback schedule, deliberately, since one
+would hide an outage behind a cadence that merely looked poor. The runner
+installs Renovate from npm in a step that holds no secret, exactly as
+the template does, for the reasons given under
+<a href="#renovate-without-docker">Renovate without Docker</a> and in the template
+README.</p>
+<p>The cutover order mattered. Every per-repository copy had to be
+disabled before the runner was triggered on a recurring basis, because
+two Renovate instances working the same repository race on branch
+creation to produce duplicate or half-written pull requests, and the
+runner's concurrency group cannot prevent that: the two runs are
+different workflows in different repositories. Every copy is disabled
+now, so re-enabling one while the runner is dispatched reintroduces that
+race.</p>
 <p>Its global configuration is <code>renovate-runner.json</code> at the root of this
 repository. That file decides two things. Which repositories are
 discovered: autodiscovery over <code>shakenfist/*</code>, with <code>requireConfig</code>

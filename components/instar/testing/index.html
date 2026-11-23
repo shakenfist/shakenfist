@@ -3500,34 +3500,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-llm-doc-structure/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plan: an `llm-doc-structure` consistency audit for AGENTS.md and ARCHITECTURE.md
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../development/plans/PLAN-push-audit-phase/" class="md-nav__link">
         
   
@@ -3900,34 +3872,6 @@
     
   
     Review import
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../development/plans/PLAN-consistency/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Shaken Fist Project Consistency Plan
   
 
     
@@ -19910,10 +19854,9 @@ comment-granular version of the script then missed a second one in a
 <code>tests/</code> assertion message, which is why it reads string literals and
 prose rather than comments alone. Expect it to flag a docs page or a
 test message, not only a <code>//</code> comment.</p>
-<p>Two trees are excluded on purpose: <code>docs/plans/</code> records what was true
+<p>One tree is excluded on purpose: <code>docs/plans/</code> records what was true
 when each phase was planned and prescribes the sweeps that made it
-false, and <code>CHANGELOG.md</code> entries were true for the release they
-describe. Editing either to satisfy the script would falsify a record.</p>
+false. Editing it to satisfy the script would falsify a record.</p>
 <p>Build trees are excluded for a duller reason: <code>src/target/</code> and
 <code>tests/.venv/</code> are inside two of the globs, and pathlib matches dotted
 directories, so a developer who had built the tree scanned 1,199 files

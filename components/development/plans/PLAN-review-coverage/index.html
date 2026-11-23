@@ -3504,34 +3504,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../PLAN-llm-doc-structure/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plan: an `llm-doc-structure` consistency audit for AGENTS.md and ARCHITECTURE.md
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../PLAN-push-audit-phase/" class="md-nav__link">
         
   
@@ -4354,34 +4326,6 @@
     
   
     Review import
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../PLAN-consistency/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Shaken Fist Project Consistency Plan
   
 
     
@@ -17141,7 +17085,7 @@ check specs (e.g. <code>audits/delete-branch-on-merge.md</code>):</p>
   every other repo N/A.</li>
 </ul>
 <p>Also add the new audit to the criteria lists in
-<code>PROJECT-CONSISTENCY-AUDITS.md</code> and <code>PLAN-consistency.md</code>,
+<code>PROJECT-CONSISTENCY-AUDITS.md</code> and <a href="https://github.com/shakenfist/development/blob/7be8a9922dae7bdeafa9e19ae7d3af97836ef86e/docs/plans/PLAN-consistency.md"><code>PLAN-consistency.md</code></a>,
 matching how the other audits are described there.</p>
 <p>Tests in <code>scripts/test_audit_check.py</code>, following its fixture
 patterns: not_applicable without a scope config; pass/fail either
@@ -17763,7 +17707,7 @@ against the tree at <code>5861c0a</code>:</p>
 <li><code>PROJECT-CONSISTENCY-AUDITS.md</code> is gone, dissolved into <code>docs/</code>
   by <code>1276ff2</code>; the criteria list it held is now
   <code>docs/consistency-audits.md</code>.</li>
-<li><code>PLAN-consistency.md</code> is now <code>docs/plans/PLAN-consistency.md</code>,
+<li><code>PLAN-consistency.md</code> is now <a href="https://github.com/shakenfist/development/blob/7be8a9922dae7bdeafa9e19ae7d3af97836ef86e/docs/plans/PLAN-consistency.md"><code>docs/plans/PLAN-consistency.md</code></a>,
   moved by <code>3b546d6</code>, and <code>docs/plans/index.md:20</code> still links it as
   <code>Superseded</code>. <em>Corrected on 2026-09-20: this bullet said the two
   files were "both gone". Only the first is. That is precisely the
@@ -17971,7 +17915,7 @@ which is the reason the instruction is explicit.</p>
 <td>high</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Wave 2c, documentation review, per the brief in <code>PUSH-AUDIT.md</code>, over the three ranges in D6.1. Apply D6.3. The question is whether the documents this plan touched now say the same thing as each other and as the code: <code>docs/code-review-tracking.md</code> (rewritten by step 5 and repaired by step 5.1), <code>docs/audits/review-coverage.md</code> (moved from <code>audits/</code>), <code>docs/audits/README.md</code>, <code>AGENTS.md</code> and <code>ARCHITECTURE.md</code> (both corrected during #139's review). Check specifically that no page still says the prune workflow runs on <code>main</code> or on "the repository's own main branch" -- ryll's default branch is <code>develop</code> and step 5.1 changed four such references; that <code>REVIEW_BACKLOG_THRESHOLD</code> is cited at <code>scripts/audit/checks/review.py</code> and nowhere else outside <code>docs/plans/</code>; that the loop-termination argument in the Steady state section still matches ryll's <code>.github/workflows/prune-reviews.yml</code> header comment, which is the authority; and that the work-queue caveat added by step 5.1 names <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/138" title="GitHub Issue: shakenfist/development #138">development#138</a>. Also check that the two files step 4 edited left no dangling reference anywhere in <code>docs/</code>: <code>PROJECT-CONSISTENCY-AUDITS.md</code> was deleted and can dangle, while <code>PLAN-consistency.md</code> merely moved to <code>docs/plans/</code> and is still linked from the index, so a reference to it is not dangling.</td>
+<td>Wave 2c, documentation review, per the brief in <code>PUSH-AUDIT.md</code>, over the three ranges in D6.1. Apply D6.3. The question is whether the documents this plan touched now say the same thing as each other and as the code: <code>docs/code-review-tracking.md</code> (rewritten by step 5 and repaired by step 5.1), <code>docs/audits/review-coverage.md</code> (moved from <code>audits/</code>), <code>docs/audits/README.md</code>, <code>AGENTS.md</code> and <code>ARCHITECTURE.md</code> (both corrected during #139's review). Check specifically that no page still says the prune workflow runs on <code>main</code> or on "the repository's own main branch" -- ryll's default branch is <code>develop</code> and step 5.1 changed four such references; that <code>REVIEW_BACKLOG_THRESHOLD</code> is cited at <code>scripts/audit/checks/review.py</code> and nowhere else outside <code>docs/plans/</code>; that the loop-termination argument in the Steady state section still matches ryll's <code>.github/workflows/prune-reviews.yml</code> header comment, which is the authority; and that the work-queue caveat added by step 5.1 names <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/138" title="GitHub Issue: shakenfist/development #138">development#138</a>. Also check that the two files step 4 edited left no dangling reference anywhere in <code>docs/</code>: <code>PROJECT-CONSISTENCY-AUDITS.md</code> was deleted and can dangle, while <a href="https://github.com/shakenfist/development/blob/7be8a9922dae7bdeafa9e19ae7d3af97836ef86e/docs/plans/PLAN-consistency.md"><code>PLAN-consistency.md</code></a> merely moved to <code>docs/plans/</code> and is still linked from the index, so a reference to it is not dangling.</td>
 </tr>
 <tr>
 <td>6e</td>
@@ -18405,17 +18349,17 @@ source rather than left for the next reader.</p>
 </li>
 <li>
 <p>The 6d brief said <code>PROJECT-CONSISTENCY-AUDITS.md</code> and
-  <code>PLAN-consistency.md</code> "no longer exist", inheriting the survey's
+  <a href="https://github.com/shakenfist/development/blob/7be8a9922dae7bdeafa9e19ae7d3af97836ef86e/docs/plans/PLAN-consistency.md"><code>PLAN-consistency.md</code></a> "no longer exist", inheriting the survey's
   error. Only the first was deleted; the second moved to
-  <code>docs/plans/PLAN-consistency.md</code> and is linked live from
+  <a href="https://github.com/shakenfist/development/blob/7be8a9922dae7bdeafa9e19ae7d3af97836ef86e/docs/plans/PLAN-consistency.md"><code>docs/plans/PLAN-consistency.md</code></a> and is linked live from
   <code>docs/plans/index.md:20</code>. 6d's conclusion survives the correction,
   and was re-checked on 2026-09-20 rather than assumed: the only
   remaining references to <code>PROJECT-CONSISTENCY-AUDITS.md</code> are in the
   historical sections of <code>PLAN-consistency-audits-v2.md</code>,
-  <code>PLAN-plan-template-blocks.md</code>, <code>PLAN-consistency.md</code>,
-  <code>PLAN-llm-doc-structure.md</code> and this
+  <code>PLAN-plan-template-blocks.md</code>, <a href="https://github.com/shakenfist/development/blob/7be8a9922dae7bdeafa9e19ae7d3af97836ef86e/docs/plans/PLAN-consistency.md"><code>PLAN-consistency.md</code></a>,
+  <a href="https://github.com/shakenfist/development/blob/3b546d6e617026705f4f5dc994e9cc996a892410/docs/plans/PLAN-llm-doc-structure.md"><code>PLAN-llm-doc-structure.md</code></a> and this
   plan, which phase 5's decision says stand as records of what was
-  written at the time; and every reference to <code>PLAN-consistency.md</code>
+  written at the time; and every reference to <a href="https://github.com/shakenfist/development/blob/7be8a9922dae7bdeafa9e19ae7d3af97836ef86e/docs/plans/PLAN-consistency.md"><code>PLAN-consistency.md</code></a>
   resolves, because the file is there. So nothing dangles -- but the
   brief asked the question of a file that could not have dangled,
   which is half the check it thought it was making.</p>
@@ -18568,7 +18512,7 @@ PR on this branch, the ryll work a separate PR.</p>
 <tr>
 <td>4</td>
 <td>development</td>
-<td><code>PROJECT-CONSISTENCY-AUDITS.md</code> + <code>PLAN-consistency.md</code> entries</td>
+<td><code>PROJECT-CONSISTENCY-AUDITS.md</code> + <a href="https://github.com/shakenfist/development/blob/7be8a9922dae7bdeafa9e19ae7d3af97836ef86e/docs/plans/PLAN-consistency.md"><code>PLAN-consistency.md</code></a> entries</td>
 <td>Complete</td>
 <td><code>b677b61</code> (#11)</td>
 </tr>
