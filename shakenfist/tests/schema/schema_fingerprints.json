@@ -487,6 +487,29 @@
     ],
     "version": 2
   },
+  "namespace_claim_holds": {
+    "columns": {
+      "claim_uuid": "CHAR(32) NOT NULL",
+      "cpus": "BIGINT NOT NULL",
+      "created_at": "DATETIME(6) NOT NULL",
+      "disk_gb": "BIGINT NOT NULL",
+      "instance_uuid": "CHAR(32) NULL",
+      "memory_mb": "BIGINT NOT NULL",
+      "namespace": "VARCHAR(255) NOT NULL",
+      "node_uuid": "CHAR(32) NULL",
+      "updated_at": "DATETIME(6) NOT NULL",
+      "uuid": "CHAR(32) NOT NULL"
+    },
+    "indexes": {
+      "idx_namespace_claim_holds_claim": "(claim_uuid)",
+      "idx_namespace_claim_holds_instance": "(instance_uuid)",
+      "idx_namespace_claim_holds_node": "(node_uuid)"
+    },
+    "primary_key": [
+      "uuid"
+    ],
+    "version": 1
+  },
   "namespace_claims": {
     "columns": {
       "expires_at": "DATETIME NOT NULL",
@@ -770,6 +793,9 @@
   "scheduler_node_capacity": {
     "columns": {
       "expected_demand": "DOUBLE NOT NULL",
+      "held_cpus": "BIGINT NOT NULL",
+      "held_disk_gb": "BIGINT NOT NULL",
+      "held_memory_mb": "BIGINT NOT NULL",
       "limit_cpus": "BIGINT NOT NULL",
       "limit_disk_gb": "BIGINT NOT NULL",
       "limit_memory_mb": "BIGINT NOT NULL",
@@ -783,7 +809,7 @@
     "primary_key": [
       "node_uuid"
     ],
-    "version": 1
+    "version": 2
   },
   "trusted_issuer_attributes": {
     "columns": {
