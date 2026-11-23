@@ -17379,6 +17379,23 @@ constantly. This exists because one-off automated fixes had been
 landing across partially implemented plans and having to be unpicked
 (see the step 3 note in
 <code>docs/plans/PLAN-scheduler-reservations-phase-01-node-metrics-columns.md</code>).</p>
+<p><code>issue-fix.yml</code> will not publish a fix whose non-test diff exceeds
+<code>max_diff_lines</code> (400 by default); an over-budget fix is pushed to its
+<code>issue-fix-&lt;N&gt;</code> branch for a human instead. Files that <code>.gitattributes</code>
+marks <code>linguist-generated</code> are not counted. That attribute covers the
+protobuf stubs <code>tox -e genprotos</code> writes, because adding one field to a
+message rewrites every serialized offset in the regenerated <code>_pb2.py</code>
+and once made a fix of about 200 lines measure 1800. The count is made
+by <code>tools/measure-change-size.sh</code>, a copy of the script in
+shakenfist/development's <code>templates/issue-fix/</code>. It reads both the
+attributes and the diff base from the commit recorded before the model
+ran, so a fix cannot mark its own code generated. It also fails closed:
+an inline <code>git diff | awk</code> without pipefail would measure a failing git
+as zero lines. <code>shakenfist/tests/test_measure_change_size.py</code> pins those
+rules, and <code>test_issue_fix_workflow_seams.py</code> checks that every stub
+under <code>shakenfist/protos/</code> is still covered. Mark only files a
+generator writes: the attribute is an exemption from the cap as well as
+a display hint.</p>
 <p><code>issue-fix.yml</code> asks the model for two marker delimited blocks on
 stdout: a commit message and a pull request description. The commit
 message is pushed and its first line becomes the pull request title;
