@@ -35,6 +35,7 @@ from shakenfist.instance import Instance
 from shakenfist.ipam import IPAMs
 from shakenfist.namespace import Namespaces
 from shakenfist.namespace import revoke_trusts_naming_missing_namespaces
+from shakenfist.namespace import usable_key_counts
 from shakenfist.namespace_key import keys_with_attributes
 from shakenfist.namespace_key import NamespaceKey
 from shakenfist.network.network import Network
@@ -1011,6 +1012,103 @@ def reap_expired_namespace_keys() -> None:
 
     if reaped:
         LOG.info(f'Soft deleted {reaped} expired namespace keys')
+
+
+# Keys which could authenticate right now, by namespace (#5015). A
+# namespace reading zero cannot be authenticated to at all, and `system`
+# reading zero locks out every deploy, every sf-ctl call and the private
+# CI conductor at once -- in #3836 the first symptom was a 66 minute
+# outage rather than an alert. Nothing in the write path can prevent the
+# condition, which is why this is a gauge rather than a guard: an
+# operator can delete the last key by hand, and the expiry sweep soft
+# deletes the last key if nothing replaced it.
+#
+# Leader-only, like the gauges above, so it is cleared on demotion.
+# examples/prometheus-namespace-key-alert.yaml is the shipped alert. A
+# pass costs one object_states listing plus one key listing per
+# namespace: the same cadence and the same FindNamespaceKeys operation
+# the expiry sweep above already issues, so it roughly doubles a figure
+# which sits below the database load budget's inclusion cut.
+NAMESPACE_USABLE_KEYS = Gauge(
+    'namespace_usable_keys',
+    'Keys which could authenticate right now, by namespace: an active '
+    'object state, an attributes row, and no lapsed expiry.',
+    ['namespace'])
+
+# The namespaces we last published for, so one deleted since the last
+# pass has its series removed rather than left at its final value.
+_NAMESPACE_KEY_HEALTH_EXPORTED: set[str] = set()
+
+
+def clear_namespace_key_health_metrics() -> None:
+    """Drop the usable key gauge when this node is demoted.
+
+    Only the elected cluster maintainer publishes it, so a demoted node
+    would otherwise keep answering with the counts it last saw while the
+    new leader answers with the truth. This is the same reasoning as
+    ``clear_deleted_object_metrics()``, and it is also what a failed
+    count does, for the reason given in publish_namespace_key_health().
+    """
+    for namespace in _NAMESPACE_KEY_HEALTH_EXPORTED:
+        try:
+            NAMESPACE_USABLE_KEYS.remove(namespace)
+        except KeyError:
+            # Never published, or already cleared.
+            pass
+    _NAMESPACE_KEY_HEALTH_EXPORTED.clear()
+
+
+def publish_namespace_key_health() -> None:
+    """Set the usable key gauge from a count per namespace.
+
+    Published for every active namespace, zeros included, so an alert
+    can rely on the series existing. This is deliberately its own pass
+    rather than a count folded into reap_expired_namespace_keys(), which
+    does not run at all when NAMESPACE_KEY_REAP_GRACE is zero: a health
+    signal a reaping setting silently switches off is the failure this
+    is meant to end.
+
+    An unreachable tier raises DatabaseUnavailable, which ends the
+    maintenance batch for the reason _run_due_scheduled_jobs() gives,
+    and leaves the gauge reading what the last pass published. That is
+    the safe direction -- a stale reading can only be too high, and the
+    alert fires on zero -- and it is the tier's own alerts which should
+    be answering for a tier that is gone.
+    """
+    counts = usable_key_counts()
+    if counts is None:
+        # A failed read cannot vouch for what it last published, and
+        # must not publish zeros either, because zero is the condition
+        # the alert fires on. Drop the series instead and let the alert
+        # on the metric's absence cover the gap, exactly as
+        # publish_deleted_object_backlog() does for a failed count.
+        LOG.warning('Could not list active namespace keys, dropping the '
+                    'usable namespace key gauge')
+        clear_namespace_key_health_metrics()
+        return
+
+    for namespace, count in counts.items():
+        NAMESPACE_USABLE_KEYS.labels(namespace=namespace).set(count)
+
+    for namespace in _NAMESPACE_KEY_HEALTH_EXPORTED - set(counts):
+        try:
+            NAMESPACE_USABLE_KEYS.remove(namespace)
+        except KeyError:
+            pass
+    _NAMESPACE_KEY_HEALTH_EXPORTED.clear()
+    _NAMESPACE_KEY_HEALTH_EXPORTED.update(counts)
+
+    # One namespace deserves a log line of its own. A namespace with no
+    # keys is unremarkable -- a federated one mints them per login --
+    # but `system` without one is a cluster nobody can administer, and
+    # an operator reading logs should not have to be scraping metrics
+    # to find that out. Absent counts the same as zero: either way
+    # nothing in `system` can authenticate.
+    if not counts.get('system'):
+        LOG.warning(
+            'The system namespace has no key which can authenticate. Every '
+            'deploy, sf-ctl call and cluster administration request will '
+            'fail until one is created with sf-ctl bootstrap-system-key.')
 
 
 # How long after a token's own expiry its replay record is kept.

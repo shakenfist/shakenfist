@@ -1,0 +1,86 @@
+# Prometheus alerting rules which fire when a namespace has no key
+# that can authenticate.
+#
+# The system namespace is the one that matters. When its last usable key
+# goes, every deploy, every `sf-ctl` call and every piece of automation
+# holding a system credential is locked out at once, and nothing in
+# Shaken Fist can refuse to let it happen: an operator can delete the
+# last key by hand, and the expiry sweep soft deletes the last key if
+# nothing replaced it. The first symptom is therefore an outage rather
+# than an alert -- in issue 3836 a conductor was locked out for 66
+# minutes before anyone knew why. See
+# docs/operator_guide/authentication.md.
+#
+# Installing this:
+#
+#   1. Scrape the cluster daemon's metrics port, `CLUSTER_METRICS_PORT`
+#      (default 13007), on every node which runs sf-cluster. Only the
+#      node currently holding the cluster maintenance lock publishes
+#      these series, and which node that is changes, so scraping one
+#      node is scraping nothing most of the time.
+#   2. Copy this file into your Prometheus rule directory -- whatever
+#      `rule_files` in prometheus.yml names, typically
+#      `/etc/prometheus/rules/` -- and reload Prometheus.
+#   3. Confirm the rules loaded at `/api/v1/rules`, and that
+#      `namespace_usable_keys` has samples at `/api/v1/query`. A rule
+#      which loads but matches no series never fires, which looks
+#      exactly like success.
+#
+# `sf-ctl namespace-key-health` asks the same question of the database
+# directly, which is what you want when the condition has already taken
+# the API away.
+
+groups:
+  - name: shakenfist-namespace-keys
+    rules:
+      - alert: ShakenFistSystemNamespaceHasNoUsableKey
+        # Aggregated across instances rather than read per instance: the
+        # series is published by the elected cluster maintainer alone,
+        # and `max` means a node which has just been demoted cannot
+        # raise this on behalf of a cluster that is fine.
+        expr: |
+          max by (namespace) (namespace_usable_keys{namespace="system"}) == 0
+        # Short, because the publisher only counts every fifteen
+        # minutes: a zero sample is already a quarter of an hour old and
+        # waiting longer buys no extra confidence. Note that rotating a
+        # single-key namespace by deleting before creating can be caught
+        # mid-rotation, which is a true reading rather than a false
+        # alarm -- create the new key first.
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: >-
+            No key can authenticate to the Shaken Fist system namespace
+          description: >-
+            Nothing holding a system credential can authenticate: every
+            deploy, `sf-ctl` call and cluster administration request
+            will fail. Create a key on a cluster node with
+            `sf-ctl bootstrap-system-key <name> --key-from-stdin`, and
+            check `sf-ctl namespace-key-health` for the other
+            namespaces.
+
+      - alert: ShakenFistNamespaceKeyHealthUnknown
+        # The gauge above cannot report a condition it is not being
+        # published for, so the absence of the series is its own alert.
+        # The cluster daemon drops it on a failed read rather than
+        # publishing a zero it cannot vouch for, and on losing the
+        # election, so a gap is expected around a leadership change.
+        expr: absent(namespace_usable_keys{namespace="system"})
+        # Three publishing cadences, which covers a leadership change
+        # and a rolling restart of the cluster daemon.
+        for: 45m
+        labels:
+          severity: warning
+        annotations:
+          summary: >-
+            Shaken Fist is not reporting whether the system namespace
+            can be authenticated to
+          description: >-
+            Either no sf-cluster daemon holds the cluster maintenance
+            lock, its metrics port is not being scraped, or its count of
+            usable keys keeps failing. The condition the gauge watches
+            for is an outage nobody is warned about, so treat its
+            absence as unmonitored rather than healthy. The cluster
+            daemon log carries `dropping the usable namespace key gauge`
+            for a failed count.
