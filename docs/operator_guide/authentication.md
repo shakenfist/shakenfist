@@ -83,6 +83,54 @@ Even so, the forensic window above is worth keeping in mind: setting
 `NAMESPACE_KEY_REAP_GRACE` to `0` while investigating keeps an expired key
 readable indefinitely.
 
+## Watching for a namespace with no usable key
+
+A namespace with no key which can authenticate cannot be reached at all,
+and nothing in Shaken Fist can refuse to let that happen: an operator may
+delete the last key by hand, and the expiry sweep above soft-deletes the
+last key if nothing replaced it. When the namespace is `system`, every
+deploy, every `sf-ctl` call and every piece of automation holding a system
+credential loses it at the same moment -- which once took 66 minutes to
+diagnose, because the first symptom was an outage rather than an alert.
+
+The elected cluster daemon therefore counts, every fifteen minutes, how
+many keys could authenticate right now:
+
+- **`namespace_usable_keys`** — a gauge on `CLUSTER_METRICS_PORT`
+  (default `13007`), labelled by `namespace`. A key counts when its
+  object state is active, its attributes row is present and its expiry
+  has not lapsed, which are the three terms the authentication read path
+  itself joins on. Every active namespace is published, zeros included,
+  so an alert can rely on the series existing.
+
+Only the node holding the cluster maintenance lock publishes it, so scrape
+every node which runs `sf-cluster`. Like the other leader-only gauges it is
+dropped on a lost election, and a pass whose count fails drops it too
+rather than publishing a zero it cannot vouch for -- zero is the condition
+you are alerting on, so a database blip must not be able to manufacture
+one. That means the absence of the series is its own alert, and the
+shipped rules in
+[`examples/prometheus-namespace-key-alert.yaml`](https://github.com/shakenfist/shakenfist/blob/develop/examples/prometheus-namespace-key-alert.yaml)
+cover both:
+
+```
+max by (namespace) (namespace_usable_keys{namespace="system"}) == 0
+```
+
+A namespace with no keys at all is unremarkable -- a federated one mints
+them per login -- so only `system` is worth alerting on by default. The
+cluster daemon log says so as well, once per pass, for `system` alone.
+
+`sf-ctl namespace-key-health` asks the same question of the database
+directly and exits non-zero when `system` has no usable key. That is the
+surface to reach for once the condition has arrived, because by then the
+API cannot be asked anything; recover with `sf-ctl bootstrap-system-key`,
+which also heals a key whose state row has gone missing.
+
+Rotating a single-key namespace by deleting before creating can be caught
+mid-rotation. That is a true reading rather than a false alarm, but it is
+avoidable: create the new key first, then delete the old one.
+
 ## Cluster generated key secrets
 
 Secrets Shaken Fist generates itself — the short-lived service keys

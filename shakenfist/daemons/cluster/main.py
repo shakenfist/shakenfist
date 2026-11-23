@@ -1308,6 +1308,8 @@ class Monitor(daemon.Daemon):
         schedule.every(15).minutes.do(
             scheduled_tasks.reap_expired_namespace_keys)
         schedule.every(15).minutes.do(
+            scheduled_tasks.publish_namespace_key_health)
+        schedule.every(15).minutes.do(
             scheduled_tasks.reap_federation_records)
         self._capacity_reconcile_job = self._register_anchored_job(
             schedule.every(5).minutes, 'reconcile_scheduler_capacity',
@@ -1427,6 +1429,7 @@ class Monitor(daemon.Daemon):
             scheduled_tasks.clear_scheduler_capacity_metrics()
             scheduled_tasks.clear_sweep_failure_metrics()
             scheduled_tasks.clear_deleted_object_metrics()
+            scheduled_tasks.clear_namespace_key_health_metrics()
 
         # Stop being the cluster maintenance node if we were. Release
         # may raise LockNotHeld if our lease has lapsed -- swallow it,

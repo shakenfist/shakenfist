@@ -650,6 +650,54 @@ class Namespaces(dbo_iter):
                 yield out
 
 
+def usable_key_counts(
+        now: Optional[float] = None) -> Optional[dict[str, int]]:
+    """How many keys could authenticate right now, in each namespace.
+
+    A namespace with none of these cannot be authenticated to at all,
+    and for the system namespace that locks every deploy, every sf-ctl
+    call and the private CI conductor out at once (issue 3836). Nothing
+    in the write path can prevent it -- an operator can delete the last
+    key by hand, and the expiry sweep soft deletes the last key if
+    nothing replaced it -- so this is the question a health signal asks
+    rather than a guard.
+
+    The three terms are the ones the authentication read path itself
+    joins on, asked as a count: an attributes row (the join inside
+    keys_with_attributes()), an unlapsed expiry (filtered in SQL
+    against ``now``), and an object state the cluster considers active
+    (one bulk query rather than a point read per key, as in issue
+    3814 -- a stateless zombie key authenticates today but is not a key
+    an operator should be relying on, and the orphan reconciler repairs
+    it).
+
+    Returns a dict of namespace name to count, or None when the state
+    listing could not be read. None is deliberately distinct from a
+    count of zero: "we cannot tell" must not be published as "nobody
+    can authenticate". An unreachable database tier raises
+    DatabaseUnavailable instead, which is not the same thing either --
+    a caller which has no answer to give must say so rather than
+    answering zero.
+    """
+    if now is None:
+        now = time.time()
+
+    active = mariadb.get_objects_by_state(
+        ObjectType.NAMESPACE_KEY,
+        sorted(namespace_key.NamespaceKey.ACTIVE_STATES))
+    if active is None:
+        return None
+    active_uuids = set(active)
+
+    counts: dict[str, int] = {}
+    for ns in Namespaces(filters=[], prefilter='active'):
+        counts[ns.uuid] = sum(
+            1 for key, _ in namespace_key.keys_with_attributes(
+                ns.uuid, now=now)
+            if str(key.uuid) in active_uuids)
+    return counts
+
+
 CACHED_TOKENS = {}
 
 

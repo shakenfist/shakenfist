@@ -141,6 +141,7 @@ from shakenfist import mariadb                             # noqa
 from shakenfist.constants import EVENT_TYPE_AUDIT          # noqa
 from shakenfist.external_api import scopes as api_scopes   # noqa
 from shakenfist.namespace import Namespace                 # noqa
+from shakenfist.namespace import usable_key_counts         # noqa
 from shakenfist.node import Node                           # noqa
 from shakenfist.schema.object_state import State           # noqa
 from shakenfist.schema.object_types import ObjectType      # noqa
@@ -582,6 +583,39 @@ def gateway_health(host: Optional[str], timeout: int) -> None:
     click.echo(f'gateway {host} is SERVING')
 
 
+@click.command(name='namespace-key-health')
+def namespace_key_health() -> None:
+    """Report how many keys could authenticate, per namespace.
+
+    The same count the cluster daemon publishes as the
+    namespace_usable_keys gauge, asked directly. It is here as well as
+    in Prometheus because the condition it reports takes the API away:
+    a system namespace with no usable key cannot be asked anything
+    (issue 3836), and this command talks to the database rather than to
+    the API. Recover with sf-ctl bootstrap-system-key.
+
+    Exits non-zero when the system namespace has no usable key, so it
+    can be a monitoring check as well as something an operator reads.
+    """
+    try:
+        counts = usable_key_counts()
+    except exceptions.DatabaseUnavailable as e:
+        raise click.ClickException(f'the database tier is unavailable: {e}')
+
+    if counts is None:
+        raise click.ClickException(
+            'could not list active namespace keys, so this says nothing '
+            'about whether a namespace can be authenticated to')
+
+    for ns in sorted(counts):
+        click.echo(f'{ns}: {counts[ns]}')
+
+    if not counts.get('system'):
+        raise click.ClickException(
+            'the system namespace has no key which can authenticate; '
+            'create one with sf-ctl bootstrap-system-key')
+
+
 def _gather_database_load(window: int, timeout: int) -> dict[str, Any]:
     """Scrape the tier twice and turn the difference into rates.
 
@@ -952,4 +986,5 @@ cli.add_command(deregister_daemon)
 cli.add_command(clear_node_error)
 cli.add_command(stop)
 cli.add_command(gateway_health)
+cli.add_command(namespace_key_health)
 cli.add_command(database_load)
