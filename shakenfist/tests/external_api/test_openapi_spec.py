@@ -725,6 +725,32 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
                             % (method, path, body.get('name')))
         self.assertEqual([], offenders, '\n'.join(offenders))
 
+    def test_every_operation_publishes_the_global_503(self):
+        # Two decorators in Resource.method_decorators answer 503
+        # before any handler runs, and both now send a Retry-After. A
+        # client generated from this specification can only find that
+        # out if every operation declares it: before issue 5030 three
+        # endpoints declared a 503 and the other two hundred-odd
+        # published a response code they can all answer as if they
+        # could not.
+        spec = self._fetch_spec()
+        missing = []
+        silent = []
+
+        for path, methods in spec['paths'].items():
+            for method, operation in methods.items():
+                if not isinstance(operation, dict):
+                    continue
+                response = operation.get('responses', {}).get('503')
+                if response is None:
+                    missing.append('%s %s' % (method, path))
+                    continue
+                if 'Retry-After' not in (response.get('headers') or {}):
+                    silent.append('%s %s' % (method, path))
+
+        self.assertEqual([], missing, '\n'.join(missing))
+        self.assertEqual([], silent, '\n'.join(silent))
+
     def test_post_instances_507_describes_the_transient_contract(self):
         # The ``Retry-After`` header is published structurally since
         # issue 4240 gave a response declaration an optional fourth

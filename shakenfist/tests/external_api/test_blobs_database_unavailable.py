@@ -54,6 +54,11 @@ class BlobsEndpointDatabaseUnavailableTestCase(base.ShakenFistTestCase):
         self.assertEqual(503, resp.status_code)
         self.assertIn('database unavailable', resp.get_json()['error'])
 
+        # End to end through a real request, not just the decorator in
+        # isolation: the response a client actually receives names how
+        # long to wait before retrying (issue 5030).
+        self.assertEqual('15', resp.headers.get('Retry-After'))
+
     @mock.patch('shakenfist.external_api.blob.Blob.from_db')
     @mock.patch('shakenfist.external_api.blob.mariadb.get_active_blob_uuids')
     def test_genuinely_empty_is_still_a_200(

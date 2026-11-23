@@ -13,6 +13,39 @@ class TestOpenAPIJS(base.BaseNamespacedTestCase):
             f'{self.test_client.base_url}/flasgger_static/swagger-ui.css')
         self.assertEqual(200, r.status_code)
 
+    def test_every_operation_publishes_the_global_503(self):
+        # The unit suite asserts what swagger_helper() builds; this
+        # asserts what a real cluster serves, which is what a generated
+        # client reads. Every endpoint can answer 503 -- two decorators
+        # in Resource.method_decorators do it before any handler runs --
+        # and since issue 5030 both of them send a Retry-After, so the
+        # declaration is on every operation rather than on the three
+        # which happened to declare one themselves.
+        r = requests.get(f'{self.test_client.base_url}/apispec_1.json')
+        self.assertEqual(200, r.status_code)
+        spec = r.json()
+
+        paths = spec.get('paths', {})
+        self.assertNotEqual(
+            {}, paths,
+            'The cluster served a specification with no paths in it, so '
+            'nothing below this can mean anything.')
+
+        wrong = []
+        for path, methods in paths.items():
+            for method, operation in methods.items():
+                if not isinstance(operation, dict):
+                    continue
+                response = operation.get('responses', {}).get('503')
+                if response is None:
+                    wrong.append(f'{method} {path} declares no 503')
+                elif 'Retry-After' not in response.get('description', ''):
+                    wrong.append(
+                        f'{method} {path} declares a 503 which does not '
+                        'mention Retry-After')
+
+        self.assertEqual([], wrong, '\n'.join(wrong))
+
 
 class TestOutstandingOperationsBodyAll(base.BaseNamespacedTestCase):
     """Body-supplied ``all`` on the outstanding-operations endpoints.

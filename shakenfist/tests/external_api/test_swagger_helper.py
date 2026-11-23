@@ -69,6 +69,56 @@ class SwaggerHelperResponsesTestCase(base.ShakenFistTestCase):
             _helper, [(200, 'Fine.', None)],
             requires_admin=True, requires_auth=False)
 
+    def test_every_endpoint_declares_503(self):
+        # handle_database_unavailable and handle_nodelock_unavailable
+        # are in Resource.method_decorators, so this is every
+        # endpoint's contract whatever its declaration says. It used to
+        # be published only by the handful of endpoints which declared
+        # it themselves, which left the Retry-After those decorators
+        # now send undiscoverable everywhere else (issue 5030).
+        out = _helper([(200, 'Fine.', None)])
+        self.assertIn(503, out['responses'])
+        # Published as a header object, not only in the prose, so a
+        # generated client can find it.
+        header = out['responses'][503]['headers']['Retry-After']
+        self.assertEqual('integer', header['type'])
+        self.assertIn(str(api_base.TRANSIENT_RETRY_AFTER_SECONDS),
+                      header['description'])
+
+    def test_an_unauthenticated_endpoint_still_declares_503(self):
+        # Unlike the 401 and the 403, a database outage does not care
+        # who is asking.
+        out = _helper([(200, 'Fine.', None)], requires_auth=False)
+        self.assertIn(503, out['responses'])
+
+    def test_an_endpoints_own_503_is_extended_not_overwritten(self):
+        out = _helper([(503, 'The half-built instance is torn down.', None)])
+        description = out['responses'][503]['description']
+        self.assertIn('The half-built instance is torn down.', description)
+        self.assertIn('Retry-After', description)
+        self.assertLess(
+            description.index('torn down'),
+            description.index('Retry-After'))
+        self.assertIn('Retry-After', out['responses'][503]['headers'])
+
+    def test_an_endpoints_own_header_is_not_overwritten(self):
+        # The endpoint's words lead for its header as for its
+        # description: the generic declaration only fills in a header
+        # the endpoint did not declare itself.
+        out = _helper([
+            (503, 'Try later.', None,
+             {'headers': [('Retry-After', 'unsignedinteger', 'Mine.')]})])
+        self.assertEqual(
+            'Mine.',
+            out['responses'][503]['headers']['Retry-After']['description'])
+
+    def test_a_response_with_no_generic_header_publishes_none(self):
+        # The 401 is generic too, and carries no header; merging the
+        # generic responses must not leave an empty headers object on
+        # it.
+        out = _helper([(200, 'Fine.', None)])
+        self.assertNotIn('headers', out['responses'][401])
+
     def test_the_callers_responses_list_is_not_mutated(self):
         # The generic 401 used to be append()ed to the endpoint's own
         # list. These lists are module-level literals evaluated once at

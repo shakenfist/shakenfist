@@ -182,6 +182,13 @@ Retry-After: 15
 The value is **always 15 seconds** for all transient capacity refusals. It is not
 computed per-refusal.
 
+The same header, with the same figure, is also sent on the `503` the API
+answers when the database tier or a node's lock service cannot be reached, so
+a `Retry-After` in a client's log is not by itself evidence of a capacity
+refusal -- read the status code with it. Those two conditions are retryable for
+their own reasons, and share the figure rather than inventing a second one; see
+[writing an endpoint](../developer_guide/writing_an_endpoint.md).
+
 ### Why 15 seconds
 
 The `15` is the default delay that the server itself uses when it defers work
