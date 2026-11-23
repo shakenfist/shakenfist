@@ -16620,6 +16620,12 @@ which does not publish the field.</p>
 </code></pre></div>
 <p>The value is <strong>always 15 seconds</strong> for all transient capacity refusals. It is not
 computed per-refusal.</p>
+<p>The same header, with the same figure, is also sent on the <code>503</code> the API
+answers when the database tier or a node's lock service cannot be reached, so
+a <code>Retry-After</code> in a client's log is not by itself evidence of a capacity
+refusal -- read the status code with it. Those two conditions are retryable for
+their own reasons, and share the figure rather than inventing a second one; see
+<a href="../../developer_guide/writing_an_endpoint/">writing an endpoint</a>.</p>
 <h3 id="why-15-seconds">Why 15 seconds<a class="headerlink" href="#why-15-seconds" title="Permanent link">&para;</a></h3>
 <p>The <code>15</code> is the default delay that the server itself uses when it defers work
 (<code>BaseClusterOperation.defer()</code>'s 15-second default). This makes the promise

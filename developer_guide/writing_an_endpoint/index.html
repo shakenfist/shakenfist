@@ -16459,8 +16459,9 @@ refuses to proceed rather than reporting a tree it could not check.</p>
 description, sample)</code> tuple, with an optional fourth element carrying
 anything else the response has to say about itself. One key is
 understood today:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">(</span><span class="mi">503</span><span class="p">,</span> <span class="s1">'The database could not be reached; the request can be retried.'</span><span class="p">,</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a> <span class="kc">None</span><span class="p">,</span> <span class="p">{</span><span class="s1">'headers'</span><span class="p">:</span> <span class="p">[</span><span class="n">api_base</span><span class="o">.</span><span class="n">RETRY_AFTER_HEADER</span><span class="p">]}),</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">(</span><span class="mi">507</span><span class="p">,</span> <span class="s1">'Unable to allocate resources for the instance. ...'</span><span class="p">,</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a> <span class="n">instance_post_507_example</span><span class="p">,</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a> <span class="p">{</span><span class="s1">'headers'</span><span class="p">:</span> <span class="p">[</span><span class="n">api_base</span><span class="o">.</span><span class="n">TRANSIENT_RETRY_AFTER_HEADER</span><span class="p">]}),</span>
 </code></pre></div>
 <p>A header is <code>(name, type token, description)</code>, taking its type from the
 same <code>ARGTYPES</code> vocabulary a parameter does, and carrying a primitive
@@ -16485,8 +16486,11 @@ than being skipped. It does not recognise flask-restful's
 three-tuples the API helpers return for other reasons — set the header
 on a response object instead.
 Where the value is a constant, declare the header beside the constant
-(as <code>RETRY_AFTER_HEADER</code> is, in <code>external_api/base.py</code>) rather than
-writing the number into the prose twice.</p>
+(as <code>RETRY_AFTER_HEADER</code> and <code>TRANSIENT_RETRY_AFTER_HEADER</code> are, in
+<code>external_api/base.py</code>) rather than writing the number into the prose
+twice. A header <code>swagger_helper()</code> publishes on every operation itself,
+as it does the generic <code>503</code>'s, is held against that generic
+declaration (<code>api_base.GENERIC_503</code>) rather than each handler's list.</p>
 <p>A response declaration still cannot carry a body <em>schema</em>, which is the
 other half of 4240 and is not built: publish a <code>sample</code> instead, which
 is machine-readable as an example if not as a schema.</p>
@@ -16500,12 +16504,28 @@ without declaring it:</p>
   peer node is involved, so borrowing the peer sentence would send
   diagnosis to the wrong machine (issue 4161).</li>
 </ul>
-<p>The published specification declares <code>503</code> only on the handful of
-endpoints where it was an observable change of behaviour rather than a
-new failure mode (<code>GET /blobs</code>, which used to answer <code>200</code> with an
-empty list, and the federated token endpoint). Treat <code>503</code> as a global
-response when writing a client; declare it on your endpoint only if you
-have something endpoint-specific to say about it.</p>
+<p>Both answer with <code>api_base.retryable_error()</code>, which is the one place
+in the API layer that sets <code>Retry-After</code>, fixed at
+<code>TRANSIENT_RETRY_AFTER_SECONDS</code>. Both conditions clear on their own —
+the database tier restarts, sf-nodelock comes back after a deploy — so
+a client is told how long to wait rather than left to invent a figure
+(issue 5030). <code>swagger_helper()</code> publishes that <code>503</code>, with the
+header, on <strong>every</strong> operation, the same way it publishes the <code>401</code>
+<code>verify_token</code> answers; it used to be declared only on the handful of
+endpoints which had something endpoint-specific to say about a <code>503</code>,
+which is why <code>POST /instances</code> published the header and the rest of the
+API did not.</p>
+<p>So do not declare the header, or the generic cause, on your endpoint.
+Declare <code>503</code> only when your endpoint has a cause of its own to
+describe — <code>POST /instances</code> tears the half-built instance down and
+names it in the body, which no generic sentence can say — and let the
+generic words follow yours. If that cause is itself retryable, answer
+it with <code>api_base.retryable_error()</code> too, so one status code does not
+mean two different contracts on one operation. If it is not — an
+unloadable <code>FEDERATION_JWKS_CA_BUNDLE</code> is a misconfiguration no wait
+clears — use <code>sf_api.error()</code> and say so in the description, because a
+<code>Retry-After</code> on it would have a client replay the request until its
+deadline.</p>
 <p><strong>Proxying to another node:</strong> call <code>api_base.proxy_request_to_node()</code>
 rather than writing your own <code>requests</code> call. An unreachable peer is an
 infrastructure condition and must answer <code>503</code> naming the peer, not an
