@@ -206,6 +206,12 @@ Beyond the Rust hooks, `pre-commit run --all-files` also runs:
   `qcow2-luks` fixture instead; the flake this prevents, and the one
   exempt file, are explained in [testing.md](/components/instar/testing/). The
   `ci-tooling` job runs the same script.
+- `no-changelog`, which fails if the tree carries a `CHANGELOG.md`,
+  `CHANGELOG` or a case variant of either, at the root or anywhere
+  below it. Release notes go on the GitHub release; see "Releases"
+  below. The script is `tools/ci/check-no-changelog.sh`, and
+  `functional-tests.yml`'s `Check paths` job runs it on every pull
+  request, docs-only ones included.
 
 To auto-fix formatting issues:
 
@@ -481,15 +487,23 @@ instar/
 │   ├── malicious/  # CVE exploit images (DANGEROUS)
 │   └── downloaded/ # External test images (CirrOS, QEMU iotests, etc.)
 ├── Makefile        # Build and development automation
-├── CHANGELOG.md    # Release history
 ├── SECURITY.md     # Vulnerability reporting and security policy
 └── README.md
 ```
 
 ## Releases
 
-See [CHANGELOG.md](https://github.com/shakenfist/instar/blob/develop/CHANGELOG.md)
-for release notes.
+Release notes live on each
+[GitHub release](https://github.com/shakenfist/instar/releases), not
+in the tree. instar keeps no `CHANGELOG.md`: a file that every pull
+request appends to is a merge conflict between every pair of pull
+requests in flight, and the per-change record is already the commit
+messages and `docs/`. The summary a user reads -- what behaviour
+changed between two versions, one entry for a fix however many commits
+it took -- is written once, at release time, by whoever cuts the
+release (step 5 below). The `no-changelog` hook, which CI runs too,
+fails if `CHANGELOG.md` reappears. The notes it kept for 0.3.0 and
+earlier are still at `git show v0.3.0:CHANGELOG.md`.
 
 Release artifacts (pre-compiled Linux binaries, plus `.deb` and `.rpm`
 packages) are published to
@@ -510,12 +524,7 @@ and a version bump pushed straight to `develop` has no such run.
    `make test-rust`, and then asks before it commits `Release 0.2.0.`,
    pushes the branch and opens a pull request. On `N`, or on any
    failure before the push, it deletes the branch and leaves the
-   checkout as it was. It does not touch `CHANGELOG.md`: date the
-   release there with a second commit on `release-0.2.0`, moving the
-   `## [Unreleased]` entries under `## [0.2.0] - YYYY-MM-DD`, and push
-   it before the pull request queues. `tag-release.sh` finds the merge
-   that contains `Release 0.2.0.`, so the extra commit does not change
-   which commit is tagged.
+   checkout as it was.
 2. **Merge.** Get the pull request reviewed and land it through the
    merge queue like any other change, then wait for the queue's
    `functional-tests.yml` run on the merged commit to finish.
@@ -530,6 +539,19 @@ and a version bump pushed straight to `develop` has no such run.
    `build`, then waits at `sign-tag` for a reviewer to approve the
    `release` environment. After approval it re-signs the tag with
    gitsign and creates the GitHub release.
+5. **Write the release notes.** The workflow fills the release body
+   with GitHub's generated list of merged pull requests, which says
+   what merged but not what a user will notice. Write a summary above
+   it from `git log --no-merges PREVIOUS_TAG..v0.2.0` (the previous
+   tag, such as `v0.1`, to this one) and the `docs/` pages those
+   commits changed, grouped as
+   Added, Changed and Fixed, and put it on the release with
+   `gh release edit v0.2.0 --notes-file NOTES.md`, keeping the
+   generated list below it. The first release after 0.3.0 has a draft
+   already: the entries the removed `CHANGELOG.md` collected under
+   `## [Unreleased]`, which
+   `git show "$(git log -1 --format=%H --diff-filter=D -- CHANGELOG.md)^:CHANGELOG.md"`
+   prints.
 
 `ci-gate` checks that `functional-tests.yml` succeeded on the tagged
 commit, in its merge queue run. A run started by hand, as
@@ -1283,6 +1305,8 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 - `tools/ci/test-check-doc-phrases.sh` - Tests for that guard, including that it does not false-positive on legitimate strings like "the PLAN-map work" or "PLAN-differencing workflow"; the `ci-tooling` CI job runs it
 - `tools/ci/check-no-runtime-luks-create.sh` - Fails if a Python or shell file under `tests/` mentions `encrypt.format=luks` or `luksFormat`: a test that makes a LUKS image at runtime hits qemu-img's key-derivation timing flake in the merge queue (#905), so tests use the `qcow2-luks` fixture. It matches the option rather than a command shape, which has no bypass but means a file that only mentions it is exempted by name in the script; `tests/test_measure.py` is the one. Runs as the `no-runtime-luks-create` pre-commit hook and in the `ci-tooling` CI job
 - `tools/ci/test-check-no-runtime-luks-create.sh` - Tests for that guard: the two argv lists the fixture conversion deleted, a `]` inside the list, `cryptsetup luksFormat`, the exemption holding only for its named file, and a git failure exiting 2 rather than reading as clean; the `ci-tooling` CI job runs it
+- `tools/ci/check-no-changelog.sh` - Fails if any tracked path is a `CHANGELOG.md` or `CHANGELOG` in any case, at any depth (see "Releases" below). Runs as the `no-changelog` pre-commit hook and in `functional-tests.yml`'s `Check paths` job, which every pull request runs
+- `tools/ci/test-check-no-changelog.sh` - Tests for that guard: the root file, a nested one, no extension, another case, and names that only contain the word; the `ci-tooling` CI job runs it
 - `tools/check-no-capability-claims.py` - Fails, naming the line, if anything in the tree claims instar cannot read or compose a differencing image; five operations compose one, so the claim is false wherever it is made. It reads flattened paragraphs across `src/**/*.rs`, `tests/**/*.py`, `docs/**/*.md`, `tools/**/*.py` and `scripts/**/*.py`, so a sentence wrapped mid-phrase and one inside an assertion message are both caught. `docs/plans/` is exempt: it records what was true when each phase was planned. `--self-test` checks the pattern against the nine forms it must and must not catch, plus that the globs still read the tree from any working directory; the `ci-tooling` CI job runs both
 - `tools/ci/check-stestr-run.sh` - Decides whether a stestr run is a result at all: a worker lost to the subunit >4MB packet-size limit, a worker reported with `N/A` elapsed, a missing totals block, a run shorter than its own discovery count, and a selection in which every test skipped all exit 0 with a totals block that reads like a pass. Takes the output file and the discovery count, the count either as a number or as `in-output` to read the `selection contains N tests` line the run printed; the count is mandatory, because the one caller that could omit it did, and a count of zero is refused in either spelling, because a selection that matched nothing clears every floor there is. It expects one run per file and refuses a file holding two totals blocks, because every number it reads is the last one in the file. The `integration-core` and two `integration-convert-*` CI jobs and `tools/test-package-functional.sh` all call it, so every job that runs a stestr selection shares one implementation
 - `tools/ci/test-check-stestr-run.sh` - Tests for that guard against totals blocks in the shape stestr really prints, including that a legitimate run with many skips still passes; the `ci-tooling` CI job runs it

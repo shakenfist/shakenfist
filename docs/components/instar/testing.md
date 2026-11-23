@@ -3236,10 +3236,9 @@ comment-granular version of the script then missed a second one in a
 prose rather than comments alone. Expect it to flag a docs page or a
 test message, not only a `//` comment.
 
-Two trees are excluded on purpose: `docs/plans/` records what was true
+One tree is excluded on purpose: `docs/plans/` records what was true
 when each phase was planned and prescribes the sweeps that made it
-false, and `CHANGELOG.md` entries were true for the release they
-describe. Editing either to satisfy the script would falsify a record.
+false. Editing it to satisfy the script would falsify a record.
 
 Build trees are excluded for a duller reason: `src/target/` and
 `tests/.venv/` are inside two of the globs, and pathlib matches dotted

@@ -177,7 +177,6 @@ nav:
                 - "Plan retirement": components/development/plans/PLAN-plan-retirement.md
                 - "Plan: a `scope-coverage` audit, reconciling the audit lists against the organisation": components/development/plans/PLAN-scope-coverage.md
                 - "Plan: a ratchet on source size": components/development/plans/PLAN-size-ratchet.md
-                - "Plan: an `llm-doc-structure` consistency audit for AGENTS.md and ARCHITECTURE.md": components/development/plans/PLAN-llm-doc-structure.md
                 - "Plan: give the pre-push audit a trigger": components/development/plans/PLAN-push-audit-phase.md
                 - "Plan: onboarding hunkydory, and what TypeScript means for the fleet": components/development/plans/PLAN-typescript-onboarding.md
                 - "Plan: restructure the audit scripts into a package of check classes": components/development/plans/PLAN-audit-scripts-restructure.md
@@ -192,7 +191,6 @@ nav:
                 - "Require the shellcheck-py versioning rule": components/development/plans/PLAN-renovate-shellcheck-audit.md
                 - "Review coverage steady state": components/development/plans/PLAN-review-coverage.md
                 - "Review import": components/development/plans/PLAN-review-import.md
-                - "Shaken Fist Project Consistency Plan": components/development/plans/PLAN-consistency.md
                 - "Systematic whole-codebase review tracking": components/development/plans/PLAN-code-review-tracking.md
                 - "Workflow ref trust": components/development/plans/PLAN-workflow-ref-trust.md
         - Hunky Dory:

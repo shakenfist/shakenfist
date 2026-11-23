@@ -31,7 +31,7 @@ three main points:
   for example I had a directory of audit items then I could spawn an
   agent per item and perform the audits in parallel.
 
-* Secondly, I think work item tracking in `PLAN-consistency.md` is
+* Secondly, I think work item tracking in [`PLAN-consistency.md`](https://github.com/shakenfist/development/blob/7be8a9922dae7bdeafa9e19ae7d3af97836ef86e/docs/plans/PLAN-consistency.md) is
   similarly awkward and I'd be better off tracking outstanding items in
   github issues, although I am unsure if they should be issues on the
   shared `development` repository or on the target project itself. If
@@ -271,7 +271,7 @@ Rather than a big-bang migration, I'd suggest:
 4. **Build the combined review+fix action** in `shakenfist/actions`
    and pilot it on one project before rolling out.
 
-5. **Retire `PLAN-consistency.md`** once all tracking has moved to
+5. **Retire [`PLAN-consistency.md`](https://github.com/shakenfist/development/blob/7be8a9922dae7bdeafa9e19ae7d3af97836ef86e/docs/plans/PLAN-consistency.md)** once all tracking has moved to
    GitHub issues.
 
 ## Open questions
@@ -470,7 +470,7 @@ nothing in the chain reads a secret.
 
 ### Phase 4: Cleanup -- DONE
 
-1. ~~Retire `PLAN-consistency.md` once issue tracking is
+1. ~~Retire [`PLAN-consistency.md`](https://github.com/shakenfist/development/blob/7be8a9922dae7bdeafa9e19ae7d3af97836ef86e/docs/plans/PLAN-consistency.md) once issue tracking is
    live.~~ Done 2026-08-22. The file is now a record of what the
    plan was and why it was replaced; its per-project checklists
    were not carried over.

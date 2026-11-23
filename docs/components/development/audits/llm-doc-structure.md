@@ -56,6 +56,15 @@ and 2262 lines -- around 21,000 words, or roughly 28k tokens of context
 the canonical source, carrying a `make test-qemu` runbook, and
 duplicating a `## Code Organisation` section between the two.
 
+Part of the cause was the instruction agents worked from. A standing
+rule to update `AGENTS.md` and `ARCHITECTURE.md` for every
+user-visible change directed both files to grow on every task. Agent
+instructions now send user-visible changes to `docs/`, and touch
+`AGENTS.md` only when a convention changes and `ARCHITECTURE.md` only
+when the shape of the system does; an instruction anywhere that tells
+an agent to update either file as a matter of course reintroduces the
+growth this audit measures.
+
 The judgment half of the policy is enforced where the bloat is created:
 the documentation-review section of each repository's pre-push audit
 file carries the canonical `llm-doc-discipline` shared block (see the

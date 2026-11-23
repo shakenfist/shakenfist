@@ -1196,7 +1196,10 @@ In scope: `.github/workflows/renovate-fleet.yml` in this repository,
 its global configuration file `renovate-runner.json`, the validator
 hook change that makes a global file checkable at all, the two
 preset rules that have to learn about the new workflow, and the
-cutover of all 23 managed repositories in the order below.
+cutover of all 23 managed repositories in the order below. Since
+2026-11-23 it also covers cutover step 5, which moves the runner's
+trigger from GitHub's cron to the private-ci conductor after step
+4's watch day failed its gate; that half lands in private-ci.
 
 Out of scope: deleting any repository's `.github/workflows/renovate.yml`
 or moving its `renovate.json` onto the preset, which is phase 3;
@@ -1419,7 +1422,8 @@ rewriting them.
 Steps 2a to 2d write files and are sub-agent work. The cutover is
 not: every one of its actions changes a live system in other
 people's repositories, so it is run by the management session with
-the operator watching, in the order under *Cutover*.
+the operator watching, in the order under *Cutover*. Steps 2e and
+2f were added with cutover step 5 and are in its section.
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
@@ -1502,11 +1506,324 @@ and nothing in it is done without an explicit yes.
    pending run per concurrency group and cancels the older one. If
    the central runner is not clearly better, stop and investigate
    before phase 3: this plan's promise on security latency rests on
-   Renovate actually running.
+   Renovate actually running. **Not met, 2026-11-23**: see *Record*.
+5. **Move the trigger to the conductor.** Added after step 4's
+   watch day failed; it has its own section below.
 
 Rollback is `gh workflow enable` per repository and disabling the
 central workflow. Nothing in this phase deletes a file elsewhere in
 the fleet.
+
+#### Cutover step 5: the conductor replaces GitHub's cron
+
+Planning effort: high. It moves the trigger of the fleet's most
+privileged workflow into another repository, and both halves are
+live the moment they merge.
+
+Added on 2026-11-23, after step 4's watch day failed the gate step 4
+set itself. *Record* has the reading. In short, GitHub started 5
+runs in the 35.6 hours after #432 turned the hourly schedule on: a
+median gap of 6h58m, against the per-repository copies' 4h47m. The
+longest gap, 7h53m, beat the copies' 9h35m, and every run that did
+start succeeded. Step 4 said that a central runner which is not
+clearly better stops phase 3 until the cause is understood. The
+cause is GitHub's delivery, not the runner. The five runs were
+created at minutes :27, :44, :22, :01 and :54 past the hour, so
+moving the cron off the hour -- the remedy the Situation proposed
+-- made no measurable difference to how many hourly events GitHub
+delivered or when.
+
+The operator chose on 2026-11-23 to have the private-ci conductor's
+periodic tier trigger the runner. That tier already dispatches
+scheduled work in shakenfist, kerbside and instar by
+`workflow_dispatch`, and is described in private-ci's
+`docs/periodic-ci.md`. He chose to remove the GitHub cron entirely
+rather than keep it as a fallback (decision 10). He also asked for
+a criterion here that forbids GitHub scheduled workflows fleet-wide
+in favour of the conductor. That is a master plan of its own,
+written after this step, and this step is its pilot. That is why
+decision 9 builds a general target kind rather than a special case
+for Renovate.
+
+Phase 2 lands in five pull requests rather than the two *Execution
+notes* records: #396, #400 and #432 so far, then 2e's pull request
+in private-ci, then this step's own pull request here. Its `Merged`
+cell names all five, the private-ci one as `private-ci <sha> (#pr)`.
+
+##### What the survey found
+
+Read against private-ci `master` at `8c5281e` and this repository's
+`main` at `91df689`. Numbered on from the phase's own survey.
+
+7. **To the conductor, a producer *is* the bug fixer.** Four places
+   assume there is only one. `dispatch_now()`
+   (`conductor/periodic.py:720`), behind the dashboard's "Run fix
+   now" button, dispatches every producer in turn until one
+   succeeds. The bug fixer card takes its budget and verdict from
+   the first producer it meets in `TARGETS` (`conductor/main.py:711-729`).
+   A producer's verdict is never escalated
+   (`conductor/periodicoutcomes.py:235`). The dashboard's starved
+   list skips producers (`conductor/templates/dashboard.html:4013`).
+   Registered as a second producer, Renovate would be started by
+   "Run fix now" whenever a fixer run was in flight, could take
+   over the fixer's card depending on list order, and could fail
+   for ever without reaching the Action Items panel.
+
+8. **Each of those comparisons names its kind, so a third kind
+   slips past all of them.** `main.py:713` and `:723` test
+   `== 'producer'`, `periodic.py:750` skips `!= 'producer'`, and
+   `periodicoutcomes.py:235` escalates `!= 'producer'`. On the
+   test-lane side, `periodic.py:227` builds the provisioner's
+   match set from `== 'test'`, and `periodic.py:431` gives deadline
+   service only to `== 'test'`. A target of a new kind is therefore
+   left alone by the fixer's code, escalated, never matched as a
+   queued lane and never owed deadline service, with no edit to any
+   of those lines. The one exception is the admission loop
+   (`periodic.py:500` onwards). It branches on producer, and
+   everything else falls through to the test-lane gates. A new kind
+   would reach those gates with no claim and no lifetime, so it
+   needs its own branch.
+
+9. **The dispatch sends no inputs, and that now matters.**
+   `github.dispatch_workflow()` (`conductor/github.py:3465`) accepts
+   inputs, but `_enforce_dispatch()` passes none. The conductor's
+   runs therefore get the defaults `renovate-fleet.yml` declares:
+   `dry_run: write-for-real` and an empty `autodiscover_filter`. A
+   default changed to `lookup` would turn every conductor dispatch
+   into a dry run, and every one of those runs would show green.
+   Nothing tests the defaults today.
+
+10. **The conductor dispatches as the operator, on `main`, which
+    is how every cutover dispatch so far was made.**
+    `_enforce_dispatch()` uses the default `OPERATOR` identity
+    (`conductor/github.py:115`). Steps 1 to 3 were all dispatched
+    with the operator's own credential on `main`, and the job's
+    `if:` and the `renovate-write` deployment rule accepted them.
+    The conductor's dispatch is the same request from a different
+    process, so the environment needs no change.
+
+11. **This survey did not establish whether the collector sweeps
+    this repository's runs.** `periodicoutcomes` matches a dispatch
+    to its run only among the runs the collector has stored, and
+    the collector reads workflow runs at `collector.py:1731`.
+    Whether that sweep includes `shakenfist/development` was not
+    traced. If it does not, the dispatches still happen, but each
+    one settles as `unknown` after 48 hours, so a red Renovate never
+    reaches the panel decision 9 relies on. Step 2e checks, and
+    reports rather than widening the sweep, because the sweep's cost
+    is charged against the conductor's REST budget. **Answered by
+    step 2e: it does.** `list_workflow_runs_and_jobs()` sweeps every
+    unarchived repository in the organisation (private-ci
+    `conductor/github.py:5397-5426`), reading each one's 40 most
+    recent runs (`:4199`, `:4329-4341`). On 2026-11-23, 40 runs of
+    this repository spanned about 10.8 hours. A run that finishes
+    after 40 newer runs have been created settles as `unknown`;
+    private-ci's `docs/periodic-ci.md` now says so.
+
+12. **Nothing outside the conductor would notice it stopping.**
+    `conductor/heartbeat.py` is a systemd watchdog: it restarts a
+    loop that has wedged, but nothing notices a host that is down.
+    Today a dead conductor delays periodic test lanes. After this
+    step it also stops dependency updates and security pull requests
+    for 23 repositories, and the overdue gauge that would report the
+    gap is published by the process that has stopped. That is
+    recorded under *Risks*, not solved here. It is the first question
+    the fleet-wide plan has to answer, because that plan makes every
+    scheduled job in the fleet depend on the same process.
+
+13. **This repository's half is small.** It is:
+    - the `schedule` block (`.github/workflows/renovate-fleet.yml:36-37`);
+    - the header comment that explains the block (`:1-26`);
+    - `test_the_workflow_runs_hourly_at_minute_23` in
+      `scripts/tests/test_renovate_fleet_workflow.py:101`, and that
+      module's docstring (`:21`);
+    - *The central runner* in `docs/audits/renovate.md` (`:36-57`);
+    - `ARCHITECTURE.md`'s entry for the runner (`:32-36`).
+
+Corrected at source in the commit that adds this section: the
+Success criteria's first bullet, which said "an hourly schedule";
+phase 4's "Renovate runs on `static` per day", wrong since this
+phase moved the runner to a VM; the Definition of done item that
+asserts the cron; and the Future work item on top-of-hour events,
+which this measurement supersedes.
+
+##### Decisions
+
+9. **A third target kind, `scheduled`, rather than a second
+   producer.** Registering a second producer means auditing the
+   four places that assume a producer is the fixer (survey item 7),
+   and the fleet plan would face the same audit dozens of times over. A
+   new kind passes all of them untouched by construction (item 8)
+   and adds one branch to the admission loop. A `scheduled` target:
+   - is admitted when `min_interval_seconds` has elapsed and no run
+     of it is queued or in progress, and on nothing else: no claim,
+     no room, no dwell, no morning boundary and no daily cap;
+   - counts towards the overdue gauge;
+   - is escalated, so a red run reaches the Action Items panel and
+     `conductor_periodic_consecutive_failures`;
+   - is never in the provisioner's match set, so its job queues as
+     ordinary work, exactly as a cron-triggered run did;
+   - is never dispatched by "Run fix now".
+
+   That is the shape a cron replacement needs. The argument against
+   is a third path through the admission loop. Neither existing path
+   changes, though, and the new one is the simplest of the three.
+
+10. **No GitHub cron, not even as a fallback.** This is the
+    operator's decision, taken on 2026-11-23. The case for keeping
+    a sparse fallback cron is survey item 12: a conductor outage
+    would then degrade to today's cadence rather than to nothing.
+    The case against, which the operator took, is threefold. GitHub's
+    cron is the thing just measured as unreliable. A fallback would
+    hide a conductor outage behind a cadence that looks merely poor.
+    And the fleet plan is going to forbid the trigger anyway. The
+    cost is accepted in writing under *Risks*.
+
+11. **Hourly floor, two-hour deadline.** `min_interval_seconds:
+    3600`, so a run starts an hour after the last dispatch, or when
+    the run in flight ends if that is later. `deadline_seconds:
+    7200`, so the target counts as overdue after two hours without
+    a dispatch. The dashboard's starved list fires at twice the
+    deadline, so it shows the target at four hours: before the
+    runner has slipped back to the cron's median gap of 4h47m. The
+    minute-23 offset goes too, since it only ever meant something
+    to GitHub's scheduler.
+
+12. **The tests pin what the conductor relies on.** The cron
+    assertion is replaced, not just deleted. One test asserts that
+    the workflow has no `schedule` trigger and still accepts
+    `workflow_dispatch`. A new test asserts the dispatch defaults,
+    `dry_run: write-for-real` and an empty `autodiscover_filter`,
+    because a bare dispatch is the only kind the conductor makes
+    (survey item 9).
+
+13. **private-ci lands and deploys first, and this repository
+    second.** In between, the cron and the conductor both trigger
+    the same workflow. That overlap is harmless: the concurrency
+    group serialises the runs, and the conductor will not dispatch
+    while a cron run is queued or in progress. The other order
+    leaves the fleet with no trigger at all until the conductor
+    deploys. Merging this step's pull request is therefore gated on
+    seeing one conductor dispatch (cutover step 5.1).
+
+14. **This repository describes the conductor only from the
+    outside.** This repository is public and private-ci is not.
+    `docs/audits/renovate.md` says:
+    - that the private-ci conductor's periodic tier dispatches the
+      runner, and how often;
+    - what stops when the conductor is down;
+    - where its own documentation is.
+
+    It names no host, says nothing about deployment, and does not
+    restate the tier's admission rules.
+
+##### Steps
+
+| Step | Effort | Model | Isolation | Brief for sub-agent |
+|------|--------|-------|-----------|---------------------|
+| 2e | high | opus | private-ci worktree | Work in the private-ci worktree the management session creates from `master`, on branch `scheduled-target-kind`; private-ci's default branch is `master`, not `main`. Read `docs/periodic-ci.md` and the module docstring of `conductor/periodic.py` first. Add a third target kind, `'scheduled'`, with exactly the semantics of decision 9 in shakenfist/development's `docs/plans/PLAN-renovate-cadence.md` (phase 2, *Cutover step 5*). The only new branch is in the admission loop in `periodic.py` (from about line 500, beside the producer branch): cadence alone, after the interval floor that already applies to every target, with no claim, room, dwell, morning-boundary or daily-cap gate, and with the existing in-flight check in `_enforce_dispatch()` still applied. Document the kind in the module docstring's numbered admission rules (about lines 36-60) and in the `TARGETS` field comment (about lines 103-130). Then add the target: `owner: 'shakenfist'`, `repo: 'development'`, `workflow: 'renovate-fleet.yml'`, `ref: 'main'`, `kind: 'scheduled'`, `min_interval_seconds: 3600`, `deadline_seconds: 7200`. Give it a comment saying what it is and why it is cadence-only: security pull requests wait on it, and its job runs on a VM rather than as a tiered test lane. Do not cite the development plan or its phases in code or comments; this repository forbids plan references in source. Do not trust the survey: open each comparison listed in survey item 8 and confirm it still reads as stated, then run `git grep -n "kind"` over `conductor/` (Python and `templates/dashboard.html`) for any read of a target's kind that the survey missed. Check that the periodic card in `dashboard.html` (about line 2521) renders a row with no `claim`, `lifetime_seconds` or `dispatches_24h`, and fix it if it does not. Find out whether the collector's workflow-run sweep (`collector.py` about line 1731) covers `shakenfist/development` (survey item 11). Report the answer with file and line, and do **not** widen the sweep: that is a REST-budget decision for the management session. Tests go in `conductor/tests/test_periodic.py`; follow `_producer()` (about line 69) with a `_scheduled()` helper, and cover: admitted with a job queued, no room, the dwell unmet and the morning boundary near; refused inside the interval floor; refused with a run in flight on the enforce path; absent from the match set; never owed deadline service; counted by the overdue gauge; escalated in `periodicoutcomes`; never dispatched by `dispatch_now()`, including with a producer in flight; the bug fixer card reads the producer even when a `scheduled` target comes before it in `TARGETS` (in `test_main.py` if that is where the card is tested); and the real `TARGETS` entry holds the values above. Update `docs/periodic-ci.md`: the `kind` row of the Targets table, the Admission rule list, a *Scheduled targets* section beside *Producers*, and any sentence that a third kind makes false. Run private-ci's own checks (`pre-commit run --all-files` and its tox environments, per its `AGENTS.md`). Mutation-test with the `mutation-check` skill, each mutant under `timeout`: remove the admission branch, let `dispatch_now()` take a scheduled target, drop it from the overdue count, and make it unescalated. Report every mutant and the test that killed it. Do not push and do not open a pull request. |
+| 2f | medium | sonnet | none | Work in this worktree. The private-ci conductor now dispatches `.github/workflows/renovate-fleet.yml` hourly, so the GitHub cron goes; see decisions 10, 12 and 14 in phase 2's *Cutover step 5* of `docs/plans/PLAN-renovate-cadence.md`. Delete the `schedule:` block (lines 36-37). Rewrite the header comment (lines 1-26) to say the conductor's periodic tier in shakenfist/private-ci dispatches the workflow about once an hour, and why: GitHub delivered roughly one hourly event in seven over the two days the schedule was on, at whatever minute it chose. Keep the warning that re-enabling any per-repository `renovate.yml` races this runner, and drop what applied only to cron. Source must not cite a plan or narrate its history (`plan-source-references`, `plan-history-in-source`), and `docs/` and `ARCHITECTURE.md` must not cite phase numbers (`plan-phase-references`), so state the measurement itself rather than where it was taken. In `scripts/tests/test_renovate_fleet_workflow.py`, replace `test_the_workflow_runs_hourly_at_minute_23` (line 101) with a test asserting that no `schedule` trigger exists and `workflow_dispatch` does, and add one asserting the dispatch defaults `dry_run: write-for-real` and `autodiscover_filter: ''`, with a comment saying the conductor sends no inputs, so these defaults are what every scheduled run gets. Update the module docstring (line 21). Rewrite *The central runner* in `docs/audits/renovate.md` (lines 36-57) per decision 14: who dispatches the runner and how often, that the runner stops if the conductor is down, and a pointer to private-ci's `docs/periodic-ci.md`, with no host names and none of the tier's internals. Keep the ordering history short. Update `ARCHITECTURE.md`'s runner entry (lines 32-36) to say the runner is dispatched by the conductor, since this adds a dependency between components. Do not edit the plan. Mutation-test three mutants, each under `timeout`: the cron restored, the `dry_run` default changed to `lookup`, and the filter default made non-empty. Restore from copies and report each killing test. Then run `pre-commit run --all-files` and `python3 scripts/audit-check.py --repo-path . --repo-name development`, and report every verdict that differs from `main`. |
+
+##### Cutover step 5
+
+Operator-gated, like steps 1 to 4. Nothing here is done without an
+explicit yes.
+
+1. **The conductor first.** Merge 2e's private-ci pull request and
+   confirm the conductor has deployed it. The periodic card lists
+   `renovate-fleet.yml`, and within the hour `gh run list --workflow
+   renovate-fleet.yml` shows a `workflow_dispatch` run under the
+   operator's identity that nobody started by hand. Record its run
+   id. If a cron run is in flight at the time, record that the
+   conductor waited for it, as decision 13 predicts.
+2. **Then the cron goes.** Merge this step's pull request (2f).
+3. **Watch at least 24 hours from that merge.** Record:
+   - every run of `renovate-fleet.yml`: its event, its queue time
+     and its job duration. Any `schedule` event means the cron
+     survived;
+   - the median and the longest gap between run starts;
+   - that dependency dashboards were updated and no duplicate
+     branch appeared.
+
+   The gate is met when the median gap is at most 90 minutes and no
+   gap is longer than 4h47m, the median of the copies it replaces.
+   The reading needs a day after this pull request merges, so under
+   `plan-phase-landing` it is recorded in the close-out commit that
+   opens phase 3. If it fails, phase 2 stays `In progress` and phase
+   3 is not planned.
+
+Rollback: remove the target from private-ci's `TARGETS`, and revert
+this step's pull request to restore the cron. Turning `ENFORCE` off
+instead would stop every periodic target, not just this one.
+
+##### Risks and mitigations
+
+* **A conductor that is down means no Renovate, and nobody is
+  told.** This follows from survey item 12 and decision 10, and the
+  operator accepted it on 2026-11-23. While the conductor runs, a
+  stalled runner reaches the starved list after four hours (decision
+  11). When the conductor is down, the only signal is Renovate
+  pull requests and dependency dashboards going quiet, and nothing
+  watches for that. The remedy belongs to the fleet plan and is its
+  first question. Future work records it here as well, so that it
+  is not lost if that plan is slow to arrive.
+* **A maintenance drain holds the tier.** No dispatches happen
+  while the cluster is drained. The `vm` pool the runner needs is
+  drained at the same time (*Execution notes*, 2026-11-14), so a
+  cron-triggered run would have waited too. This adds no cost.
+* **A dry-run default would make every run green and change
+  nothing.** Decision 12's test fails any change to the dispatch
+  defaults.
+* **The conductor dispatches with the operator's credential.** If
+  that token loses access to this repository, each pass records
+  `the dispatch failed` on the dashboard and tries again on the next
+  cycle, and the overdue gauge rises after two hours. So it is
+  visible on the dashboard, though not elsewhere.
+* **REST budget.** A due target costs one active-runs call and one
+  dispatch, about 24 of each a day. Dispatch is gated on the
+  periodic reserve, so an exhausted budget delays the runner rather
+  than failing it.
+* **Merging in the wrong order leaves no trigger at all.**
+  Decision 13 and cutover step 5.1 gate it. The management session
+  also records this step's pull request in `plan-blockers` as
+  waiting on 2e's.
+
+##### Definition of done
+
+* private-ci's `TARGETS` holds exactly one entry for
+  `shakenfist/development` `renovate-fleet.yml`, with `kind:
+  'scheduled'`, `ref: 'main'`, `min_interval_seconds: 3600` and
+  `deadline_seconds: 7200`, and a test asserts each value.
+* A `scheduled` target is admitted with a job queued, no room, the
+  dwell unmet and the morning boundary near. It is refused inside
+  its interval floor and while a run is in flight. Each property has
+  a test, and each test kills a named mutant.
+* `dispatch_now()` never dispatches a `scheduled` target, the bug
+  fixer card reads the producer whatever the order of `TARGETS`, and
+  a `scheduled` verdict is escalated, each asserted by a test.
+* private-ci's `docs/periodic-ci.md` describes the kind, and no
+  sentence in it still says the bug fixer is the only target outside
+  the test lanes.
+* `grep -n 'schedule:' .github/workflows/renovate-fleet.yml` prints
+  nothing. Tests assert both that the trigger is absent and what
+  the dispatch defaults are.
+* Every hit for `git grep -n -i conductor -- docs/audits
+  ARCHITECTURE.md .github` describes what the tier does for this
+  runner or points at private-ci's documentation. None names a host.
+* *Record* holds the run id of the first conductor dispatch
+  (step 5.1). The close-out holds the 24-hour reading (step 5.3),
+  with the gate stated as met or not met.
+* `pre-commit run --all-files` passes in both repositories, and
+  `audit-check.py` reports no verdict here that is worse than on
+  `main`.
+
+##### Back brief
+
+Before step 2e, back brief the operator on decisions 9 and 11. The
+admission semantics of a new conductor kind are cheap to propose and
+expensive to change once the fleet plan has registered dozens of
+targets of that kind. Confirm also the private-ci branch name, and
+that its pull request lands before this one.
 
 #### Record
 
@@ -1904,6 +2221,43 @@ about Dependabot or vulnerability alerts at INFO -- the only
 install step. It needs debug logging, as the dry runs already said,
 and it stays carried to phase 3.
 
+**Cutover step 4: the watch day was not met, because GitHub
+delivered few of the hourly events** (2026-11-23). #432 merged at
+06:45 UTC on 2026-11-21. The reading was taken at 18:21 UTC on
+2026-11-22, 35.6 hours later, from `gh run list --workflow
+renovate-fleet.yml`. That is longer than the day step 4 asked for.
+
+| Run | Event | Created (UTC) | Run wall time |
+|---|---|---|---|
+| 44919281741 | schedule | 11-21 15:27 | 13m13s |
+| 44953056269 | schedule | 11-21 21:44 | 15m46s |
+| 44975765932 | schedule | 11-22 02:22 | 12m39s |
+| 45010355511 | schedule | 11-22 10:01 | 13m11s |
+| 45052043985 | schedule | 11-22 17:54 | 13m16s |
+
+All five succeeded. The jobs of the first and the last, which were
+read individually, took 10m43s and 10m51s; the rest of each run's
+wall time was the wait for a VM. The gaps between starts were 6h17m,
+4h38m, 7h39m and 7h53m, and the first run came 8h42m after the
+merge.
+
+| | Per-repository copies | Central runner |
+|---|---|---|
+| Runs a day | about 5 (Situation), about 4 (2026-11-15) | about 3.4 over 35.6 hours; 4 in the last 24 |
+| Median gap | 4h47m | 6h58m |
+| Longest gap | 9h35m | 7h53m |
+
+Step 4's gate asked whether the central runner was clearly better.
+It is not: its median gap is worse, and only its longest gap
+improves. The job is not the constraint. Each run took about 11
+minutes of an available hour and none queued for long. What is
+missing is the runs themselves. Of the roughly 35 hourly events
+due at minute 23, GitHub created five, at minutes :27, :44, :22,
+:01 and :54. Moving off the top of the hour, which the Situation
+proposed because GitHub documents the hour as its busiest time, did
+not change the delivery rate the copies saw on `0 * * * *`. Cutover
+step 5 replaces the trigger.
+
 #### Execution notes
 
 Dates are Australian Eastern Daylight Time (UTC+11).
@@ -2037,6 +2391,33 @@ merge, which incidentally confirms the custom manager matches the
 fleet runner as well as the template, but it means the two durations
 differ in version as well as in mode.
 
+**Cutover step 5's back brief** (2026-11-23). The operator confirmed
+decision 9 as written: a `scheduled` kind with no daily cap. He
+confirmed decision 11 as an hourly floor and a two-hour deadline. He
+also authorised this session to push both branches and open both
+pull requests once the definition of done passed. The private-ci
+branch is `scheduled-target-kind`.
+
+**Steps 2e and 2f ran in parallel** (2026-11-23). They write to
+different repositories, and neither reads the other's output. 2f
+landed as `cc40987` here and 2e as `38cd5c0` on the private-ci
+branch. Review changed one thing in 2e, a rewrapped line in
+`docs/periodic-ci.md`. It kept one extra: a line in private-ci's
+`ARCHITECTURE.md` naming the third kind in the tier's inventory,
+which would otherwise have been wrong. private-ci's suite needs a
+`HOME` holding `.ssh/id_general.pub` on a host without one, because
+`provisioner.py` reads that key at import. That is a property of
+the suite, not of this change.
+
+**The runner's VM is on the cluster** (2026-11-23, step 2e). The plan
+said the runner's job queues as ordinary work rather than as a
+periodic lane. That is right, but it left unsaid that
+`[self-hosted, vm, debian-13, s]` is a VM the conductor provisions on
+the cluster. So an hourly run takes cluster capacity without a
+claim, exactly as each cron-triggered run did. That cost is
+unchanged by this step. Private-ci's comments and documentation now
+say so.
+
 #### Risks and mitigations
 
 * **Disabling a repository's own Renovate strands what the central
@@ -2107,7 +2488,11 @@ and the commands, not against a sub-agent's summary.
   minute-23 `schedule` its header comment recorded, once every copy
   was disabled, and the test moved with it: where it asserted that no
   `schedule` existed, it now asserts the cron itself, so a schedule
-  silently moved to the top of the hour fails it.
+  silently moved to the top of the hour fails it. Cutover step 5
+  removes the schedule again, once the private-ci conductor
+  dispatches the workflow. The test then asserts that no `schedule`
+  exists and what the dispatch defaults are, since the conductor
+  sends no inputs.
   `scripts/tests/test_renovate_fleet_workflow.py` asserts each of
   these, including that no third-party action beside the token runs
   on a ref that can move.
@@ -2155,7 +2540,10 @@ and the commands, not against a sub-agent's summary.
   because phase 3 deletes it.
 * The watch day's run count, durations and longest gap are
   recorded, and the comparison against the per-repository copies'
-  median of 4 hours 47 minutes is stated as met or not met.
+  median of 4 hours 47 minutes is stated as met or not met. It was
+  not met (2026-11-23, in *Record*). Cutover step 5's own
+  definition of done carries the item from there, and phase 2 is
+  not complete until that reading meets its gate.
 
 #### Back brief
 
@@ -2292,8 +2680,9 @@ Planning effort: medium.
 **Scope.** Thirty days after phase 3 completes, repeat the
 Situation section's measurements: Renovate pull request count by
 package and by the Situation table's rows, Renovate share of CI time
-including merge-queue runs, and Renovate runs on `static` per day
-with the longest gap between them. Record before and after here, and
+including merge-queue runs, and runs of `renovate-fleet.yml` per day
+with the longest gap between them. Those runs are on a VM since
+phase 2, and dispatched by the conductor since its cutover step 5. Record before and after here, and
 say whether the Mission's target -- 100 or fewer Renovate pull
 requests in 30 days, against the baseline this phase
 re-establishes -- was met, and if not, which row
@@ -2539,8 +2928,9 @@ After a sub-agent completes, the management session verifies:
 We will know when this plan has been successfully implemented
 because the following statements will be true:
 
-* Renovate runs on an hourly schedule for the whole fleet from this
-  repository, and no managed repository carries
+* Renovate runs hourly for the whole fleet from this repository,
+  dispatched by the private-ci conductor rather than by GitHub's
+  cron, and no managed repository carries
   `.github/workflows/renovate.yml`.
 * Every managed `renovate.json` extends the shared preset and holds
   only repository-specific rules, and `renovate-fleet.json` passes
@@ -2627,11 +3017,18 @@ chosen to defer to here, so that we do not forget them.
   verbatim-copied templates into callers of shared workflows in
   `actions` is phase 6 of `PLAN-workflow-ref-trust.md`, because it
   rests on that plan's decision to trust `actions` main.
-* GitHub dropping top-of-hour scheduled events (see Situation) is
-  not specific to Renovate. Phase 2 moves the central runner off the
-  hour, but any other fleet workflow scheduled at minute `0` is
-  exposed to the same delays and drops, which the
-  `scheduled-workflow-health` criterion would want to know.
+* **GitHub's cron is unreliable at any minute, not only on the
+  hour.** The Situation blamed the top of the hour. Phase 2's
+  watch day moved the central runner to minute 23, and GitHub then
+  delivered 5 of roughly 35 hourly events (phase 2, *Record*).
+  Every scheduled workflow in the fleet is exposed in the same way.
+  On 2026-11-23 the operator asked for a criterion here that
+  forbids `schedule:` triggers fleet-wide in favour of the private-ci
+  conductor. That is a master plan of its own, to be written after
+  phase 2's cutover step 5, which is its pilot. Its first question
+  is what notices the conductor stopping (cutover step 5, survey
+  item 12), since that plan makes every scheduled job in the fleet
+  depend on it.
 * Digest pinning moves github-actions out of Dependabot's reach.
   Step 1a found that GitHub raises Dependabot alerts for actions
   referenced by semantic version but not by commit sha, so
