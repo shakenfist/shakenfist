@@ -1019,7 +1019,7 @@ one plan and four cells, not two plans and seven. Two plans a phrase
 grep flags are correctly untouched:
 `PLAN-stestr-testtools.md` carries a `## Push audit` section but has
 no phases, so there is no range to record, and
-`PLAN-llm-doc-structure.md` names `PUSH-AUDIT.md` only in prose, has
+[`PLAN-llm-doc-structure.md`](https://github.com/shakenfist/development/blob/3b546d6e617026705f4f5dc994e9cc996a892410/docs/plans/PLAN-llm-doc-structure.md) names `PUSH-AUDIT.md` only in prose, has
 no audit phase, and is `Complete`, so the carve-out exempts it --
 that plan is decision 1's worked case for why naming the file is not
 carrying the phase.
@@ -1132,7 +1132,7 @@ Two things that look like carrying it are not, and both were got
 wrong in the first draft of this section:
 
 * **Naming `PUSH-AUDIT.md` in prose is not carrying the phase.**
-  `PLAN-llm-doc-structure.md` in this repository is the worked case:
+  [`PLAN-llm-doc-structure.md`](https://github.com/shakenfist/development/blob/3b546d6e617026705f4f5dc994e9cc996a892410/docs/plans/PLAN-llm-doc-structure.md) in this repository is the worked case:
   it names the runbook once, is `Complete`, and
   `plan_audit_phase_state` returns `('problem', 'no push audit
   phase; phase 6 is "Regenerate and document"')`. It has no audit
@@ -1149,7 +1149,7 @@ This test is not one call to an existing helper --
 `plan_audit_phase_state` returns `problem` both for a plan whose
 audit phase is outrun and for a plan that has no audit phase at all,
 so `ok`-or-`problem` is *not* the test and would sweep
-`PLAN-llm-doc-structure.md` in. A sweep determines it by reading the
+[`PLAN-llm-doc-structure.md`](https://github.com/shakenfist/development/blob/3b546d6e617026705f4f5dc994e9cc996a892410/docs/plans/PLAN-llm-doc-structure.md) in. A sweep determines it by reading the
 plan's phases, and the post-condition is mechanical: after 4c-4e
 every in-scope plan returns `ok`.
 

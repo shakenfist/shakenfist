@@ -358,6 +358,29 @@ Aggregate across the fleet with:
 gh search issues 'org:shakenfist label:consistency is:open'
 ```
 
+Issues replaced a hand-maintained checklist, and should not grow one
+back beside them. From February 2026 the fleet was audited by hand
+against thirteen criteria in one prose file, with a list per
+repository of the cleanups it needed. That audit produced most of
+what the fleet's automation is built from -- the `export-repo-config`
+reusable workflow and the `review-pr-with-claude` action in
+`shakenfist/actions` were extracted from per-project copies during
+it -- but its lists decayed in both directions at once. By August
+2026 they told five library projects to adopt a pinning variant that
+had been withdrawn (see
+[pin-indirect-dependencies](/components/development/audits/pin-indirect-dependencies/)),
+called three repositories fully compliant that the audit measured as
+failing seven to eleven criteria, carried items the ordinary issue
+flow had already closed, and omitted repositories that had joined the
+fleet since. Each mechanism here answers one of those: a criterion is
+a specification a check can measure, so its verdict is recomputed
+rather than remembered; a failure is an issue on the repository that
+has to change, which closes itself when the check passes; and the
+check runs against a fresh clone in CI, which describes what is
+committed rather than what is on someone's disk. A per-repository
+to-do list kept alongside would be a second copy of this result, and
+would go stale the same way.
+
 Two properties matter when changing any of this.
 
 **Issue titles are the idempotency key.** They are

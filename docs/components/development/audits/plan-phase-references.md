@@ -25,7 +25,7 @@ letters as a sub-phase's does (`phase 3d`, `phase 12ab`), skipping:
 * any file under a `plans/` directory at any depth -- plan documents
   legitimately discuss their own phases;
 * per-repository `doc_content_excludes` prefixes from `REPO_OVERRIDES`
-  in `scripts/audit-check.py` -- shakenfist's `docs/components/` is an
+  in `scripts/audit/repo.py` -- shakenfist's `docs/components/` is an
   automated import of the other repositories' documentation, so
   auditing it would double-report findings that must be fixed at their
   source;
