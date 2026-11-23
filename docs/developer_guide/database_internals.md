@@ -319,6 +319,34 @@ neither should grow one.
   guarded single-row `UPDATE` was correct, deadlock-free and fastest
   in every cell. A scalar subquery reading one row from inside the
   guarded `UPDATE` is not an aggregate guard.
+
+  A third form is permitted, and the two designs above do not cover it: an
+  aggregate subquery in the `WHERE` of a guarded single-row `UPDATE`, as in
+  the namespace claim's `sum(holds) <= limit` invariant. What the two
+  rejected designs share is that the guard and the write are separable, so
+  two transactions can each satisfy the guard before either has written.
+  Here they are one statement, so serialisation comes from the single
+  row's own lock, and InnoDB re-evaluates the `WHERE`, subquery included,
+  against the row as committed by whoever held the lock first. It must
+  be inside the `UPDATE`: a `SELECT SUM(...)` ahead of it is a separable
+  guard again, and under snapshot isolation it is also the statement the
+  first-statement rule forbids. Guard the aggregate with `COALESCE`, since
+  `SUM` over no rows is `NULL` and the comparison against `NULL` is never
+  true.
+
+  This was measured rather than argued. Replacing the subquery with a
+  probe followed by a comparison let 8 of 8 concurrent bookings take one
+  claim's entire allowance; the subquery form let exactly 1 land. That was
+  on MariaDB 11.8 with `innodb_snapshot_isolation` on and on 10.11 with it
+  off. The evidence is 8-way concurrency, which is representative of the
+  known callers (a conductor books about ten shapes in a pass), and is
+  well short of the scale of the original benchmark, so the rule has not
+  been re-derived at that scale. One residual risk is accepted rather than
+  argued away: the subquery scans the holds index while the same
+  transaction later inserts into it, which can deadlock. That is retried
+  (1213 is in `_TRANSIENT_TRANSACTION_ERRNOS`) and nothing livelocked
+  across the concurrency tests, which is the distinction the benchmark
+  drew between a deadlock and a livelock.
 - **Counters are allocation ledgers, not measurements.** `used_*`
   counts what was granted, so a powered-off instance keeps its
   reservation though no measurement sees it. An admission which must
@@ -349,11 +377,22 @@ database daemon's own failure in their `degraded` field, and
 
 ### The scheduler's instance
 
-Three tables: `scheduler_node_capacity` (a row per schedulable
-hypervisor), `namespace_claims` (a row per claim) and `cluster_capacity`
-(a singleton of totals, claimed and unclaimed-used counters). Their
-canonical order is `cluster_capacity`, then `namespace_claims`, then
-`scheduler_node_capacity`. Admission and release are the
+Four tables: `scheduler_node_capacity` (a row per schedulable
+hypervisor), `namespace_claims` (a row per claim), `cluster_capacity`
+(a singleton of totals, claimed and unclaimed-used counters) and
+`namespace_claim_holds` (a row per shape a claim has booked on a node,
+schema version 1; see [shape
+holds](subsystem_internals.md#shape-holds-and-the-held-counters)). The
+canonical order of the first three is `cluster_capacity`, then
+`namespace_claims`, then `scheduler_node_capacity`, and
+`namespace_claim_holds` goes last, after all three. That position changes
+no existing writer's order, so the deadlock-freedom argument for the other
+three carries over unchanged, and it is the order a booking wants anyway:
+test the claim, charge the nodes, then record what was booked. A
+transaction that touches holds must not take a lock on any of the other
+three after it has written a hold row.
+
+Admission and release are the
 `AdmitInstancePlacement` and `ReleaseInstancePlacement` RPCs
 (`_direct_admit_instance_placement()`,
 `_direct_release_instance_placement()`), the claim CRUD RPCs are a

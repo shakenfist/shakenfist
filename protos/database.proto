@@ -447,6 +447,15 @@ service DatabaseService {
   rpc GetNamespaceClaims (GetNamespaceClaimsRequest) returns (GetNamespaceClaimsReply) {}
   rpc UpdateNamespaceClaim (UpdateNamespaceClaimRequest) returns (UpdateNamespaceClaimReply) {}
   rpc DeleteNamespaceClaim (DeleteNamespaceClaimRequest) returns (DeleteNamespaceClaimReply) {}
+
+  // Shape holds. A hold is a shape a claim has booked onto one node;
+  // the rows are the ground truth and scheduler_node_capacity.held_* is
+  // derived from them. Booking moves the claim's sum invariant and the
+  // named nodes' counters in one transaction, and releasing moves the
+  // counters back.
+  rpc BookNamespaceClaimHolds (BookNamespaceClaimHoldsRequest) returns (BookNamespaceClaimHoldsReply) {}
+  rpc GetNamespaceClaimHolds (GetNamespaceClaimHoldsRequest) returns (GetNamespaceClaimHoldsReply) {}
+  rpc ReleaseNamespaceClaimHolds (ReleaseNamespaceClaimHoldsRequest) returns (ReleaseNamespaceClaimHoldsReply) {}
 }
 
 // Generic status reply
@@ -3004,6 +3013,18 @@ message CapacityDimensionDetail {
   // from an sf-database predating this field must read as "not
   // reported" rather than as a refusal which was not actually over.
   optional double shortfall = 8;
+  // Set only on the node stage's three allocation dimensions: the part
+  // of used which is room booked by a capacity claim and not yet
+  // consumed by an instance. The node guard charges booked room as well
+  // as occupied room, so used is their sum and this reports the booked
+  // part on its own: a node refused because it is full and a node
+  // refused because it is booked are different facts, and a counter
+  // which has drifted from the hold rows it is recomputed from is a
+  // third. optional for the same reason as the fields above -- zero is
+  // an honest value for a node holding nothing, so a reply from an
+  // sf-database predating this field must read as "not reported" rather
+  // than as a node with no bookings.
+  optional double held = 9;
 }
 
 // One counter a floored decrement had to clamp at zero: the ledger
@@ -3167,6 +3188,14 @@ message SchedulerNodeCapacityRow {
   int64 used_memory_mb = 6;
   int64 used_disk_gb = 7;
   double expected_demand = 8;
+  // Room booked on this node by capacity claims and not yet consumed by
+  // an instance, beside used_*. Derived from the namespace_claim_holds
+  // rows, which are the ground truth. A reply from a daemon that
+  // predates these fields reads as zero, which is also what a node with
+  // no holds reports.
+  int64 held_cpus = 9;
+  int64 held_memory_mb = 10;
+  int64 held_disk_gb = 11;
 }
 
 message GetSchedulerNodeCapacityReply {
@@ -3316,6 +3345,13 @@ message UpdateNamespaceClaimReply {
   string refused_reason = 4;
   repeated CapacityDimensionDetail dimensions = 5;
   NamespaceClaim claim = 6;
+  // The holds a shrink gave back, most recently booked first, because
+  // the new limit no longer covered the sum of them. Empty on a grow, on
+  // an expiry change, and on a shrink the bookings already fit inside.
+  // The shrink floor itself is unchanged and still stops at the claim's
+  // used_*: returning capacity must not be harder than taking it, so a
+  // shrink releases bookings rather than being refused for them.
+  repeated NamespaceClaimHold released_holds = 7;
 }
 
 message DeleteNamespaceClaimRequest {
@@ -3333,8 +3369,103 @@ message DeleteNamespaceClaimReply {
   int64 returned_cpus = 4;
   int64 returned_memory_mb = 5;
   int64 returned_disk_gb = 6;
-  // The claimed_* decrement had to be floored at zero, meaning the
-  // singleton and the claims disagreed before this delete. Corrected by
-  // the next reconcile pass.
+  // The claimed_* decrement, or a node's held_* decrement for a hold
+  // this delete released, had to be floored at zero -- meaning the
+  // counters and the rows they are derived from disagreed before this
+  // delete. Corrected by the next reconcile pass.
   bool clamped = 7;
+  // Every hold the claim had booked. A hold lives inside its claim's
+  // limits, so removing the claim removes them too, in the same
+  // transaction that returns the claim's capacity.
+  repeated NamespaceClaimHold released_holds = 8;
+}
+
+// Shape holds (MariaDB)
+// One namespace_claim_holds row: a shape a claim has booked onto one
+// node. The rows are the ground truth for booked room, and the per-node
+// held_* counters are recomputed from them rather than adjusted.
+
+// One namespace_claim_holds row as its readers see it. The timestamps are
+// epoch seconds computed server side with UNIX_TIMESTAMP(), for the same
+// reason NamespaceClaim's are.
+//
+// ``node_uuid`` and ``instance_uuid`` are nullable in the table and an
+// empty string here means NULL. An empty node is a hold that is owed but
+// unplaced because its hypervisor left service; an empty instance is a
+// hold nothing has consumed yet, and a set one is the whole of the
+// consumption state.
+message NamespaceClaimHold {
+  string uuid = 1;           // Dashed uuid form
+  string claim_uuid = 2;     // Dashed uuid form
+  string namespace = 3;
+  int64 cpus = 4;
+  int64 memory_mb = 5;
+  int64 disk_gb = 6;
+  string node_uuid = 7;      // Dashed uuid form, or empty for displaced
+  string instance_uuid = 8;  // Dashed uuid form, or empty for unconsumed
+  double created_at = 9;
+  double updated_at = 10;
+}
+
+// A shape and the node it is to be booked on. Choosing the node is the
+// caller's job, not the booking transaction's.
+message NamespaceClaimHoldShape {
+  int64 cpus = 1;
+  int64 memory_mb = 2;
+  int64 disk_gb = 3;
+  string node_uuid = 4;      // Dashed uuid form
+}
+
+message BookNamespaceClaimHoldsRequest {
+  string claim_uuid = 1;     // Dashed uuid form
+  repeated NamespaceClaimHoldShape shapes = 2;
+}
+
+message BookNamespaceClaimHoldsReply {
+  bool success = 1;          // The RPC ran; false means an error, see error
+  string error = 2;
+  bool booked = 3;
+  // Why a run that succeeded did not book, and nothing was written: the
+  // whole booking is refused or none of it is.
+  string refused_reason = 4;
+  repeated CapacityDimensionDetail dimensions = 5;
+  repeated NamespaceClaimHold holds = 6;
+}
+
+message GetNamespaceClaimHoldsRequest {
+  string claim_uuid = 1;     // Dashed uuid form
+}
+
+message GetNamespaceClaimHoldsReply {
+  repeated NamespaceClaimHold holds = 1;
+}
+
+message ReleaseNamespaceClaimHoldsRequest {
+  string claim_uuid = 1;     // Dashed uuid form
+  // The holds to release, named one by one.
+  repeated string hold_uuids = 2;
+  // Release every hold the claim has, for a claim being deleted or
+  // lapsed. This is a separate flag rather than "hold_uuids empty means
+  // all" because proto3 cannot tell a repeated field left unset from one
+  // explicitly empty, and release is destructive: under that sentinel a
+  // caller whose list went missing asks for every hold on the claim to
+  // be given back, and the request is indistinguishable from the one it
+  // meant to send. An empty hold_uuids with all_holds false is refused
+  // instead. This is the same reason UpdateNamespaceClaimRequest carries
+  // an explicit fields mask.
+  bool all_holds = 3;
+}
+
+message ReleaseNamespaceClaimHoldsReply {
+  bool success = 1;          // The RPC ran; false means an error, see error
+  string error = 2;
+  repeated NamespaceClaimHold released = 3;
+  // A node counter had to be floored at zero, meaning the counters and
+  // the rows disagreed before this release. Corrected by the next
+  // reconcile pass.
+  bool clamped = 4;
+  // Which node's held_* counters a true clamped is about, and the
+  // per-dimension drift the clamp erased. Empty when nothing clamped, or
+  // when the reply came from an sf-database predating the field.
+  repeated CapacityClampDetail clamps = 5;
 }

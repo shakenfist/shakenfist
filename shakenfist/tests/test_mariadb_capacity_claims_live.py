@@ -72,6 +72,10 @@ DSN_ENV = 'SF_MARIADB_TEST_DSN'
 TEST_TABLES = [
     'scheduler_node_capacity',
     'namespace_claims',
+    # A claim create asserts that its limits cover the holds booked
+    # against its uuid, so this suite needs the table that invariant
+    # reads even though nothing here books a hold.
+    'namespace_claim_holds',
     'cluster_capacity',
     'node_metrics',
     'object_references',
@@ -122,6 +126,7 @@ class _LiveClaimFixture(base.ShakenFistTestCase):
                        mariadb._ensure_node_metrics_schema,
                        mariadb._ensure_scheduler_node_capacity_schema,
                        mariadb._ensure_namespace_claims_schema,
+                       mariadb._ensure_namespace_claim_holds_schema,
                        mariadb._ensure_cluster_capacity_schema):
             ensure(self.engine)
 

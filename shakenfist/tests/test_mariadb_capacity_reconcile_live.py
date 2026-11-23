@@ -30,7 +30,14 @@ to break:
 * the per-claim usage recompute, whose whole job -- counting an
   instance with a duplicated placement row once, and zeroing a claim
   whose namespace has emptied -- lives in one UPDATE ... JOIN that a
-  mocked connection can only be asked about as a string.
+  mocked connection can only be asked about as a string,
+* the booked-room fold, whose joins to the claim and to the consuming
+  instance compare undashed CHAR(32) uuids directly rather than
+  through the REPLACE() the placement joins need: getting either of
+  those the wrong way round matches nothing, and nothing matching is
+  indistinguishable from nothing being booked, so a pass would quietly
+  overwrite every booked counter with zero. A mock cannot show that at
+  all -- it returns whatever rows the test handed it.
 
 The fixture mirrors the one used for the plan's step 4 validation, so
 the assertions here are the same hand-computed numbers recorded in
@@ -64,6 +71,7 @@ DSN_ENV = 'SF_MARIADB_TEST_DSN'
 TEST_TABLES = [
     'scheduler_node_capacity',
     'namespace_claims',
+    'namespace_claim_holds',
     'cluster_capacity',
     'node_metrics',
     'object_references',
@@ -132,6 +140,7 @@ class CapacityReconcileLiveTestCase(base.ShakenFistTestCase):
                        mariadb._ensure_node_metrics_schema,
                        mariadb._ensure_scheduler_node_capacity_schema,
                        mariadb._ensure_namespace_claims_schema,
+                       mariadb._ensure_namespace_claim_holds_schema,
                        mariadb._ensure_cluster_capacity_schema):
             ensure(self.engine)
 
@@ -326,6 +335,58 @@ class CapacityReconcileLiveTestCase(base.ShakenFistTestCase):
         claims_t = mariadb._get_namespace_claims_table()
         with self.engine.connect() as conn:
             return conn.execute(sa.select(claims_t)).fetchall()
+
+    def _capacity_rows(self):
+        capacity_t = mariadb._get_scheduler_node_capacity_table()
+        with self.engine.connect() as conn:
+            return {r.node_uuid: r for r in
+                    conn.execute(sa.select(capacity_t)).fetchall()}
+
+    def _add_hold(self, claim, node, cpus=4, memory_mb=4096, disk_gb=40,
+                  instance=None, namespace='ci-1'):
+        """Book a shape onto a node by writing the hold row directly.
+
+        The booking path has its own suite; what this suite is about is
+        what a pass computes from rows that are already there, so the
+        row is written rather than booked. The timestamps go through
+        the same NOW(6) helper the booking path uses, because the
+        columns are DATETIME(6) and a plain NOW() would store whole
+        seconds.
+        """
+        holds_t = mariadb._get_namespace_claim_holds_table()
+        hold = uuid4()
+        with self.engine.connect() as conn:
+            self._insert(conn, holds_t, uuid=hold, claim_uuid=claim,
+                         namespace=namespace, cpus=cpus,
+                         memory_mb=memory_mb, disk_gb=disk_gb,
+                         node_uuid=node, instance_uuid=instance,
+                         created_at=mariadb._now_microseconds(),
+                         updated_at=mariadb._now_microseconds())
+            conn.commit()
+        return hold
+
+    def _hold_rows(self):
+        holds_t = mariadb._get_namespace_claim_holds_table()
+        with self.engine.connect() as conn:
+            return {r.uuid: r for r in
+                    conn.execute(sa.select(holds_t)).fetchall()}
+
+    def _set_held(self, node, cpus, memory_mb, disk_gb):
+        """Put wrong figures in a node's booked counters."""
+        capacity_t = mariadb._get_scheduler_node_capacity_table()
+        with self.engine.connect() as conn:
+            conn.execute(sa.update(capacity_t).where(
+                capacity_t.c.node_uuid == node).values(
+                    held_cpus=cpus, held_memory_mb=memory_mb,
+                    held_disk_gb=disk_gb))
+            conn.commit()
+
+    def _held(self, node):
+        row = self._capacity_rows()[node]
+        return (row.held_cpus, row.held_memory_mb, row.held_disk_gb)
+
+    def _active_claim(self):
+        return self._claims_by_namespace()['ci-1'].uuid
 
     def _claims_by_namespace(self):
         # Only safe where the test's claims are one per namespace; a
@@ -611,6 +672,144 @@ class CapacityReconcileLiveTestCase(base.ShakenFistTestCase):
                 sa.select(mariadb._get_cluster_capacity_table())).fetchall()
         self.assertEqual(2, len(rows_again))
         self.assertEqual(1, len(cluster_rows), 'singleton was duplicated')
+
+    # ------------------------------------------------------------------
+    # The booked-room counters, recomputed from the hold rows
+    # ------------------------------------------------------------------
+
+    def test_unconsumed_holds_total_onto_their_own_node(self):
+        claim = self._active_claim()
+        self._add_hold(claim, self.node_a, cpus=4, memory_mb=4096,
+                       disk_gb=40)
+        self._add_hold(claim, self.node_a, cpus=2, memory_mb=2048,
+                       disk_gb=20)
+        self._add_hold(claim, self.node_b, cpus=1, memory_mb=1024,
+                       disk_gb=10)
+
+        self._reconcile()
+
+        self.assertEqual((6, 6144, 60), self._held(self.node_a))
+        self.assertEqual((1, 1024, 10), self._held(self.node_b))
+
+    def test_a_consumed_hold_contributes_only_its_residue(self):
+        # i2 is placed on node_a, asks for 2 cpus and 2048 MB, and its
+        # disk_spec is the messy one -- so this also pins the residue's
+        # disk arithmetic to the aggregation used_disk_gb comes from,
+        # rounding and malformed entries included. A hold bigger than
+        # the instance that consumed it keeps the difference booked:
+        # the instance's own request is in used_* from here on.
+        claim = self._active_claim()
+        self._add_hold(claim, self.node_a, cpus=6, memory_mb=8192,
+                       disk_gb=40, instance=self.instances['i2'])
+
+        self._reconcile()
+
+        messy_disk = mariadb.disk_spec_virtual_gb(DISK_SPEC_MESSY)
+        self.assertEqual((4, 6144, 40 - messy_disk),
+                         self._held(self.node_a))
+        self.assertNotEqual(40, self._held(self.node_a)[2],
+                            'a consumed hold was counted at its full size')
+
+    def test_a_hold_consuming_more_than_it_booked_counts_as_nothing(self):
+        # i1 asks for 4 cpus against a one cpu booking. The clamp is
+        # per hold, so the overrun contributes zero rather than eating
+        # the other booking on the same node -- and used_* already
+        # counts that instance in full, so a negative residue would
+        # subtract room that really is in use.
+        claim = self._active_claim()
+        self._add_hold(claim, self.node_a, cpus=1, memory_mb=1024,
+                       disk_gb=1, instance=self.instances['i1'])
+        self._add_hold(claim, self.node_a, cpus=2, memory_mb=2048,
+                       disk_gb=20)
+
+        self._reconcile()
+
+        self.assertEqual((2, 2048, 20), self._held(self.node_a))
+
+    def test_a_hold_on_a_node_without_a_capacity_row_is_left_alone(self):
+        # node_f is an errored hypervisor, so it ends the pass with no
+        # capacity row. Its booking contributes to no node's counters,
+        # and the room is still owed to the claim: the pass may neither
+        # delete the row nor null its node to make the accounting
+        # tidier.
+        claim = self._active_claim()
+        hold = self._add_hold(claim, self.node_f, cpus=8, memory_mb=8192,
+                              disk_gb=80)
+        self._add_hold(claim, self.node_a, cpus=2, memory_mb=2048,
+                       disk_gb=20)
+
+        self._reconcile()
+
+        self.assertNotIn(self.node_f, self._capacity_rows())
+        self.assertEqual((2, 2048, 20), self._held(self.node_a))
+        row = self._hold_rows()[hold]
+        self.assertEqual(self.node_f, row.node_uuid)
+        self.assertEqual(8, row.cpus)
+
+    def test_a_pass_does_not_zero_the_counters_of_a_node_with_holds(self):
+        # The failure this suite exists for. A join that compares the
+        # two uuid forms, or that transforms a form that needed no
+        # transforming, matches nothing; the fold reads no rows as "no
+        # node holds anything" and a pass which reports complete
+        # success overwrites the bookings it was meant to total. Only a
+        # real server can tell that apart from a working join.
+        claim = self._active_claim()
+        self._add_hold(claim, self.node_a, cpus=4, memory_mb=4096,
+                       disk_gb=40)
+
+        self._reconcile()
+
+        held = self._held(self.node_a)
+        self.assertNotEqual(
+            (0, 0, 0), held,
+            'the fold returned nothing for a node holding a booking')
+        self.assertEqual((4, 4096, 40), held)
+
+        # And a second pass, which takes the upsert's ON DUPLICATE KEY
+        # UPDATE path rather than its INSERT path, must not undo it.
+        self._reconcile()
+        self.assertEqual((4, 4096, 40), self._held(self.node_a))
+
+    def test_wrong_counters_are_corrected_by_a_pass(self):
+        # Recompute rather than adjust is what makes these counters
+        # trustworthy: whatever a crash between two writes, a double
+        # count or a lost decrement left behind, the next pass states
+        # the truth. A pass that adjusted instead would read 103 here.
+        claim = self._active_claim()
+        self._add_hold(claim, self.node_a, cpus=3, memory_mb=3072,
+                       disk_gb=30)
+        self._reconcile()
+        self._set_held(self.node_a, 100, 100000, 1000)
+
+        self._reconcile()
+
+        self.assertEqual((3, 3072, 30), self._held(self.node_a))
+
+        # The other direction too: counters that claim nothing is
+        # booked when something is.
+        self._set_held(self.node_a, 0, 0, 0)
+        self._reconcile()
+        self.assertEqual((3, 3072, 30), self._held(self.node_a))
+
+    def test_limit_disk_gb_is_unchanged_by_booked_disk(self):
+        # limit_disk_gb is the recomputed drawdown plus the headroom
+        # the filesystem reports. If booked disk entered that drawdown
+        # the limit would rise by exactly the bookings, and the guard
+        # ``used + held + request <= limit`` would collapse into
+        # ``request <= headroom`` -- handing every booked gigabyte out
+        # a second time. The figure below is the same one
+        # test_limits_match_the_scheduler_arithmetic asserts with
+        # nothing booked at all.
+        claim = self._active_claim()
+        self._add_hold(claim, self.node_a, cpus=1, memory_mb=1024,
+                       disk_gb=4000)
+
+        by_node = self._by_node(self._reconcile())
+
+        self.assertEqual(33 + 480, by_node[str(self.node_a)]['limit_disk_gb'])
+        self.assertEqual(4000, self._held(self.node_a)[2])
+        self.assertEqual(
+            33 + 480, self._capacity_rows()[self.node_a].limit_disk_gb)
 
     def test_orphaned_metrics_row_never_gets_a_row(self):
         # A node_metrics row that has outlived its node's static and

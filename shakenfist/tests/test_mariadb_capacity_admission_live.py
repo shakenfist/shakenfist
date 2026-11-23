@@ -55,6 +55,7 @@ from testtools import content
 from shakenfist.constants import GiB
 from shakenfist import exceptions
 from shakenfist import mariadb
+from shakenfist import scheduler
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.tests import base
@@ -65,6 +66,7 @@ DSN_ENV = 'SF_MARIADB_TEST_DSN'
 TEST_TABLES = [
     'scheduler_node_capacity',
     'namespace_claims',
+    'namespace_claim_holds',
     'cluster_capacity',
     'node_metrics',
     'object_references',
@@ -142,6 +144,7 @@ class _LiveCapacityFixture(base.ShakenFistTestCase):
                        mariadb._ensure_node_metrics_schema,
                        mariadb._ensure_scheduler_node_capacity_schema,
                        mariadb._ensure_namespace_claims_schema,
+                       mariadb._ensure_namespace_claim_holds_schema,
                        mariadb._ensure_cluster_capacity_schema):
             ensure(self.engine)
 
@@ -427,6 +430,157 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
             self.assertFalse(result['admitted'], f'{dimension} did not bind')
             detail = {d['dimension']: d for d in result['dimensions']}
             self.assertTrue(detail[dimension]['exceeded'])
+
+    def _set_held(self, node, **held):
+        """Book room on a node's counters, as a claim's booking would."""
+        capacity_t = mariadb._get_scheduler_node_capacity_table()
+        with self.engine.connect() as conn:
+            conn.execute(sa.update(capacity_t).where(
+                capacity_t.c.node_uuid == node).values(**held))
+            conn.commit()
+
+    def _prefilter(self, node, cpus, memory_mb):
+        """Both ledger pre-filter stages, on the row the server holds.
+
+        The capacity row comes back out of the database through the
+        accessor the scheduler itself uses, so this is the real row and
+        not a literal written to match it. The measured figures are
+        generous, because the guard has no measured term for the filters
+        to agree with -- what can disagree is the ledger arithmetic.
+        """
+        read = mariadb._direct_get_scheduler_node_capacity()
+        self.assertFalse(read.degraded)
+        rows = {row['node_uuid']: row for row in read.rows}
+        key = str(node)
+        self.assertIn(key, rows)
+        metrics = {key: {
+            'cpu_schedulable': 1024,
+            'cpu_total_instance_vcpus': 0,
+            'memory_available': 1 << 30,
+            'memory_reserved_mb': 0,
+            'memory_max': 1 << 30,
+            'memory_total_instance_actual': 0,
+        }}
+        snapshot = scheduler.PlacementSnapshot(
+            metrics, lambda: (rows, False))
+        shape = scheduler.PlacementShape(
+            cpus=cpus, memory_mb=memory_mb, disk_gb=0, affinity={},
+            namespace='ci-1')
+        s = scheduler.Scheduler.__new__(scheduler.Scheduler)
+        log_ctx = mock.MagicMock()
+        cpu_ok, _ = s._has_sufficient_cpu(log_ctx, shape, key, snapshot)
+        ram_ok, _ = s._has_sufficient_ram(log_ctx, shape, key, snapshot)
+        return cpu_ok and ram_ok
+
+    def test_booked_room_binds_a_real_admission(self):
+        # node_b has 64 cpus and 65536 MB, none of it placed. Book all
+        # but four cpus of it and a four cpu create no longer fits,
+        # although nothing is placed there at all: the arithmetic is
+        # used + held + request <= limit and this is the half of it a
+        # mocked connection cannot show, because there the rowcount is
+        # whatever the test said it was.
+        self._set_held(self.node_b, held_cpus=61, held_memory_mb=1024,
+                       held_disk_gb=1)
+
+        result = self._admit(self.node_b, cpus=4, memory_mb=4096, disk_gb=40)
+
+        self.assertTrue(result['success'], result['error'])
+        self.assertFalse(result['admitted'])
+        self.assertEqual('node', result['failing_stage'])
+        detail = {d['dimension']: d for d in result['dimensions']}
+        self.assertEqual(64.0, detail['cpus']['limit'])
+        self.assertEqual(61.0, detail['cpus']['used'])
+        self.assertEqual(61.0, detail['cpus']['held'])
+        self.assertTrue(detail['cpus']['exceeded'])
+        # Memory had room to spare, so only the binding dimension is
+        # flagged -- and its held term is reported either way.
+        self.assertFalse(detail['memory_mb']['exceeded'])
+        self.assertEqual(1024.0, detail['memory_mb']['held'])
+
+        # Nothing was charged and nothing was released: the whole
+        # transaction rolled back.
+        row = self._capacity(self.node_b)
+        self.assertEqual(0, row.used_cpus)
+        self.assertEqual(61, row.held_cpus)
+
+        # Three fits exactly, which is the boundary the clause is
+        # written against.
+        self.assertTrue(self._admit(
+            self.node_b, cpus=3, memory_mb=4096, disk_gb=40)['admitted'])
+
+    def test_an_admission_charges_used_and_moves_no_booked_room(self):
+        # An admission records an instance arriving. Nothing about it
+        # consumes a booking, so the booked counters must come out of
+        # the transaction exactly as they went in: a decrement here
+        # would hand the same room to this instance and to whoever
+        # booked it.
+        self._set_held(self.node_b, held_cpus=8, held_memory_mb=8192,
+                       held_disk_gb=80)
+
+        self.assertTrue(self._admit(
+            self.node_b, cpus=4, memory_mb=4096, disk_gb=40)['admitted'])
+
+        row = self._capacity(self.node_b)
+        self.assertEqual(4, row.used_cpus)
+        self.assertEqual(4096, row.used_memory_mb)
+        self.assertEqual(40, row.used_disk_gb)
+        self.assertEqual(8, row.held_cpus)
+        self.assertEqual(8192, row.held_memory_mb)
+        self.assertEqual(80, row.held_disk_gb)
+
+    def test_the_guard_refuses_what_the_prefilter_predicted(self):
+        """The two implementations of one comparison, against a server.
+
+        The pre-filter decides in Python whether a node stays a
+        candidate and the guard decides in SQL whether the placement is
+        admitted. A pre-filter which is more permissive than the guard
+        attracts a burst to a node which then refuses all of it, so the
+        two are compared directly: same row, same shape, same verdict.
+        The unit suite asserts this against the guard's compiled WHERE;
+        here the guard really runs, so the SQL arithmetic itself is what
+        answers.
+
+        Disk is excluded, and knowingly: the disk pre-filter reads no
+        capacity row at all, so on that dimension the two do not agree
+        and are not asked to.
+        """
+        cases = [
+            # (used_cpus, held_cpus, requested cpus, both must admit)
+            (0, 60, 4, True),
+            (0, 60, 5, False),
+            (4, 56, 4, True),
+            (4, 56, 5, False),
+            (60, 0, 4, True),
+            (60, 0, 5, False),
+            (30, 30, 4, True),
+            (30, 30, 5, False),
+        ]
+        for used, held, wanted, expected in cases:
+            capacity_t = mariadb._get_scheduler_node_capacity_table()
+            with self.engine.connect() as conn:
+                conn.execute(sa.update(capacity_t).where(
+                    capacity_t.c.node_uuid == self.node_b).values(
+                        used_cpus=used, held_cpus=held,
+                        used_memory_mb=used * 1024,
+                        held_memory_mb=held * 1024,
+                        used_disk_gb=0, held_disk_gb=0))
+                conn.commit()
+
+            prefilter = self._prefilter(self.node_b, wanted, wanted * 1024)
+            admitted = self._admit(
+                self.node_b, cpus=wanted, memory_mb=wanted * 1024,
+                disk_gb=0)['admitted']
+            label = f'used {used}, held {held}, requested {wanted}'
+            self.assertEqual(expected, admitted, f'the guard, {label}')
+            self.assertEqual(
+                admitted, prefilter,
+                f'the guard and the pre-filter disagree ({label}): '
+                f'guard says {admitted}, pre-filter says {prefilter}')
+
+            # An admitted placement charged the row, so put it back
+            # before the next case reads it.
+            self._release(cpus=wanted, memory_mb=wanted * 1024, disk_gb=0,
+                          node=str(self.node_b))
 
     def test_the_demand_clause_refuses_on_measured_load(self):
         # cpu_schedulable 64 x target load 0.75 = 48. Publish a load

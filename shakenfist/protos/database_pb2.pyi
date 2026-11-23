@@ -9806,6 +9806,7 @@ class CapacityDimensionDetail(_message.Message):
     CPU_LOAD_1_FIELD_NUMBER: _builtins.int
     EXPECTED_DEMAND_FIELD_NUMBER: _builtins.int
     SHORTFALL_FIELD_NUMBER: _builtins.int
+    HELD_FIELD_NUMBER: _builtins.int
     dimension: _builtins.str
     """cpus, memory_mb, disk_gb or demand"""
     limit: _builtins.float
@@ -9836,6 +9837,19 @@ class CapacityDimensionDetail(_message.Message):
     from an sf-database predating this field must read as "not
     reported" rather than as a refusal which was not actually over.
     """
+    held: _builtins.float
+    """Set only on the node stage's three allocation dimensions: the part
+    of used which is room booked by a capacity claim and not yet
+    consumed by an instance. The node guard charges booked room as well
+    as occupied room, so used is their sum and this reports the booked
+    part on its own: a node refused because it is full and a node
+    refused because it is booked are different facts, and a counter
+    which has drifted from the hold rows it is recomputed from is a
+    third. optional for the same reason as the fields above -- zero is
+    an honest value for a node holding nothing, so a reply from an
+    sf-database predating this field must read as "not reported" rather
+    than as a node with no bookings.
+    """
     def __init__(
         self,
         *,
@@ -9847,21 +9861,26 @@ class CapacityDimensionDetail(_message.Message):
         cpu_load_1: _builtins.float | None = ...,
         expected_demand: _builtins.float | None = ...,
         shortfall: _builtins.float | None = ...,
+        held: _builtins.float | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1", "_expected_demand", b"_expected_demand", "_shortfall", b"_shortfall", "cpu_load_1", b"cpu_load_1", "expected_demand", b"expected_demand", "shortfall", b"shortfall"]  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1", "_expected_demand", b"_expected_demand", "_held", b"_held", "_shortfall", b"_shortfall", "cpu_load_1", b"cpu_load_1", "expected_demand", b"expected_demand", "held", b"held", "shortfall", b"shortfall"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1", "_expected_demand", b"_expected_demand", "_shortfall", b"_shortfall", "cpu_load_1", b"cpu_load_1", "dimension", b"dimension", "exceeded", b"exceeded", "expected_demand", b"expected_demand", "limit", b"limit", "requested", b"requested", "shortfall", b"shortfall", "used", b"used"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1", "_expected_demand", b"_expected_demand", "_held", b"_held", "_shortfall", b"_shortfall", "cpu_load_1", b"cpu_load_1", "dimension", b"dimension", "exceeded", b"exceeded", "expected_demand", b"expected_demand", "held", b"held", "limit", b"limit", "requested", b"requested", "shortfall", b"shortfall", "used", b"used"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     _WhichOneofReturnType__cpu_load_1: _TypeAlias = _typing.Literal["cpu_load_1"]  # noqa: Y015
     _WhichOneofArgType__cpu_load_1: _TypeAlias = _typing.Literal["_cpu_load_1", b"_cpu_load_1"]  # noqa: Y015
     _WhichOneofReturnType__expected_demand: _TypeAlias = _typing.Literal["expected_demand"]  # noqa: Y015
     _WhichOneofArgType__expected_demand: _TypeAlias = _typing.Literal["_expected_demand", b"_expected_demand"]  # noqa: Y015
+    _WhichOneofReturnType__held: _TypeAlias = _typing.Literal["held"]  # noqa: Y015
+    _WhichOneofArgType__held: _TypeAlias = _typing.Literal["_held", b"_held"]  # noqa: Y015
     _WhichOneofReturnType__shortfall: _TypeAlias = _typing.Literal["shortfall"]  # noqa: Y015
     _WhichOneofArgType__shortfall: _TypeAlias = _typing.Literal["_shortfall", b"_shortfall"]  # noqa: Y015
     @_typing.overload
     def WhichOneof(self, oneof_group: _WhichOneofArgType__cpu_load_1) -> _WhichOneofReturnType__cpu_load_1 | None: ...
     @_typing.overload
     def WhichOneof(self, oneof_group: _WhichOneofArgType__expected_demand) -> _WhichOneofReturnType__expected_demand | None: ...
+    @_typing.overload
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__held) -> _WhichOneofReturnType__held | None: ...
     @_typing.overload
     def WhichOneof(self, oneof_group: _WhichOneofArgType__shortfall) -> _WhichOneofReturnType__shortfall | None: ...
 
@@ -10195,6 +10214,9 @@ class SchedulerNodeCapacityRow(_message.Message):
     USED_MEMORY_MB_FIELD_NUMBER: _builtins.int
     USED_DISK_GB_FIELD_NUMBER: _builtins.int
     EXPECTED_DEMAND_FIELD_NUMBER: _builtins.int
+    HELD_CPUS_FIELD_NUMBER: _builtins.int
+    HELD_MEMORY_MB_FIELD_NUMBER: _builtins.int
+    HELD_DISK_GB_FIELD_NUMBER: _builtins.int
     node_uuid: _builtins.str
     """Dashed uuid form"""
     limit_cpus: _builtins.int
@@ -10204,6 +10226,15 @@ class SchedulerNodeCapacityRow(_message.Message):
     used_memory_mb: _builtins.int
     used_disk_gb: _builtins.int
     expected_demand: _builtins.float
+    held_cpus: _builtins.int
+    """Room booked on this node by capacity claims and not yet consumed by
+    an instance, beside used_*. Derived from the namespace_claim_holds
+    rows, which are the ground truth. A reply from a daemon that
+    predates these fields reads as zero, which is also what a node with
+    no holds reports.
+    """
+    held_memory_mb: _builtins.int
+    held_disk_gb: _builtins.int
     def __init__(
         self,
         *,
@@ -10215,10 +10246,13 @@ class SchedulerNodeCapacityRow(_message.Message):
         used_memory_mb: _builtins.int = ...,
         used_disk_gb: _builtins.int = ...,
         expected_demand: _builtins.float = ...,
+        held_cpus: _builtins.int = ...,
+        held_memory_mb: _builtins.int = ...,
+        held_disk_gb: _builtins.int = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["expected_demand", b"expected_demand", "limit_cpus", b"limit_cpus", "limit_disk_gb", b"limit_disk_gb", "limit_memory_mb", b"limit_memory_mb", "node_uuid", b"node_uuid", "used_cpus", b"used_cpus", "used_disk_gb", b"used_disk_gb", "used_memory_mb", b"used_memory_mb"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["expected_demand", b"expected_demand", "held_cpus", b"held_cpus", "held_disk_gb", b"held_disk_gb", "held_memory_mb", b"held_memory_mb", "limit_cpus", b"limit_cpus", "limit_disk_gb", b"limit_disk_gb", "limit_memory_mb", b"limit_memory_mb", "node_uuid", b"node_uuid", "used_cpus", b"used_cpus", "used_disk_gb", b"used_disk_gb", "used_memory_mb", b"used_memory_mb"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -10626,6 +10660,7 @@ class UpdateNamespaceClaimReply(_message.Message):
     REFUSED_REASON_FIELD_NUMBER: _builtins.int
     DIMENSIONS_FIELD_NUMBER: _builtins.int
     CLAIM_FIELD_NUMBER: _builtins.int
+    RELEASED_HOLDS_FIELD_NUMBER: _builtins.int
     success: _builtins.bool
     """The RPC ran; false means an error, see error"""
     error: _builtins.str
@@ -10643,6 +10678,16 @@ class UpdateNamespaceClaimReply(_message.Message):
     def dimensions(self) -> _containers.RepeatedCompositeFieldContainer[Global___CapacityDimensionDetail]: ...
     @_builtins.property
     def claim(self) -> Global___NamespaceClaim: ...
+    @_builtins.property
+    def released_holds(self) -> _containers.RepeatedCompositeFieldContainer[Global___NamespaceClaimHold]:
+        """The holds a shrink gave back, most recently booked first, because
+        the new limit no longer covered the sum of them. Empty on a grow, on
+        an expiry change, and on a shrink the bookings already fit inside.
+        The shrink floor itself is unchanged and still stops at the claim's
+        used_*: returning capacity must not be harder than taking it, so a
+        shrink releases bookings rather than being refused for them.
+        """
+
     def __init__(
         self,
         *,
@@ -10652,10 +10697,11 @@ class UpdateNamespaceClaimReply(_message.Message):
         refused_reason: _builtins.str = ...,
         dimensions: _abc.Iterable[Global___CapacityDimensionDetail] | None = ...,
         claim: Global___NamespaceClaim | None = ...,
+        released_holds: _abc.Iterable[Global___NamespaceClaimHold] | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _typing.Literal["claim", b"claim"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["claim", b"claim", "dimensions", b"dimensions", "error", b"error", "refused_reason", b"refused_reason", "success", b"success", "updated", b"updated"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["claim", b"claim", "dimensions", b"dimensions", "error", b"error", "refused_reason", b"refused_reason", "released_holds", b"released_holds", "success", b"success", "updated", b"updated"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -10692,6 +10738,7 @@ class DeleteNamespaceClaimReply(_message.Message):
     RETURNED_MEMORY_MB_FIELD_NUMBER: _builtins.int
     RETURNED_DISK_GB_FIELD_NUMBER: _builtins.int
     CLAMPED_FIELD_NUMBER: _builtins.int
+    RELEASED_HOLDS_FIELD_NUMBER: _builtins.int
     success: _builtins.bool
     """The RPC ran; false means an error, see error"""
     error: _builtins.str
@@ -10705,10 +10752,18 @@ class DeleteNamespaceClaimReply(_message.Message):
     returned_memory_mb: _builtins.int
     returned_disk_gb: _builtins.int
     clamped: _builtins.bool
-    """The claimed_* decrement had to be floored at zero, meaning the
-    singleton and the claims disagreed before this delete. Corrected by
-    the next reconcile pass.
+    """The claimed_* decrement, or a node's held_* decrement for a hold
+    this delete released, had to be floored at zero -- meaning the
+    counters and the rows they are derived from disagreed before this
+    delete. Corrected by the next reconcile pass.
     """
+    @_builtins.property
+    def released_holds(self) -> _containers.RepeatedCompositeFieldContainer[Global___NamespaceClaimHold]:
+        """Every hold the claim had booked. A hold lives inside its claim's
+        limits, so removing the claim removes them too, in the same
+        transaction that returns the claim's capacity.
+        """
+
     def __init__(
         self,
         *,
@@ -10719,11 +10774,297 @@ class DeleteNamespaceClaimReply(_message.Message):
         returned_memory_mb: _builtins.int = ...,
         returned_disk_gb: _builtins.int = ...,
         clamped: _builtins.bool = ...,
+        released_holds: _abc.Iterable[Global___NamespaceClaimHold] | None = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["clamped", b"clamped", "deleted", b"deleted", "error", b"error", "returned_cpus", b"returned_cpus", "returned_disk_gb", b"returned_disk_gb", "returned_memory_mb", b"returned_memory_mb", "success", b"success"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["clamped", b"clamped", "deleted", b"deleted", "error", b"error", "released_holds", b"released_holds", "returned_cpus", b"returned_cpus", "returned_disk_gb", b"returned_disk_gb", "returned_memory_mb", b"returned_memory_mb", "success", b"success"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
 Global___DeleteNamespaceClaimReply: _TypeAlias = DeleteNamespaceClaimReply  # noqa: Y015
+
+@_typing.final
+class NamespaceClaimHold(_message.Message):
+    """Shape holds (MariaDB)
+    One namespace_claim_holds row: a shape a claim has booked onto one
+    node. The rows are the ground truth for booked room, and the per-node
+    held_* counters are recomputed from them rather than adjusted.
+
+    One namespace_claim_holds row as its readers see it. The timestamps are
+    epoch seconds computed server side with UNIX_TIMESTAMP(), for the same
+    reason NamespaceClaim's are.
+
+    ``node_uuid`` and ``instance_uuid`` are nullable in the table and an
+    empty string here means NULL. An empty node is a hold that is owed but
+    unplaced because its hypervisor left service; an empty instance is a
+    hold nothing has consumed yet, and a set one is the whole of the
+    consumption state.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    CLAIM_UUID_FIELD_NUMBER: _builtins.int
+    NAMESPACE_FIELD_NUMBER: _builtins.int
+    CPUS_FIELD_NUMBER: _builtins.int
+    MEMORY_MB_FIELD_NUMBER: _builtins.int
+    DISK_GB_FIELD_NUMBER: _builtins.int
+    NODE_UUID_FIELD_NUMBER: _builtins.int
+    INSTANCE_UUID_FIELD_NUMBER: _builtins.int
+    CREATED_AT_FIELD_NUMBER: _builtins.int
+    UPDATED_AT_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    """Dashed uuid form"""
+    claim_uuid: _builtins.str
+    """Dashed uuid form"""
+    namespace: _builtins.str
+    cpus: _builtins.int
+    memory_mb: _builtins.int
+    disk_gb: _builtins.int
+    node_uuid: _builtins.str
+    """Dashed uuid form, or empty for displaced"""
+    instance_uuid: _builtins.str
+    """Dashed uuid form, or empty for unconsumed"""
+    created_at: _builtins.float
+    updated_at: _builtins.float
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+        claim_uuid: _builtins.str = ...,
+        namespace: _builtins.str = ...,
+        cpus: _builtins.int = ...,
+        memory_mb: _builtins.int = ...,
+        disk_gb: _builtins.int = ...,
+        node_uuid: _builtins.str = ...,
+        instance_uuid: _builtins.str = ...,
+        created_at: _builtins.float = ...,
+        updated_at: _builtins.float = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["claim_uuid", b"claim_uuid", "cpus", b"cpus", "created_at", b"created_at", "disk_gb", b"disk_gb", "instance_uuid", b"instance_uuid", "memory_mb", b"memory_mb", "namespace", b"namespace", "node_uuid", b"node_uuid", "updated_at", b"updated_at", "uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___NamespaceClaimHold: _TypeAlias = NamespaceClaimHold  # noqa: Y015
+
+@_typing.final
+class NamespaceClaimHoldShape(_message.Message):
+    """A shape and the node it is to be booked on. Choosing the node is the
+    caller's job, not the booking transaction's.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    CPUS_FIELD_NUMBER: _builtins.int
+    MEMORY_MB_FIELD_NUMBER: _builtins.int
+    DISK_GB_FIELD_NUMBER: _builtins.int
+    NODE_UUID_FIELD_NUMBER: _builtins.int
+    cpus: _builtins.int
+    memory_mb: _builtins.int
+    disk_gb: _builtins.int
+    node_uuid: _builtins.str
+    """Dashed uuid form"""
+    def __init__(
+        self,
+        *,
+        cpus: _builtins.int = ...,
+        memory_mb: _builtins.int = ...,
+        disk_gb: _builtins.int = ...,
+        node_uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["cpus", b"cpus", "disk_gb", b"disk_gb", "memory_mb", b"memory_mb", "node_uuid", b"node_uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___NamespaceClaimHoldShape: _TypeAlias = NamespaceClaimHoldShape  # noqa: Y015
+
+@_typing.final
+class BookNamespaceClaimHoldsRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    CLAIM_UUID_FIELD_NUMBER: _builtins.int
+    SHAPES_FIELD_NUMBER: _builtins.int
+    claim_uuid: _builtins.str
+    """Dashed uuid form"""
+    @_builtins.property
+    def shapes(self) -> _containers.RepeatedCompositeFieldContainer[Global___NamespaceClaimHoldShape]: ...
+    def __init__(
+        self,
+        *,
+        claim_uuid: _builtins.str = ...,
+        shapes: _abc.Iterable[Global___NamespaceClaimHoldShape] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["claim_uuid", b"claim_uuid", "shapes", b"shapes"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___BookNamespaceClaimHoldsRequest: _TypeAlias = BookNamespaceClaimHoldsRequest  # noqa: Y015
+
+@_typing.final
+class BookNamespaceClaimHoldsReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    SUCCESS_FIELD_NUMBER: _builtins.int
+    ERROR_FIELD_NUMBER: _builtins.int
+    BOOKED_FIELD_NUMBER: _builtins.int
+    REFUSED_REASON_FIELD_NUMBER: _builtins.int
+    DIMENSIONS_FIELD_NUMBER: _builtins.int
+    HOLDS_FIELD_NUMBER: _builtins.int
+    success: _builtins.bool
+    """The RPC ran; false means an error, see error"""
+    error: _builtins.str
+    booked: _builtins.bool
+    refused_reason: _builtins.str
+    """Why a run that succeeded did not book, and nothing was written: the
+    whole booking is refused or none of it is.
+    """
+    @_builtins.property
+    def dimensions(self) -> _containers.RepeatedCompositeFieldContainer[Global___CapacityDimensionDetail]: ...
+    @_builtins.property
+    def holds(self) -> _containers.RepeatedCompositeFieldContainer[Global___NamespaceClaimHold]: ...
+    def __init__(
+        self,
+        *,
+        success: _builtins.bool = ...,
+        error: _builtins.str = ...,
+        booked: _builtins.bool = ...,
+        refused_reason: _builtins.str = ...,
+        dimensions: _abc.Iterable[Global___CapacityDimensionDetail] | None = ...,
+        holds: _abc.Iterable[Global___NamespaceClaimHold] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["booked", b"booked", "dimensions", b"dimensions", "error", b"error", "holds", b"holds", "refused_reason", b"refused_reason", "success", b"success"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___BookNamespaceClaimHoldsReply: _TypeAlias = BookNamespaceClaimHoldsReply  # noqa: Y015
+
+@_typing.final
+class GetNamespaceClaimHoldsRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    CLAIM_UUID_FIELD_NUMBER: _builtins.int
+    claim_uuid: _builtins.str
+    """Dashed uuid form"""
+    def __init__(
+        self,
+        *,
+        claim_uuid: _builtins.str = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["claim_uuid", b"claim_uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetNamespaceClaimHoldsRequest: _TypeAlias = GetNamespaceClaimHoldsRequest  # noqa: Y015
+
+@_typing.final
+class GetNamespaceClaimHoldsReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    HOLDS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def holds(self) -> _containers.RepeatedCompositeFieldContainer[Global___NamespaceClaimHold]: ...
+    def __init__(
+        self,
+        *,
+        holds: _abc.Iterable[Global___NamespaceClaimHold] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["holds", b"holds"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___GetNamespaceClaimHoldsReply: _TypeAlias = GetNamespaceClaimHoldsReply  # noqa: Y015
+
+@_typing.final
+class ReleaseNamespaceClaimHoldsRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    CLAIM_UUID_FIELD_NUMBER: _builtins.int
+    HOLD_UUIDS_FIELD_NUMBER: _builtins.int
+    ALL_HOLDS_FIELD_NUMBER: _builtins.int
+    claim_uuid: _builtins.str
+    """Dashed uuid form"""
+    all_holds: _builtins.bool
+    """Release every hold the claim has, for a claim being deleted or
+    lapsed. This is a separate flag rather than "hold_uuids empty means
+    all" because proto3 cannot tell a repeated field left unset from one
+    explicitly empty, and release is destructive: under that sentinel a
+    caller whose list went missing asks for every hold on the claim to
+    be given back, and the request is indistinguishable from the one it
+    meant to send. An empty hold_uuids with all_holds false is refused
+    instead. This is the same reason UpdateNamespaceClaimRequest carries
+    an explicit fields mask.
+    """
+    @_builtins.property
+    def hold_uuids(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
+        """The holds to release, named one by one."""
+
+    def __init__(
+        self,
+        *,
+        claim_uuid: _builtins.str = ...,
+        hold_uuids: _abc.Iterable[_builtins.str] | None = ...,
+        all_holds: _builtins.bool = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["all_holds", b"all_holds", "claim_uuid", b"claim_uuid", "hold_uuids", b"hold_uuids"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___ReleaseNamespaceClaimHoldsRequest: _TypeAlias = ReleaseNamespaceClaimHoldsRequest  # noqa: Y015
+
+@_typing.final
+class ReleaseNamespaceClaimHoldsReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    SUCCESS_FIELD_NUMBER: _builtins.int
+    ERROR_FIELD_NUMBER: _builtins.int
+    RELEASED_FIELD_NUMBER: _builtins.int
+    CLAMPED_FIELD_NUMBER: _builtins.int
+    CLAMPS_FIELD_NUMBER: _builtins.int
+    success: _builtins.bool
+    """The RPC ran; false means an error, see error"""
+    error: _builtins.str
+    clamped: _builtins.bool
+    """A node counter had to be floored at zero, meaning the counters and
+    the rows disagreed before this release. Corrected by the next
+    reconcile pass.
+    """
+    @_builtins.property
+    def released(self) -> _containers.RepeatedCompositeFieldContainer[Global___NamespaceClaimHold]: ...
+    @_builtins.property
+    def clamps(self) -> _containers.RepeatedCompositeFieldContainer[Global___CapacityClampDetail]:
+        """Which node's held_* counters a true clamped is about, and the
+        per-dimension drift the clamp erased. Empty when nothing clamped, or
+        when the reply came from an sf-database predating the field.
+        """
+
+    def __init__(
+        self,
+        *,
+        success: _builtins.bool = ...,
+        error: _builtins.str = ...,
+        released: _abc.Iterable[Global___NamespaceClaimHold] | None = ...,
+        clamped: _builtins.bool = ...,
+        clamps: _abc.Iterable[Global___CapacityClampDetail] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["clamped", b"clamped", "clamps", b"clamps", "error", b"error", "released", b"released", "success", b"success"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___ReleaseNamespaceClaimHoldsReply: _TypeAlias = ReleaseNamespaceClaimHoldsReply  # noqa: Y015

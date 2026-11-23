@@ -2896,7 +2896,8 @@ class MockMariaDB():
     def set_node_capacity(self, node_uuid, limit_cpus=0, limit_memory_mb=0,
                           limit_disk_gb=0, used_cpus=0, used_memory_mb=0,
                           used_disk_gb=0, expected_demand=0.0,
-                          demand_limit=None):
+                          demand_limit=None, held_cpus=0, held_memory_mb=0,
+                          held_disk_gb=0):
         """Seed a scheduler_node_capacity row for a node.
 
         No node has one by default, which is the fail-open case:
@@ -2923,6 +2924,9 @@ class MockMariaDB():
             'used_memory_mb': used_memory_mb,
             'used_disk_gb': used_disk_gb,
             'expected_demand': expected_demand,
+            'held_cpus': held_cpus,
+            'held_memory_mb': held_memory_mb,
+            'held_disk_gb': held_disk_gb,
             'demand_limit': demand_limit,
         }
         return self.node_capacity[str(node_uuid)]
@@ -3098,7 +3102,12 @@ class MockMariaDB():
         """
         result = {
             'success': True, 'error': '', 'updated': False,
-            'refused_reason': '', 'dimensions': [], 'claim': None}
+            'refused_reason': '', 'dimensions': [], 'claim': None,
+            # This mock has no holds model, so a shrink here never
+            # releases one. Carried anyway because the real reply always
+            # has the key and a caller reading it must not have to
+            # wonder which implementation it is talking to.
+            'released_holds': []}
         row = self._claim_by_uuid(claim_uuid)
         if row is None:
             result['refused_reason'] = 'not_found'
@@ -3143,7 +3152,8 @@ class MockMariaDB():
         result = {
             'success': True, 'error': '', 'deleted': False,
             'returned_cpus': 0, 'returned_memory_mb': 0,
-            'returned_disk_gb': 0, 'clamped': False}
+            'returned_disk_gb': 0, 'clamped': False,
+            'released_holds': []}
         row = self._claim_by_uuid(claim_uuid)
         if row is None:
             return result
@@ -3351,9 +3361,16 @@ class MockMariaDB():
             for dimension, requested in (('cpus', cpus),
                                          ('memory_mb', memory_mb),
                                          ('disk_gb', disk_gb)):
+                # The real guard charges booked room alongside occupied
+                # room, so this double has to as well: a mock which
+                # admitted what production refuses would send every
+                # caller-side test down a walk the real code does not
+                # take. The booked half is reported separately for the
+                # same reason the real denial reports it.
+                held = row['held_' + dimension]
                 dimensions.append(mariadb._capacity_dimension(
                     dimension, row['limit_' + dimension],
-                    row['used_' + dimension], requested))
+                    row['used_' + dimension] + held, requested, held=held))
             if enforce_demand and row['demand_limit'] is not None:
                 # Check-then-charge, as the real clause does: the
                 # incoming placement's demand_add is reported but

@@ -5,7 +5,7 @@
 
 """Tests for the scheduler-reservations capacity tables.
 
-Covers the three capacity tables
+Covers the four capacity tables
 (see docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md):
 column drift guards for each table definition, the version constants and
 their EXPECTED_SCHEMA_VERSIONS wiring, and the fresh-create / no-op
@@ -36,6 +36,9 @@ EXPECTED_COLUMNS = {
         'used_cpus',
         'used_memory_mb',
         'used_disk_gb',
+        'held_cpus',
+        'held_memory_mb',
+        'held_disk_gb',
         'expected_demand',
         'updated_at',
     ],
@@ -68,6 +71,30 @@ EXPECTED_COLUMNS = {
         'unclaimed_used_disk_gb',
         'updated_at',
     ],
+    'namespace_claim_holds': [
+        'uuid',
+        'claim_uuid',
+        'namespace',
+        'cpus',
+        'memory_mb',
+        'disk_gb',
+        'node_uuid',
+        'instance_uuid',
+        'created_at',
+        'updated_at',
+    ],
+}
+
+
+# The holds table's indexes, by name and by the columns they cover. An
+# index name is part of the schema: a rename is a migration, and the
+# three here are the three access paths the table was shaped for, so a
+# dropped one is a sequential scan on the admission or release path
+# rather than a test failure anywhere else.
+EXPECTED_HOLD_INDEXES = {
+    'idx_namespace_claim_holds_claim': ['claim_uuid'],
+    'idx_namespace_claim_holds_node': ['node_uuid'],
+    'idx_namespace_claim_holds_instance': ['instance_uuid'],
 }
 
 
@@ -87,6 +114,10 @@ CAPACITY_TABLES = [
      mariadb._get_cluster_capacity_table,
      mariadb._ensure_cluster_capacity_schema,
      mariadb.CLUSTER_CAPACITY_VERSION),
+    ('namespace_claim_holds',
+     mariadb._get_namespace_claim_holds_table,
+     mariadb._ensure_namespace_claim_holds_schema,
+     mariadb.NAMESPACE_CLAIM_HOLDS_VERSION),
 ]
 
 
@@ -108,6 +139,11 @@ class CapacityTableDefinitionTestCase(base.ShakenFistTestCase):
         self.assertEqual(EXPECTED_COLUMNS['cluster_capacity'],
                          [c.name for c in table.c])
 
+    def test_namespace_claim_holds_columns(self):
+        table = mariadb._get_namespace_claim_holds_table()
+        self.assertEqual(EXPECTED_COLUMNS['namespace_claim_holds'],
+                         [c.name for c in table.c])
+
     def test_scheduler_node_capacity_types(self):
         table = mariadb._get_scheduler_node_capacity_table()
 
@@ -124,6 +160,25 @@ class CapacityTableDefinitionTestCase(base.ShakenFistTestCase):
             self.assertIsInstance(table.c[name].type, sa.BigInteger)
             self.assertIsNotNone(table.c[name].server_default,
                                  f'{name} should default to zero')
+
+        # The booked-room counters match the counters they sit beside in
+        # width and in default, so an upgraded row reads as zero rather
+        # than as NULL -- the guard does arithmetic on them inside a
+        # WHERE clause, where a NULL is not false but unknown, and would
+        # refuse every placement on the node rather than fail loudly.
+        self.assertEqual(('held_cpus', 'held_memory_mb', 'held_disk_gb'),
+                         mariadb.SCHEDULER_NODE_CAPACITY_HELD_COLUMNS)
+        for name in mariadb.SCHEDULER_NODE_CAPACITY_HELD_COLUMNS:
+            self.assertIsInstance(table.c[name].type, sa.BigInteger)
+            self.assertFalse(table.c[name].nullable, name)
+            self.assertIsNotNone(table.c[name].server_default,
+                                 f'{name} should default to zero')
+        # And the converse: a held_* column added to the table but not
+        # to the tuple would never be added to an upgraded database,
+        # because the migration only walks the tuple.
+        self.assertEqual(
+            set(mariadb.SCHEDULER_NODE_CAPACITY_HELD_COLUMNS),
+            {c.name for c in table.c if c.name.startswith('held_')})
 
         # updated_at follows the cluster_locks server-side timestamp
         # idiom.
@@ -190,6 +245,83 @@ class CapacityTableDefinitionTestCase(base.ShakenFistTestCase):
 
         self.assertIsInstance(table.c['updated_at'].type, sa.DateTime)
 
+    def test_namespace_claim_holds_types(self):
+        table = mariadb._get_namespace_claim_holds_table()
+
+        # Every uuid column is a CHAR(32) Uuid, including the two
+        # nullable ones: the per-node fold and the release paths join
+        # and filter on them, and a column stored in the other uuid
+        # spelling matches nothing rather than failing.
+        self.assertIsInstance(table.c['uuid'].type, sa.Uuid)
+        self.assertTrue(table.c['uuid'].primary_key)
+        for name in ('claim_uuid', 'node_uuid', 'instance_uuid'):
+            self.assertIsInstance(table.c[name].type, sa.Uuid, name)
+
+        # The claim is required, because a hold without one belongs to
+        # nothing and could never be released. The node and the instance
+        # are not: a NULL node is a displaced hold, and a NULL instance
+        # is an unconsumed one, which is the whole of the consumption
+        # state.
+        self.assertFalse(table.c['claim_uuid'].nullable)
+        self.assertTrue(table.c['node_uuid'].nullable)
+        self.assertTrue(table.c['instance_uuid'].nullable)
+
+        # The namespace column matches the namespaces table's name
+        # primary key exactly, as the claim table's copy of it does.
+        namespaces = mariadb._get_namespaces_table()
+        self.assertIsInstance(table.c['namespace'].type, sa.String)
+        self.assertEqual(namespaces.c['name'].type.length,
+                         table.c['namespace'].type.length)
+        self.assertFalse(table.c['namespace'].nullable)
+
+        # BigInteger asserted rather than Integer for the same reason as
+        # the counters these rows are folded into: pin the deliberate
+        # widening. The dimensions are required and have no default --
+        # a hold of an unstated size is not a hold.
+        for name in ('cpus', 'memory_mb', 'disk_gb'):
+            self.assertIsInstance(table.c[name].type, sa.BigInteger, name)
+            self.assertFalse(table.c[name].nullable, name)
+            self.assertIsNone(table.c[name].server_default, name)
+
+        # created_at and updated_at follow the cluster_locks server-side
+        # timestamp idiom: created_at is what orders a shrink's
+        # releases, so it must come from the database's clock rather
+        # than from whichever node took the booking.
+        #
+        # The microsecond precision is pinned, not merely the type. At
+        # whole seconds two bookings a moment apart tie and "release the
+        # most recently booked first" becomes "release in uuid order" --
+        # stable, and not what the rule says. A later tidy-up that put
+        # the fsp back to a plain DATETIME would coarsen that ordering
+        # with nothing visible to notice it by, so it fails here.
+        for name in ('created_at', 'updated_at'):
+            self.assertIsInstance(table.c[name].type, sa.DateTime, name)
+            self.assertEqual(6, table.c[name].type.fsp, name)
+            self.assertFalse(table.c[name].nullable, name)
+
+        # And the DDL that reaches the server says so, because the fsp
+        # only arrives through the dialect type: a plain sa.DateTime()
+        # renders as DATETIME with no way to ask for the fraction.
+        ddl = ' '.join(str(sa.schema.CreateTable(table).compile(
+            dialect=sa.dialects.mysql.dialect())).split())
+        self.assertIn('created_at DATETIME(6) NOT NULL', ddl)
+        self.assertIn('updated_at DATETIME(6) NOT NULL', ddl)
+
+    def test_namespace_claim_holds_indexes(self):
+        table = mariadb._get_namespace_claim_holds_table()
+        self.assertEqual(
+            EXPECTED_HOLD_INDEXES,
+            {idx.name: [c.name for c in idx.columns] for idx in table.indexes})
+
+    def test_the_capacity_tables_declare_no_foreign_keys(self):
+        # Nothing in this schema has a foreign key, and the holds table
+        # does not become the first: a hold's claim, node and instance
+        # are plain columns, and the reconciler rather than the engine
+        # is what notices when one of them has gone.
+        for _, get_table, _, _ in CAPACITY_TABLES:
+            table = get_table()
+            self.assertEqual(set(), set(table.foreign_keys), table.name)
+
 
 class CapacitySchemaVersionsTestCase(base.ShakenFistTestCase):
     """The version constants and their EXPECTED_SCHEMA_VERSIONS wiring."""
@@ -199,16 +331,30 @@ class CapacitySchemaVersionsTestCase(base.ShakenFistTestCase):
         # deliberate edit here as well as in mariadb.py -- which is the
         # only thing that makes the migration branch tests below mean
         # anything. namespace_claims is at 2 because v2 added the used_*
-        # high-water mark.
-        self.assertEqual(1, mariadb.SCHEDULER_NODE_CAPACITY_VERSION)
+        # high-water mark, and scheduler_node_capacity is at 2 because
+        # v2 added the held_* booked-room counters.
+        self.assertEqual(2, mariadb.SCHEDULER_NODE_CAPACITY_VERSION)
         self.assertEqual(2, mariadb.NAMESPACE_CLAIMS_VERSION)
         self.assertEqual(1, mariadb.CLUSTER_CAPACITY_VERSION)
+        self.assertEqual(1, mariadb.NAMESPACE_CLAIM_HOLDS_VERSION)
 
     def test_versions_wired_into_expected_schema_versions(self):
         for table_name, _, _, version in CAPACITY_TABLES:
             self.assertIn(table_name, mariadb.EXPECTED_SCHEMA_VERSIONS)
             self.assertEqual(
                 version, mariadb.EXPECTED_SCHEMA_VERSIONS[table_name])
+
+    def test_ensure_schema_calls_every_capacity_ensure_function(self):
+        # A table whose _ensure_*_schema() exists but is never called
+        # from ensure_schema() is absent on every real cluster and
+        # present in every unit test, which is the failure mode this
+        # catches. The drift guard in test_mariadb_schema_concurrency.py
+        # covers the matching EXPECTED_SCHEMA_VERSIONS entry.
+        source = inspect.getsource(mariadb.ensure_schema)
+        for _, _, ensure, _ in CAPACITY_TABLES:
+            self.assertIn(f'{ensure.__name__}(engine)', source,
+                          f'ensure_schema() does not call '
+                          f'{ensure.__name__}()')
 
 
 class EnsureCapacitySchemaTestCase(base.ShakenFistTestCase):
@@ -344,3 +490,80 @@ class NamespaceClaimsPeakMigrationTestCase(base.ShakenFistTestCase):
             mariadb._add_missing_namespace_claims_columns)
         self.assertNotIn('UPDATE', source)
         self.assertNotIn('used_cpus', source)
+
+
+class SchedulerNodeCapacityHeldMigrationTestCase(base.ShakenFistTestCase):
+    """The v1-to-2 booked-room migration.
+
+    The same shape of guard as the high-water mark migration above, and
+    for the same reason: the migration walks a named tuple, so a column
+    added to the table definition and not to the tuple is created on a
+    fresh database and silently absent on an upgraded one -- where the
+    first thing to notice is the admission guard selecting a column
+    that is not there.
+    """
+
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version', return_value=1)
+    def test_version_one_gains_the_held_columns(
+            self, mock_get_version, mock_set_version):
+        mock_engine = mock.MagicMock()
+        conn = mock_engine.begin.return_value.__enter__.return_value
+
+        with mock.patch('sqlalchemy.MetaData.create_all') as mock_create, \
+                mock.patch('shakenfist.mariadb.get_table_columns',
+                           return_value={'node_uuid': {}, 'used_cpus': {}}):
+            result = mariadb._ensure_scheduler_node_capacity_schema(
+                mock_engine)
+
+        self.assertEqual(1, result['start_version'])
+        self.assertEqual(2, result['end_version'])
+        self.assertTrue(result['migrated'])
+        mock_create.assert_not_called()
+        mock_set_version.assert_called_once_with(
+            mock_engine, 'scheduler_node_capacity', 2)
+
+        issued = [str(call.args[0]) for call in conn.execute.call_args_list]
+        self.assertEqual(3, len(issued), issued)
+        for name in mariadb.SCHEDULER_NODE_CAPACITY_HELD_COLUMNS:
+            # The type comes from the table definition rather than from
+            # a string in the migration, so the DDL cannot drift from
+            # the column it adds -- and the counter must not be
+            # nullable, because the guard that reads it does arithmetic
+            # on it inside a WHERE clause.
+            self.assertIn(
+                f'ALTER TABLE scheduler_node_capacity ADD COLUMN {name} '
+                f'BIGINT NOT NULL DEFAULT 0', issued)
+
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version', return_value=1)
+    def test_a_rerun_over_existing_columns_issues_no_ddl(
+            self, mock_get_version, mock_set_version):
+        # A database at v1 whose columns are already there -- the shape
+        # an interrupted migration, or a hand-patched schema, leaves
+        # behind. The version is still advanced; no ALTER is issued.
+        mock_engine = mock.MagicMock()
+        conn = mock_engine.begin.return_value.__enter__.return_value
+        present = {name: {}
+                   for name in mariadb.SCHEDULER_NODE_CAPACITY_HELD_COLUMNS}
+
+        with mock.patch('shakenfist.mariadb.get_table_columns',
+                        return_value=present):
+            result = mariadb._ensure_scheduler_node_capacity_schema(
+                mock_engine)
+
+        self.assertTrue(result['migrated'])
+        self.assertEqual(2, result['end_version'])
+        conn.execute.assert_not_called()
+        mock_set_version.assert_called_once_with(
+            mock_engine, 'scheduler_node_capacity', 2)
+
+    def test_the_migration_backfills_nothing(self):
+        # Held room is derived from the hold rows, and an upgraded
+        # database has none, so there is nothing to seed these counters
+        # from. Reading used_* for a starting value would book every
+        # running instance a second time.
+        source = inspect.getsource(
+            mariadb._add_missing_scheduler_node_capacity_columns)
+        self.assertNotIn('UPDATE', source)
+        self.assertNotIn('used_', source)

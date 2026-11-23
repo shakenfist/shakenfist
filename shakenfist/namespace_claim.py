@@ -74,7 +74,10 @@ class ClaimRefused(Exception):
 
     ``reason`` is one of the refusal reasons the mariadb claim wrappers
     document: 'capacity', 'no_cluster_capacity', 'exists',
-    'below_usage', 'not_found', 'not_active' or 'conflict'.
+    'below_usage', 'not_found', 'not_active' or 'conflict' for the claim
+    itself, and 'claim_capacity' or 'node_capacity' for a booking --
+    which say that the claim would be over its own limits, or that the
+    node chosen for a shape has no room left for it.
     """
 
     def __init__(
@@ -90,6 +93,21 @@ def _as_uuid(value: Any) -> UUID:
     if isinstance(value, UUID):
         return value
     return UUID(str(value))
+
+
+def _hold_summary(hold: mariadb.NamespaceClaimHoldRow) -> dict[str, Any]:
+    """One hold as an event records it: what it is and where it was.
+
+    The booking and the release events say the same thing about a hold,
+    so they say it the same way -- a reader following a hold's life
+    through a claim's history should not have to translate between two
+    spellings of the same row. The claim's own uuid is left out because
+    the event is already on the claim, and the consuming instance
+    because nothing consumes a hold yet.
+    """
+    return {'uuid': hold['uuid'], 'node': hold['node_uuid'],
+            'cpus': hold['cpus'], 'memory_mb': hold['memory_mb'],
+            'disk_gb': hold['disk_gb']}
 
 
 class NamespaceClaim(dbo):
@@ -312,6 +330,12 @@ class NamespaceClaim(dbo):
         shrinking is permitted down to the claim's current usage and no
         further, and one call may do both. Raises ClaimRefused when the
         cluster or the claim's own usage declines the change.
+
+        A shrink below the sum of this claim's shape holds releases
+        holds, most recently booked first, until the claim fits. Each
+        release is an event here, because a booking a holder was relying
+        on going away is exactly the kind of thing the claim's history
+        has to be able to answer for afterwards.
         """
         if fields is None:
             raise ValueError(
@@ -336,6 +360,132 @@ class NamespaceClaim(dbo):
                    'limit_memory_mb': limit_memory_mb,
                    'limit_disk_gb': limit_disk_gb,
                    'expires_in_seconds': expires_in_seconds})
+
+        if result['released_holds']:
+            self._event_released_holds(
+                'released shape holds to shrink the claim',
+                result['released_holds'])
+
+    def _event_released_holds(
+            self, message: str,
+            released: list[mariadb.NamespaceClaimHoldRow]) -> None:
+        """Record which bookings this claim just lost, and why.
+
+        One event naming all of them rather than one each: they are
+        released together in one transaction, and a reader asking what
+        happened to a booking wants the whole set and the reason, not a
+        burst it has to correlate.
+        """
+        self.add_event(
+            EVENT_TYPE_MUTATE, message,
+            extra={'holds': [_hold_summary(hold) for hold in released]})
+
+    def book_holds(
+            self, shapes: list[dict[str, int]], scheduler: Any = None
+    ) -> list[mariadb.NamespaceClaimHoldRow]:
+        """Book room inside this claim for a set of shapes, one hold each.
+
+        ``shapes`` is a list of ``{'cpus', 'memory_mb', 'disk_gb'}``
+        requests. Each one is placed on a node by the scheduler and then
+        booked there, so that a later create of that shape has somewhere
+        to go which no other placement can take first.
+
+        The node for each shape is the head of its own ranked candidate
+        list, which is the node the scheduler would have placed it on
+        had it been a create. Taking anything further down the list
+        would leave the bookings arranged against an arithmetic the
+        scheduler did not do, because every shape after the one skipped
+        was ranked as though it were on the node it was charged to.
+
+        Placement is all or nothing and deliberately not translated
+        here. A set the cluster cannot host raises whatever the refusing
+        scheduling stage raises for a single request -- carrying that
+        stage and the refused shape's index in ``shapes`` -- and a
+        caller needs both to say which shape did not fit and why.
+        Collapsing that into a generic refusal would discard the only
+        two facts a caller can act on.
+
+        Raises ClaimRefused when the booking itself is declined: a claim
+        cannot book past its own limits, and a node cannot be booked
+        past the room its placements have left. Those two reasons are
+        not in the API layer's claim refusal table, because nothing a
+        REST caller can reach books a hold yet; whatever adds that route
+        adds them there too.
+        """
+        # Imported here rather than at module scope because the
+        # scheduler reaches instances, which reach artifacts, which
+        # reach namespaces, which reach this module.
+        from shakenfist import scheduler as scheduler_module
+
+        if not shapes:
+            raise ValueError('book_holds() needs at least one shape')
+
+        requested = [
+            {'cpus': int(shape['cpus']),
+             'memory_mb': int(shape['memory_mb']),
+             'disk_gb': int(shape['disk_gb'])}
+            for shape in shapes]
+
+        if scheduler is None:
+            scheduler = scheduler_module.Scheduler()
+        assignment = scheduler.find_candidates_for_shapes(
+            [scheduler_module.PlacementShape(
+                cpus=shape['cpus'], memory_mb=shape['memory_mb'],
+                disk_gb=shape['disk_gb'], affinity={},
+                namespace=self.namespace)
+             for shape in requested],
+            related_objects=[self])
+
+        result = mariadb.book_claim_holds(str(self.uuid), [
+            dict(shape, node_uuid=str(assignment[index][0]))
+            for index, shape in enumerate(requested)])
+
+        if not result['booked']:
+            if not result['success']:
+                raise exceptions.WriteException(
+                    'holds for namespace claim %s could not be written: %s'
+                    % (self.uuid, result['error']))
+            raise ClaimRefused(result['refused_reason'],
+                               dimensions=result['dimensions'])
+
+        self.add_event(
+            EVENT_TYPE_MUTATE, 'booked shape holds',
+            extra={'holds': [_hold_summary(hold)
+                             for hold in result['holds']]})
+        return result['holds']
+
+    def holds(self) -> list[mariadb.NamespaceClaimHoldRow]:
+        """Every hold booked against this claim, oldest first."""
+        return mariadb.get_namespace_claim_holds(str(self.uuid))
+
+    def release_holds(
+            self, hold_uuids: Optional[list[str]] = None,
+            all_holds: bool = False
+    ) -> list[mariadb.NamespaceClaimHoldRow]:
+        """Give back named holds, or every hold this claim has booked.
+
+        A request naming nothing and not setting ``all_holds`` raises
+        ValueError rather than releasing everything: a list that went
+        missing on the way here must not read as "all of them".
+
+        Returns the rows that are now gone, which is empty when there
+        was nothing left to release -- a repeat release is harmless, like
+        a repeat delete. Raises WriteException when the release could
+        not be written, because a caller told the room was back when it
+        is not would go on to place something that cannot fit.
+        """
+        result = mariadb.release_claim_holds(
+            str(self.uuid), hold_uuids=hold_uuids, all_holds=all_holds)
+
+        if not result['success']:
+            raise exceptions.WriteException(
+                'holds for namespace claim %s could not be released: %s'
+                % (self.uuid, result['error']))
+
+        if result['released']:
+            self._event_released_holds(
+                'released shape holds', result['released'])
+        return result['released']
 
     def external_view(
             self, row: Optional[mariadb.NamespaceClaimRow] = None
@@ -396,6 +546,11 @@ class NamespaceClaim(dbo):
         the capacity back inside the same transaction that removes the
         row.
 
+        The claim's shape holds go back in that same transaction and for
+        the same reason. A hold is room inside this claim's limits, so
+        one that outlived the claim would be a booking charged to a node
+        with nothing left to account for it.
+
         Deleting twice is harmless; the second call finds no row and
         returns nothing. A delete that *failed*, though, is not the same
         as one that found nothing, and this raises rather than carrying
@@ -424,7 +579,12 @@ class NamespaceClaim(dbo):
                 'returned_cpus': result['returned_cpus'],
                 'returned_memory_mb': result['returned_memory_mb'],
                 'returned_disk_gb': result['returned_disk_gb'],
-                'clamped': result['clamped']
+                'clamped': result['clamped'],
+                # The bookings that went with it, named rather than
+                # counted: this is the last record anything keeps of
+                # them, because the claim's own events are about to go.
+                'released_holds': [_hold_summary(hold)
+                                   for hold in result['released_holds']],
             }
             self.log.with_fields(returned).info(
                 'Namespace claim deleted, capacity returned to the cluster')
