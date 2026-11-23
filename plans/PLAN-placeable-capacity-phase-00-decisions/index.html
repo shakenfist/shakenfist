@@ -17777,8 +17777,26 @@ guarded increment already move (<code>_floored_node_decrement()</code>,
 figures it already publishes
 (<code>shakenfist/scheduler.py:457-545</code>), and nets held room out of
 <code>cpu_available</code>, <code>ram_available</code> and <code>disk_available</code>, because
-those are the figures a client-side ledger model reads. The fields
-go in that shared payload builder, not in the bound
+those are the figures a client-side ledger model reads.</p>
+<div class="admonition note">
+<p class="admonition-title">Amended by phase 3</p>
+<p>Phase 3's <code>D4</code> and <code>D5</code> amend this paragraph on two points,
+and leave the rest of this decision intact. Held room is
+<strong>not</strong> netted out of <code>disk_available</code>: unlike the other two
+figures, that one carries no ledger term at all -- it is
+filesystem free space less the node's reservation -- so
+subtracting a booking from it would be the first ledger term
+in a measured figure and would disagree with the guard, which
+tests against <code>limit_disk_gb</code>. It is also the reason the disk
+ledger is published beside it rather than folded into it. All
+three held figures are still published. And the published
+middle figure is <code>ram_held_mb</code>, not <code>memory_held_mb</code>: the
+column stays <code>held_memory_mb</code> to match <code>used_memory_mb</code>, while
+the figure matches the <code>ram_committed</code> and <code>ram_available</code> it
+sits beside -- a split this codebase already carries.
+See <code>PLAN-placeable-capacity-phase-03-holds-schema.md</code>. The fields</p>
+</div>
+<p>go in that shared payload builder, not in the bound
 <code>Scheduler.summarize_resources()</code> at <code>:1377</code>, whose own docstring
 records it as retained for the test suite and called by no
 production code.</p>

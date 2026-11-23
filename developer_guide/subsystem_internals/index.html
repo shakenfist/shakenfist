@@ -16107,6 +16107,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#shape-holds-and-the-held-counters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shape holds and the held counters
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -16640,6 +16651,121 @@ to survive.</p>
   <code>values()</code> reorders by column rather than by call order, so it is
   recorded in this repository's <code>AGENTS.md</code> as well as here.</li>
 </ul>
+<h3 id="shape-holds-and-the-held-counters">Shape holds and the held counters<a class="headerlink" href="#shape-holds-and-the-held-counters" title="Permanent link">&para;</a></h3>
+<p>A capacity claim can book room for instances it has not created yet. Each
+booking is a <strong>hold</strong>: one row in <code>namespace_claim_holds</code> recording a shape
+(<code>cpus</code>, <code>memory_mb</code>, <code>disk_gb</code>), the claim and namespace it belongs to,
+and the node it was booked on. A hold is room <em>inside</em> the claim's own
+limits, promised to one node, which no other placement may take.</p>
+<p>The hold rows are the ground truth. <code>scheduler_node_capacity.held_cpus</code>,
+<code>held_memory_mb</code> and <code>held_disk_gb</code> are a per-node fold of them, in the
+same relation as <code>used_*</code> is to the placement reference rows. Booking and
+release keep the counters current on the hot path; the reconciler then
+recomputes them from the rows wholesale on every pass and overwrites
+whatever it finds, so a counter that drifted is corrected rather than
+trusted. Admission never touches <code>held_*</code>: an admission records an
+instance arriving, which charges <code>used_*</code>.</p>
+<p>Three columns are worth knowing before reading the table's definition:</p>
+<ul>
+<li><strong><code>instance_uuid</code> is the whole of the consumption state.</strong> Null means
+  the hold is unconsumed; set means an instance is using it. There is
+  deliberately no boolean beside it, because a flag would be a second
+  ledger that agrees with the uuid only until the next write. What a
+  consumed hold still contributes cannot be computed without the
+  instance anyway. Nothing sets the column yet, so every hold is
+  currently unconsumed.</li>
+<li><strong><code>node_uuid</code> is nullable</strong> because a hold outlives its node. Null says
+  the room is still owed to the claim but is currently unplaced, and such
+  a hold contributes to no node's counters.</li>
+<li><strong><code>namespace</code> is a denormalisation</strong> of what the claim row already
+  says, carried so the per-node fold and the release paths do not join to
+  <code>namespace_claims</code>. The reconciler is its authority.</li>
+</ul>
+<p>There are no foreign keys, as with every table in the capacity family;
+integrity between a hold, its claim, its node and its instance is the
+reconciler's job. <code>created_at</code> and <code>updated_at</code> are server-side, and are
+the only timestamps in the family stored as <code>DATETIME(6)</code>: shrinking a
+claim releases the most recently booked holds first, and at whole-second
+precision two bookings in the same second tied and fell back to uuid
+order. Every statement that stamps a hold must use <code>NOW(6)</code>, because
+<code>NOW()</code> inserted into a <code>DATETIME(6)</code> column stores <code>.000000</code> and the
+column would advertise precision it never received.</p>
+<p><strong>What a consumed hold contributes.</strong> The reconciler computes each node's
+<code>held_*</code> as the sum, over that node's holds, of the hold's size less the
+consuming instance's own request, read from the <code>instances</code> row that the
+usage recompute already joins. An unconsumed hold's residue is its full
+size, which falls out of the same expression through a <code>LEFT JOIN</code>. The
+instance's request is not copied onto the hold row, because that would be
+a third ledger, and reading it from the instance means a residue and
+<code>used_*</code> cannot disagree about one instance. Each hold's contribution is
+clamped at zero <em>before</em> the sum (<code>GREATEST(0, ...)</code>), so an instance
+resized larger than its hold cannot offset another hold's booking on the
+same node. Only holds whose claim is in coverage state <code>active</code> count.
+A hold whose node has no capacity row after the pass contributes to
+nothing and is left alone, neither deleted nor given a null node, for the
+reason an instance stranded on a drained hypervisor is excluded from the
+unclaimed totals.</p>
+<p>Two statements say what a hold may and may not do:</p>
+<ul>
+<li><strong>A claim cannot book past its own limits</strong>: the sum of its holds is at
+  most <code>limit_*</code> in each dimension. It is tested inside the claim's own
+  guarded <code>UPDATE</code>, as a correlated scalar subquery in its <code>WHERE</code> (see
+  <a href="../database_internals/#the-rules">the rules for guarded counters</a>),
+  with <code>COALESCE</code> around the <code>SUM</code> because a claim with no holds would
+  otherwise compare against <code>NULL</code> and fail its own guard.</li>
+<li><strong>A node cannot be booked past its room</strong>: the node guard is
+  <code>used_* + held_* + request &lt;= limit_*</code>, for admissions and bookings
+  alike, so a booking binds every other namespace's creates and not only
+  the holder's. The claim branch and the cluster branch of an admission do
+  not gain a hold term, because a hold is already inside the claim's
+  limits and so inside <code>claimed_*</code>.</li>
+</ul>
+<p><strong>Held disk must never enter the disk limit.</strong> The reconciler derives
+<code>limit_disk_gb</code> from <code>used_disk_gb</code> plus the headroom the filesystem
+reports. Adding held disk to that term raises the limit by exactly the
+bookings, and the guard then admits them a second time. The call takes
+<code>used[2]</code> alone and a named test asserts it, because the mistake is one
+word on a line that already passes a <code>used_*</code> figure.</p>
+<p><strong>Release.</strong> A hold ends in exactly four ways: a caller releases it,
+its claim is deleted, the expiry sweep lapses the claim, or a shrink
+leaves the sum of holds above the new limit. It does <em>not</em> end when its
+instance is deleted. Claim delete and the expiry sweep release every
+hold the claim has; a shrink names the holds it releases one by one,
+newest first, stopping as soon as the claim fits, and considers only the
+dimensions actually being shrunk. All four go through one helper, so the
+node counters come back by the same arithmetic however a hold ended.
+The shrink's floor is still <code>used_* &lt;= new limit</code> and is not raised to
+<code>used + held</code>. Releases decrement the node counters with a floored form
+so a counter the reconciler has not yet corrected cannot go negative.
+<code>release_claim_holds</code> refuses a request that names no holds and does not
+set <code>all_holds</code>, rather than reading an empty list as "all of them": a
+caller whose list went missing must not release everything.</p>
+<p><strong>Where the arithmetic is mirrored.</strong> <code>Scheduler._has_sufficient_cpu()</code> and
+the ledger sub-check of <code>_has_sufficient_ram()</code> charge a node
+<code>committed + held</code> against the limit, and the live memory sub-check treats
+a node's held memory as resident, because a booked instance's memory will
+be. There is no matching disk term in the pre-filter, which is the
+existing asymmetry between its disk and cpu/memory checks and is not a
+property of holds. <code>_summarize_resources()</code> publishes <code>cpu_held</code>,
+<code>ram_held_mb</code> and <code>disk_held_gb</code> per node, nets held out of <code>cpu_available</code>
+and <code>ram_available</code> (before the maximum against measured usage, so the
+published figure agrees with the pre-filter), and does <strong>not</strong> net it out
+of <code>disk_available</code>, which is a filesystem measurement with no ledger term
+in it. A client modelling the ledger reads <code>disk_limit_gb</code>,
+<code>disk_committed_gb</code> and <code>disk_held_gb</code>.</p>
+<p>Any test that says a pre-filter and the guard agree has to compare them
+one dimension at a time. Memory is usually the binding dimension on these
+nodes, so a whole-statement comparison passes with the cpu term deleted
+from the guard, hidden behind the memory clause that refuses in all the
+same cases.</p>
+<p>Nothing a caller can reach creates a hold yet: there is no API route and
+no advertised capability, so <code>held_*</code> is zero everywhere and these terms
+change no arithmetic in a running cluster. Booking is reachable only
+through the database tier's RPCs and <code>NamespaceClaim.book_holds()</code>. The
+booking refusal reasons <code>claim_capacity</code> and <code>node_capacity</code> are not in
+the API layer's claim refusal table (<code>CLAIM_REFUSAL_STATUS</code>) and have to be
+mapped by whatever adds the route; <code>not_found</code> and <code>not_active</code> already
+are.</p>
 <h2 id="node-resource-health">Node resource health<a class="headerlink" href="#node-resource-health" title="Permanent link">&para;</a></h2>
 <p>Node storage health drives <code>node.state</code>, on a different axis from the
 daemon-liveness watchdog below. <code>shakenfist/resource_health.py</code> is the

@@ -16945,8 +16945,8 @@ landed reads <code>—</code>. Phases that land in client-python record
 </tr>
 <tr>
 <td>3. Shape holds: schema and the node guard (<code>A</code>)</td>
-<td>PLAN-placeable-capacity-phase-03-holds-schema.md (to be written)</td>
-<td>Not started</td>
+<td><a href="../PLAN-placeable-capacity-phase-03-holds-schema/">PLAN-placeable-capacity-phase-03-holds-schema.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -17045,9 +17045,19 @@ before either admission change.</p>
 <li><strong>Phase 4</strong> is the hold lifecycle: implicit best-fit and explicit
   consumption (<code>G3</code>), holds that return on delete for the claim's
   life, re-placement in the same transaction or displacement when a
-  node leaves service (<code>D8</code>), and ground-truth overbooking. A
-  displaced hold defends no slot, which is why phase 0's <code>D15</code> has
-  it reported rather than quietly retained as an aggregate.</li>
+  node leaves service (the brief's <code>D8</code>), and ground-truth
+  overbooking. A displaced hold defends no slot, which is why phase
+  0's <code>D15</code> has it reported rather than quietly retained as an
+  aggregate. <strong>Prerequisite, found by phase 3's survey (its <code>R3</code>):</strong>
+  phase 4 is what makes holds reachable, by advertising <code>A</code>'s
+  capability, and a refusal caused by another namespace's hold is
+  not transient — no retry clears it until the claim releases it.
+  <code>capacity_guard</code> is in <code>TRANSIENT_CAPACITY_STAGES</code> today, and the
+  comment there already says that a denial which stops meaning
+  "momentary shortage" must be split out of that set rather than
+  silently inheriting it. So the split lands no later than the
+  capability: either phase 4 carries it, or phases 4 and 5 swap.
+  That choice is this plan's and is not yet made.</li>
 <li><strong>Phase 5</strong> gives claim refusals the <code>stage</code>/<code>transient</code>/
   <code>Retry-After</code> contract (no open issue; see <code>S1</code>), adds the
   held-create refusal fields (<code>G7</code>), and states the split of claim
@@ -17140,9 +17150,18 @@ already assigned, which phase 3's hold evaluation has to decide what
 to do about.</p>
 <h3 id="phase-3-shape-holds-schema-and-the-node-guard-a">Phase 3: shape holds — schema and the node guard (<code>A</code>)<a class="headerlink" href="#phase-3-shape-holds-schema-and-the-node-guard-a" title="Permanent link">&para;</a></h3>
 <p>Add a claim's ability to carry shapes and book them onto nodes. The
-schema decision (<code>Q4</code>) is the per-node held column beside <code>used_*</code>:
-its shape, its reconciler recomputation from hold rows, and how
-claim migration carries bookings. The node guard becomes <code>used +
+schema decision (<code>Q4</code>) is answered by phase 0's <code>D8</code>: hold rows in
+a table of their own are the ground truth, and the per-node held
+dimension is three columns on <strong><code>scheduler_node_capacity</code></strong>, beside
+<em>that</em> table's <code>used_*</code> — not on <code>namespace_claims</code>, whose counters
+are namespace-denominated and node-independent and so cannot carry
+a per-node quantity. This section used to say "the per-node held
+column beside <code>used_*</code>" without naming the table, which left a
+reading that cannot be guarded in SQL; phase 3's survey (<code>F2</code>)
+corrected it here. What phase 3 owns is that column's reconciler
+recomputation from hold rows, how claim migration carries bookings
+(it carries none), the node guard, and the release paths that
+belong to a claim's own lifecycle. The node guard becomes <code>used +
 held + request &lt;= limit</code> for every create (<code>G6</code>), a consuming
 create excluding its own hold in the same statement; this is the
 node guard's switch, kept apart from <code>CLAIM_ENFORCEMENT_HARD</code>. Claim
@@ -17150,6 +17169,13 @@ limits are validated, at creation and update, to be at least the sum
 of the claim's holds. The claim branch of
 <code>admit_instance_placement()</code> is otherwise unchanged, since holds sit
 inside <code>claimed</code>.</p>
+<p>Phase 3 ships no API surface and advertises no capability: <code>G5</code>
+allows one capability string for <code>A</code>, and <code>A</code> is not usable until a
+create can consume a hold, so the token is phase 4's. Nothing a
+REST caller can reach writes a hold row in phase 3's release, which
+is deliberate — every arithmetic change phase 3 makes to the guard
+every instance create passes through is a no-op in production until
+phase 4 lands. See that phase plan's <code>D6</code>.</p>
 <h3 id="phase-4-shape-holds-consumption-release-and-displacement">Phase 4: shape holds — consumption, release and displacement<a class="headerlink" href="#phase-4-shape-holds-consumption-release-and-displacement" title="Permanent link">&para;</a></h3>
 <p>The lifecycle (<code>D3</code>, <code>D8</code>): a create consumes the smallest hold it
 fits within (best fit, memory then vCPUs then disk) on a node
@@ -17310,6 +17336,18 @@ stale (see the Prompt).</p>
   <code>D10</code> found 10 post-change refusals in standing <code>ucs-lab-*</code>
   namespaces and no record of who creates them; worth knowing before
   the design is called "every caller".</li>
+<li><strong>The disk ledger in the placement pre-filter.</strong>
+  <code>_has_sufficient_disk()</code> reads no capacity row: it tests
+  filesystem free space, and neither <code>used_disk_gb</code> nor (after phase
+  3) <code>held_disk_gb</code> appears in the pre-filter, so a node's booked
+  and committed disk is invisible until the admission guard refuses
+  it and the create walks to the next candidate. The cost is a
+  wasted admission attempt per candidate rather than a spurious
+  refusal. Phase 3 declined to close it (its <code>D11</code>): adding a ledger
+  term there changes behaviour for every create in the cluster, held
+  or not, on the stage that produced the largest single family of
+  refusals in placeable-claims phase 5a's reading, and it should be
+  decided with a measurement rather than on the way past.</li>
 <li><strong>Affinity across a set's own members.</strong> Phase 1's <code>D6</code> charges
   capacity across a multiset but leaves the hard affinity filter
   and the scorer blind to the set's tentatively placed members,

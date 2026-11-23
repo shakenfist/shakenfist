@@ -17123,6 +17123,31 @@ checked against the allocation ledger, not just the pre-filters'
 measurements above. See
 <a href="../database/"><code>docs/operator_guide/database.md</code></a> for the RPCs and the
 tables they draw down.</p>
+<p>The node-side test in that claim is <code>used + held + request &lt;= limit</code> for
+each of cpus, memory and disk, where <code>held</code> is room a capacity claim has
+booked on the node for instances it has not created yet. Booked room
+therefore binds every namespace's creates on that node, not only the
+claim holder's. The CPU and RAM pre-filters charge the same <code>held</code>
+figure, and the live memory check treats a node's held memory as
+resident, since a booked instance's memory will be. The claim and
+cluster halves of the claim are unchanged: a hold sits inside its claim's
+own limits, which the cluster already counts in full.</p>
+<p>Each node's held room is published in <code>/admin/resources</code> as <code>cpu_held</code>,
+<code>ram_held_mb</code> and <code>disk_held_gb</code>, beside the committed figures and with
+the same convention that a node with no capacity row reports zero.
+<code>cpu_available</code> and <code>ram_available</code> already have held room netted out of
+them. <code>disk_available</code> does <strong>not</strong>: it is a filesystem measurement, and
+the disk ledger is published beside it rather than folded into it. A
+reader who wants the disk ledger reads <code>disk_limit_gb</code>,
+<code>disk_committed_gb</code> and <code>disk_held_gb</code>. The disk pre-filter does not read
+the ledger at all, so held disk becomes visible to a create only when the
+guard refuses it, and the placement walk then moves to the next
+candidate.</p>
+<p>There is currently no operator-facing way to create a hold. No API
+route, command or capability books one, so <code>held</code> is zero on every
+cluster and these terms change no refusal you will see today. They are
+in place so that the booking that arrives later does not have to change
+the guard every instance create passes through.</p>
 <p>A refused candidate is not a failed create: there is a single shared
 placement walk (<code>Instance.place_on_candidates()</code>) that both the create
 path and the start-redirect operation use. It calls <code>place_instance()</code>

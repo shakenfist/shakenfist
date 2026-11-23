@@ -16625,21 +16625,47 @@ neither should grow one.</p>
   guarded single-row <code>UPDATE</code> was correct, deadlock-free and fastest
   in every cell. A scalar subquery reading one row from inside the
   guarded <code>UPDATE</code> is not an aggregate guard.</li>
-<li><strong>Counters are allocation ledgers, not measurements.</strong> <code>used_*</code>
+</ul>
+<p>A third form is permitted, and the two designs above do not cover it: an
+  aggregate subquery in the <code>WHERE</code> of a guarded single-row <code>UPDATE</code>, as in
+  the namespace claim's <code>sum(holds) &lt;= limit</code> invariant. What the two
+  rejected designs share is that the guard and the write are separable, so
+  two transactions can each satisfy the guard before either has written.
+  Here they are one statement, so serialisation comes from the single
+  row's own lock, and InnoDB re-evaluates the <code>WHERE</code>, subquery included,
+  against the row as committed by whoever held the lock first. It must
+  be inside the <code>UPDATE</code>: a <code>SELECT SUM(...)</code> ahead of it is a separable
+  guard again, and under snapshot isolation it is also the statement the
+  first-statement rule forbids. Guard the aggregate with <code>COALESCE</code>, since
+  <code>SUM</code> over no rows is <code>NULL</code> and the comparison against <code>NULL</code> is never
+  true.</p>
+<p>This was measured rather than argued. Replacing the subquery with a
+  probe followed by a comparison let 8 of 8 concurrent bookings take one
+  claim's entire allowance; the subquery form let exactly 1 land. That was
+  on MariaDB 11.8 with <code>innodb_snapshot_isolation</code> on and on 10.11 with it
+  off. The evidence is 8-way concurrency, which is representative of the
+  known callers (a conductor books about ten shapes in a pass), and is
+  well short of the scale of the original benchmark, so the rule has not
+  been re-derived at that scale. One residual risk is accepted rather than
+  argued away: the subquery scans the holds index while the same
+  transaction later inserts into it, which can deadlock. That is retried
+  (1213 is in <code>_TRANSIENT_TRANSACTION_ERRNOS</code>) and nothing livelocked
+  across the concurrency tests, which is the distinction the benchmark
+  drew between a deadlock and a livelock.
+- <strong>Counters are allocation ledgers, not measurements.</strong> <code>used_*</code>
   counts what was granted, so a powered-off instance keeps its
   reservation though no measurement sees it. An admission which must
   also compare against a measurement reads it inside the same
   transaction, as a subquery in the guarded <code>UPDATE</code>'s <code>WHERE</code> (which
   is how <code>_demand_guard_clause()</code> reads <code>node_metrics</code>), and never
-  substitutes one for the other.</li>
-<li><strong>Admission and release do the drawdown; the reconciler heals drift.</strong>
+  substitutes one for the other.
+- <strong>Admission and release do the drawdown; the reconciler heals drift.</strong>
   The hot path keeps the counters current; the reconciler recomputes
   them wholesale and overwrites what it finds. A difference between
   the two is drift, corrected on the next pass. Do not make the
   reconciler the only writer: a counter as stale as its cadence guards
   nothing. An admission committed during a pass may be overwritten by
-  it and is reinstated by the next, which sees its placement.</li>
-</ul>
+  it and is reinstated by the next, which sees its placement.</p>
 <h3 id="reading-the-counters">Reading the counters<a class="headerlink" href="#reading-the-counters" title="Permanent link">&para;</a></h3>
 <p>A read returns the counters with two flags kept apart: whether the row
 exists, and whether the read itself failed. "Not reconciled yet" and
@@ -16652,11 +16678,21 @@ database daemon's own failure in their <code>degraded</code> field, and
 <code>degraded</code> with every figure <code>null</code> when either says so (see
 <a href="../../operator_guide/scheduler/#the-cluster-wide-ledger-in-the-resources-response">the cluster-wide ledger</a>).</p>
 <h3 id="the-schedulers-instance">The scheduler's instance<a class="headerlink" href="#the-schedulers-instance" title="Permanent link">&para;</a></h3>
-<p>Three tables: <code>scheduler_node_capacity</code> (a row per schedulable
-hypervisor), <code>namespace_claims</code> (a row per claim) and <code>cluster_capacity</code>
-(a singleton of totals, claimed and unclaimed-used counters). Their
-canonical order is <code>cluster_capacity</code>, then <code>namespace_claims</code>, then
-<code>scheduler_node_capacity</code>. Admission and release are the
+<p>Four tables: <code>scheduler_node_capacity</code> (a row per schedulable
+hypervisor), <code>namespace_claims</code> (a row per claim), <code>cluster_capacity</code>
+(a singleton of totals, claimed and unclaimed-used counters) and
+<code>namespace_claim_holds</code> (a row per shape a claim has booked on a node,
+schema version 1; see <a href="../subsystem_internals/#shape-holds-and-the-held-counters">shape
+holds</a>). The
+canonical order of the first three is <code>cluster_capacity</code>, then
+<code>namespace_claims</code>, then <code>scheduler_node_capacity</code>, and
+<code>namespace_claim_holds</code> goes last, after all three. That position changes
+no existing writer's order, so the deadlock-freedom argument for the other
+three carries over unchanged, and it is the order a booking wants anyway:
+test the claim, charge the nodes, then record what was booked. A
+transaction that touches holds must not take a lock on any of the other
+three after it has written a hold row.</p>
+<p>Admission and release are the
 <code>AdmitInstancePlacement</code> and <code>ReleaseInstancePlacement</code> RPCs
 (<code>_direct_admit_instance_placement()</code>,
 <code>_direct_release_instance_placement()</code>), the claim CRUD RPCs are a
