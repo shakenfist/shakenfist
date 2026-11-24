@@ -85,6 +85,37 @@ teardown powers nodes off and the reusable workflow's does not. It has no
 `concurrency_key` to pass, so its own `concurrency.group` carries the lane
 name, and the seam test reads it from there.
 
+### The node lifecycle lane is where cluster-disturbing checks live
+
+`nodelifecycletests.sh` runs alone against its own `slim-primary` cluster
+and breaks that cluster on purpose, so it is the home for any check whose
+side effects would fail unrelated tests if it ran inside a stestr suite.
+It carries three such exercises, two of them beyond the node kills it is
+named for:
+
+- the documented `API_VALIDATION_MODE` rollback, which flips a
+  cluster-wide config value and restarts sf-api
+  (`apivalidationrollbacktests.py`);
+- node resource health, which makes a hypervisor's storage really fail —
+  a read-only bind mount over `STORAGE_PATH/uploads` — and asserts the
+  node reaches `error` with a diagnosis naming the path, leaves the
+  scheduler's candidate set, publishes `node_resource_health` 0, and
+  comes back only when `sf-ctl clear-node-error` is run
+  (`noderesourcehealthtests.py`);
+- the node kills themselves, and the maintainer failover they force.
+
+The constraint that puts the second one here is worth stating, because it
+applies to anything that would error a node. `slim-tier`'s three nodes are
+all hypervisors and sum to exactly the cluster ledger floor
+`cluster_ci_tests/test_nodes.py` asserts, and the two non-network
+hypervisors `test_network_lifecycle.py` pins instances onto are the only
+two a fault could pick from — so erroring one inside `cluster-ci.conf`
+would fail tests that have nothing to do with the fault. What the cluster
+suite keeps is the half that is read-only:
+`cluster_ci_tests/test_node_health.py` asserts every node publishes a
+healthy gauge and a write heartbeat in each path its roles declare, which
+catches a probe thread that never started on the merge that broke it.
+
 Two of its steps reach the cluster's nodes over ssh: the cached-image
 upload, which deliberately targets a hypervisor rather than the primary,
 and `tools/ci-restart-cluster-nodes.sh`, which power cycles the nodes

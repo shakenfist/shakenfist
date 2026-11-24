@@ -206,6 +206,27 @@ if ! python3 apivalidationrollbacktests.py --mode enforce; then
 fi
 log "API validation rollback checks complete"
 
+# Prove that a dead storage path takes a node out of scheduling, and that
+# sf-ctl clear-node-error puts it back (issue 4960). This lives here rather
+# than in the stestr cluster suite for the same reason the rollback checks
+# above do, only more so: it errors a hypervisor, and on slim-tier the three
+# nodes are all hypervisors summing to exactly the cluster ledger floor
+# cluster_ci_tests/test_nodes.py asserts, so erroring one inside a suite
+# which runs concurrently would fail unrelated tests. This job disturbs its
+# cluster by design and runs nothing else while it does.
+#
+# Run before any instances exist, so nothing in the cluster is relying on
+# the faulted node, and the script restores the mount and clears the node
+# error whatever happens. noderesourcehealthtests.py explains why the fault
+# is a read-only bind mount over the uploads path specifically.
+echo
+log "=== Node resource health checks ==="
+if ! python3 noderesourcehealthtests.py; then
+    log "Node resource health assertions failed"
+    exit 1
+fi
+log "Node resource health checks complete"
+
 # Launch two instances on each hypervisor, each on its own network
 echo
 for hypervisor in ${hypervisors}; do
