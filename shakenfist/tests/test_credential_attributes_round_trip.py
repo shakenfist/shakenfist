@@ -34,18 +34,18 @@ KEY_UUID = UUID('11111111-1111-4111-8111-111111111111')
 
 
 class CredentialAttributesRoundTripTestCase(base.ShakenFistTestCase):
-    # (what fails on the server, what the client calls, the SQL-ish
-    # fragment the server's exception message carries).
+    # (what fails on the server, what the client calls, the RPC whose
+    # name is all the status detail carries -- see _rpc_error()).
     READERS = [
         ('_direct_get_namespace_key_attributes',
          '_grpc_get_namespace_key_attributes',
-         'namespace key attributes'),
+         'GetNamespaceKeyAttributes'),
         ('_direct_get_trusted_issuer_attributes',
          '_grpc_get_trusted_issuer_attributes',
-         'trusted issuer attributes'),
+         'GetTrustedIssuerAttributes'),
         ('_direct_get_mapping_rule_attributes',
          '_grpc_get_mapping_rule_attributes',
-         'mapping rule attributes'),
+         'GetMappingRuleAttributes'),
     ]
 
     def setUp(self):
@@ -104,7 +104,7 @@ class CredentialAttributesRoundTripTestCase(base.ShakenFistTestCase):
                     self._client_reads(wrapper, direct, side_effect=self.BOOM)
 
                 raised = str(cm.exception)
-                self.assertIn(f'{expected} could not be read', raised)
+                self.assertIn(f'database {expected} failed', raised)
                 self.assertNotIn('SQL:', raised)
                 self.assertNotIn('parameters:', raised)
 

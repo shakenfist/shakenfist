@@ -24018,6 +24018,16 @@ def _direct_delete_cluster_operation(uuid: UUID) -> bool:
         return False
 
 
+# What a placement, claim, hold or enqueue result's ``error`` says when
+# the database failed. Never the exception: a SQLAlchemy error renders as the
+# statement and its bound parameters, an RpcError carries the database
+# node's address, and these results reach add_event()'s extra on the
+# instance or claim, which a tenant can read through the API (#5027).
+# Every site logs the exception itself, where it happened.
+_RESULT_ERROR_DATABASE = 'MariaDB error; the cause is logged where it ran'
+_RESULT_ERROR_UNAVAILABLE = 'database unavailable; the cause is logged'
+
+
 def _direct_create_and_enqueue_cluster_operation(
         op_uuid: UUID,
         operation_type: str,
@@ -24184,13 +24194,13 @@ def _direct_create_and_enqueue_cluster_operation(
             return True, ''
         LOG.warning(
             f'MariaDB atomic create+enqueue refused duplicate '
-            f'cluster_operation {op_uuid}')
-        return False, f'duplicate cluster_operation uuid: {e}'
+            f'cluster_operation {op_uuid}: {e}')
+        return False, f'duplicate cluster_operation uuid {op_uuid}'
     except OperationalError as e:
         LOG.warning(
             f'MariaDB atomic create+enqueue failed for '
             f'cluster_operation {op_uuid}: {e}')
-        return False, f'MariaDB error: {e}'
+        return False, _RESULT_ERROR_DATABASE
 
 
 def _direct_set_cluster_operation_error(
@@ -24561,7 +24571,7 @@ def _grpc_create_and_enqueue_cluster_operation(
         LOG.warning(
             f'gRPC CreateAndEnqueueClusterOperation failed for '
             f'{op_uuid}: {e}')
-        return False, f'gRPC error: {e}'
+        return False, _RESULT_ERROR_UNAVAILABLE
 
 
 def _grpc_set_cluster_operation_error(
@@ -30849,7 +30859,7 @@ def _direct_admit_instance_placement(
             f'MariaDB admit_instance_placement failed for '
             f'{instance_uuid}: {e}')
         result['success'] = False
-        result['error'] = f'MariaDB error: {e}'
+        result['error'] = _RESULT_ERROR_DATABASE
         return result
 
 
@@ -30986,7 +30996,7 @@ def _direct_release_instance_placement(
             f'MariaDB release_instance_placement failed for '
             f'{instance_uuid}: {e}')
         result['success'] = False
-        result['error'] = f'MariaDB error: {e}'
+        result['error'] = _RESULT_ERROR_DATABASE
         return result
 
 
@@ -31133,9 +31143,9 @@ def _grpc_admit_instance_placement(
             # upgraded. Name the cause so the resulting 500 does.
             result['error'] = (
                 'database service predates AdmitInstancePlacement; '
-                f'upgrade sf-database before sf-api: {e}')
+                'upgrade sf-database before sf-api')
         else:
-            result['error'] = f'database unavailable: {e}'
+            result['error'] = _RESULT_ERROR_UNAVAILABLE
         return result
 
 
@@ -31179,7 +31189,7 @@ def _grpc_release_instance_placement(
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.error(f'gRPC ReleaseInstancePlacement failed: {e}')
         result['success'] = False
-        result['error'] = f'database unavailable: {e}'
+        result['error'] = _RESULT_ERROR_UNAVAILABLE
         return result
 
 
@@ -32077,7 +32087,7 @@ def _direct_create_namespace_claim(
         LOG.warning(
             f'MariaDB create_namespace_claim failed for {claim_uuid}: {e}')
         result['success'] = False
-        result['error'] = f'MariaDB error: {e}'
+        result['error'] = _RESULT_ERROR_DATABASE
         return result
 
 
@@ -32420,7 +32430,7 @@ def _direct_update_namespace_claim(
                 f'MariaDB update_namespace_claim failed for '
                 f'{claim_uuid}: {e}')
             result['success'] = False
-            result['error'] = f'MariaDB error: {e}'
+            result['error'] = _RESULT_ERROR_DATABASE
             return result
 
     LOG.warning(
@@ -33062,7 +33072,7 @@ def _direct_book_claim_holds(
         LOG.warning(
             f'MariaDB book_claim_holds failed for {claim_uuid}: {e}')
         result['success'] = False
-        result['error'] = f'MariaDB error: {e}'
+        result['error'] = _RESULT_ERROR_DATABASE
         return result
 
 
@@ -33301,7 +33311,7 @@ def _direct_release_claim_holds(
             LOG.warning(
                 f'MariaDB release_claim_holds failed for {claim_uuid}: {e}')
             result['success'] = False
-            result['error'] = f'MariaDB error: {e}'
+            result['error'] = _RESULT_ERROR_DATABASE
             return result
 
     LOG.warning(
@@ -33467,7 +33477,7 @@ def _direct_delete_namespace_claim(
                 f'MariaDB delete_namespace_claim failed for '
                 f'{claim_uuid}: {e}')
             result['success'] = False
-            result['error'] = f'MariaDB error: {e}'
+            result['error'] = _RESULT_ERROR_DATABASE
             return result
 
     LOG.warning(
@@ -33629,7 +33639,7 @@ def _grpc_create_namespace_claim(
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.error(f'gRPC CreateNamespaceClaim failed: {e}')
         result['success'] = False
-        result['error'] = f'database unavailable: {e}'
+        result['error'] = _RESULT_ERROR_UNAVAILABLE
         return result
 
 
@@ -33663,7 +33673,7 @@ def _grpc_update_namespace_claim(
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.error(f'gRPC UpdateNamespaceClaim failed: {e}')
         result['success'] = False
-        result['error'] = f'database unavailable: {e}'
+        result['error'] = _RESULT_ERROR_UNAVAILABLE
         return result
 
 
@@ -33688,7 +33698,7 @@ def _grpc_delete_namespace_claim(
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.error(f'gRPC DeleteNamespaceClaim failed: {e}')
         result['success'] = False
-        result['error'] = f'database unavailable: {e}'
+        result['error'] = _RESULT_ERROR_UNAVAILABLE
         return result
 
 
@@ -33782,7 +33792,7 @@ def _grpc_book_claim_holds(
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.error(f'gRPC BookNamespaceClaimHolds failed: {e}')
         result['success'] = False
-        result['error'] = f'database unavailable: {e}'
+        result['error'] = _RESULT_ERROR_UNAVAILABLE
         return result
 
 
@@ -33838,7 +33848,7 @@ def _grpc_release_claim_holds(
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.error(f'gRPC ReleaseNamespaceClaimHolds failed: {e}')
         result['success'] = False
-        result['error'] = f'database unavailable: {e}'
+        result['error'] = _RESULT_ERROR_UNAVAILABLE
         return result
 
 

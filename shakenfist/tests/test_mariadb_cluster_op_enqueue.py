@@ -332,7 +332,11 @@ class CreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         )
 
         self.assertFalse(success)
-        self.assertIn('DB down', error)
+        # The cause is logged, never returned: the reason crosses the
+        # database tier and a SQLAlchemy error carries its statement
+        # (#5027).
+        self.assertNotIn('DB down', error)
+        self.assertEqual(mariadb._RESULT_ERROR_DATABASE, error)
         # Only two executes attempted (third would be work_queue).
         self.assertEqual(mock_conn.execute.call_count, 2)
         mock_conn.commit.assert_not_called()
@@ -360,7 +364,11 @@ class CreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         )
 
         self.assertFalse(success)
-        self.assertIn('DB down', error)
+        # The cause is logged, never returned: the reason crosses the
+        # database tier and a SQLAlchemy error carries its statement
+        # (#5027).
+        self.assertNotIn('DB down', error)
+        self.assertEqual(mariadb._RESULT_ERROR_DATABASE, error)
         self.assertEqual(mock_conn.execute.call_count, 3)
         mock_conn.commit.assert_not_called()
 
@@ -561,7 +569,8 @@ class CreateAndEnqueueDeadlockRetryTestCase(base.ShakenFistTestCase):
         )
 
         self.assertFalse(success)
-        self.assertIn('Deadlock found', error)
+        self.assertNotIn('Deadlock found', error)
+        self.assertEqual(mariadb._RESULT_ERROR_DATABASE, error)
         self.assertEqual(
             mariadb._DEADLOCK_MAX_ATTEMPTS,
             mock_conn.execute.call_count)
@@ -642,7 +651,7 @@ class GrpcCreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.mariadb._grpc_call')
     @mock.patch('shakenfist.mariadb._get_database_stub')
-    def test_rpc_error_propagates_exception_detail(
+    def test_rpc_error_reports_a_written_reason(
             self, mock_stub, mock_call):
         import grpc
         mock_call.side_effect = grpc.RpcError('service unavailable')
@@ -650,7 +659,8 @@ class GrpcCreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         success, error = self._call()
 
         self.assertFalse(success)
-        self.assertIn('service unavailable', error)
+        self.assertNotIn('service unavailable', error)
+        self.assertEqual(mariadb._RESULT_ERROR_UNAVAILABLE, error)
 
 
 class CreateAndEnqueueObservationalWireTestCase(base.ShakenFistTestCase):
