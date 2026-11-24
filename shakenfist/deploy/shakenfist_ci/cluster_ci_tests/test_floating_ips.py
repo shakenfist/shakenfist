@@ -130,8 +130,9 @@ class TestFloatingIPLifecycle(base.BaseNamespacedTestCase):
     The host level assertions and the reachability ping run on the
     network node, which the suite discovers from the API and reaches over
     the mesh -- it is not necessarily the node running this suite. If that
-    node cannot be reached the whole test skips loudly. See
-    docs/plans/PLAN-ci-node-exec-assertions.md.
+    node cannot be reached the whole test skips loudly. See "Why
+    assertions run on a named node, over the mesh" in
+    docs/developer_guide/ci.md.
     """
 
     def __init__(self, *args, **kwargs):

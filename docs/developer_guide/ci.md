@@ -360,6 +360,74 @@ rather than ten inline `subprocess` calls:
   that refuses it, so `_require_node_exec()` skips on both without being
   taught the difference.
 
+### Why assertions run on a named node, over the mesh
+
+A test which needs to see real host state -- a network namespace, a link,
+an iptables rule, a libvirt domain -- usually needs to see it on a node
+which is not the one running the suite. In the collection's multi-node
+topologies the suite runs on `primary`, which is deployed with
+`SHAKENFIST_NODE_IS_NETWORK_NODE=False`, and a floating IP's netns,
+`flt-<hex>` veth, `/32` and DNAT rule are plumbed on a separate network
+node (`sf1` in the slim topologies), where the floating network lives as
+an uplink-less island on `egr-br-eth0`.
+
+Assuming otherwise cost coverage twice over. `ping <floating>` run
+locally on `primary` could never succeed, because that host has no
+interface or route onto the floating network, which is the visible
+merge-queue failure on PR #3389. Worse, the host-level plumbing and
+cleanup assertions guarded on a *local* `/var/run/netns/<net>` check,
+false on `primary`, so they silently no-op'd and the floating-leak
+regression coverage they existed for never ran at all.
+
+The API's own `ping` endpoint is not a substitute. It runs
+`ip netns exec <net> ping`, and inside the namespace the floating `/32`
+is local and the DNAT PREROUTING path is never traversed, so it cannot
+answer whether a floating address is reachable. That can only be asked
+from an egress-side vantage, which means the root namespace of the
+network node.
+
+So the helpers on `BaseTestCase` discover the cluster's nodes from `GET
+/nodes` and run a command on a chosen one. Three choices in that design
+are load-bearing:
+
+* **Discovery is API-native, never hardcoded.** `get_nodes()` reports
+  each node's `name`, mesh `ip`, `is_network_node` and `is_hypervisor`,
+  so a test carries no knowledge of the CI IP plan or of node names, and
+  on a single-node cluster the network node resolves to the local host.
+* **Local versus remote is decided by mesh IP, not by name.**
+  `_node_is_local()` compares the node's `ip` against the addresses on
+  this host, because the SF node name (`config.NODE_NAME`, `sf1`) and the
+  OS fqdn (`t-6dFds-1`) are different strings -- the mismatch that
+  already makes the placement tests skip.
+* **An unavailable channel skips loudly.** `_require_node_exec()` runs
+  `true` on the node first and calls `skipTest` with the node's name and
+  mesh IP if that fails. A silent no-op is what hid the breakage above,
+  and a skip which names the node does not.
+
+The deploy prerequisite for the remote path -- the CI key present on the
+suite host as `~/.ssh/id_rsa`, which every node already trusts for
+`debian` -- is in place: `shakenfist/actions`' `smoke-cluster.yml`
+copies `id_ci` onto the primary for every functional job. So a node-exec
+skip is now a real signal rather than the expected state, and should be
+read as the mesh or the key being broken.
+
+Two things these assertions deliberately do not do. They add **no new SF
+API surface**: they observe kernel and libvirt state out of band rather
+than reading SF's own bookkeeping, which could hide the very drift they
+exist to catch. And they do not work by **periodic node-state logging**
+to Loki, which cannot prove reachability at all, is a racy oracle for
+absence and cleanup, and would couple test correctness to log volume. An
+on-demand operator diagnostic dumping a network's host-side plumbing may
+be worth building on its own merits, but not as these tests' mechanism.
+
+Where a test needs the plumbing to be present on a particular pair of
+nodes, it pins instances with `force_placement=<node name>` rather than
+trusting the scheduler to spread them: the presence assertion is only
+deterministic if the test chose the nodes, and choosing two hypervisors
+which are *not* the network node is what makes it sharp, since after
+teardown the network must vanish from both while remaining on the
+network node.
+
 ### Credentials go through the environment, not argv
 
 `_exec()` in the command-line tests writes every command it runs to stderr,
@@ -660,6 +728,20 @@ through the same helper.
 asserts a refusal, needs no successful create and no candidate count,
 and so is expected to run on every topology including a single-node
 one. A skip there is a bug in the test.
+
+### Per-node accounting is never checked against libvirt
+
+`cluster_ci_tests/test_nodes.py` asserts that `/admin/resources` reports
+the nodes it should with the fields it should, but only against Shaken
+Fist's own view of itself. Nothing enumerates the `sf:` domains libvirt
+actually has on a hypervisor and compares their count, vCPU and memory
+totals with that node's ledger entry, so a ledger which drifts from
+reality during create and delete churn is only ever caught from a
+symptom -- a create refused 507 while the cluster has room, which is
+[#3772](https://github.com/shakenfist/shakenfist/issues/3772) -- and
+drift which refuses nothing is invisible. The node-exec helpers make the
+assertion cheap to write; it is tracked as
+[#5059](https://github.com/shakenfist/shakenfist/issues/5059).
 
 ### Upgrade data verification
 

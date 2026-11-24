@@ -697,6 +697,15 @@ run.
 
 ## Stray vxlan reaping
 
+Which networks a node should be carrying is a closed question: a network
+is present on a node **if and only if** that node hosts an instance on
+it, or the node is the network node, which always carries every network
+for DHCP and NAT. Everything else is residue, and the invariant is what
+makes a leak detectable rather than a judgement call -- stale vxlan
+plumbing stranded on a hypervisor an instance has left is the leak class
+this reaping exists for, and the cluster suite's network lifecycle test
+asserts the same invariant from the outside.
+
 Every node's network maintainer compares the vxlan devices actually
 present on the host against the networks that node should be carrying.
 A device which matches nothing is a *stray* -- residue from a network
