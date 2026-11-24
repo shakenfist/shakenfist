@@ -57,7 +57,7 @@ dependencies = [
     # Imported directly by external_api/validation.py, not merely reached
     # through webargs, so it is declared rather than left to arrive as a
     # transitive pin webargs could drop at any release.
-    "marshmallow==4.3.1",                 # mit
+    "marshmallow==4.4.0",                 # mit
     "py-cpuinfo==9.0.0",                  # mit
     "distro==1.9.0",                      # apache2
     "symbolicmode==2.0.1",                # CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
