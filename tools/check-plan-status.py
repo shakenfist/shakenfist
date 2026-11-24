@@ -133,11 +133,12 @@ VOCABULARY_BLOCK_RE = re.compile(
 VOCABULARY_TERM_RE = re.compile(r'^- `([^`]+)`', re.MULTILINE)
 
 # Plans whose phases are not in an Execution table, so their index arithmetic
-# cannot be recomputed. See the index preamble, which names the same three.
+# cannot be recomputed. See the index preamble, which names the same two. A
+# retired plan needs no entry here: its row links a permalink rather than a
+# local file, so this checker never reaches it.
 HAND_COUNTED = {
     'blob-storage-roadmap.md',          # phases as headings
     'api-query-batching-roadmap.md',    # phases as headings
-    'PLAN-attribute-field-masks.md',    # phases as headings
 }
 
 # Plans whose Execution table is explicitly a placeholder, so its row count

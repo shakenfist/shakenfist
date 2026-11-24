@@ -342,7 +342,8 @@ copy lives in shakenfist/development at
     A few of this repository's older roadmaps write their
     phases as prose sections rather than as a table:
     `blob-storage-roadmap.md`, `api-query-batching-roadmap.md`
-    and `PLAN-attribute-field-masks.md`, which are the three
+    and [`PLAN-attribute-field-masks.md`](https://github.com/shakenfist/shakenfist/blob/39433621264676c043cb4e2353d2207255543e28/docs/plans/PLAN-attribute-field-masks.md) (retired; the
+    plans index links its text), which are the three
     named in `check-plan-status.py`'s `HAND_COUNTED`. The
     first two carry a `**Merged**:` line in the phase's own
     section -- beside `**Status**` where the phase has one,
