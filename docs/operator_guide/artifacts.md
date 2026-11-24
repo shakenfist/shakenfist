@@ -131,6 +131,37 @@ does not carry the mirror's digest: that blob was verified when it was
 originally fetched, and the mirror's digest describes the mirror's
 copy rather than this one.
 
+## Transient fetch failures
+
+A fetch which fails on the network rather than on the content is retried
+before the artifact is given up on. An unreachable mirror, a 5xx, a DNS
+hiccup, or a blob replication whose every source timed out awaiting our
+transfer connection, re-queues the fetch after 15, then 30, then 60
+seconds. Each attempt is recorded on the artifact as a `transient fetch
+failure, will retry` or `transient blob replication failure, will retry`
+event carrying the attempt number. Only once that budget is spent does
+the artifact enter `error`, and only then is an instance waiting on the
+fetch torn down.
+
+So an artifact which sat in `creating` for a couple of minutes and then
+succeeded hit a blip rather than anything wanting attention, and one
+which errored was unreachable for the better part of two minutes. The
+retry exists because the alternative was worse than the outage: a
+one-second blip during an `instance create` errored the artifact within
+about fifteen seconds and deleted the instance with it, so a patch
+reboot of a mirror cost a user manual cleanup.
+
+Neither path errors an artifact which already has a good version, since
+other nodes still hold valid copies: only one still in `initial` or
+`creating` is errored. An upstream fetch which was updating such an
+artifact falls back to the already cached version first, and retries
+only if that cached copy is unusable too.
+
+The retry budget is a general cluster-operation facility rather than
+something artifacts have of their own; [the database
+internals](../developer_guide/database_internals.md#the-transient-failure-retry-budget-rides-on-the-work-item)
+describe where the counter lives and why.
+
 ## Sharing artifacts
 
 Artifacts in the system namespace can be shared with all other namespaces.
