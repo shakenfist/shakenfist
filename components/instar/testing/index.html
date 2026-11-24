@@ -16672,6 +16672,28 @@ pre-commit hook and in the <code>ci-tooling</code> job. It rejects any
 the option has to be exempted by name in the script, with its reason;
 <code>tests/test_measure.py</code>, which passes it to <code>instar measure</code> to check
 the refusal, is the one exemption.</p>
+<p><strong>Never use <code>tempfile.NamedTemporaryFile</code> in a test; use <code>ScratchFile</code>
+from <code>tests/helpers/scratch.py</code>.</strong> A failed <code>convert</code>, <code>dd</code> or <code>copy</code>
+removes an output file it left empty
+(<a href="https://github.com/shakenfist/instar/issues/849">#849</a>), so a test
+that expects a refusal can reach the end of its <code>with</code> block with the
+temporary file already gone. Python 3.12 and later ignore that, but
+3.10 and 3.11 raise <code>FileNotFoundError</code> from the cleanup and fail the
+test. The PR gate runs Python 3.13 and cannot see the difference. Only
+the merge queue's Debian 12 and Ubuntu 22.04 legs can, and 25 tests
+built like this ejected every queued pull request
+(<a href="https://github.com/shakenfist/instar/issues/959">#959</a>).
+<code>ScratchFile</code> takes the same arguments, apart from Python 3.12's
+<code>delete_on_close</code>, which it refuses because forwarding it would fail
+on 3.10 and 3.11, and it behaves the same on every Python. Do not
+assert that a refused run leaves its output in place, or read it
+without checking it exists: an absent output is the expected result.</p>
+<p><code>tools/ci/check-no-named-temporary-file.sh</code> enforces this, as a
+pre-commit hook and in the <code>ci-tooling</code> job. It matches the name
+anywhere under <code>tests/</code>, comments included, because whether instar
+writes to a given temporary file is a property of the test that can
+change in an edit the <code>with</code> statement never sees.
+<code>tests/helpers/scratch.py</code> itself is the one exemption.</p>
 <h2 id="test-categories">Test Categories<a class="headerlink" href="#test-categories" title="Permanent link">&para;</a></h2>
 <h3 id="safe-images-test_info_safepy">Safe Images (<code>test_info_safe.py</code>)<a class="headerlink" href="#safe-images-test_info_safepy" title="Permanent link">&para;</a></h3>
 <p>Tests against known-safe disk images. These run <code>qemu-img</code> directly and
