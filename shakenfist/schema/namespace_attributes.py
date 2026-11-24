@@ -14,8 +14,6 @@
 # 1. The source of truth for the namespace_attributes table schema
 # 2. A typed data transfer object for namespace attributes
 
-from typing import Any
-
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
@@ -28,16 +26,16 @@ class NamespaceAttributesData(BaseModel):
     object. Unlike NamespaceData (static values), these can be
     updated after creation.
 
-    Consolidates separate etcd attributes into a single row:
-    - attribute/namespace/{name}/keys -> keys (JSON dict)
-    - attribute/namespace/{name}/trust -> trust (JSON list)
-
     Table: namespace_attributes
     Primary key: name (references namespaces.name)
 
+    A namespace's authentication keys used to be a JSON dict on this
+    row. They are NamespaceKey objects in their own tables now, and the
+    column was dropped by this table's version 3 migration, so the
+    model no longer carries the field either (issue 5016).
+
     Attributes:
         name: The namespace name (references namespaces.name).
-        keys: Authentication keys dict with nonced key entries.
         trust: List of namespace names granted full trust.
     """
 
@@ -46,13 +44,6 @@ class NamespaceAttributesData(BaseModel):
 
     # Primary key — references namespaces.name
     name: str = Field(max_length=255)
-
-    # Authentication keys — JSON dict of nonced keys
-    # Structure: {'nonced_keys': {key_name: {'key': hash,
-    #             'nonce': str, 'expiry': float (optional)}}}
-    keys: dict[str, Any] = Field(
-        default_factory=lambda: {'nonced_keys': {}}
-    )
 
     # Trust relationships — list of namespace names granted
     # full trust. Always includes 'system' by default.

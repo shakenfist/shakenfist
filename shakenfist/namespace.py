@@ -92,10 +92,11 @@ class Namespace(dbo):
 
         fields is deliberately required: callers must name exactly the
         fields they changed so concurrent writers of other attributes
-        on the same row (keys against trust, which hold different
-        attribute locks) cannot lose their committed columns to this
+        on the same row cannot lose their committed columns to this
         writer's read-modify-write. None writes every column and is
-        reserved for row creation and upgrade persistence.
+        reserved for row creation and upgrade persistence. See
+        mariadb._namespace_attributes_column_values for why the mask
+        stays now that trust is the only attribute left on the row.
         """
         if self.__attributes is not None:
             mariadb.update_namespace_attributes(self.__attributes, fields=fields)
@@ -185,9 +186,9 @@ class Namespace(dbo):
         namespace_attributes row load, and the expiry filter is pushed
         into SQL rather than applied in Python -- so /auth no longer
         bcrypt compares keys it was always going to reject. The legacy
-        namespace_attributes.keys JSON column is neither read nor
-        written any more; it is vestigial until a later schema version
-        drops it.
+        namespace_attributes.keys JSON column was neither read nor
+        written after that, and the table's version 3 migration has
+        dropped it (issue 5016).
 
         This accessor hands out hashes and nonces because /auth and
         verify_token need them. Nothing which does not authenticate a

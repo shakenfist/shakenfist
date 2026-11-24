@@ -1713,7 +1713,7 @@ dedicated attribute tables:
 |-------|-------------|------------|
 | `blob_attributes` | Blob | uuid, size, info, last_used, retention |
 | `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, versions, metrics. Per-daemon state lives in `node_daemon_states` since v19; the legacy `daemon_states` JSON column on this table is no longer read or written. Instance placement lives in `object_references` as `instance_location` rows since `object_references` schema v3; the dual-write and the union into reads have been removed; the legacy `instances` JSON column itself remains in place (nullable, unread) as a rollback fallback until a later release drops it |
-| `namespace_attributes` | Namespace | name, keys (JSON), trust (JSON). Keys live in `namespace_keys` / `namespace_key_attributes` since the v2 `namespace_keys` migration; the legacy `keys` JSON column is left in place until a later schema bump drops it |
+| `namespace_attributes` | Namespace | name, trust (JSON). Keys live in `namespace_keys` / `namespace_key_attributes` since the v2 `namespace_keys` migration; the legacy `keys` JSON column was dropped by this table's v3 migration |
 | `namespace_key_attributes` | NamespaceKey | uuid, key (base64 encoded bcrypt hash), nonce, expiry (nullable epoch seconds), scopes (nullable JSON list), provenance (nullable JSON dict) |
 | `trusted_issuer_attributes` | TrustedIssuer | uuid, issuer_url, jwks_uri (nullable since v2), audience, authorization_endpoint (nullable LONGTEXT), token_endpoint (nullable LONGTEXT), device_authorization_endpoint (nullable LONGTEXT), client_id (nullable), oidc_scopes (nullable, space separated), discovered_at (nullable epoch seconds) |
 | `mapping_rule_attributes` | MappingRule | uuid, issuer, bound_claims (JSON dict), scopes (JSON list), key_ttl, key_name_prefix |
@@ -1727,8 +1727,9 @@ dedicated attribute tables:
 Node attributes consolidate observed state, roles, daemons and versions
 into a single row.
 
-Namespace attributes consolidate keys (authentication) and trust
-(namespace trust relationships) into a single row.
+Namespace attributes hold trust (namespace trust relationships).
+Authentication keys were on this row too until the v3 migration dropped
+the column; they are their own objects.
 
 Because these tables pack several logically independent attributes into
 one row, every updater passes a field mask naming exactly the columns it
@@ -1846,14 +1847,30 @@ are NULL. Expired keys are migrated too and removed by the reaper on
 its next pass. The migration is idempotent — keys which already have a
 row are skipped — so it is safe to re-run.
 
-The legacy JSON column is deliberately left untouched by the
-migration, exactly as the `node_daemon_states` migration left
-`node_attributes.daemon_states` in place. One consequence is worth
-knowing before an upgrade: **rolling back to a pre-upgrade release
-revives the JSON column**, which still holds every key that existed
-before the migration, but keys created or rotated after the migration
-exist only in the new tables and will be invisible to the rolled-back
-code.
+Version 3 of `namespace_attributes` then drops that JSON column. It
+had no reader but the migration above, and what it held was a second
+copy of live bcrypt hashes and nonces sitting at rest — so the two
+could disagree, and anybody reading the schema had to work out which
+was authoritative. `sf-ctl ensure-mariadb-schema` runs the
+`namespace_keys` fan-out before this drop, in that order, so a cluster
+upgrading from before first-class keys copies them out of the column
+before it goes. The drop then confirms it rather than trusting the
+order: it repeats the fan-out and refuses to drop while any key with a
+hash and a nonce has no `namespace_keys` row. A drop which fails leaves the table at version 2 and
+the command exits non-zero rather than reporting a column gone which
+is still there; re-run it.
+
+The consequence to know before upgrading is about rolling *back*.
+While the column survived, a rollback to a pre-first-class-keys
+release revived it, so keys which predated that migration kept
+working and only keys created or rotated since were lost. Once
+version 3 has run there is no column to revive: a rollback to a
+release that reads it finds **no keys at all** for every namespace,
+and `POST /auth` refuses every credential until a key is created
+again on the rolled-back release. Rolling back across this migration
+is therefore a credential event, not an inconvenience. The blast
+radius is the same shape as the `node_daemon_states` precedent, one
+step further on.
 
 #### Federation Abuse Resistance Tables
 

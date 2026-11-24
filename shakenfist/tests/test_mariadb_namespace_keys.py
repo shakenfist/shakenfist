@@ -8,6 +8,7 @@
 #                              _MockEngine/_MockConnection direct-path tests,
 #                              public-router tests)
 
+import json
 from unittest import mock
 from uuid import UUID
 
@@ -103,6 +104,18 @@ class _MockEngine:
         return self._connection
 
 
+def _versions(**versions):
+    """A _get_table_version() stub which answers per table.
+
+    _ensure_namespace_keys_schema() asks about two tables now: its own,
+    and namespace_attributes, which tells it whether the legacy keys
+    column it fans out is still there (issue 5016).
+    """
+    def _get(engine, table_name):
+        return versions.get(table_name, 0)
+    return _get
+
+
 # ---------------------------------------------------------------------------
 # Schema-up tests
 # ---------------------------------------------------------------------------
@@ -113,7 +126,9 @@ class EnsureNamespaceKeysSchemaTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes',
                 return_value=(0, 0))
     @mock.patch('shakenfist.mariadb._set_table_version')
-    @mock.patch('shakenfist.mariadb._get_table_version', return_value=0)
+    @mock.patch('shakenfist.mariadb._get_table_version',
+                side_effect=_versions(namespace_keys=0,
+                                      namespace_attributes=2))
     def test_fresh_engine_creates_table_and_migrates_to_version_2(
             self, mock_get_version, mock_set_version, mock_migrate):
         """From version 0 the table is created, then migrated to v2."""
@@ -136,7 +151,54 @@ class EnsureNamespaceKeysSchemaTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes',
                 return_value=(0, 0))
     @mock.patch('shakenfist.mariadb._set_table_version')
-    @mock.patch('shakenfist.mariadb._get_table_version', return_value=0)
+    @mock.patch('shakenfist.mariadb._get_table_version',
+                side_effect=_versions(namespace_keys=0,
+                                      namespace_attributes=0))
+    def test_fresh_cluster_does_not_read_a_table_which_is_not_there(
+            self, mock_get_version, mock_set_version, mock_migrate):
+        """A fresh cluster has no namespace_attributes table to read.
+
+        ensure_schema() creates namespace_keys before
+        namespace_attributes, because the v2->v3 step on that table
+        drops the column this migration reads. On a fresh cluster that
+        means the source table does not exist yet when this runs, and
+        there is nothing in it to copy either way.
+        """
+        mock_engine = mock.MagicMock()
+
+        with mock.patch('sqlalchemy.MetaData.create_all'):
+            result = mariadb._ensure_namespace_keys_schema(mock_engine)
+
+        self.assertEqual(result['end_version'], 2)
+        mock_migrate.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes',
+                return_value=(0, 0))
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version',
+                side_effect=_versions(namespace_keys=1,
+                                      namespace_attributes=3))
+    def test_dropped_column_is_not_read(
+            self, mock_get_version, mock_set_version, mock_migrate):
+        """A namespace_attributes at v3 has no keys column left.
+
+        The fan out would be a SQL error rather than an empty answer,
+        and there is nothing to fan out: the column only reaches v3 by
+        way of this migration having already run (issue 5016).
+        """
+        mock_engine = mock.MagicMock()
+
+        result = mariadb._ensure_namespace_keys_schema(mock_engine)
+
+        self.assertEqual(result['end_version'], 2)
+        mock_migrate.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes',
+                return_value=(0, 0))
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version',
+                side_effect=_versions(namespace_keys=0,
+                                      namespace_attributes=2))
     def test_creation_emits_composite_unique_index_ddl(
             self, mock_get_version, mock_set_version, mock_migrate):
         """The (namespace, name) UNIQUE index is created by hand.
@@ -163,7 +225,9 @@ class EnsureNamespaceKeysSchemaTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes',
                 return_value=(2, 0))
     @mock.patch('shakenfist.mariadb._set_table_version')
-    @mock.patch('shakenfist.mariadb._get_table_version', return_value=1)
+    @mock.patch('shakenfist.mariadb._get_table_version',
+                side_effect=_versions(namespace_keys=1,
+                                      namespace_attributes=2))
     def test_existing_v1_table_runs_only_the_migration(
             self, mock_get_version, mock_set_version, mock_migrate):
         """An upgrading cluster gets the data migration, and no DDL."""
@@ -181,7 +245,9 @@ class EnsureNamespaceKeysSchemaTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes')
     @mock.patch('shakenfist.mariadb._set_table_version')
-    @mock.patch('shakenfist.mariadb._get_table_version', return_value=2)
+    @mock.patch('shakenfist.mariadb._get_table_version',
+                side_effect=_versions(namespace_keys=2,
+                                      namespace_attributes=3))
     def test_already_at_version_2_is_noop(
             self, mock_get_version, mock_set_version, mock_migrate):
         """Table already at v2: no DDL, no migration, migrated=False."""
@@ -284,7 +350,7 @@ class MigrateKeysFromNamespaceAttributesTestCase(base.ShakenFistTestCase):
     def test_two_keys_become_static_attribute_and_state_rows(self):
         """Each JSON entry produces three rows, values preserved verbatim."""
         conn = _migration_connection([
-            _MockRow(name='banana', keys={'nonced_keys': {
+            _MockRow(name='banana', keys_json={'nonced_keys': {
                 'first': {'key': 'aGFzaC1vbmU=', 'nonce': 'nonce-one'},
                 'second': {'key': 'aGFzaC10d28=', 'nonce': 'nonce-two',
                            'expiry': 4242.0},
@@ -338,7 +404,7 @@ class MigrateKeysFromNamespaceAttributesTestCase(base.ShakenFistTestCase):
     def test_expired_keys_are_migrated_too(self):
         """Expiry is not a migration policy -- the reaper deals with it."""
         conn = _migration_connection([
-            _MockRow(name='banana', keys={'nonced_keys': {
+            _MockRow(name='banana', keys_json={'nonced_keys': {
                 'ancient': {'key': 'aGFzaA==', 'nonce': 'n', 'expiry': 1.0},
             }}),
         ])
@@ -356,7 +422,7 @@ class MigrateKeysFromNamespaceAttributesTestCase(base.ShakenFistTestCase):
         """Keys which already have a row are skipped, so a re-run is a no-op."""
         conn = _migration_connection(
             [
-                _MockRow(name='banana', keys={'nonced_keys': {
+                _MockRow(name='banana', keys_json={'nonced_keys': {
                     'first': {'key': 'aGFzaC1vbmU=', 'nonce': 'nonce-one'},
                     'second': {'key': 'aGFzaC10d28=', 'nonce': 'nonce-two',
                                'expiry': 4242.0},
@@ -384,7 +450,7 @@ class MigrateKeysFromNamespaceAttributesTestCase(base.ShakenFistTestCase):
         """
         conn = _migration_connection(
             [
-                _MockRow(name='banana', keys={'nonced_keys': {
+                _MockRow(name='banana', keys_json={'nonced_keys': {
                     'first': {'key': 'c3RhbGU=', 'nonce': 'stale'},
                 }}),
             ],
@@ -400,9 +466,9 @@ class MigrateKeysFromNamespaceAttributesTestCase(base.ShakenFistTestCase):
     def test_namespace_with_no_keys_is_a_noop(self):
         """An empty or absent keys column migrates nothing and errors none."""
         conn = _migration_connection([
-            _MockRow(name='banana', keys={'nonced_keys': {}}),
-            _MockRow(name='sausage', keys={}),
-            _MockRow(name='potato', keys=None),
+            _MockRow(name='banana', keys_json={'nonced_keys': {}}),
+            _MockRow(name='sausage', keys_json={}),
+            _MockRow(name='potato', keys_json=None),
         ])
 
         migrated, errors = mariadb._migrate_keys_from_namespace_attributes(
@@ -412,10 +478,50 @@ class MigrateKeysFromNamespaceAttributesTestCase(base.ShakenFistTestCase):
         self.assertEqual(0, errors)
         self.assertEqual(2, conn.execute.call_count)
 
+    def test_json_text_from_the_driver_is_decoded(self):
+        """The column arrives as the JSON text it is stored as.
+
+        The legacy column is read by a raw text select, because the
+        table definition no longer declares it (issue 5016), so no
+        column type deserialises it on the way in. A string which went
+        undecoded would be counted as malformed content and the
+        namespace's keys would never reach the new tables.
+        """
+        conn = _migration_connection([
+            _MockRow(name='banana', keys_json=json.dumps({'nonced_keys': {
+                'first': {'key': 'aGFzaC1vbmU=', 'nonce': 'nonce-one',
+                          'expiry': 4242.0},
+            }})),
+        ])
+
+        migrated, errors = mariadb._migrate_keys_from_namespace_attributes(
+            _MockEngine(conn))
+
+        self.assertEqual(1, migrated)
+        self.assertEqual(0, errors)
+
+        attrs = _inserts_for(conn, 'namespace_key_attributes')
+        self.assertEqual(1, len(attrs))
+        self.assertEqual('aGFzaC1vbmU=', attrs[0]['key'])
+        self.assertEqual('nonce-one', attrs[0]['nonce'])
+        self.assertEqual(4242.0, attrs[0]['expiry'])
+
+    def test_undecodable_json_text_is_counted_not_raised(self):
+        """Text which is not JSON at all is an error, not an exception."""
+        conn = _migration_connection([
+            _MockRow(name='banana', keys_json='{this is not json'),
+        ])
+
+        migrated, errors = mariadb._migrate_keys_from_namespace_attributes(
+            _MockEngine(conn))
+
+        self.assertEqual(0, migrated)
+        self.assertEqual(1, errors)
+
     def test_malformed_keys_column_is_counted_not_raised(self):
         """A keys column which is not a dict is an error, not an exception."""
         conn = _migration_connection([
-            _MockRow(name='banana', keys=['not', 'a', 'dict']),
+            _MockRow(name='banana', keys_json=['not', 'a', 'dict']),
         ])
 
         migrated, errors = mariadb._migrate_keys_from_namespace_attributes(
@@ -427,7 +533,7 @@ class MigrateKeysFromNamespaceAttributesTestCase(base.ShakenFistTestCase):
     def test_missing_nonced_keys_is_counted_not_raised(self):
         """A populated keys dict without nonced_keys is malformed."""
         conn = _migration_connection([
-            _MockRow(name='banana', keys={'legacy_keys': {'a': 'b'}}),
+            _MockRow(name='banana', keys_json={'legacy_keys': {'a': 'b'}}),
         ])
 
         migrated, errors = mariadb._migrate_keys_from_namespace_attributes(
@@ -439,7 +545,7 @@ class MigrateKeysFromNamespaceAttributesTestCase(base.ShakenFistTestCase):
     def test_malformed_nonced_keys_is_counted_not_raised(self):
         """nonced_keys which is not a dict is malformed."""
         conn = _migration_connection([
-            _MockRow(name='banana', keys={'nonced_keys': 'oops'}),
+            _MockRow(name='banana', keys_json={'nonced_keys': 'oops'}),
         ])
 
         migrated, errors = mariadb._migrate_keys_from_namespace_attributes(
@@ -451,7 +557,7 @@ class MigrateKeysFromNamespaceAttributesTestCase(base.ShakenFistTestCase):
     def test_malformed_entry_is_skipped_and_the_rest_migrate(self):
         """One broken entry does not stop the namespace's other keys."""
         conn = _migration_connection([
-            _MockRow(name='banana', keys={'nonced_keys': {
+            _MockRow(name='banana', keys_json={'nonced_keys': {
                 'broken': {'nonce': 'no key here'},
                 'alsobroken': 'not even a dict',
                 'good': {'key': 'aGFzaA==', 'nonce': 'n'},
@@ -472,7 +578,7 @@ class MigrateKeysFromNamespaceAttributesTestCase(base.ShakenFistTestCase):
         conn = _MockConnection()
         conn.execute = mock.Mock(side_effect=[
             _MockResult(rows=[
-                _MockRow(name='banana', keys={'nonced_keys': {
+                _MockRow(name='banana', keys_json={'nonced_keys': {
                     'first': {'key': 'aGFzaA==', 'nonce': 'n'},
                     'second': {'key': 'aGFzaA==', 'nonce': 'n'},
                 }})]),
