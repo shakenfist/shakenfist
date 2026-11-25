@@ -36,7 +36,7 @@ enqueue` status check:
 | `Lint` | self-hosted `l` | `make lint` (rustfmt + clippy) and `make package-check` (every crate packaged and built from its tarball, as `cargo publish` would) |
 | `Cross-check Windows` | self-hosted `l` | `make check-windows` |
 | `Build (Linux x86_64)` | self-hosted `l` | `make release`, both `--web` smoke tests, `make test`, `.deb` and `.rpm` |
-| `cargo audit` | self-hosted `s` | RustSec advisory check |
+| `cargo audit` | self-hosted `s` | RustSec advisory check with the `cargo audit` CLI: fails on a vulnerability, prints unmaintained and unsound warnings without failing. It does not use `rustsec/audit-check`, whose check-run update fails intermittently ([rustsec/audit-check#56](https://github.com/rustsec/audit-check/issues/56)) |
 | `cargo deny` | self-hosted `s` | Licence, ban, and advisory policy (`deny.toml`) |
 | `gitleaks` | self-hosted `s` | Secret scanning over full history |
 | `shellcheck` | self-hosted `s` | `tools/run-shellcheck.sh`, then `tools/audit/test-audit-range.sh`, `tools/test-report-fuzz-failure.sh`, `tools/test-report-fuzz-run.sh` and `tools/test-fuzz-targets.sh` |
