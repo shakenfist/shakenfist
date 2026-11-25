@@ -228,9 +228,10 @@ Add the judgment-level review on the diff
   `instance_attributes.interfaces`) have already been
   replaced by one indexed query against the child table,
   which also removed an N+1 hydration loop from every
-  caller; legitimate non-FK list fields (e.g.
-  `node_attributes.daemons`, `namespace_attributes.trust`)
-  are not flagged. See
+  caller, and a third (`node_attributes.daemons`) by a
+  query against `node_daemon_states`; legitimate non-FK
+  list fields (e.g. `namespace_attributes.trust`) are not
+  flagged. See
   [docs/operator_guide/database.md](docs/operator_guide/database.md),
   "Cached Child-UUID Lists Are Not Stored".
 - **Three-layer pattern:** Does every new MariaDB function

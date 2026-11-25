@@ -108,9 +108,20 @@ class NodeAttributesDataTestCase(base.ShakenFistTestCase):
         self.assertFalse(data.is_network_node)
         self.assertFalse(data.is_eventlog_node)
         self.assertFalse(data.is_database_node)
-        self.assertEqual(data.daemons, [])
-        self.assertEqual(data.daemon_states, {})
         self.assertIsNone(data.qemu_version)
+
+    def test_daemon_fields_are_gone(self):
+        """Daemon registration and state are node_daemon_states rows only.
+
+        The daemons list and daemon_states dict used to be carried here as
+        well, which is how a registration and its state row came to be able
+        to disagree. The columns survive on the SQLAlchemy table for one
+        release as a rollback fallback, but nothing reads or writes them, so
+        the model must not offer them back.
+        """
+        fields = set(NodeAttributesData.model_fields)
+        self.assertNotIn('daemons', fields)
+        self.assertNotIn('daemon_states', fields)
 
     def test_mutable(self):
         """Test that NodeAttributesData is mutable (not frozen)."""
@@ -154,17 +165,6 @@ class NodeAttributesDataTestCase(base.ShakenFistTestCase):
         back = mariadb._node_attrs_from_proto(
             mariadb._node_attrs_to_proto(without))
         self.assertIsNone(back.spice_server_cert_subject)
-
-    def test_daemon_states_dict(self):
-        """Test daemon_states as a nested dict."""
-        data = NodeAttributesData(uuid=TEST_UUID)
-        data.daemon_states['api'] = {
-            'value': 'daemon-running',
-            'update_time': 1234567890.0,
-            'message': None
-        }
-        self.assertEqual(
-            data.daemon_states['api']['value'], 'daemon-running')
 
 
 class NodeClassTestCase(base.ShakenFistTestCase):
@@ -460,13 +460,12 @@ class NodeDaemonStateTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states',
                 return_value=[])
+    @mock.patch('shakenfist.node.mariadb.get_node_daemon_state',
+                return_value=None)
     @mock.patch('shakenfist.node.mariadb.set_node_daemon_state',
                 return_value=True)
     @mock.patch('shakenfist.node.mariadb.update_node_attributes')
-    @mock.patch('shakenfist.node.mariadb.create_node_attributes')
-    @mock.patch('shakenfist.node.mariadb.get_node_attributes')
-    @mock.patch('shakenfist.node.add_event')
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.get_lock_attr')
+    @mock.patch('shakenfist.eventlog.add_event')
     @mock.patch('shakenfist.mariadb.set_state')
     @mock.patch(
         'shakenfist.mariadb.get_state',
@@ -474,60 +473,57 @@ class NodeDaemonStateTestCase(base.ShakenFistTestCase):
             value='created', update_time=1234567890.0))
     def test_register_daemon(
             self, mock_get_state, mock_set_state,
-            mock_lock, mock_add_event, mock_get_attrs,
-            mock_create_attrs, mock_update_attrs,
-            mock_set_daemon_state, mock_get_all_states):
-        """Test registering a daemon adds it to the list."""
-        attrs = NodeAttributesData(uuid=TEST_UUID)
-        mock_get_attrs.return_value = attrs
-        mock_lock.return_value = mock.MagicMock()
-        mock_update_attrs.return_value = True
+            mock_add_event, mock_update_attrs,
+            mock_set_daemon_state, mock_get_one_state, mock_get_all_states):
+        """Registering a daemon creates its state row, and nothing else.
 
+        The registration *is* the row, so there must be no second record
+        of it: no node_attributes write, and therefore no attribute lock.
+        """
         n = self._make_node()
         n.register_daemon('api')
 
-        self.assertIn('api', attrs.daemons)
         mock_set_daemon_state.assert_called_once()
+        self.assertEqual(TEST_UUID, mock_set_daemon_state.call_args[0][0])
+        self.assertEqual('api', mock_set_daemon_state.call_args[0][1])
+        self.assertEqual(
+            Node.DAEMON_STATE_STOPPED, mock_set_daemon_state.call_args[0][2])
+        mock_update_attrs.assert_not_called()
+        mock_add_event.assert_called_once()
 
     @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states',
                 return_value=[])
+    @mock.patch('shakenfist.node.mariadb.get_node_daemon_state')
     @mock.patch('shakenfist.node.mariadb.set_node_daemon_state',
                 return_value=True)
     @mock.patch('shakenfist.node.mariadb.update_node_attributes')
-    @mock.patch('shakenfist.node.mariadb.create_node_attributes')
-    @mock.patch('shakenfist.node.mariadb.get_node_attributes')
-    @mock.patch('shakenfist.node.add_event')
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.get_lock_attr')
-    @mock.patch('shakenfist.mariadb.set_state')
+    @mock.patch('shakenfist.eventlog.add_event')
     @mock.patch(
         'shakenfist.mariadb.get_state',
         return_value=State(
             value='created', update_time=1234567890.0))
     def test_register_daemon_already_registered_is_noop(
-            self, mock_get_state, mock_set_state,
-            mock_lock, mock_add_event, mock_get_attrs,
-            mock_create_attrs, mock_update_attrs,
-            mock_set_daemon_state, mock_get_all_states):
+            self, mock_get_state, mock_add_event, mock_update_attrs,
+            mock_set_daemon_state, mock_get_one_state, mock_get_all_states):
         """Re-registering an existing daemon must not reset its state.
 
         A deploy re-runs register-daemon every pass; with restart-on-change the
         daemon is not restarted when nothing changed. Resetting a running
         daemon's state to STOPPED here would leave it stuck stopped and the node
-        wrongly degraded, so re-registration must be a true no-op.
+        wrongly degraded, so re-registration must be a true no-op. The guard
+        now reads the same row it protects, so a registration can no longer
+        exist without the state row the guard looks for.
         """
-        attrs = NodeAttributesData(uuid=TEST_UUID)
-        attrs.daemons.append('api')
-        mock_get_attrs.return_value = attrs
-        mock_lock.return_value = mock.MagicMock()
-        mock_update_attrs.return_value = True
+        mock_get_one_state.return_value = NodeDaemonStateData(
+            node_uuid=TEST_UUID, daemon='api', value='daemon-running',
+            update_time=1234567890.0)
 
         n = self._make_node()
         n.register_daemon('api')
 
-        # Still registered exactly once, and no state reset / event emitted.
-        self.assertEqual(['api'], attrs.daemons)
         mock_set_daemon_state.assert_not_called()
         mock_add_event.assert_not_called()
+        mock_update_attrs.assert_not_called()
 
     def test_register_invalid_daemon(self):
         """Test registering invalid daemon raises."""
@@ -538,29 +534,54 @@ class NodeDaemonStateTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.node.mariadb.delete_node_daemon_state',
                 return_value=True)
     @mock.patch('shakenfist.node.mariadb.update_node_attributes')
-    @mock.patch('shakenfist.node.mariadb.get_node_attributes')
-    @mock.patch('shakenfist.node.add_event')
-    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.get_lock_attr')
+    @mock.patch('shakenfist.eventlog.add_event')
     @mock.patch(
         'shakenfist.mariadb.get_state',
         return_value=State(
             value='created', update_time=1234567890.0))
     def test_deregister_daemon(
-            self, mock_get_state, mock_lock,
-            mock_add_event, mock_get_attrs,
+            self, mock_get_state, mock_add_event,
             mock_update_attrs, mock_delete_daemon_state):
-        """Test deregistering a daemon removes it."""
-        attrs = NodeAttributesData(uuid=TEST_UUID)
-        attrs.daemons.append('api')
-        mock_get_attrs.return_value = attrs
-        mock_lock.return_value = mock.MagicMock()
-        mock_update_attrs.return_value = True
-
+        """Deregistering a daemon deletes its state row, and nothing else."""
         n = self._make_node()
         n.deregister_daemon('api')
 
-        self.assertNotIn('api', attrs.daemons)
         mock_delete_daemon_state.assert_called_once_with(TEST_UUID, 'api')
+        mock_update_attrs.assert_not_called()
+
+    def test_deregister_invalid_daemon(self):
+        """Deregistering an unknown daemon raises."""
+        n = self._make_node()
+        self.assertRaises(
+            NoSuchDaemon, n.deregister_daemon, 'bogus')
+
+    @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states')
+    def test_get_registered_daemons_reads_state_rows(
+            self, mock_get_all_states):
+        """Registration is derived from the state rows, nothing else.
+
+        A row naming a daemon this release does not know about is ignored,
+        so a row left behind by a retired daemon cannot report the node
+        degraded forever.
+        """
+        mock_get_all_states.return_value = [
+            NodeDaemonStateData(
+                node_uuid=TEST_UUID, daemon='api', value='daemon-running',
+                update_time=1234567890.0),
+            NodeDaemonStateData(
+                node_uuid=TEST_UUID, daemon='triggers', value='daemon-running',
+                update_time=1234567890.0),
+        ]
+
+        n = self._make_node()
+        self.assertEqual(['api'], n.get_registered_daemons())
+
+    @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states',
+                return_value=None)
+    def test_get_registered_daemons_on_read_error(self, mock_get_all_states):
+        """A failed read reports nothing registered rather than raising."""
+        n = self._make_node()
+        self.assertEqual([], n.get_registered_daemons())
 
 
 class NodeSetDaemonStateTestCase(base.ShakenFistTestCase):
@@ -624,6 +645,28 @@ class NodeSetDaemonStateTestCase(base.ShakenFistTestCase):
             n.set_daemon_state('queues', Node.DAEMON_STATE_STOPPED)
         self.assertIn(
             mock.call(Node.STATE_DEGRADED), mock_state.mock_calls)
+
+    @mock.patch('shakenfist.mariadb.set_node_daemon_state')
+    def test_unreadable_daemon_states_do_not_reconcile(self, mock_set):
+        """A failed state read must leave a degraded node degraded.
+
+        Registration is now derived from the state rows, so a read error
+        yields no registered daemons at all. Treating that as "nothing is
+        degraded" would mark the node created on a transient database
+        error.
+        """
+        n = self._make_node()
+        n.add_event = mock.MagicMock()
+        with mock.patch.object(
+                Node, 'get_degraded_daemons', return_value=None), \
+                mock.patch.object(
+                    Node, 'state', new_callable=mock.PropertyMock) as mock_state:
+            mock_state.return_value = mock.Mock(value=Node.STATE_DEGRADED)
+            n.set_daemon_state('queues', Node.DAEMON_STATE_RUNNING)
+        # The row was still written; only the reconcile was skipped.
+        mock_set.assert_called_once()
+        self.assertNotIn(
+            mock.call(Node.STATE_CREATED), mock_state.mock_calls)
 
 
 class NodeSetLifecycleStateTestCase(base.ShakenFistTestCase):
@@ -869,13 +912,8 @@ class NodesDegradedTestCase(base.ShakenFistTestCase):
         return n
 
     @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states')
-    @mock.patch('shakenfist.node.mariadb.get_node_attributes')
-    def test_no_degraded_when_all_running(
-            self, mock_get_attrs, mock_get_all_states):
+    def test_no_degraded_when_all_running(self, mock_get_all_states):
         """Test no degraded daemons when all are running."""
-        attrs = NodeAttributesData(uuid=TEST_UUID)
-        attrs.daemons = ['api', 'database']
-        mock_get_attrs.return_value = attrs
         mock_get_all_states.return_value = [
             NodeDaemonStateData(
                 node_uuid=TEST_UUID, daemon='api',
@@ -890,13 +928,8 @@ class NodesDegradedTestCase(base.ShakenFistTestCase):
         self.assertEqual(degraded, [])
 
     @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states')
-    @mock.patch('shakenfist.node.mariadb.get_node_attributes')
-    def test_degraded_when_daemon_stopped(
-            self, mock_get_attrs, mock_get_all_states):
+    def test_degraded_when_daemon_stopped(self, mock_get_all_states):
         """Test daemon shows as degraded when stopped."""
-        attrs = NodeAttributesData(uuid=TEST_UUID)
-        attrs.daemons = ['api', 'database']
-        mock_get_attrs.return_value = attrs
         mock_get_all_states.return_value = [
             NodeDaemonStateData(
                 node_uuid=TEST_UUID, daemon='api',
@@ -911,19 +944,54 @@ class NodesDegradedTestCase(base.ShakenFistTestCase):
         self.assertIn('database', degraded)
         self.assertNotIn('api', degraded)
 
-    @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states',
-                return_value=[])
-    @mock.patch('shakenfist.node.mariadb.get_node_attributes')
-    def test_degraded_when_no_state(
-            self, mock_get_attrs, mock_get_all_states):
-        """Test daemon shows as degraded when it has no state."""
-        attrs = NodeAttributesData(uuid=TEST_UUID)
-        attrs.daemons = ['api']
-        mock_get_attrs.return_value = attrs
+    @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states')
+    def test_degraded_when_state_row_has_no_value(self, mock_get_all_states):
+        """A registered daemon with no state value is degraded.
+
+        The row is the registration, so "registered but with no state" is
+        now a row whose value is NULL -- which is what the v2 seeding
+        migration writes for a daemon whose legacy JSON entry had no
+        value.
+        """
+        mock_get_all_states.return_value = [
+            NodeDaemonStateData(
+                node_uuid=TEST_UUID, daemon='api', value=None,
+                update_time=1234567890.0),
+        ]
 
         n = self._make_node()
-        degraded = n.get_degraded_daemons()
-        self.assertIn('api', degraded)
+        self.assertEqual(['api'], n.get_degraded_daemons())
+
+    @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states',
+                return_value=[])
+    def test_nothing_degraded_when_no_rows(self, mock_get_all_states):
+        """No state rows means nothing is registered, so nothing degraded."""
+        n = self._make_node()
+        self.assertEqual([], n.get_degraded_daemons())
+
+    @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states')
+    def test_retired_daemon_row_ignored(self, mock_get_all_states):
+        """A row for a daemon this release retired cannot degrade a node."""
+        mock_get_all_states.return_value = [
+            NodeDaemonStateData(
+                node_uuid=TEST_UUID, daemon='triggers',
+                value='daemon-stopped', update_time=1234567890.0),
+        ]
+
+        n = self._make_node()
+        self.assertEqual([], n.get_degraded_daemons())
+
+    @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states',
+                return_value=None)
+    def test_read_error_is_not_nothing_degraded(self, mock_get_all_states):
+        """A failed read is unknown, not "nothing is degraded".
+
+        An empty list is a positive claim, and set_daemon_state() acts on
+        it by walking a degraded node back to created. A database error
+        must not get to make that claim.
+        """
+        n = self._make_node()
+        self.assertIsNone(n.get_degraded_daemons())
 
 
 class NodeUUIDPersistenceTestCase(base.ShakenFistTestCase):

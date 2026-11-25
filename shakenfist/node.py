@@ -332,11 +332,6 @@ class Node(dbo):
         if self.__attributes is not None:
             mariadb.update_node_attributes(self.__attributes, fields=fields)
 
-    def _invalidate_attributes(self) -> None:
-        """Force reload of attributes on next access."""
-        self.__attributes_loaded = False
-        self.__attributes = None
-
     @classmethod
     def _upgrade_step_10_to_11(cls, static_values):
         ...
@@ -544,8 +539,8 @@ class Node(dbo):
         attrs.spice_server_cert_subject = read_spice_server_cert_subject()
         # This runs unlocked every 15 seconds from both sentinel
         # daemons, so it must only ever write the fields it owns: a
-        # full-row write here can revert a concurrent instances or
-        # daemons list update made from another node.
+        # full-row write here can revert a concurrent write of another
+        # attribute made from another node.
         n._save_attributes(fields=[
             'last_seen', 'installed_version', 'is_etcd_master',
             'is_hypervisor', 'is_network_node', 'is_eventlog_node',
@@ -592,32 +587,40 @@ class Node(dbo):
         return retval
 
     def get_registered_daemons(self):
-        attrs = self._load_attributes()
-        if attrs is None:
-            return []
-        return list(attrs.daemons)
+        """The daemons registered on this node.
+
+        A registration *is* a node_daemon_states row: register_daemon()
+        creates one and deregister_daemon() deletes it. There is
+        deliberately no second copy of this set -- the legacy JSON list
+        under the node_attributes daemons column could disagree with the
+        state rows, because the two writes were not in one transaction.
+
+        Rows naming a daemon this release does not know about (one
+        retired since the row was written) are ignored, so a stale row
+        cannot hold the node degraded forever.
+        """
+        rows = mariadb.get_all_node_daemon_states(self.uuid) or []  # nopushdown: per-node scope, ~12 rows
+        return [r.daemon for r in rows if r.daemon in self.VALID_DAEMONS]
 
     def register_daemon(self, daemon):
         if daemon not in self.VALID_DAEMONS:
             raise NoSuchDaemon(
                 f'Cannot register daemon "{daemon}" on node {self.fqdn}, '
                 f'as that daemon is unknown.')
-        with self.get_lock_attr('daemons', 'Register daemon'):
-            self._invalidate_attributes()
-            attrs = self._ensure_attributes()
-            if daemon in attrs.daemons:
-                # Already registered: re-registering must be a true no-op. In
-                # particular it must NOT reset the daemon state. A deploy runs
-                # register-daemon on every pass, and with restart-on-change the
-                # daemon is not restarted when nothing changed -- so resetting a
-                # running daemon's state to STOPPED here would leave it stuck
-                # stopped (nothing re-asserts a running daemon's state without a
-                # restart) and wrongly report the whole node degraded.
-                return
-            attrs.daemons.append(daemon)
-            self._save_attributes(fields=['daemons'])
-        # Only reached for a genuinely new registration: initialise the state to
-        # STOPPED (the daemon has not started yet) and record the event.
+        if mariadb.get_node_daemon_state(self.uuid, daemon) is not None:
+            # Already registered: re-registering must be a true no-op. In
+            # particular it must NOT reset the daemon state. A deploy runs
+            # register-daemon on every pass, and with restart-on-change the
+            # daemon is not restarted when nothing changed -- so resetting a
+            # running daemon's state to STOPPED here would leave it stuck
+            # stopped (nothing re-asserts a running daemon's state without a
+            # restart) and wrongly report the whole node degraded. The guard
+            # now reads the very record it protects, so there is no window in
+            # which registration says yes and the state row says nothing.
+            return
+        # A genuinely new registration: the state row is the registration, so
+        # creating it at STOPPED (the daemon has not started yet) is the whole
+        # of the work.
         self.set_daemon_state(daemon, self.DAEMON_STATE_STOPPED)
         self.add_event(EVENT_TYPE_AUDIT, f'{daemon} daemon registered')
 
@@ -626,12 +629,6 @@ class Node(dbo):
             raise NoSuchDaemon(
                 f'Cannot deregister daemon "{daemon}" on node {self.fqdn}, '
                 f'as that daemon is unknown.')
-        with self.get_lock_attr('daemons', 'Deregister daemon'):
-            self._invalidate_attributes()
-            attrs = self._ensure_attributes()
-            if daemon in attrs.daemons:
-                attrs.daemons.remove(daemon)
-                self._save_attributes(fields=['daemons'])
         mariadb.delete_node_daemon_state(self.uuid, daemon)
         self.add_event(EVENT_TYPE_AUDIT, f'{daemon} daemon deregistered')
 
@@ -652,6 +649,12 @@ class Node(dbo):
         # spurious call (state didn't actually change) is a cheap no-op, so
         # we no longer need a "changed" check before running this.
         degraded = self.get_degraded_daemons()
+        if degraded is None:
+            # The daemon state rows could not be read, so whether this node
+            # is degraded is simply unknown. Reconciling on that would walk a
+            # degraded node back to created on a transient database error,
+            # because "no rows" and "could not read" would look the same.
+            return
         # Node states whose degraded-reconcile must be skipped. STATE_ERROR is
         # here so a resource-health error (node_health.apply_result, set when a
         # node's storage fails) is not silently downgraded to degraded -- which
@@ -716,14 +719,26 @@ class Node(dbo):
         return row.to_state()
 
     def get_degraded_daemons(self):
-        rows = mariadb.get_all_node_daemon_states(self.uuid) or []  # nopushdown: per-node scope, ~12 rows
-        states_by_daemon = {r.daemon: r.value for r in rows}
+        """Registered daemons on this node which are not running.
+
+        Returns None when the state rows could not be read. An empty list
+        is the positive claim that nothing is degraded, which a database
+        error must not get to make -- see the caller in set_daemon_state().
+
+        One round trip: the rows carry both which daemons are registered
+        and what state each is in, so this does not also need to ask
+        get_registered_daemons().
+        """
+        rows = mariadb.get_all_node_daemon_states(self.uuid)  # nopushdown: per-node scope, ~12 rows
+        if rows is None:
+            return None
         degraded = []
-        for daemon in self.get_registered_daemons():
-            value = states_by_daemon.get(daemon)
-            if not value or value in (
+        for row in rows:
+            if row.daemon not in self.VALID_DAEMONS:
+                continue
+            if not row.value or row.value in (
                     self.DAEMON_STATE_STOPPING, self.DAEMON_STATE_STOPPED):
-                degraded.append(daemon)
+                degraded.append(row.daemon)
         return degraded
 
     # Static values (immutable, from NodeData)

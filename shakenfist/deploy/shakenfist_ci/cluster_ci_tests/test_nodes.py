@@ -518,6 +518,84 @@ class TestNodes(base.BaseNamespacedTestCase):
         finally:
             self.test_client.delete_instance(inst['uuid'])
 
+    # Daemons whose restart is least disruptive to a shared cluster, most
+    # preferred first. Only consulted to choose which already-running
+    # daemon the idempotent re-registration below pokes at: if the no-op
+    # guard were broken the daemon would be left reading stopped, and the
+    # cleanup restarts it. Nothing here is on the API or scheduling path.
+    SAFE_DAEMONS_TO_REREGISTER = ['checksums', 'transfers', 'cleaner']
+
+    def test_register_daemon_leaves_a_running_daemon_running(self):
+        """Re-registering a running daemon must be a true no-op.
+
+        A deploy runs sf-ctl register-daemon on every pass, and with
+        restart-on-change the daemon is not restarted when nothing changed,
+        so a re-registration that touches the daemon's state is a
+        production fault rather than a theoretical one. Registration used
+        to be a JSON list on node_attributes maintained beside the
+        node_daemon_states row that carries the state, and the two records
+        could disagree -- which is how a re-register came to reset a
+        running daemon to stopped, where nothing re-asserts it without a
+        restart, and the whole node then read degraded. A registration is
+        now exactly that state row, so the guard reads the record it
+        protects.
+        """
+        nodes = self.system_client.get_nodes()
+        node = None
+        for candidate in nodes:
+            if self._node_is_local(candidate):
+                node = candidate
+                break
+        if node is None and nodes:
+            node = nodes[0]
+        self._require_node_exec(node)
+
+        running = {
+            key[len('daemon-'):-len('-state')]
+            for key, value in node.items()
+            if key.startswith('daemon-') and key.endswith('-state')
+            and value == 'daemon-running'}
+        if not running:
+            self.skipTest(
+                'Node %s reports no running daemon, so there is no '
+                'registration to re-assert. node=%s'
+                % (node.get('name'), json.dumps(node, sort_keys=True)))
+        preferred = [d for d in self.SAFE_DAEMONS_TO_REREGISTER
+                     if d in running]
+        daemon = (preferred or sorted(running))[0]
+
+        self.addCleanup(self._restore_running_daemon, node, daemon)
+        self._node_exec(
+            node, ['sf-ctl', 'register-daemon', daemon], sudo=True)
+
+        after = self.system_client.get_node(node['name'])
+        self.addDetail('node_after_reregister', content.text_content(
+            json.dumps(after, indent=4, sort_keys=True)))
+        self.assertEqual(
+            'daemon-running', after.get('daemon-%s-state' % daemon),
+            'Re-registering the already-running %s daemon on %s changed its '
+            'state. Registration is the node_daemon_states row, so '
+            'register_daemon() must see the row and do nothing at all.'
+            % (daemon, node['name']))
+        self.assertNotEqual(
+            'degraded', after.get('state'),
+            'Node %s went degraded after an idempotent re-registration of '
+            'the %s daemon.' % (node['name'], daemon))
+
+    def _restore_running_daemon(self, node, daemon):
+        """Restart daemon on node if it is no longer reporting running.
+
+        Only does anything when the assertion above has already failed, and
+        it is here so that a failure does not leave the shared cluster with
+        a node stuck degraded for the rest of the run.
+        """
+        current = self.system_client.get_node(node['name'])
+        if current.get('daemon-%s-state' % daemon) == 'daemon-running':
+            return
+        self._node_exec(
+            node, ['systemctl', 'restart', 'sf-%s.service' % daemon],
+            sudo=True, check_exit_code=False)
+
     def _safe_delete_instance(self, instance_uuid):
         """Delete an instance, tolerating if it's already gone."""
         try:

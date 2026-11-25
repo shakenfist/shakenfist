@@ -245,7 +245,7 @@ class ArtifactColumnValuesTestCase(base.ShakenFistTestCase):
 NODE_ALL_COLUMNS = {
     'last_seen', 'installed_version', 'spice_server_cert_subject',
     'is_etcd_master', 'is_hypervisor', 'is_network_node', 'is_eventlog_node',
-    'is_database_node', 'daemons', 'daemon_states',
+    'is_database_node',
     'qemu_version', 'libvirt_version', 'python_version',
     'python_implementation', 'dependency_versions', 'process_metrics',
 }
@@ -257,22 +257,42 @@ class NodeColumnValuesTestCase(base.ShakenFistTestCase):
         self.data = NodeAttributesData(
             uuid=uuid.uuid4(),
             last_seen=1234567890.0,
-            daemons=['queues', 'resources'],
             process_metrics={'process_cpu_time_sf_api': 1.5})
 
     def test_no_mask_returns_every_column(self):
         values = mariadb._node_attributes_column_values(self.data)
         self.assertEqual(NODE_ALL_COLUMNS, set(values))
 
+    def test_legacy_json_columns_are_never_written(self):
+        # daemons, daemon_states and instances survive on the table for
+        # one release as a rollback fallback, but they have no writer:
+        # registration and daemon state are node_daemon_states rows and
+        # placement is an object_references row. A full-row write must
+        # not resurrect them.
+        values = mariadb._node_attributes_column_values(self.data)
+        self.assertNotIn('daemons', values)
+        self.assertNotIn('daemon_states', values)
+        self.assertNotIn('instances', values)
+
+    def test_legacy_json_columns_remain_declared(self):
+        # The rollback fallback. Removing the columns from the table
+        # definition is a separate, later change needing its own schema
+        # version bump and a DROP COLUMN migration, so an upgraded
+        # database keeps them until then -- and the daemon_states column
+        # still has one reader, the node_daemon_states v2 seeding
+        # migration.
+        columns = set(mariadb._get_node_attributes_table().c.keys())
+        self.assertIn('daemons', columns)
+        self.assertIn('daemon_states', columns)
+        self.assertIn('instances', columns)
+
     def test_mask_limits_columns(self):
-        # This mask is the one observe_this_node uses: it must never
-        # include the daemons list, whose writers hold a different
-        # attribute lock.
+        # This mask is the one observe_this_node uses.
         values = mariadb._node_attributes_column_values(
             self.data, ['last_seen', 'installed_version', 'is_etcd_master',
                         'is_hypervisor', 'is_network_node',
                         'is_eventlog_node', 'is_database_node'])
-        self.assertNotIn('daemons', values)
+        self.assertEqual(7, len(values))
         self.assertEqual(1234567890.0, values['last_seen'])
 
     def test_unknown_field_rejected(self):

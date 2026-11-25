@@ -33,8 +33,6 @@ class NodeAttributesData(BaseModel):
     Consolidates many separate etcd attributes into a single row:
     - observed (at, release) -> last_seen, installed_version
     - roles -> is_etcd_master, is_hypervisor, etc.
-    - daemons -> daemons (JSON list)
-    - daemon:{name} -> daemon_states (JSON dict)
     - version tuples -> qemu_version, libvirt_version, etc.
     - process_metrics -> process_metrics (JSON dict)
 
@@ -52,10 +50,6 @@ class NodeAttributesData(BaseModel):
         is_hypervisor: Whether this node runs instances.
         is_network_node: Whether this node handles networking.
         is_eventlog_node: Whether this node runs eventlog.
-        daemons: List of registered daemon names (JSON).
-        daemon_states: Legacy per-daemon state info (JSON dict). No
-            longer read or written (see node_daemon_states); retained
-            for one release cycle as a rollback fallback.
         qemu_version: QEMU version as [major, minor, patch].
         libvirt_version: libvirt version as [major, minor, patch].
         python_version: Python version as [major, minor, patch].
@@ -91,10 +85,13 @@ class NodeAttributesData(BaseModel):
     is_eventlog_node: bool = False
     is_database_node: bool = False
 
-    # Daemon management
-    daemons: list[str] = Field(default_factory=list)
-    # {daemon_name: {value: str, update_time: float, message: str}}
-    daemon_states: dict[str, Any] = Field(default_factory=dict)
+    # Daemon registration and per-daemon state both live in the
+    # node_daemon_states table: a registration *is* a row there, so the
+    # legacy daemons (JSON list) and daemon_states (JSON dict) columns
+    # have no reader and no writer. They stay declared on the SQLAlchemy
+    # table for one release as a rollback fallback and are dropped
+    # together with node_attributes.instances; see
+    # docs/operator_guide/database.md.
 
     # Software version tuples stored as JSON lists
     qemu_version: Optional[list[int]] = None
