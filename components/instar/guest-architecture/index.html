@@ -16756,10 +16756,10 @@ provides a modular architecture with:
  (filename, actual-size, vmdk cid + parent-cid, vhdx log-size,
  the wrapping-file physical size, cache hints) before
  comparison; remaining writer divergences (qcow2 compat
- hardcode, zstd accept-ignore, vhd CHS-rounded virtual<strong>ize) are
- document</strong> as per-case skips rather than whitelist extensions so
+ hardcode, zstd accept-ignore, vhd CHS-rounded virtual_size) are
+ documented as per-case skips rather than whitelist extensions so
  each gap stays visible.
-- <strong>operations/resi</strong>/<strong> - In-place virtual-</strong>ze mutation
+- <strong>operations/resize/</strong> - In-place virtual-size mutation
  operation. Reads a <code>ResizeConfig</code> (target format, current and
  new virtual sizes, current file size, per-format hints from the
  existing header, preallocation mode, <code>--shrink</code> flag) from
@@ -16816,8 +16816,8 @@ provides a modular architecture with:
  <code>src/fuzz/fuzz_targets/fuzz_resize_planners.rs</code> and
  <code>scripts/differential-fuzz.py</code>'s <code>op_resize</code>. The binary
  builds at ~73 KiB / 384 KiB.
-- <strong>operations/map/**</strong> Allocation-map operation. Reads a
- <code>MapConfig</code> (sector<strong>ize, input_dev</strong>e<strong>oun</strong> start_offset,
+- <strong>operations/map/</strong> - Allocation-map operation. Reads a
+ <code>MapConfig</code> (sector_size, input_device_count, start_offset,
  max_length window) from <code>OPERATION_CONFIG_ADDR</code>, detects the
  source format on input device 0, refuses sources with chain
  composition (qcow2 backing-file references, vhd differencing
