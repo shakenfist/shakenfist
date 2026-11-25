@@ -309,6 +309,37 @@ looks like to a client: a reply which parses but carries no known field is a
 bug in this protocol, not a daemon blip, and it stays loud in `__exit__` and in
 `health_check_nodelock()` alike.
 
+## A work item has no `wait_for_nodelock()`
+
+Every long-lived daemon blocks in `Daemon.wait_for_nodelock()` before it does
+any work, and its docstring says why: the nodelock daemon is briefly unhealthy
+during startup or node churn. On an ordinary rolling restart of sfcbr that
+window is six to fourteen seconds, and sf-net, sf-resources and sf-sidechannel
+all log that they waited it out and then carried on.
+
+A cluster operation running on sf-queues gets none of that. `NodeLock.__enter__`
+retries `NODELOCK_ACQUIRE_ATTEMPTS` times over well under a second and then
+raises `NodeLockUnavailable`, and a `dispatch_task()` handler which catches
+`Exception` and calls `enter_error_state()` turns the same self-healing
+few-second blip into a terminally errored operation --
+`node_net_op.dispatch_task` did, on a `network_destroy` whose
+`_apply_delete_on_hypervisor` takes a node lock (#5058).
+
+So a task which takes a node lock catches `NodeLockUnavailable` *before* its
+general handler and spends `defer_with_backoff()`'s retry budget on it, erroring
+out only once the budget is gone. That is the same shape
+`artifact_fetch_op._image_fetch` uses for a transient upstream fetch, and it is
+the work-item path's equivalent of the daemon's wait: the operation goes back to
+`queued` with a delay rather than occupying a worker thread for the duration.
+Note that the budget is shared with the dependency-wait defers the dispatchers
+spend on the same `defer_count`, so an operation which already waited on a
+dependency has less of it.
+
+The classification matters more than the retry. `NodeLockUnavailable` means
+"this node's own lock daemon did not answer", which says nothing about whether
+the work would have succeeded; anything else out of the task is a failure of the
+work and is still terminal on its first occurrence.
+
 ## Fail closed on a field, not on a formatting accident
 
 A reply that says "this went wrong" must say so in a field set only on the

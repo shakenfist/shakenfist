@@ -54,6 +54,7 @@ metrics. The headlines:
 - Put the meter above the expensive thing, not below it.
 - A guard has to sit where the exception is raised.
 - Releasing a lock is not part of the work.
+- A work item has no `wait_for_nodelock()`.
 - A sample taken before the work is not a decision.
 - Fail closed on a field, not on a formatting accident.
 - Credential-carrying routes are not logged, not redacted.
