@@ -16323,6 +16323,32 @@ unlock <code>NODELOCK_UNLOCK_ATTEMPTS</code> times before it gives up and logs.<
 looks like to a client: a reply which parses but carries no known field is a
 bug in this protocol, not a daemon blip, and it stays loud in <code>__exit__</code> and in
 <code>health_check_nodelock()</code> alike.</p>
+<h2 id="a-work-item-has-no-wait_for_nodelock">A work item has no <code>wait_for_nodelock()</code><a class="headerlink" href="#a-work-item-has-no-wait_for_nodelock" title="Permanent link">&para;</a></h2>
+<p>Every long-lived daemon blocks in <code>Daemon.wait_for_nodelock()</code> before it does
+any work, and its docstring says why: the nodelock daemon is briefly unhealthy
+during startup or node churn. On an ordinary rolling restart of sfcbr that
+window is six to fourteen seconds, and sf-net, sf-resources and sf-sidechannel
+all log that they waited it out and then carried on.</p>
+<p>A cluster operation running on sf-queues gets none of that. <code>NodeLock.__enter__</code>
+retries <code>NODELOCK_ACQUIRE_ATTEMPTS</code> times over well under a second and then
+raises <code>NodeLockUnavailable</code>, and a <code>dispatch_task()</code> handler which catches
+<code>Exception</code> and calls <code>enter_error_state()</code> turns the same self-healing
+few-second blip into a terminally errored operation --
+<code>node_net_op.dispatch_task</code> did, on a <code>network_destroy</code> whose
+<code>_apply_delete_on_hypervisor</code> takes a node lock (#5058).</p>
+<p>So a task which takes a node lock catches <code>NodeLockUnavailable</code> <em>before</em> its
+general handler and spends <code>defer_with_backoff()</code>'s retry budget on it, erroring
+out only once the budget is gone. That is the same shape
+<code>artifact_fetch_op._image_fetch</code> uses for a transient upstream fetch, and it is
+the work-item path's equivalent of the daemon's wait: the operation goes back to
+<code>queued</code> with a delay rather than occupying a worker thread for the duration.
+Note that the budget is shared with the dependency-wait defers the dispatchers
+spend on the same <code>defer_count</code>, so an operation which already waited on a
+dependency has less of it.</p>
+<p>The classification matters more than the retry. <code>NodeLockUnavailable</code> means
+"this node's own lock daemon did not answer", which says nothing about whether
+the work would have succeeded; anything else out of the task is a failure of the
+work and is still terminal on its first occurrence.</p>
 <h2 id="fail-closed-on-a-field-not-on-a-formatting-accident">Fail closed on a field, not on a formatting accident<a class="headerlink" href="#fail-closed-on-a-field-not-on-a-formatting-accident" title="Permanent link">&para;</a></h2>
 <p>A reply that says "this went wrong" must say so in a field set only on the
 success path. <code>CountFederatedAttemptReply</code> used to signal failure by carrying a
