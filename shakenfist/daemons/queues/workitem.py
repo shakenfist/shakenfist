@@ -105,10 +105,37 @@ class Job(util_concurrency.Job):
     def _cluster_operation_execute(self):
         op_type = self.workitem.get('operation_type')
         op_uuid = self.workitem.get('operation_uuid')
-        op = get_object_class(op_type).from_db(op_uuid)
+        defer_count = self.workitem.get('defer_count', 0)
+        # The failure audit is suppressed because from_db() would write it
+        # onto an operation which no longer has a row, so no caller can
+        # ever read it back -- the log line below carries the same facts
+        # and names the work item which carried them.
+        op = get_object_class(op_type).from_db(
+            op_uuid, suppress_failure_audit=True)
 
         if not op:
-            self.log.error('Operation not found')
+            # Not an error, and not lost work. A work item exists only
+            # because its operation existed: the operation row, its state
+            # row and the work item are written in one transaction, and a
+            # defer re-enqueues an operation it has just read. So a
+            # missing row means the operation has been hard deleted, and
+            # the deleted-object sweep only hard deletes an object it has
+            # re-read in a final state. The operation therefore ran, or
+            # was aborted, and then outlived CLUSTER_OPERATION_RETENTION
+            # before this work item was dequeued -- the same race as the
+            # "no longer queued" skip below, one retention window later.
+            #
+            # Still logged, because the age it implies is a real signal:
+            # either this queue was a retention window behind, or the
+            # work item was re-queued that long after its operation
+            # finished. Logged with the operation named, because without
+            # that the line said nothing at all and no occurrence of it
+            # could be investigated (issue 5056).
+            self.log.with_fields({
+                'operation_type': op_type,
+                'operation_uuid': op_uuid,
+                'defer_count': defer_count
+            }).warning('Operation not found, it has been hard deleted')
             return
 
         # A work item the stuck-row reaper re-queued can name an operation
@@ -140,7 +167,7 @@ class Job(util_concurrency.Job):
             return
 
         op.queue_name = self.queue_name
-        op.current_defer_count = self.workitem.get('defer_count', 0)
+        op.current_defer_count = defer_count
         op.dispatcher_batch_size = self.batch_size
 
         # Ensure our dependencies are met.
