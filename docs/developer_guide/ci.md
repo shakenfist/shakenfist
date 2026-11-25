@@ -57,7 +57,7 @@ decides when a lane runs:
 it does not select anything: it names the bundle artifact and forms part of
 the concurrency group, and nothing else reads it. A lane's suite is its
 `stestr_config` alone. `debian-13-localhost` passes `tier: smoke` and runs
-the whole of `cluster-ci.conf`, the same 163 tests as the multi-node lanes,
+the whole of `cluster-ci.conf`, the same suite as the multi-node lanes,
 which is why its `test_timeout_minutes` is the largest of any lane rather
 than the smallest -- one node at concurrency 3 needs about 48 minutes for
 the suite the three-node lane finishes in 34 at concurrency 5. Making that

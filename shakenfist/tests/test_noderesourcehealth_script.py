@@ -36,6 +36,7 @@ from unittest import mock
 from shakenfist import blob
 from shakenfist import constants
 from shakenfist import instance
+from shakenfist import node as sf_node
 from shakenfist import resource_health
 from shakenfist import upload
 from shakenfist.config import SFConfig
@@ -216,6 +217,19 @@ class ChooseVictimTestCase(base.ShakenFistTestCase):
                 node['state'] = 'missing'
         self.assertIsNone(script.choose_victim(nodes, 'primary', 'sf1'))
 
+    def test_never_an_active_node_which_cannot_take_a_pin(self):
+        # degraded and initial are active, but the create handler refuses
+        # a pinned create onto anything but created, so the control would
+        # fail before any fault and blame the product for it.
+        for state in ('degraded', 'initial'):
+            nodes = self._nodes()
+            for node in nodes:
+                if node['name'] == 'sf2':
+                    node['state'] = state
+            self.assertEqual(
+                'sf3', script.choose_victim(nodes, 'primary', 'sf1')['name'],
+                'a %s node was chosen' % state)
+
     def test_no_network_node_reported(self):
         # network_node resolves to None when no node claims the role; that
         # must not accidentally exclude a node whose name is missing.
@@ -224,6 +238,54 @@ class ChooseVictimTestCase(base.ShakenFistTestCase):
 
     def test_returns_none_on_an_empty_roster(self):
         self.assertIsNone(script.choose_victim([], 'primary', 'sf1'))
+
+
+class _Failed(Exception):
+    pass
+
+
+class AssertControlsTestCase(base.ShakenFistTestCase):
+    """The controls fail with the reason they were written to give."""
+
+    VICTIM = {'name': 'sf2', 'state': 'created', 'ip': '10.0.0.2'}
+
+    def _controls(self, victim, returncode=0, stdout='present\n'):
+        """Run assert_controls() until it fails, returning the reason.
+
+        The ssh is stubbed at subprocess.run rather than at node_run(),
+        so a check= which turns a missing heartbeat into run()'s generic
+        exit-status failure is still caught here.
+        """
+        def raise_failed(msg):
+            raise _Failed(msg)
+
+        result = mock.Mock(returncode=returncode, stdout=stdout, stderr='')
+        with mock.patch.object(script.subprocess, 'run',
+                               return_value=result), \
+                mock.patch.object(script, 'await_gauge'), \
+                mock.patch.object(script, 'log'), \
+                mock.patch.object(script, 'in_scheduler_view',
+                                  return_value=False), \
+                mock.patch.object(script, 'fail', side_effect=raise_failed):
+            with self.assertRaises(_Failed) as ctx:
+                script.assert_controls(mock.Mock(), victim, [])
+        return str(ctx.exception)
+
+    def test_a_missing_heartbeat_is_named(self):
+        # test -f exits 1 when the file is absent; that has to reach the
+        # heartbeat diagnosis rather than a bare "exited 1".
+        reason = self._controls(self.VICTIM, returncode=1, stdout='')
+        self.assertIn('heartbeat', reason)
+        self.assertNotIn('exited', reason)
+
+    def test_a_present_heartbeat_moves_on(self):
+        reason = self._controls(self.VICTIM)
+        self.assertIn('not a placement candidate', reason)
+
+    def test_a_victim_which_cannot_take_a_pin_is_named(self):
+        reason = self._controls({**self.VICTIM, 'state': 'degraded'})
+        self.assertIn('degraded', reason)
+        self.assertIn('pinned', reason)
 
 
 class MountIsReadonlyTestCase(base.ShakenFistTestCase):
@@ -421,6 +483,8 @@ class DuplicatedConstantsTestCase(base.ShakenFistTestCase):
             script.RESOURCES_METRICS_PORT)
         self.assertEqual(
             constants.NODE_ACTIVE_STATES, script.NODE_ACTIVE_STATES)
+        self.assertEqual(
+            sf_node.Node.STATE_CREATED, script.NODE_PINNABLE_STATE)
         self.assertEqual(
             constants.EVENT_TYPE_HEALTH, script.HEALTH_EVENT_TYPE)
         self.assertIn(script.EVENT_TYPE_FIELD, EventReadRow.model_fields)

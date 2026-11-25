@@ -89,6 +89,13 @@ METRICS_TIMEOUT = 5
 # scheduler's prefilter='active' resolves to.
 NODE_ACTIVE_STATES = frozenset({'initial', 'created', 'degraded'})
 
+# shakenfist.node.Node.STATE_CREATED, the one state the create handler
+# accepts a pinned create onto (external_api/instance.py refuses any
+# other as "not ready"). The victim has to be in it, because the control
+# create pins there; an active but degraded node would fail the control
+# and read as a product fault rather than a node which was not ready.
+NODE_PINNABLE_STATE = 'created'
+
 # shakenfist.constants.EVENT_TYPE_HEALTH, the channel apply_result()
 # writes its diagnosis on, and the field an event carries it in on the
 # wire, which is shakenfist.schema.event.EventReadRow's -- not the
@@ -233,14 +240,16 @@ def choose_victim(nodes, script_host, network_node):
     the network node either: the cluster-wide networknode-* queues are
     drained only by the node holding that role and there is no failover
     for it, which is the same carve-out nodelifecycletests.sh makes
-    before it picks a node to kill.
+    before it picks a node to kill. And only a node in exactly
+    ``created``: the control create pins to the victim, and the API
+    refuses a pin onto any other state, active ones included.
     """
     for node in nodes:
         if not node.get('is_hypervisor'):
             continue
         if node.get('name') in (script_host, network_node):
             continue
-        if node.get('state') not in NODE_ACTIVE_STATES:
+        if node.get('state') != NODE_PINNABLE_STATE:
             continue
         return node
     return None
@@ -586,16 +595,17 @@ def assert_controls(client, victim, created):
     that something is absent, refused or zero after the fault says
     nothing unless it was present, accepted or one before it.
     """
-    if victim['state'] not in NODE_ACTIVE_STATES:
-        fail('%s is in state %r before the fault'
-             % (victim['name'], victim['state']))
+    if victim['state'] != NODE_PINNABLE_STATE:
+        fail('%s is in state %r before the fault, not %r, so a create '
+             'pinned to it would be refused whatever its health'
+             % (victim['name'], victim['state'], NODE_PINNABLE_STATE))
     await_gauge(victim, 1.0, DETECT_TIMEOUT)
     log('OK: %s publishes node_resource_health 1 while healthy' % victim['name'])
 
     heartbeat = node_run(
         victim['name'],
         'test -f %s && echo present'
-        % os.path.join(FAULT_PATH, HEARTBEAT_FILENAME))
+        % os.path.join(FAULT_PATH, HEARTBEAT_FILENAME), check=False)
     if 'present' not in heartbeat:
         fail('%s has no %s heartbeat, so the write tier never probed it'
              % (victim['name'], FAULT_PATH))

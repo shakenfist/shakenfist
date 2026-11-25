@@ -717,11 +717,15 @@ nonce and expiry exactly, so tokens minted before the upgrade continue to
 validate. That column has since been dropped, by the `namespace_attributes`
 v3 migration, because it had no reader but the fan-out itself and holding a
 second copy of live key material at rest bought nothing. The two steps run
-in that order in `ensure_schema()`, but the drop does not rely on it: the
-fan-out stamps its version even when a key failed to copy, so immediately
-before dropping, the v3 step repeats the fan-out and refuses to drop while
-any usable key in the column has no `namespace_keys` row
-(`_unmigrated_legacy_keys()`).
+in that order in `ensure_schema()`, but the drop does not rely on the order
+alone. The fan-out proves its own copy: it stamps `namespace_keys` at version
+2 only when `_unmigrated_legacy_keys()` finds no usable key in the column
+without a `namespace_keys` row, so a failed copy leaves it at version 1 and a
+re-run finishes the job. The v3 drop then trusts that version stamp (and asks
+`_legacy_keys_column_present()` whether there is a column to drop), refuses
+below version 2, and deliberately does not copy again: from version 2 on, a
+key left only in the column is indistinguishable from one revoked since, and
+copying it back would revive a revoked credential.
 Note that a downgrade across either migration loses keys — across the first
 one, any key created since it ran; across the drop, all of them, because the
 column a pre-first-class-keys release reads is no longer there.

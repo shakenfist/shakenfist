@@ -1845,7 +1845,10 @@ state `created`. Hashes, nonces and expiries are copied verbatim, so
 tokens issued before the upgrade keep working; scopes and provenance
 are NULL. Expired keys are migrated too and removed by the reaper on
 its next pass. The migration is idempotent — keys which already have a
-row are skipped — so it is safe to re-run.
+row are skipped — so it is safe to re-run. It records version 2 only
+once it has checked its own work: if any key with a hash and a nonce
+still has no `namespace_keys` row, the table stays at version 1 and
+the next run copies it.
 
 Version 3 of `namespace_attributes` then drops that JSON column. It
 had no reader but the migration above, and what it held was a second
@@ -1854,9 +1857,12 @@ could disagree, and anybody reading the schema had to work out which
 was authoritative. `sf-ctl ensure-mariadb-schema` runs the
 `namespace_keys` fan-out before this drop, in that order, so a cluster
 upgrading from before first-class keys copies them out of the column
-before it goes. The drop then confirms it rather than trusting the
-order: it repeats the fan-out and refuses to drop while any key with a
-hash and a nonce has no `namespace_keys` row. A drop which fails leaves the table at version 2 and
+before it goes. The drop trusts the `namespace_keys` version stamp
+rather than the order: it refuses while that table is below version 2,
+and it does not repeat the fan-out. Once keys are served from the new
+tables, a key left only in the column has been revoked since, and
+copying it back would revive a revoked credential. A drop which fails
+leaves the table at version 2 and
 the command exits non-zero rather than reporting a column gone which
 is still there; re-run it.
 

@@ -3907,7 +3907,7 @@ class MockMariaDB():
             self._trace(
                 f'MockMariaDB.create_and_enqueue_cluster_operation'
                 f'({key}): duplicate')
-            return False, f'duplicate cluster_operation uuid: {key}'
+            return False, f'duplicate cluster_operation uuid {key}'
 
         row = dict(metadata)
         row['uuid'] = key

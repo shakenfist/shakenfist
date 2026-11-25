@@ -14019,10 +14019,6 @@ def _ensure_namespace_attributes_schema(engine: sa.Engine) -> dict[str, Any]:
         # upgrading from ran on, sf-ctl ensure-mariadb-schema names it
         # as short of version 3 and exits non-zero, and a re-run
         # finishes it.
-        LOG.info(
-            f'Upgrading {table_name} table to version '
-            f'{NAMESPACE_ATTRIBUTES_KEYS_DROPPED_VERSION} '
-            f'(drop legacy keys column)')
         #
         # The drop cannot be undone, so it goes ahead only once
         # namespace_keys has reached version 2, which that table stamps
@@ -14061,6 +14057,11 @@ def _ensure_namespace_attributes_schema(engine: sa.Engine) -> dict[str, Any]:
                 'target_version': NAMESPACE_ATTRIBUTES_VERSION,
                 'migrated': start_ver != current_ver
             }
+        # Only now, so a refused drop never reads as an upgrade.
+        LOG.info(
+            f'Upgrading {table_name} table to version '
+            f'{NAMESPACE_ATTRIBUTES_KEYS_DROPPED_VERSION} '
+            f'(drop legacy keys column)')
         try:
             with engine.connect() as conn:
                 conn.execute(sa.text(

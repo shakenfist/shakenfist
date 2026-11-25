@@ -3231,14 +3231,16 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     request.namespace, request.coverage_state):
                 reply.claims.append(self._claim_message(claim))
             return reply
-        except ValueError:
+        except ValueError as e:
             # A coverage_state the public layer would have refused. This
             # is the caller's mistake, not a database fault, but it is
             # still an error status rather than an empty list, for the
             # reason given below. The detail names the argument instead
             # of calling _rpc_error(), which would report a database
             # failure that did not happen -- and instead of str(e),
-            # which the rest of this file no longer passes on.
+            # which the rest of this file no longer passes on. What was
+            # refused is recorded here instead.
+            LOG.warning(f'database GetNamespaceClaims refused its arguments: {e}')
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             context.set_details('coverage_state is not a valid claim state')
             return database_pb2.GetNamespaceClaimsReply()
@@ -3397,14 +3399,15 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             for clamp in result['clamps']:
                 reply.clamps.add(**clamp)
             return reply
-        except ValueError:
+        except ValueError as e:
             # A request naming no holds and not asking for all of them.
             # The caller's mistake rather than a database fault, so it
             # gets an argument status rather than a recorded exception,
             # and never the release of everything it did not ask for.
             # The only ValueError this handler's own code raises, so the
             # message is written rather than str(e), for the reason on
-            # _rpc_error().
+            # _rpc_error(). What was refused is recorded here instead.
+            LOG.warning(f'database ReleaseNamespaceClaimHolds refused its arguments: {e}')
             message = 'ReleaseNamespaceClaimHolds needs hold_uuids or all_holds'
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             context.set_details(message)
