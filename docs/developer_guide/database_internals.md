@@ -976,6 +976,46 @@ Observability is the
 `scheduler_capacity_*` gauges and counters exported on
 `CLUSTER_METRICS_PORT`, plus one structured log line per pass.
 
+### The transient-failure retry budget rides on the work item
+
+A task which fails on something outside its own control -- an
+artifact fetch whose mirror is briefly unreachable, a blob
+replication whose every source timed out awaiting our transfer
+connection, a vxlan interface a sibling operation is still creating
+-- calls `BaseClusterOperation.defer_with_backoff()` rather than
+erroring the operation out. That re-queues the operation after 15,
+then 30, then 60 seconds, a ceiling of one minute forty-five, and
+returns `False` once the budget is spent so the caller can run
+whatever final-error handling it has. The schedule is long enough to
+cover a service restart during an OS patch run and short enough that
+a genuinely broken URL still surfaces an error promptly; a caller
+wanting a different one passes `delays`. `artifact_fetch_op`,
+`node_blob_op` and `net_op` all use it.
+
+The retry counter lives in the work-item payload rather than on the
+operation. `cluster_operations` rows are insert-only -- the contract
+stated on `_get_cluster_operations_table`, and the same reason the
+structured failure record needs a `cluster_operation_errors` table
+of its own -- so the count cannot be a column there. `defer()`
+instead writes `defer_count = current_defer_count + 1` into the work
+item it enqueues, and each dispatcher reads it back onto
+`op.current_defer_count` before executing, so the depth survives
+both re-enqueues and a worker restart with no schema change. The
+dependency-wait back-off derives its own depth from the same field
+(see [the exponential back-off
+map](network_dispatcher.md#exponential-back-off-map)), and the
+enqueue-side coalescing dedup refuses to adopt an operation whose
+row is still waiting out a delay it asked for, below.
+
+A retry is visible to anything watching the operation's events,
+which is why the CI suite needed no change to tolerate one: each
+defer records a `status` event, and `_await_objects_ready()` in
+`shakenfist/deploy/shakenfist_ci/base.py` renews its
+`OBJECTS_READY_PROGRESS_TIMEOUT` window on any `audit`, `mutate` or
+`status` event. So retries do not trip the no-progress timer, but
+they are not free either: the same wait has an absolute
+`OBJECTS_READY_CEILING` which no amount of progress renews.
+
 ## Batched, Priority-Aware Dequeue
 
 `sf-net` and the `sf-queues` worker pool both call a single

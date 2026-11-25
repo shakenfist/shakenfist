@@ -125,6 +125,48 @@ rather than having to retrofit one. The mask travels over gRPC as
 replaced the whole row would let a caller name the wrong fields and
 still see the write it expected.
 
+**A per-attribute lock is not a substitute, and this is the part which
+surprises people.** The locks are per attribute while the write is whole
+row, so two correctly locked writers clobber each other: `add_instance()`
+held the `instances` lock and `register_daemon()` held `daemons`, and
+either one, saving a snapshot loaded before the other committed, reverted
+it. Unlocked writers make it worse rather than being the whole problem.
+`Node.observe_this_node()` runs every 15 seconds from both sentinel
+daemons on every node, and the resources daemon's version setters run
+every 300 seconds -- with `dependency_versions` saving a snapshot taken
+before a `dpkg-query` subprocess ran, which widens the stale window to
+seconds. The symptom that found this was a scheduler affinity pass
+scoring every node zero, because the instance it was affine to had
+vanished from its node's `instances` list about 55 seconds after
+placement wrote it there. A mask is the fix because it removes the
+stale columns from the statement entirely; a bigger lock would only
+serialise writers which have no business contending.
+
+The mask is validated in the public `update_*_attributes` function,
+before it dispatches to the direct or gRPC implementation, so an unknown
+field name raises `ValueError` either way. Validating only in the direct
+path would have made the same mistake a silently discarded `StatusReply`
+failure over gRPC.
+
+**During a rolling upgrade the mask degrades rather than failing.** An
+`sf-database` which has not restarted yet does not know the `fields`
+proto field, ignores it, and writes the whole row -- exactly the
+previous release's semantics, until the daemon rolls. This is accepted
+without a guard, as it was when the instance, artifact and network masks
+shipped: the window is one deploy long and the failure it reintroduces is
+the one which existed before.
+
+Two multi-writer lists are still packed into attribute rows, both
+deliberately. `namespace_attributes.trust` is small and written rarely,
+so naming it in the mask is enough and un-packing it would buy nothing.
+`node_attributes.daemons` is redundant rather than tolerable -- the
+registration set is derivable from the `node_daemon_states` rows which
+`register_daemon()` and `deregister_daemon()` already maintain -- and
+removing it is tracked as
+[#5060](https://github.com/shakenfist/shakenfist/issues/5060). A blob's
+`last_used` is advisory, so a full-row blob write reverting a concurrent
+`update_blob_last_used()` costs nothing worth guarding.
+
 ## A guarded UPDATE must be the transaction's first statement
 
 `innodb_snapshot_isolation` defaults ON from MariaDB 11.6.2, which is

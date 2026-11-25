@@ -570,17 +570,13 @@ copy lives in shakenfist/development at
 
     A few of this repository's older roadmaps write their
     phases as prose sections rather than as a table:
-    `blob-storage-roadmap.md`, `api-query-batching-roadmap.md`
-    and `PLAN-attribute-field-masks.md`, which are the three
-    named in `check-plan-status.py`'s `HAND_COUNTED`. The
-    first two carry a `**Merged**:` line in the phase's own
-    section -- beside `**Status**` where the phase has one,
-    otherwise directly under the heading. The third carries no
-    such line, which is a decision rather than an oversight:
-    it is `Complete` and has no push-audit phase, so the
-    shared block's do-not-reopen rule leaves it alone. Nothing
-    checks either form, so a wrong SHA is caught only in
-    review.
+    `blob-storage-roadmap.md` and
+    `api-query-batching-roadmap.md`, which are the two named
+    in `check-plan-status.py`'s `HAND_COUNTED`. Both carry a
+    `**Merged**:` line in the phase's own section -- beside
+    `**Status**` where the phase has one, otherwise directly
+    under the heading. Nothing checks that form, so a wrong
+    SHA is caught only in review.
 
 ## Agent guidance
 

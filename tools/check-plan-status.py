@@ -93,12 +93,12 @@ in the canonical block (which lives in shakenfist/development, at
 `templates/shared-blocks/plan-status-vocabulary.md`) cannot leave this
 checker rejecting a status the template tells authors to write.
 
-Three plans predate the Execution-table convention and are counted by hand,
+Two plans predate the Execution-table convention and are counted by hand,
 and three more keep a table which is a placeholder rather than a phase list.
 They are named in `HAND_COUNTED` and `PROVISIONAL` rather than detected, so
 that a plan cannot join them by quietly omitting or stubbing its table:
 adding a name is a deliberate edit, and the index preamble names the same
-six for readers.
+five for readers.
 
 `order.yml` is registration, not navigation. Nothing in this repository
 renders it -- `mkdocs.yml.tmpl` lists the Plans nav by hand -- but the format
@@ -133,11 +133,12 @@ VOCABULARY_BLOCK_RE = re.compile(
 VOCABULARY_TERM_RE = re.compile(r'^- `([^`]+)`', re.MULTILINE)
 
 # Plans whose phases are not in an Execution table, so their index arithmetic
-# cannot be recomputed. See the index preamble, which names the same three.
+# cannot be recomputed. See the index preamble, which names the same two. A
+# retired plan needs no entry here: its row links a permalink rather than a
+# local file, so this checker never reaches it.
 HAND_COUNTED = {
     'blob-storage-roadmap.md',          # phases as headings
     'api-query-batching-roadmap.md',    # phases as headings
-    'PLAN-attribute-field-masks.md',    # phases as headings
 }
 
 # Plans whose Execution table is explicitly a placeholder, so its row count

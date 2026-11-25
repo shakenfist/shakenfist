@@ -38,8 +38,10 @@ class TestNetworkPlumbingLifecycle(base.BaseNamespacedTestCase):
     The per-node assertions run over the mesh via the node-exec helper.
     The test skips loudly if the nodes cannot be reached, or if the
     cluster lacks two hypervisors distinct from the network node (which it
-    needs to keep the presence assertions sharp). See
-    docs/plans/PLAN-ci-node-exec-assertions.md.
+    needs to keep the presence assertions sharp). See "Why assertions
+    run on a named node, over the mesh" in docs/developer_guide/ci.md;
+    the presence invariant itself is under "Stray vxlan reaping" in
+    docs/operator_guide/networking/overview.md.
     """
 
     def __init__(self, *args, **kwargs):

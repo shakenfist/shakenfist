@@ -885,8 +885,16 @@ of the whole attributes row, so concurrent full-row writers (for example the
 sentinels' 15-second `observe_this_node()` heartbeat) could silently revert
 a placement. References are single-row inserts and deletes, needing no
 cross-writer coordination. `Node.instances` queries them via
-`mariadb.get_references_from()` filtered by `INSTANCE_LOCATION`. Unlike
-`BLOB_LOCATION`, these rows key the node by UUID, not FQDN. The dual-write and the
+`mariadb.get_references_from()` filtered by `INSTANCE_LOCATION`.
+
+Unlike `BLOB_LOCATION`, these rows key the node by UUID rather than by
+FQDN. `BLOB_LOCATION`'s FQDN keying is a legacy of the pre-UUID era and
+was deliberately not copied: an FQDN is renameable and is not the node's
+identity anywhere else. That leaves the two relationship types keying the
+same source object two different ways, which is tracked as
+[#5045](https://github.com/shakenfist/shakenfist/issues/5045).
+
+The dual-write and the
 read-side union were removed once every placement writer had moved onto
 the atomic admission primitive; the column itself remains declared in
 the table (nullable, no longer read or written)
