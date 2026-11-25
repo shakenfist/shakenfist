@@ -3373,15 +3373,7 @@
          <lastmod>2026-11-25</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/plans/PLAN-artifact-fetch-retry-with-backoff/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
          <loc>https://shakenfist.com/plans/PLAN-artifact-ux-rework/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-attribute-field-masks/</loc>
          <lastmod>2026-11-25</lastmod>
     </url>
     <url>
@@ -3422,10 +3414,6 @@
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-ci-cloud-sizing/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/plans/PLAN-ci-node-exec-assertions/</loc>
          <lastmod>2026-11-25</lastmod>
     </url>
     <url>

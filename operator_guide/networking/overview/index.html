@@ -16998,6 +16998,22 @@ namespace loopback interface up</code> when it does. If the loopback cannot
 be brought up, that is reported like any other probe which could not
 run.</p>
 <h2 id="stray-vxlan-reaping">Stray vxlan reaping<a class="headerlink" href="#stray-vxlan-reaping" title="Permanent link">&para;</a></h2>
+<p>Which networks a node should be carrying is a closed question: a network
+is present on a node <strong>if and only if</strong> that node hosts an instance on
+it, or the node is the network node, which always carries every network
+for DHCP and NAT. Everything else is residue, and the invariant is what
+makes a leak detectable rather than a judgement call -- stale vxlan
+plumbing stranded on a hypervisor an instance has left is the leak class
+this reaping exists for, and the cluster suite's network lifecycle test
+asserts the same invariant from the outside.</p>
+<p>The invariant says what a node should carry, not what the maintainer
+deletes, and the deletion side is deliberately more conservative. An
+instance which is still building, or which has errored but whose domain
+may still be running, protects its vxlan even though maintenance does
+not reconcile its network (<code>_local_instance_vxids()</code> in
+<code>shakenfist/daemons/network/maintain.py</code>), and a stray must outlive a
+grace period before anything acts on it. A vxlan belonging to an
+instance in either state is therefore not a leak.</p>
 <p>Every node's network maintainer compares the vxlan devices actually
 present on the host against the networks that node should be carrying.
 A device which matches nothing is a <em>stray</em> -- residue from a network

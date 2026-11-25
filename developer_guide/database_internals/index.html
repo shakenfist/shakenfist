@@ -16170,6 +16170,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Cluster Operation Storage and Work Queues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-transient-failure-retry-budget-rides-on-the-work-item" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The transient-failure retry budget rides on the work item
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -17182,6 +17199,42 @@ holds. See
 Observability is the
 <code>scheduler_capacity_*</code> gauges and counters exported on
 <code>CLUSTER_METRICS_PORT</code>, plus one structured log line per pass.</p>
+<h3 id="the-transient-failure-retry-budget-rides-on-the-work-item">The transient-failure retry budget rides on the work item<a class="headerlink" href="#the-transient-failure-retry-budget-rides-on-the-work-item" title="Permanent link">&para;</a></h3>
+<p>A task which fails on something outside its own control -- an
+artifact fetch whose mirror is briefly unreachable, a blob
+replication whose every source timed out awaiting our transfer
+connection, a vxlan interface a sibling operation is still creating
+-- calls <code>BaseClusterOperation.defer_with_backoff()</code> rather than
+erroring the operation out. That re-queues the operation after 15,
+then 30, then 60 seconds, a ceiling of one minute forty-five, and
+returns <code>False</code> once the budget is spent so the caller can run
+whatever final-error handling it has. The schedule is long enough to
+cover a service restart during an OS patch run and short enough that
+a genuinely broken URL still surfaces an error promptly; a caller
+wanting a different one passes <code>delays</code>. <code>artifact_fetch_op</code>,
+<code>node_blob_op</code> and <code>net_op</code> all use it.</p>
+<p>The retry counter lives in the work-item payload rather than on the
+operation. <code>cluster_operations</code> rows are insert-only -- the contract
+stated on <code>_get_cluster_operations_table</code>, and the same reason the
+structured failure record needs a <code>cluster_operation_errors</code> table
+of its own -- so the count cannot be a column there. <code>defer()</code>
+instead writes <code>defer_count = current_defer_count + 1</code> into the work
+item it enqueues, and each dispatcher reads it back onto
+<code>op.current_defer_count</code> before executing, so the depth survives
+both re-enqueues and a worker restart with no schema change. The
+dependency-wait back-off derives its own depth from the same field
+(see <a href="../network_dispatcher/#exponential-back-off-map">the exponential back-off
+map</a>), and the
+enqueue-side coalescing dedup refuses to adopt an operation whose
+row is still waiting out a delay it asked for, below.</p>
+<p>A retry is visible to anything watching the operation's events,
+which is why the CI suite needed no change to tolerate one: each
+defer records a <code>status</code> event, and <code>_await_objects_ready()</code> in
+<code>shakenfist/deploy/shakenfist_ci/base.py</code> renews its
+<code>OBJECTS_READY_PROGRESS_TIMEOUT</code> window on any <code>audit</code>, <code>mutate</code> or
+<code>status</code> event. So retries do not trip the no-progress timer, but
+they are not free either: the same wait has an absolute
+<code>OBJECTS_READY_CEILING</code> which no amount of progress renews.</p>
 <h2 id="batched-priority-aware-dequeue">Batched, Priority-Aware Dequeue<a class="headerlink" href="#batched-priority-aware-dequeue" title="Permanent link">&para;</a></h2>
 <p><code>sf-net</code> and the <code>sf-queues</code> worker pool both call a single
 <code>mariadb.dequeue_work_items(queue_names, limit)</code> primitive. The
