@@ -197,27 +197,42 @@ class NamespaceKeysColumnLiveTestCase(base.ShakenFistTestCase):
         self.assertEqual('banana', row.name)
         self.assertEqual(['system'], row.trust)
 
-    def test_a_key_an_earlier_fan_out_missed_is_copied_before_the_drop(self):
-        """namespace_keys at v2 is not proof that every key was copied.
+    def test_a_key_revoked_after_the_fan_out_stays_revoked(self):
+        """The drop must not copy back a key removed since the fan out.
 
-        The fan out stamps v2 even when it counted failures, so a
-        cluster which reached v2 releases ago may hold a key which lives
-        only in the legacy column. Dropping it there would delete that
-        key for good.
+        Namespace.remove_key() is a hard delete and nothing has written
+        the legacy column since the fan out, so a key revoked in between
+        is still in the column with no row anywhere else. Fanning out
+        again before the drop re-created it with its old hash and nonce,
+        and a revoked credential authenticated again (PR 5057 review).
         """
         self._regress_to_version_2()
-        mariadb._set_table_version(self.engine, 'namespace_keys', 2)
         self._write_legacy_namespace('banana', {'nonced_keys': {
-            'first': {'key': 'aGFzaC1vbmU=', 'nonce': 'nonce-one'},
+            'kept': {'key': 'aGFzaC1vbmU=', 'nonce': 'nonce-one'},
+            'revoked': {'key': 'aGFzaC10d28=', 'nonce': 'nonce-two'},
         }})
 
-        result = mariadb._ensure_namespace_attributes_schema(self.engine)
-
-        self.assertEqual(3, result['end_version'])
+        # A development build between the two migrations: namespace_keys
+        # reaches version 2, namespace_attributes stays at 2, the cluster
+        # serves from the new tables, and somebody revokes a key.
+        mariadb._ensure_namespace_keys_schema(self.engine)
         self.assertEqual(
-            {('banana', 'first'): ('aGFzaC1vbmU=', 'nonce-one', None)},
+            2, mariadb._get_table_version(self.engine, 'namespace_keys'))
+        keys = mariadb._get_namespace_keys_table()
+        with self.engine.connect() as conn:
+            conn.execute(sa.delete(keys).where(keys.c.name == 'revoked'))
+            conn.commit()
+
+        for ensure in ENSURES:
+            ensure(self.engine)
+
+        self.assertEqual(
+            {('banana', 'kept'): ('aGFzaC1vbmU=', 'nonce-one', None)},
             self._keys_in_the_new_tables())
         self.assertEqual({'name', 'trust'}, self._columns())
+        self.assertEqual(
+            3, mariadb._get_table_version(
+                self.engine, 'namespace_attributes'))
 
     def test_a_key_which_cannot_be_copied_keeps_the_column(self):
         """A copy which fails leaves the original where it is."""
@@ -234,6 +249,9 @@ class NamespaceKeysColumnLiveTestCase(base.ShakenFistTestCase):
                 result = ensure(self.engine)
                 results[result['table']] = result
 
+        # namespace_keys does not claim the copy it could not prove, and
+        # the drop will not run without that claim.
+        self.assertEqual(1, results['namespace_keys']['end_version'])
         self.assertEqual(2, results['namespace_attributes']['end_version'])
         self.assertEqual(
             2, mariadb._get_table_version(

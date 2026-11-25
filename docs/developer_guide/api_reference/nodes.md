@@ -100,7 +100,7 @@ event system.
             "fqdn": "sf-1",
             "message": "updated node resources and package versions",
             "timestamp": 1685475323.252612,
-            "type": "resources"
+            "event_type": "resources"
         },
         ...
     ]

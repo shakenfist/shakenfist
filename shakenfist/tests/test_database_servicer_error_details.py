@@ -74,11 +74,20 @@ def _mentions(node, name):
 def _client_visible_values(node):
     """Every expression in ``node`` which a client gets to see.
 
-    The two channels are a ``set_details()`` call's arguments and an
-    ``error=`` keyword on a reply constructor. Nothing else in a
-    handler reaches the caller.
+    The channels are a ``set_details()`` or ``abort()`` call's
+    arguments, and a reply's ``error`` field, whether it is set by an
+    ``error=`` keyword on the constructor or assigned afterwards
+    (``reply.error = ...``, ``+=`` included). Nothing else in a handler
+    reaches the caller.
     """
     for inner in ast.walk(node):
+        if isinstance(inner, (ast.Assign, ast.AugAssign, ast.AnnAssign)):
+            targets = (inner.targets if isinstance(inner, ast.Assign)
+                       else [inner.target])
+            if inner.value is not None and any(
+                    isinstance(t, ast.Attribute) and t.attr == 'error'
+                    for t in targets):
+                yield inner.value
         if (isinstance(inner, ast.Call)
                 and isinstance(inner.func, ast.Attribute)
                 and inner.func.attr in ('set_details', 'abort')):
@@ -102,9 +111,10 @@ def _tainted_names(handler):
     """The handler's bound name, and every name assigned from it.
 
     ``msg = str(e)`` and then ``set_details(msg)`` hands the exception
-    on just as surely as ``set_details(str(e))``, so a simple assignment
-    from a tainted expression taints its target, followed to a fixed
-    point within the handler.
+    on just as surely as ``set_details(str(e))``, so an assignment from
+    a tainted expression taints its target -- every name in a tuple
+    target, and the target of an augmented assignment (``msg += str(e)``)
+    too -- followed to a fixed point within the handler.
     """
     tainted = {handler.name}
     changed = True
@@ -113,17 +123,22 @@ def _tainted_names(handler):
         for inner in ast.walk(handler):
             if isinstance(inner, ast.Assign):
                 targets, value = inner.targets, inner.value
-            elif isinstance(inner, ast.AnnAssign) and inner.value:
+            elif isinstance(inner, (ast.AnnAssign, ast.AugAssign)) \
+                    and inner.value:
                 targets, value = [inner.target], inner.value
             else:
                 continue
             if not any(_mentions(value, name) for name in tainted):
                 continue
             for target in targets:
-                if isinstance(target, ast.Name) \
-                        and target.id not in tainted:
-                    tainted.add(target.id)
-                    changed = True
+                names = (target.elts
+                         if isinstance(target, (ast.Tuple, ast.List))
+                         else [target])
+                for name in names:
+                    if isinstance(name, ast.Name) \
+                            and name.id not in tainted:
+                        tainted.add(name.id)
+                        changed = True
     return tainted
 
 
@@ -300,6 +315,45 @@ class TaintAndResultErrorCheckTestCase(base.ShakenFistTestCase):
             '    detail = msg\n'
             '    context.set_details(detail)\n')
         self.assertEqual([(6, 'e')], offences)
+
+    def test_assigning_a_reply_error_field_is_an_offence(self):
+        offences = find_leaked_exceptions(
+            'try:\n'
+            '    read()\n'
+            'except Exception as e:\n'
+            '    reply = database_pb2.StatusReply(success=False)\n'
+            '    reply.error = str(e)\n'
+            '    return reply\n')
+        self.assertEqual([(5, 'e')], offences)
+
+    def test_an_augmented_assignment_carries_the_taint(self):
+        offences = find_leaked_exceptions(
+            'try:\n'
+            '    read()\n'
+            'except Exception as e:\n'
+            "    msg = 'read failed: '\n"
+            '    msg += str(e)\n'
+            '    context.set_details(msg)\n')
+        self.assertEqual([(6, 'e')], offences)
+
+    def test_a_tuple_target_carries_the_taint(self):
+        offences = find_leaked_exceptions(
+            'try:\n'
+            '    read()\n'
+            'except Exception as e:\n'
+            '    msg, code = str(e), 1\n'
+            '    context.set_details(msg)\n')
+        self.assertEqual([(5, 'e')], offences)
+
+    def test_assigning_a_written_message_to_the_error_field_is_accepted(self):
+        self.assertEqual([], find_leaked_exceptions(
+            'try:\n'
+            '    read()\n'
+            'except Exception as e:\n'
+            "    LOG.warning(f'read failed: {e}')\n"
+            '    reply = database_pb2.StatusReply(success=False)\n'
+            "    reply.error = 'Read failed'\n"
+            '    return reply\n'))
 
     def test_abort_with_the_exception_is_an_offence(self):
         offences = find_leaked_exceptions(

@@ -34,10 +34,12 @@ import types
 from unittest import mock
 
 from shakenfist import blob
+from shakenfist import constants
 from shakenfist import instance
 from shakenfist import resource_health
 from shakenfist import upload
 from shakenfist.config import SFConfig
+from shakenfist.schema.event import EventReadRow
 from shakenfist.tests import base
 
 
@@ -94,6 +96,15 @@ def _load_script():
 script = _load_script()
 
 
+def _literal(value):
+    """literal_eval, plus the ``frozenset({...})`` the CI tree spells sets as."""
+    if (isinstance(value, ast.Call) and isinstance(value.func, ast.Name)
+            and value.func.id == 'frozenset' and len(value.args) == 1
+            and not value.keywords):
+        return frozenset(ast.literal_eval(value.args[0]))
+    return ast.literal_eval(value)
+
+
 def _module_constants(path, names):
     """Read module level literal assignments without importing the module.
 
@@ -110,7 +121,7 @@ def _module_constants(path, names):
             continue
         for target in node.targets:
             if isinstance(target, ast.Name) and target.id in names:
-                found[target.id] = ast.literal_eval(node.value)
+                found[target.id] = _literal(node.value)
 
     missing = sorted(set(names) - set(found))
     if missing:
@@ -325,10 +336,24 @@ class ParseGaugeTestCase(base.ShakenFistTestCase):
 class HealthDiagnosisTestCase(base.ShakenFistTestCase):
     """The diagnosis is the newest health event carrying affected_types."""
 
+    @staticmethod
+    def _event(event_type, message='failed', extra=None):
+        """An event exactly as GET /nodes/<name>/events returns one.
+
+        Built from the server's own row model rather than written out by
+        hand, so a fixture cannot share a mistake with the script about
+        which key the event type travels in: it once read ``type``,
+        which no event on the wire has, and these fixtures agreed.
+        """
+        return EventReadRow(
+            event_uuid='00000000-0000-0000-0000-000000000000',
+            event_type=event_type, timestamp=1700000000.0, fqdn='sf-2',
+            message=message, extra=extra).model_dump(mode='json')
+
     def _health(self, types, failed=None, message='failed'):
-        return {'type': 'health', 'message': message,
-                'extra': {'affected_types': types,
-                          'failed': failed or []}}
+        return self._event(
+            constants.EVENT_TYPE_HEALTH, message=message,
+            extra={'affected_types': types, 'failed': failed or []})
 
     def test_finds_the_newest_health_event(self):
         events = [self._health(['upload'], message='newest'),
@@ -336,7 +361,8 @@ class HealthDiagnosisTestCase(base.ShakenFistTestCase):
         self.assertEqual('newest', script.health_diagnosis(events)['message'])
 
     def test_ignores_other_event_types(self):
-        events = [{'type': 'audit', 'extra': {'affected_types': ['blob']}},
+        events = [self._event(constants.EVENT_TYPE_AUDIT,
+                              extra={'affected_types': ['blob']}),
                   self._health(['upload'])]
         self.assertEqual(
             ['upload'],
@@ -345,8 +371,10 @@ class HealthDiagnosisTestCase(base.ShakenFistTestCase):
     def test_a_health_event_without_a_payload_is_skipped(self):
         # apply_result() is not the only writer on the health channel, so
         # a health row with no blast radius in it is not the diagnosis.
-        events = [{'type': 'health', 'message': 'something else'},
-                  {'type': 'health', 'extra': 'not a dict'},
+        events = [self._event(constants.EVENT_TYPE_HEALTH,
+                              message='something else'),
+                  {**self._event(constants.EVENT_TYPE_HEALTH),
+                   'extra': 'not a dict'},
                   self._health(['upload'])]
         self.assertEqual(
             ['upload'],
@@ -356,7 +384,7 @@ class HealthDiagnosisTestCase(base.ShakenFistTestCase):
         self.assertIsNone(script.health_diagnosis([]))
         self.assertIsNone(script.health_diagnosis(None))
         self.assertIsNone(script.health_diagnosis(
-            [{'type': 'audit', 'extra': {}}]))
+            [self._event(constants.EVENT_TYPE_AUDIT, extra={})]))
 
 
 class DuplicatedConstantsTestCase(base.ShakenFistTestCase):
@@ -391,6 +419,11 @@ class DuplicatedConstantsTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             self._default('RESOURCES_METRICS_PORT'),
             script.RESOURCES_METRICS_PORT)
+        self.assertEqual(
+            constants.NODE_ACTIVE_STATES, script.NODE_ACTIVE_STATES)
+        self.assertEqual(
+            constants.EVENT_TYPE_HEALTH, script.HEALTH_EVENT_TYPE)
+        self.assertIn(script.EVENT_TYPE_FIELD, EventReadRow.model_fields)
 
     def test_the_faulted_path_is_declared_by_upload_alone(self):
         # The whole reason this fault is safe to inject on a cluster the
@@ -414,7 +447,7 @@ class DuplicatedConstantsTestCase(base.ShakenFistTestCase):
         found = _module_constants(
             CLUSTER_TEST,
             ('EVERY_NODE_PATHS', 'HYPERVISOR_PATHS', 'STORAGE_PATH',
-             'HEARTBEAT_FILENAME'))
+             'HEARTBEAT_FILENAME', 'NODE_ACTIVE_STATES'))
 
         self.assertEqual(
             sorted(set(blob.Blob.health_dependencies +
@@ -427,6 +460,8 @@ class DuplicatedConstantsTestCase(base.ShakenFistTestCase):
             self._default('STORAGE_PATH'), found['STORAGE_PATH'])
         self.assertEqual(
             resource_health.HEARTBEAT_FILENAME, found['HEARTBEAT_FILENAME'])
+        self.assertEqual(
+            constants.NODE_ACTIVE_STATES, found['NODE_ACTIVE_STATES'])
 
 
 class ShellInvocationTestCase(base.ShakenFistTestCase):

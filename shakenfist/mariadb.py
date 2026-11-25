@@ -609,10 +609,10 @@ NAMESPACES_VERSION = 2
 # migration is the one thing which reads it, so ensure_schema() runs
 # namespace_keys before this table.
 NAMESPACE_ATTRIBUTES_VERSION = 3
-# The version at which the keys column stopped existing, named because
-# two steps have to agree about it: the one which drops it, and the
-# namespace_keys migration which must not ask a table at or above this
-# version for a column it no longer has.
+# The version at which the keys column stopped existing. The
+# namespace_keys migration asks the table whether the column is there
+# rather than reading this, because a table can exist with no version
+# it can report and still have it.
 NAMESPACE_ATTRIBUTES_KEYS_DROPPED_VERSION = 3
 # v1: schema creation. v2: data migration out of the
 # namespace_attributes.keys JSON column. namespace_key_attributes rows
@@ -13976,14 +13976,15 @@ def _ensure_namespace_attributes_schema(engine: sa.Engine) -> dict[str, Any]:
     # it can report -- never stamped, or a version read which failed --
     # may still carry the legacy column, so it goes through the drop
     # step below rather than being stamped as though it had been made
-    # without one.
+    # without one. Its version is left as the one recorded, so that a
+    # drop which is refused or fails reports the version an operator
+    # will find in schema_versions rather than one assumed here.
     if current_ver <= 0 and sa.inspect(engine).has_table(table_name):
         LOG.warning(
             f'{table_name} exists but reports version {current_ver}; '
-            f'treating it as version 1 so the legacy keys column is '
-            f'checked and dropped')
-        current_ver = 1
-    if current_ver <= 0:
+            f'checking it for the legacy keys column rather than '
+            f'stamping it')
+    elif current_ver <= 0:
         LOG.info(f'Creating {table_name} table (version {NAMESPACE_ATTRIBUTES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
@@ -14022,38 +14023,37 @@ def _ensure_namespace_attributes_schema(engine: sa.Engine) -> dict[str, Any]:
             f'Upgrading {table_name} table to version '
             f'{NAMESPACE_ATTRIBUTES_KEYS_DROPPED_VERSION} '
             f'(drop legacy keys column)')
+        #
+        # The drop cannot be undone, so it goes ahead only once
+        # namespace_keys has reached version 2, which that table stamps
+        # only after proving every well-formed legacy key has a row (see
+        # _ensure_namespace_keys_schema). It deliberately does not copy
+        # again here. From that version on a legacy key with no row has
+        # either been removed -- and Namespace.remove_key() is a hard
+        # delete, so a revoked key leaves no trace but its absence -- or
+        # has failed to authenticate ever since, because authentication
+        # reads namespace_keys. Copying it back could only make a
+        # revoked credential valid again. A column which is already gone
+        # (a drop whose version stamp failed) has nothing left to lose.
+        may_drop = False
         try:
-            # The drop cannot be undone, so it is the drop which proves
-            # the copy happened rather than trusting namespace_keys'
-            # version to say so. That version is stamped even when the
-            # fan out counted failures, and a cluster which reached it
-            # releases ago may have a key whose copy failed then and
-            # which survives today only in this column. Fan out once
-            # more -- it skips every key already copied -- and refuse
-            # the drop if any well-formed key still has no row. A
-            # column which is already gone (a drop whose version stamp
-            # failed) has nothing left to lose.
-            columns = {
-                c['name']
-                for c in sa.inspect(engine).get_columns(table_name)}
-            if 'keys' in columns:
-                _migrate_keys_from_namespace_attributes(engine)
-                unmigrated = _unmigrated_legacy_keys(engine)
+            keys_ver = _get_table_version(engine, 'namespace_keys')
+            if not _legacy_keys_column_present(engine):
+                may_drop = True
+            elif keys_ver >= 2:
+                may_drop = True
             else:
-                unmigrated = []
+                LOG.warning(
+                    f'Not dropping {table_name}.keys: namespace_keys is '
+                    f'at version {keys_ver}, so the copy out of it has '
+                    f'not been proven. The table stays at version '
+                    f'{current_ver}; a re-run retries the copy.')
         except Exception as e:
             LOG.warning(
-                f'Could not confirm every legacy namespace key was '
+                f'Could not confirm the legacy namespace keys were '
                 f'copied, so not dropping {table_name}.keys and leaving '
                 f'the table at version {current_ver}: {e}')
-            unmigrated = None
-        if unmigrated:
-            LOG.warning(
-                f'Not dropping {table_name}.keys: {len(unmigrated)} '
-                f'key(s) in it have no namespace_keys row '
-                f'({", ".join(unmigrated[:10])}). The table stays at '
-                f'version {current_ver}; a re-run retries the copy.')
-        if unmigrated != []:
+        if not may_drop:
             return {
                 'table': table_name,
                 'start_version': start_ver,
@@ -14776,11 +14776,29 @@ def _migrate_keys_from_namespace_attributes(
     return migrated, errors
 
 
+def _legacy_keys_column_present(engine: sa.Engine) -> bool:
+    """Whether namespace_attributes still has the legacy keys JSON column.
+
+    Asked of the table rather than inferred from its version, because a
+    table which exists with no version it can report may still have the
+    column, and a version stamp which failed after the drop leaves a
+    table at version 2 without it. Raises on a failed inspection rather
+    than answering, so a caller cannot mistake it for "no column".
+    """
+    inspector = sa.inspect(engine)
+    if not inspector.has_table('namespace_attributes'):
+        return False
+    return 'keys' in {
+        c['name'] for c in inspector.get_columns('namespace_attributes')}
+
+
 def _unmigrated_legacy_keys(engine: sa.Engine) -> list[str]:
     """Name every well-formed legacy key which has no namespace_keys row.
 
-    The namespace_attributes v2->v3 drop asks this immediately before it
-    runs, because the drop is the end of the only other copy. Only keys
+    The namespace_keys v1->v2 step asks this immediately after its fan
+    out, and stamps version 2 only on an empty answer: that version is
+    what the namespace_attributes v2->v3 drop trusts before it ends the
+    only other copy. Only keys
     the fan out could have copied count: an entry without both a hash
     and a nonce cannot authenticate anything, so losing it loses nothing,
     and counting it would block the drop forever. Raises rather than
@@ -14855,28 +14873,57 @@ def _ensure_namespace_keys_schema(engine: sa.Engine) -> dict[str, Any]:
         # writes namespace_key_attributes rows, so ensure_schema() must
         # have created that table already.
         #
-        # The source column only exists below
-        # NAMESPACE_ATTRIBUTES_KEYS_DROPPED_VERSION: a fresh cluster has
-        # not created that table yet when this runs, and from that
-        # version the column is dropped (issue 5016). Either way there
-        # is nothing to copy, and asking the column for its contents
-        # would be an error rather than an empty answer.
-        attrs_ver = _get_table_version(engine, 'namespace_attributes')
-        if 0 < attrs_ver < NAMESPACE_ATTRIBUTES_KEYS_DROPPED_VERSION:
-            LOG.info(
-                f'Migrating namespace keys JSON into {table_name} '
-                f'(version 2)')
-            migrated, errors = _migrate_keys_from_namespace_attributes(engine)
-            LOG.info(
-                f'{table_name} migration: {migrated} key(s) copied, '
-                f'{errors} error(s)')
-        else:
-            LOG.info(
-                f'No legacy namespace keys column to migrate into '
-                f'{table_name} (namespace_attributes is at version '
-                f'{attrs_ver})')
-        current_ver = 2
-        _set_table_version(engine, table_name, current_ver)
+        # Whether there is anything to copy is asked of the column
+        # itself rather than of namespace_attributes' version: a fresh
+        # cluster has not created that table yet when this runs, from
+        # version 3 the column is gone (issue 5016), and a table which
+        # exists with no version it can report may still have it.
+        #
+        # Version 2 is stamped only once every well-formed legacy key is
+        # proven to have a row here. This is the one point at which a
+        # legacy key without a row can only mean a copy which failed:
+        # sf-database will not start until this table reaches version 2,
+        # so nothing has authenticated against, or removed, a key in it
+        # yet. From version 2 on a missing row is indistinguishable from
+        # a key which was revoked since, which is why the namespace_attributes
+        # v2->v3 drop trusts this version rather than copying again. A
+        # copy which fails leaves this table at version 1, sf-ctl
+        # ensure-mariadb-schema exits non-zero, and a re-run retries it.
+        copy_proven = False
+        try:
+            if _legacy_keys_column_present(engine):
+                LOG.info(
+                    f'Migrating namespace keys JSON into {table_name} '
+                    f'(version 2)')
+                migrated, errors = _migrate_keys_from_namespace_attributes(
+                    engine)
+                LOG.info(
+                    f'{table_name} migration: {migrated} key(s) copied, '
+                    f'{errors} error(s)')
+                uncopied = _unmigrated_legacy_keys(engine)
+                if uncopied:
+                    LOG.warning(
+                        f'{len(uncopied)} legacy namespace key(s) have '
+                        f'no {table_name} row '
+                        f'({", ".join(uncopied[:10])}). {table_name} '
+                        f'stays at version {current_ver}; a re-run '
+                        f'retries the copy.')
+                else:
+                    copy_proven = True
+            else:
+                LOG.info(
+                    f'No legacy namespace keys column to migrate into '
+                    f'{table_name}')
+                copy_proven = True
+        except Exception as e:
+            LOG.warning(
+                f'Could not confirm every legacy namespace key was '
+                f'copied into {table_name}, leaving it at version '
+                f'{current_ver}: {e}')
+
+        if copy_proven:
+            current_ver = 2
+            _set_table_version(engine, table_name, current_ver)
 
     return {
         'table': table_name,

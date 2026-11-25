@@ -89,6 +89,13 @@ METRICS_TIMEOUT = 5
 # scheduler's prefilter='active' resolves to.
 NODE_ACTIVE_STATES = frozenset({'initial', 'created', 'degraded'})
 
+# shakenfist.constants.EVENT_TYPE_HEALTH, the channel apply_result()
+# writes its diagnosis on, and the field an event carries it in on the
+# wire, which is shakenfist.schema.event.EventReadRow's -- not the
+# "type" some older API reference examples still show.
+HEALTH_EVENT_TYPE = 'health'
+EVENT_TYPE_FIELD = 'event_type'
+
 # The systemd EnvironmentFile the daemons read. SHAKENFIST_NODE_NAME in
 # it is the SF-level node name, which is not necessarily the kernel
 # hostname -- the two diverged in this environment once already and a
@@ -204,7 +211,7 @@ def health_diagnosis(events):
     other health event and is skipped rather than returned empty.
     """
     for event in events or []:
-        if event.get('type') != 'health':
+        if event.get(EVENT_TYPE_FIELD) != HEALTH_EVENT_TYPE:
             continue
         extra = event.get('extra')
         if not isinstance(extra, dict):
@@ -538,7 +545,11 @@ def assert_absent_from_scheduler_view(client, node, deadline_seconds):
 
 def assert_diagnosis(client, node):
     """The error names the affected type, the check, the status and the detail."""
-    event = health_diagnosis(client.get_node_events(node['name'], limit=100))
+    # Filtered by the server as well as here: a node whose cascade wrote
+    # a burst of audit events would otherwise push the diagnosis out of
+    # an unfiltered page.
+    event = health_diagnosis(client.get_node_events(
+        node['name'], event_type=HEALTH_EVENT_TYPE, limit=100))
     if not event:
         fail('No resource health event was recorded against %s, so the '
              'cluster cascade has no blast radius to read' % node['name'])

@@ -27,6 +27,17 @@ def _inspector(has_table=False, columns=('name', 'keys', 'trust')):
                       return_value=inspector)
 
 
+def _versions(**versions):
+    """A _get_table_version() stub which answers per table.
+
+    The v2->v3 step asks about two tables: its own, and namespace_keys,
+    whose version 2 is the proof that the legacy keys were copied.
+    """
+    def _get(engine, table_name):
+        return versions.get(table_name, 0)
+    return _get
+
+
 def _executed(mock_engine):
     """Every statement the ensure function issued, as text."""
     conn = mock_engine.connect.return_value.__enter__.return_value
@@ -48,9 +59,8 @@ class NamespaceAttributesShapeTestCase(base.ShakenFistTestCase):
     def test_expected_schema_version_is_3(self):
         self.assertEqual(
             3, mariadb.EXPECTED_SCHEMA_VERSIONS['namespace_attributes'])
-        # The namespace_keys migration reads this constant to decide
-        # whether the column it fans out is still there, so the two
-        # must agree about which version dropped it.
+        # The drop step is gated on this constant, so it has to be the
+        # version the table is expected to reach.
         self.assertEqual(
             3, mariadb.NAMESPACE_ATTRIBUTES_KEYS_DROPPED_VERSION)
 
@@ -97,11 +107,12 @@ class EnsureNamespaceAttributesSchemaTestCase(base.ShakenFistTestCase):
             [], [stmt for stmt in _executed(mock_engine)
                  if 'DROP COLUMN' in stmt])
 
-    @mock.patch('shakenfist.mariadb._unmigrated_legacy_keys', return_value=[])
-    @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes',
-                return_value=(0, 0))
+    @mock.patch('shakenfist.mariadb._unmigrated_legacy_keys')
+    @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes')
     @mock.patch('shakenfist.mariadb._set_table_version')
-    @mock.patch('shakenfist.mariadb._get_table_version', return_value=2)
+    @mock.patch('shakenfist.mariadb._get_table_version',
+                side_effect=_versions(namespace_attributes=2,
+                                      namespace_keys=2))
     def test_version_2_drops_the_legacy_keys_column(
             self, mock_get_version, mock_set_version, mock_migrate,
             mock_unmigrated):
@@ -110,10 +121,6 @@ class EnsureNamespaceAttributesSchemaTestCase(base.ShakenFistTestCase):
 
         with _inspector(has_table=True):
             result = mariadb._ensure_namespace_attributes_schema(mock_engine)
-
-        # The copy is retried, and confirmed, before the drop.
-        mock_migrate.assert_called_once_with(mock_engine)
-        mock_unmigrated.assert_called_once_with(mock_engine)
 
         self.assertEqual(2, result['start_version'])
         self.assertEqual(3, result['end_version'])
@@ -142,14 +149,12 @@ class EnsureNamespaceAttributesSchemaTestCase(base.ShakenFistTestCase):
         mock_set_version.assert_not_called()
         mock_engine.connect.assert_not_called()
 
-    @mock.patch('shakenfist.mariadb._unmigrated_legacy_keys', return_value=[])
-    @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes',
-                return_value=(0, 0))
     @mock.patch('shakenfist.mariadb._set_table_version')
-    @mock.patch('shakenfist.mariadb._get_table_version', return_value=2)
+    @mock.patch('shakenfist.mariadb._get_table_version',
+                side_effect=_versions(namespace_attributes=2,
+                                      namespace_keys=2))
     def test_a_failed_drop_does_not_claim_the_version(
-            self, mock_get_version, mock_set_version, mock_migrate,
-            mock_unmigrated):
+            self, mock_get_version, mock_set_version):
         """A drop which fails leaves the table short of version 3.
 
         The point of the step is that the key material stops being at
@@ -172,29 +177,27 @@ class EnsureNamespaceAttributesSchemaTestCase(base.ShakenFistTestCase):
         mock_set_version.assert_not_called()
 
 
-class DropRefusesWhileKeysAreUncopiedTestCase(base.ShakenFistTestCase):
-    """The drop proves the copy happened before it destroys the original.
+class DropTrustsTheProvenCopyTestCase(base.ShakenFistTestCase):
+    """The drop goes ahead on namespace_keys' proof, and only on it.
 
-    namespace_keys stamps its version 2 even when the fan out counted
-    failures, and a cluster which reached that version releases ago may
-    hold a key whose copy failed then and which lives today only in the
-    legacy column. Dropping the column would delete that key for good,
-    and nothing would ever retry it.
+    namespace_keys stamps version 2 only once its fan out has proven
+    every well-formed legacy key has a row. Below that the copy is not
+    proven and the drop refuses. From it on, a legacy key with no row
+    has been revoked since -- remove_key() is a hard delete -- or has
+    not authenticated since, and copying it back could only make a
+    revoked credential valid again.
     """
 
     def _drops(self, mock_engine):
         return [stmt for stmt in _executed(mock_engine)
                 if 'DROP COLUMN' in stmt]
 
-    @mock.patch('shakenfist.mariadb._unmigrated_legacy_keys',
-                return_value=['banana:first'])
-    @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes',
-                return_value=(0, 1))
     @mock.patch('shakenfist.mariadb._set_table_version')
-    @mock.patch('shakenfist.mariadb._get_table_version', return_value=2)
-    def test_an_uncopied_key_keeps_the_column(
-            self, mock_get_version, mock_set_version, mock_migrate,
-            mock_unmigrated):
+    @mock.patch('shakenfist.mariadb._get_table_version',
+                side_effect=_versions(namespace_attributes=2,
+                                      namespace_keys=1))
+    def test_an_unproven_copy_keeps_the_column(
+            self, mock_get_version, mock_set_version):
         mock_engine = mock.MagicMock()
 
         with _inspector(has_table=True):
@@ -205,54 +208,74 @@ class DropRefusesWhileKeysAreUncopiedTestCase(base.ShakenFistTestCase):
         self.assertFalse(result['migrated'])
         mock_set_version.assert_not_called()
 
-    @mock.patch('shakenfist.mariadb._unmigrated_legacy_keys',
+    @mock.patch('shakenfist.mariadb._legacy_keys_column_present',
                 side_effect=OperationalError(
-                    'SELECT', {}, Exception('lock wait timeout exceeded')))
-    @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes',
-                return_value=(0, 0))
+                    'SHOW COLUMNS', {}, Exception('lock wait timeout')))
     @mock.patch('shakenfist.mariadb._set_table_version')
-    @mock.patch('shakenfist.mariadb._get_table_version', return_value=2)
+    @mock.patch('shakenfist.mariadb._get_table_version',
+                side_effect=_versions(namespace_attributes=2,
+                                      namespace_keys=2))
     def test_a_check_which_cannot_be_made_keeps_the_column(
-            self, mock_get_version, mock_set_version, mock_migrate,
-            mock_unmigrated):
-        """A failed read is not an empty answer."""
+            self, mock_get_version, mock_set_version, mock_present):
+        """A failed inspection is not an absent column."""
         mock_engine = mock.MagicMock()
 
-        with _inspector(has_table=True):
-            result = mariadb._ensure_namespace_attributes_schema(mock_engine)
+        result = mariadb._ensure_namespace_attributes_schema(mock_engine)
 
         self.assertEqual([], self._drops(mock_engine))
         self.assertEqual(2, result['end_version'])
         mock_set_version.assert_not_called()
 
-    @mock.patch('shakenfist.mariadb._unmigrated_legacy_keys')
+    @mock.patch('shakenfist.mariadb._unmigrated_legacy_keys',
+                return_value=['banana:revoked'])
     @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes')
     @mock.patch('shakenfist.mariadb._set_table_version')
-    @mock.patch('shakenfist.mariadb._get_table_version', return_value=2)
-    def test_a_column_already_gone_is_stamped(
+    @mock.patch('shakenfist.mariadb._get_table_version',
+                side_effect=_versions(namespace_attributes=2,
+                                      namespace_keys=2))
+    def test_a_key_removed_since_the_copy_is_not_copied_back(
             self, mock_get_version, mock_set_version, mock_migrate,
             mock_unmigrated):
-        """A drop whose version stamp failed is finished, not stuck."""
+        """The column is dropped as it stands, not fanned out again.
+
+        Fanning out here re-created a key removed after the first fan
+        out, with its old hash and nonce, in state created.
+        """
+        mock_engine = mock.MagicMock()
+
+        with _inspector(has_table=True):
+            result = mariadb._ensure_namespace_attributes_schema(mock_engine)
+
+        mock_migrate.assert_not_called()
+        self.assertEqual(1, len(self._drops(mock_engine)))
+        self.assertEqual(3, result['end_version'])
+
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version',
+                side_effect=_versions(namespace_attributes=2,
+                                      namespace_keys=1))
+    def test_a_column_already_gone_is_stamped(
+            self, mock_get_version, mock_set_version):
+        """A drop whose version stamp failed is finished, not stuck.
+
+        Nothing is left to lose, so not even an unproven copy holds it
+        back.
+        """
         mock_engine = mock.MagicMock()
 
         with _inspector(has_table=True, columns=('name', 'trust')):
             result = mariadb._ensure_namespace_attributes_schema(mock_engine)
 
-        # Nothing to read the keys out of, so nothing is asked of it.
-        mock_migrate.assert_not_called()
-        mock_unmigrated.assert_not_called()
         self.assertEqual(3, result['end_version'])
         mock_set_version.assert_called_once_with(
             mock_engine, 'namespace_attributes', 3)
 
-    @mock.patch('shakenfist.mariadb._unmigrated_legacy_keys', return_value=[])
-    @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes',
-                return_value=(0, 0))
     @mock.patch('shakenfist.mariadb._set_table_version')
-    @mock.patch('shakenfist.mariadb._get_table_version', return_value=0)
+    @mock.patch('shakenfist.mariadb._get_table_version',
+                side_effect=_versions(namespace_attributes=0,
+                                      namespace_keys=2))
     def test_an_unversioned_existing_table_is_checked_not_stamped(
-            self, mock_get_version, mock_set_version, mock_migrate,
-            mock_unmigrated):
+            self, mock_get_version, mock_set_version):
         """A table that exists with no version may still have the column."""
         mock_engine = mock.MagicMock()
 
@@ -261,9 +284,29 @@ class DropRefusesWhileKeysAreUncopiedTestCase(base.ShakenFistTestCase):
             result = mariadb._ensure_namespace_attributes_schema(mock_engine)
 
         create_all.assert_not_called()
-        mock_migrate.assert_called_once_with(mock_engine)
         self.assertEqual(1, len(self._drops(mock_engine)))
         self.assertEqual(3, result['end_version'])
+
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version',
+                side_effect=_versions(namespace_attributes=0,
+                                      namespace_keys=1))
+    def test_a_refused_drop_reports_the_version_recorded(
+            self, mock_get_version, mock_set_version):
+        """An unversioned table which is refused reports 0, not 1.
+
+        The version is what an operator will go and look for in
+        schema_versions, so it has to be the one which is there.
+        """
+        mock_engine = mock.MagicMock()
+
+        with _inspector(has_table=True):
+            result = mariadb._ensure_namespace_attributes_schema(mock_engine)
+
+        self.assertEqual([], self._drops(mock_engine))
+        self.assertEqual(0, result['end_version'])
+        self.assertFalse(result['migrated'])
+        mock_set_version.assert_not_called()
 
 
 class UnmigratedLegacyKeysTestCase(base.ShakenFistTestCase):

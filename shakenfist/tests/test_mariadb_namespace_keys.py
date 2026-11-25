@@ -13,6 +13,7 @@ from unittest import mock
 from uuid import UUID
 
 from pydantic import SecretStr
+from sqlalchemy.exc import OperationalError
 
 from shakenfist import mariadb
 from shakenfist.schema.namespace_key_attributes import NamespaceKeyAttributesData
@@ -104,16 +105,21 @@ class _MockEngine:
         return self._connection
 
 
-def _versions(**versions):
-    """A _get_table_version() stub which answers per table.
+def _legacy_column(present):
+    """Patch whether namespace_attributes still has its keys column.
 
-    _ensure_namespace_keys_schema() asks about two tables now: its own,
-    and namespace_attributes, which tells it whether the legacy keys
-    column it fans out is still there (issue 5016).
+    _ensure_namespace_keys_schema() asks the column itself, rather than
+    namespace_attributes' version, whether there is anything to fan out
+    (issue 5016).
     """
-    def _get(engine, table_name):
-        return versions.get(table_name, 0)
-    return _get
+    return mock.patch('shakenfist.mariadb._legacy_keys_column_present',
+                      return_value=present)
+
+
+def _uncopied(*names):
+    """Patch the proof the fan out runs before it stamps version 2."""
+    return mock.patch('shakenfist.mariadb._unmigrated_legacy_keys',
+                      return_value=list(names))
 
 
 # ---------------------------------------------------------------------------
@@ -126,15 +132,14 @@ class EnsureNamespaceKeysSchemaTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes',
                 return_value=(0, 0))
     @mock.patch('shakenfist.mariadb._set_table_version')
-    @mock.patch('shakenfist.mariadb._get_table_version',
-                side_effect=_versions(namespace_keys=0,
-                                      namespace_attributes=2))
+    @mock.patch('shakenfist.mariadb._get_table_version', return_value=0)
     def test_fresh_engine_creates_table_and_migrates_to_version_2(
             self, mock_get_version, mock_set_version, mock_migrate):
         """From version 0 the table is created, then migrated to v2."""
         mock_engine = mock.MagicMock()
 
-        with mock.patch('sqlalchemy.MetaData.create_all'):
+        with mock.patch('sqlalchemy.MetaData.create_all'), \
+                _legacy_column(True), _uncopied():
             result = mariadb._ensure_namespace_keys_schema(mock_engine)
 
         self.assertEqual(result['table'], 'namespace_keys')
@@ -151,54 +156,73 @@ class EnsureNamespaceKeysSchemaTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes',
                 return_value=(0, 0))
     @mock.patch('shakenfist.mariadb._set_table_version')
-    @mock.patch('shakenfist.mariadb._get_table_version',
-                side_effect=_versions(namespace_keys=0,
-                                      namespace_attributes=0))
-    def test_fresh_cluster_does_not_read_a_table_which_is_not_there(
+    @mock.patch('shakenfist.mariadb._get_table_version', return_value=0)
+    def test_no_legacy_column_is_not_read(
             self, mock_get_version, mock_set_version, mock_migrate):
-        """A fresh cluster has no namespace_attributes table to read.
+        """No column, nothing to fan out, and nothing to prove.
 
-        ensure_schema() creates namespace_keys before
-        namespace_attributes, because the v2->v3 step on that table
-        drops the column this migration reads. On a fresh cluster that
-        means the source table does not exist yet when this runs, and
-        there is nothing in it to copy either way.
+        A fresh cluster has not created namespace_attributes yet when
+        this runs -- ensure_schema() creates namespace_keys first,
+        because the v2->v3 step on that table drops the column this
+        migration reads -- and from that version the column is gone.
+        Either way the fan out would be a SQL error rather than an
+        empty answer.
         """
         mock_engine = mock.MagicMock()
 
-        with mock.patch('sqlalchemy.MetaData.create_all'):
+        with mock.patch('sqlalchemy.MetaData.create_all'), \
+                _legacy_column(False), _uncopied() as mock_uncopied:
             result = mariadb._ensure_namespace_keys_schema(mock_engine)
 
         self.assertEqual(result['end_version'], 2)
         mock_migrate.assert_not_called()
+        mock_uncopied.assert_not_called()
 
     @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes',
-                return_value=(0, 0))
+                return_value=(0, 1))
     @mock.patch('shakenfist.mariadb._set_table_version')
-    @mock.patch('shakenfist.mariadb._get_table_version',
-                side_effect=_versions(namespace_keys=1,
-                                      namespace_attributes=3))
-    def test_dropped_column_is_not_read(
+    @mock.patch('shakenfist.mariadb._get_table_version', return_value=1)
+    def test_an_uncopied_key_holds_the_table_at_version_1(
             self, mock_get_version, mock_set_version, mock_migrate):
-        """A namespace_attributes at v3 has no keys column left.
+        """Version 2 is the proof the drop trusts, so it is earned.
 
-        The fan out would be a SQL error rather than an empty answer,
-        and there is nothing to fan out: the column only reaches v3 by
-        way of this migration having already run (issue 5016).
+        This is the one point at which a legacy key with no row can
+        only be a copy which failed: sf-database does not start below
+        version 2, so nothing can have removed a key yet. Stamping
+        version 2 anyway would leave the drop unable to tell that key
+        from one revoked since.
         """
         mock_engine = mock.MagicMock()
 
-        result = mariadb._ensure_namespace_keys_schema(mock_engine)
+        with _legacy_column(True), _uncopied('banana:first'):
+            result = mariadb._ensure_namespace_keys_schema(mock_engine)
 
-        self.assertEqual(result['end_version'], 2)
-        mock_migrate.assert_not_called()
+        self.assertEqual(result['end_version'], 1)
+        self.assertFalse(result['migrated'])
+        mock_set_version.assert_not_called()
 
     @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes',
                 return_value=(0, 0))
     @mock.patch('shakenfist.mariadb._set_table_version')
-    @mock.patch('shakenfist.mariadb._get_table_version',
-                side_effect=_versions(namespace_keys=0,
-                                      namespace_attributes=2))
+    @mock.patch('shakenfist.mariadb._get_table_version', return_value=1)
+    def test_a_proof_which_cannot_be_made_holds_the_table_at_version_1(
+            self, mock_get_version, mock_set_version, mock_migrate):
+        """A failed read is not an empty answer."""
+        mock_engine = mock.MagicMock()
+
+        with _legacy_column(True), mock.patch(
+                'shakenfist.mariadb._unmigrated_legacy_keys',
+                side_effect=OperationalError(
+                    'SELECT', {}, Exception('lock wait timeout'))):
+            result = mariadb._ensure_namespace_keys_schema(mock_engine)
+
+        self.assertEqual(result['end_version'], 1)
+        mock_set_version.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes',
+                return_value=(0, 0))
+    @mock.patch('shakenfist.mariadb._set_table_version')
+    @mock.patch('shakenfist.mariadb._get_table_version', return_value=0)
     def test_creation_emits_composite_unique_index_ddl(
             self, mock_get_version, mock_set_version, mock_migrate):
         """The (namespace, name) UNIQUE index is created by hand.
@@ -209,7 +233,8 @@ class EnsureNamespaceKeysSchemaTestCase(base.ShakenFistTestCase):
         """
         mock_engine = mock.MagicMock()
 
-        with mock.patch('sqlalchemy.MetaData.create_all'):
+        with mock.patch('sqlalchemy.MetaData.create_all'), \
+                _legacy_column(True), _uncopied():
             mariadb._ensure_namespace_keys_schema(mock_engine)
 
         conn = mock_engine.connect.return_value.__enter__.return_value
@@ -225,15 +250,14 @@ class EnsureNamespaceKeysSchemaTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes',
                 return_value=(2, 0))
     @mock.patch('shakenfist.mariadb._set_table_version')
-    @mock.patch('shakenfist.mariadb._get_table_version',
-                side_effect=_versions(namespace_keys=1,
-                                      namespace_attributes=2))
+    @mock.patch('shakenfist.mariadb._get_table_version', return_value=1)
     def test_existing_v1_table_runs_only_the_migration(
             self, mock_get_version, mock_set_version, mock_migrate):
         """An upgrading cluster gets the data migration, and no DDL."""
         mock_engine = mock.MagicMock()
 
-        result = mariadb._ensure_namespace_keys_schema(mock_engine)
+        with _legacy_column(True), _uncopied():
+            result = mariadb._ensure_namespace_keys_schema(mock_engine)
 
         self.assertEqual(result['start_version'], 1)
         self.assertEqual(result['end_version'], 2)
@@ -245,9 +269,7 @@ class EnsureNamespaceKeysSchemaTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.mariadb._migrate_keys_from_namespace_attributes')
     @mock.patch('shakenfist.mariadb._set_table_version')
-    @mock.patch('shakenfist.mariadb._get_table_version',
-                side_effect=_versions(namespace_keys=2,
-                                      namespace_attributes=3))
+    @mock.patch('shakenfist.mariadb._get_table_version', return_value=2)
     def test_already_at_version_2_is_noop(
             self, mock_get_version, mock_set_version, mock_migrate):
         """Table already at v2: no DDL, no migration, migrated=False."""
