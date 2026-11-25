@@ -321,8 +321,8 @@ Out of scope:
 | Phase | Status | Merged |
 |-------|--------|--------|
 | 1. Shared preset and its validation | Complete | `47086db` |
-| 2. Central runner and cutover | In progress | |
-| 3. Fleet sweep and audit change | Not started | |
+| 2. Central runner and cutover | Complete | `fc75514` (#396), `013c9c4` (#400), `e259e24` (#432), private-ci `250a8ba` (#321), `d23c5ad` (#440) |
+| 3. Fleet sweep and audit change | In progress | |
 | 4. Re-measure | Not started | |
 | 5. Push audit | Not started | |
 
@@ -2029,6 +2029,16 @@ token, and neither of GitHub's two secrets pages -- the concept page
 and the how-to -- states a precedence between an environment secret
 and an organisation secret of the same name, which is the same gap
 *Two claims about the environment were wrong* records one level down.
+**Corrected 2026-11-25, planning phase 3:** a third page does. The
+*Secrets reference*
+(<https://docs.github.com/en/actions/reference/security/secrets>,
+under *Naming your secrets*) says "If a secret with the same name
+exists at multiple levels, the secret at the lowest level takes
+precedence", and its example ends with the environment-level secret
+taking precedence over both. So the fleet runner's job receives the
+`renovate-write` environment copy, and phase 3's survey item 6 takes
+the consequence: the organisation secret can be deleted rather than
+narrowed.
 
 The 22 are not the 23. `uncalibrated-sextant` is managed by Renovate,
 is not on the organisation secret's list, and has no repository
@@ -2257,6 +2267,63 @@ due at minute 23, GitHub created five, at minutes :27, :44, :22,
 proposed because GitHub documents the hour as its busiest time, did
 not change the delivery rate the copies saw on `0 * * * *`. Cutover
 step 5 replaces the trigger.
+
+**Cutover step 5.1: the conductor's first dispatch came after the
+cron's removal had merged, not before** (recorded on 2026-11-25, in
+the close-out that opens phase 3). private-ci #321 merged at
+19:18:49 UTC on 2026-11-22. GitHub's cron then created two more
+runs, at 23:40 UTC on 2026-11-22 and 07:54 UTC on 2026-11-23, and
+#440 (step 2f) merged at 09:25:27 UTC on 2026-11-23. The first
+`workflow_dispatch` run after the cutover is 45147312399, created at
+09:28:16 UTC, 2m49s after that merge, and every run since has been a
+`workflow_dispatch` created 60.0 to 60.5 minutes after the one
+before it. So decision 13's gate -- see one conductor dispatch
+before merging 2f -- is not shown by this record, which shows the
+reverse order. Nothing was lost by it: the gap from the last cron
+run to the first dispatch was 1h34m, inside the cron's own median.
+Attributing 45147312399 and its successors to the conductor rests
+on that cadence rather than on the run record, which names
+`mikalstill` as the triggering actor of every run, hand dispatches
+and conductor dispatches alike, because the conductor dispatches
+with the operator's identity (survey item 10). The conductor is
+deployed by hand, so its deploy time is not in GitHub either.
+
+**Cutover step 5.3: the gate is met** (read at 18:34 UTC on
+2026-11-24, from the workflow runs and jobs API). In the 24 hours
+from #440's merge:
+
+| | Value |
+|---|---|
+| Runs | 24, every one `workflow_dispatch` and `success` |
+| `schedule` events | none after 07:54 UTC on 2026-11-23 |
+| Gap between dispatches | median 60.1 minutes, longest 60.5, shortest 60.0 |
+| Queue, dispatch to job start | median 1.8 minutes, longest 3.8 |
+| Job duration | median 11.0 minutes, longest 15.0, shortest 10.2 |
+
+The gate asked for a median gap of at most 90 minutes and no gap
+over 4h47m. Both hold by a wide margin: the longest gap is shorter
+than the cron's median by a factor of almost five. Read on past the
+window to 34 runs, the picture holds, with one exception worth
+knowing: 45415169726, dispatched at 14:32 UTC on 2026-11-24, queued
+22m43s for a VM, and the next dispatch still came an hour after the
+previous *dispatch* rather than an hour after that run ended. The
+floor is measured from dispatch, so a slow queue shortens the time
+between two passes rather than stretching the cadence.
+
+Dashboards were rewritten in 5 of the 23 repositories inside the
+window (`actions`, `cloudgood`, `ryll`, `shakenfist`,
+`uncalibrated-sextant`) and in 9 by the time of the reading.
+Renovate rewrites a dashboard only when its content changes, so the
+other 14 being untouched since 2026-11-21 or 2026-11-22 is what a
+quiet week looks like rather than a sign that they were skipped;
+all 23 were rewritten by the first full pass in cutover step 3. No
+duplicate branch exists. The fleet holds seven `renovate/` branches,
+six of them carrying one open pull request each; the seventh,
+`uncalibrated-sextant`'s `renovate/rust-1.x`, belongs to its #36,
+which merged at 01:12 UTC on 2026-11-23 and left the branch behind.
+
+Phase 2 is therefore complete, and its five pull requests are in the
+Execution table's `Merged` cell.
 
 #### Execution notes
 
@@ -2574,104 +2641,626 @@ Planning effort: high for the audit change, medium for the sweep.
 The audit change reverses what the `Renovate` criterion means -- a
 file it requires today becomes a failure -- and files issues across
 the fleet at the next weekly audit run (Sunday 18:00 UTC), which is
-high effort by this
-repository's own rule (see Planning effort below). The sweep that
-follows is the mechanical `consistency-fix` pattern the fleet
-already runs. Plan them as two steps, and land the audit change
-first.
+high effort by this repository's own rule (see Planning effort
+below). The sweep that follows is mechanical once its rules are
+fixed, and decision 6 fixes them. Planned on 2026-11-25; the
+original scope below was written on 2026-10-03 and corrected at
+source where the survey found it stale, as the survey says item by
+item.
 
-**Scope.** In this repository: the `Renovate` check now requires
-`renovate.json` to extend `local>shakenfist/development:renovate-fleet`,
-and treats a `.github/workflows/renovate.yml` as a failure, because
-if it were re-enabled it would race the central runner. Tests in the
-packaging test module cover both new failures (the workflow file
-present, the `extends` missing) as well as the pass. The issue title
-`Renovate` does not change, since it is the fleet-wide idempotency
-key. Rewrite `docs/audits/renovate.md` with the check: its "What we
-check" list and rationale describe the required `extends` and the
-forbidden workflow file, where today they say the workflow must
-exist, runs hourly and is copied verbatim. Specifications are
-written for human review and nothing regenerates them, so a spec
-left alone would contradict the check and every issue it files. The
-rewrite stales the spec's review mark in `REVIEWS.md`; that is
-expected, and per the phase-landing rules above it is left for
-`prune-reviews` rather than edited here. Delete
-`templates/renovate/renovate.yml` and this repository's own
-`.github/workflows/renovate.yml`, and remove the template's row
-from the template README. Deleting those two files breaks
-`ConvergedTemplatesTest.test_this_repository_runs_renovate_verbatim`
-in `scripts/tests/test_registry.py`, which reads both and asserts
-they are byte-identical, so `pre-commit run --all-files` fails in
-the same pull request unless the test goes with them. Do not stop at
-that one: run `git grep -n 'renovate\.yml'` and settle every hit
-outside `docs/plans/`. On 2026-10-10 the others were the
-`ConvergedTemplatesTest` docstring, the actionlint comment in
-`.pre-commit-config.yaml` that cites `renovate.yml` and counts "the
-ten copy-directly templates", the supporting-workflows list in
-`ARCHITECTURE.md` (which should name `renovate-fleet.yml` from
-phase 2 instead), the `renovate.yml` fixture in the packaging test
-module, and `docs/audits/renovate.md` itself; the mention in
-`docs/audits/scheduled-workflow-health.md` is history and stays.
-Since 2026-11-21 two more go with the files: the
-`dtolnay/rust-toolchain` rule in the root `renovate.json`, which keeps
-that action unpinned in exactly these two paths, and
-`test_only_the_doomed_renovate_copies_keep_rust_toolchain_unpinned`
-in `scripts/tests/test_packaging_renovate.py`, which fails while the
-rule names a path that does not exist, together with
-`test_the_root_config_holds_two_local_rules` beside it, whose count
-drops to one. `test_a_pinned_rust_toolchain_states_its_toolchain` in
-`scripts/tests/test_registry.py` reads both files as well; it goes,
-or is narrowed to `.github/workflows/renovate-fleet.yml`, where its
-docstring says the same reference is pinned by hand.
-The audit change lands first, and the
-`Renovate` issues it files at the next weekly run are the sweep's
-work queue. That is deliberate: it is the fleet's issue-driven
-`consistency-fix` pattern, and a transitional check that accepted
-both forms would spare about 23 issues at the price of letting the
-sweep stall unnoticed. Before the audit change merges, preview its
-verdicts against fresh clones of the fleet with `audit-check.py`
-and `audit-manage-issues.py --dry-run`, as
-`docs/consistency-audits.md` describes, and record here that the
-count matched the one below. A `workflow_dispatch` of
-`consistency-audit.yml` has no dry-run mode -- it files issues for
-real -- so it is only for starting the sweep after the merge
-without waiting for Sunday.
+#### Scope
 
-In each managed repository, one pull request: delete
-`.github/workflows/renovate.yml`, and reduce `renovate.json` to
-`extends` plus the repository's own rules. Keep every lockstep
-group, every `constraints.python` and every `rangeStrategy`.
-Lockstep groups stay local throughout this plan, because the
-`renovate-lockstep-groups` criterion (`RenovateLockstepGroups` in
+**In this repository**, in one pull request that lands first: the
+`Renovate` check requires `renovate.json` to extend
+`local>shakenfist/development:renovate-fleet`, and treats a
+`.github/workflows/renovate.yml` as a failure, because if it were
+re-enabled it would race the central runner. It also fails a
+`renovate.json` that sets, at its top level, a key the preset sets
+(decision 3). Tests in `scripts/tests/test_packaging_renovate.py`
+(split out of the packaging test module by #414) cover each new
+failure as well as the pass. The issue title `Renovate` does not
+change, since it is the fleet-wide idempotency key. Rewrite
+`docs/audits/renovate.md` with the check: its "What we check" list
+and rationale describe the required `extends`, the forbidden
+workflow file and the forbidden overrides, where today they say the
+workflow must exist, runs hourly and is copied verbatim.
+Specifications are written for human review and nothing regenerates
+them, so a spec left alone would contradict the check and every
+issue it files. The rewrite stales the spec's review mark in
+`REVIEWS.md`; that is expected, and per the phase-landing rules
+above it is left for `prune-reviews` rather than edited here.
+Delete `templates/renovate/renovate.yml` and this repository's own
+`.github/workflows/renovate.yml`, and settle every reference to
+either outside `docs/plans/` -- survey item 4 lists them as they
+stand today. The same pull request adds a `log_level` input to
+`renovate-fleet.yml`, so that open question 1's last half can be
+answered (decision 8).
+
+Before the audit change merges, preview its verdicts against fresh
+clones of the fleet with `audit-check.py` and
+`audit-manage-issues.py --dry-run`, as `docs/consistency-audits.md`
+describes, and record here that the count matched survey item 3. A
+`workflow_dispatch` of `consistency-audit.yml` has no dry-run mode
+-- it files issues for real -- so it is only for starting the sweep
+after the merge without waiting for Sunday. The `Renovate` issues
+the audit files are the sweep's work queue. That is deliberate: it
+is the fleet's issue-driven `consistency-fix` pattern, and a
+transitional check that accepted both forms would spare about 15
+issues at the price of letting the sweep stall unnoticed.
+
+**In each of the 22 other managed repositories**, one pull request:
+delete `.github/workflows/renovate.yml`, and reduce `renovate.json`
+to `extends` plus the repository's own rules, by the rules in
+decision 6. Keep every lockstep group, every `constraints.python`,
+every `rangeStrategy`, every custom manager and every rule about a
+path or package only that repository has. Lockstep groups stay
+local throughout this plan, because the `renovate-lockstep-groups`
+criterion (`RenovateLockstepGroups` in
 `scripts/audit/checks/packaging.py`) reads only the local file and
 would report a group moved into the preset as missing; promoting
-them is under Future work. Delete only rules that restate the
-preset. Once every sweep pull request has merged, remove the
-runner's temporary `renovate.yml` package rule from phase 2. Two repositories need extra care:
+them is under Future work. Two repositories need extra care:
 `instar` (its custom manager for `cargo install` pins and its frozen
 release base image) and `shakenfist` (the most groups). In
-`kerbside`, delete the shellcheck-py `versioning` rule, which now
-restates the preset, but keep its `shellcheck` group and its
-`tox.ini` custom manager, which are repository-specific. State in
-this section how many repositories the audit change newly fails:
-every managed repository until its sweep pull request merges,
-except `development`, which moved onto the preset in phase 1 and
-loses its own `renovate.yml` in the audit change's pull request, so
-it passes from the start.
+`kerbside`, keep its `shellcheck` group and its `tox.ini` custom
+manager, which are repository-specific.
 
-Once the sweep has merged, the preset's schedules govern the fleet
-for the first time. Watch the first Saturday after that and record
-here that the weekly window got runs, and that the week's pending
-updates opened or were visibly held by the preset's pull request
-limits: phase 2's daily run count does not show whether a one-day
-window was hit.
+**Then, in this repository again**, in a closing pull request once
+every sweep pull request has merged: remove the runner's temporary
+`renovate.yml` package rule from phase 2; record the first Saturday
+after the sweep, when the preset's schedules govern the fleet for
+the first time, showing that the weekly window got runs and that
+the week's pending updates opened or were visibly held by the
+preset's pull request limits; and record the `RENOVATE_TOKEN`
+change below.
 
 When no copy of `renovate.yml` remains, `RENOVATE_TOKEN` is needed
-only by `renovate-fleet.yml`. If it is an organisation secret
-(open question 1), restrict its repository access to
-`shakenfist/development`; if it is a set of per-repository secrets,
-delete the others. Either way, record which, so the credential's
-exposure drops from 23 repositories to one.
+only by `renovate-fleet.yml`, which reads the `renovate-write`
+environment's copy (survey item 6). The organisation secret is then
+read by nothing, so it is deleted rather than narrowed, which takes
+the credential's exposure from 23 repositories to one environment.
+
+Out of scope: promoting lockstep groups into the preset (Future
+work, #88); splitting the Renovate criteria out of `packaging.py`
+(#434, decision 4); the fleet-wide criterion against GitHub
+`schedule:` triggers (Future work); and `images`' disabled
+Dependabot alerts (survey item 9).
+
+#### What the survey found
+
+Read against `main` at `8d89c14` and the fleet's default branches on
+2026-11-25. Numbered on from phase 2's survey, which ended at 13.
+The false claims are corrected at their source in the scope above in
+the commit that adds this section, so the prose no longer disagrees
+with the tree.
+
+14. **Every managed `renovate.json` overrides the preset's schedule,
+    and the original brief would have kept it.** All 22 set
+    `"schedule": ["after 9pm"]` at the top level. A repository's own
+    configuration is resolved after the presets it extends, so a
+    local `schedule` wins over the preset's `on saturday`, and a
+    sweep that only deleted "rules that restate the preset" -- the
+    original brief's words -- would have left the fleet on a daily
+    window with this plan's whole volume reduction quietly undone.
+    `after 9pm` does not restate the preset: it contradicts it. The
+    other top-level keys every repository carries --
+    `assignees`, `dependencyDashboard`, `gitAuthor`,
+    `minimumReleaseAge`, `rollbackPrs` and a `pre-commit` block --
+    do restate it, and 19 also carry
+    `customManagers:githubActionsVersions` in `extends`, which the
+    preset extends too. Decision 3 makes the criterion catch the
+    whole class rather than trusting the sweep to.
+
+15. **The `shellcheck-py` versioning rule is in 15 repositories, not
+    one.** The original scope said to delete it from `kerbside`;
+    `PLAN-renovate-shellcheck-audit.md` found that fourteen more had
+    acquired it since. They are `actions`, `andris`, `clingwrap`,
+    `cloudgood`, `divergulent`, `hunkydory`, `instar`, `kerbside`,
+    `kerbside-client`, `kerbside-patches`, `library-utilities`,
+    `occystrap`, `ryll`, `sfui` and `uncalibrated-sextant`. Each
+    restates the preset and goes. Three more rules are
+    near-universal and go for the same reason: `automerge: false`
+    for minor, patch and digest updates (all 22), the Renovate-major
+    `prBodyNotes` entry (19), and the Node-major disable naming
+    `.github/workflows/renovate.yml` (19), whose file the same pull
+    request deletes.
+
+16. **The newly failing count is 15, not "every managed
+    repository".** The `renovate` column of `docs/audits/compliance.md`
+    today: `development` compliant; `images` and `private-ci` N/A,
+    `images` because `REPO_OVERRIDES` scopes it to `eol-distro` alone
+    (`scripts/audit/repo.py:143`); six non-compliant
+    (`agent-python`, `client-python`, `client-python-k3s`, which
+    still run `renovatebot/github-action`; `client-python-ova`, for
+    the shellcheck-py rule; `cloudgood` and `divergulent`, for
+    template drift), each with an open `Consistency: Renovate`
+    issue; and 15 compliant. The audit change fails all 21 in scope
+    except `development`: 15 newly, each with a new issue, and six
+    whose existing issues are rewritten. `images` gets a sweep pull
+    request with no issue behind it, since nothing audits its
+    Renovate configuration.
+
+17. **The `renovate.yml` references have moved since 2026-10-10.**
+    `git grep -n 'renovate\.yml'` outside `docs/plans/`,
+    `docs/audits/compliance.md`, `REVIEWS.md` and `.vscode/` (the
+    last two are the review tooling's, healed by `prune-reviews`)
+    finds, beyond the two files themselves:
+    - `scripts/audit/checks/packaging.py:189-300` and the
+      `Renovate` check at `:552-620` -- the drift and container
+      machinery this phase removes;
+    - `scripts/tests/test_packaging_renovate.py`, which reads the
+      template at module level (`:23`) and uses it as a fixture in
+      five classes, plus three tests naming the two paths
+      (`:386`, `:446`, `:576`, `:653`);
+    - `scripts/tests/test_registry.py`:
+      `test_this_repository_runs_renovate_verbatim` (`:1288`), the
+      `ConvergedTemplatesTest` docstring (`:1242`), and
+      `test_a_pinned_rust_toolchain_states_its_toolchain`
+      (`:1296-1335`), which reads all three workflow files;
+    - `scripts/tests/test_npm_dependencies.py:270`, a fixture named
+      `renovate.yml` whose docstring calls it "this template";
+    - `scripts/tests/test_ci_workflows.py:3296`, a fixture name only,
+      which stays;
+    - `renovate-fleet.json:64-83`, the Node-major rule's
+      `matchFileNames` and the Renovate-major note, both naming the
+      two doomed files beside `renovate-fleet.yml`;
+    - `renovate-runner.json:11-14`, phase 2's temporary rule;
+    - `renovate.json:27-30`, the `dtolnay/rust-toolchain` rule, and
+      its `customManagers` entry (`:38-49`), which exists only to
+      read `# renovate:` comments under `templates/` -- once the
+      template goes, `git grep -l '# renovate:' -- templates`
+      finds only `templates/renovate/README.md`, which is prose;
+    - `.pre-commit-config.yaml:44-50`, the actionlint comment that
+      cites `renovate.yml` and counts "the ten copy-directly
+      templates";
+    - `ARCHITECTURE.md:52`, the supporting-workflows list;
+    - `templates/renovate/README.md`, most of whose 357 lines
+      describe the workflow, and `docs/audits/renovate.md`, the
+      spec, both rewritten by step 3d;
+    - `.github/workflows/renovate-fleet.yml:4` and `:22`, header
+      comments on the copies.
+
+    The mention in `docs/audits/scheduled-workflow-health.md` is
+    history and stays.
+
+18. **The organisation secret can be deleted, not narrowed.** The
+    original scope said to restrict the organisation secret to this
+    repository. Phase 2's record established that there are two
+    copies of the token, the organisation secret and an environment
+    secret on `renovate-write`, and said no GitHub page stated which
+    one a job sees. One does: the *Secrets reference* says the
+    lowest level takes precedence, environment over repository over
+    organisation (phase 2's *Record*, corrected in this commit). So
+    the fleet runner reads the environment copy, and after the sweep
+    nothing reads the organisation secret at all. Deleting it also
+    ends #402, which asks for a check of the organisation secret's
+    selected list: there will be no list. The only `RENOVATE_TOKEN`
+    reads in this repository are the two in `renovate-fleet.yml`
+    (`:138` and `:249`, both inside the environment's job) and the
+    one in `.github/workflows/renovate.yml`, which this phase
+    deletes.
+
+19. **`packaging.py` is exactly at its size-ratchet baseline.** 2,493
+    lines against an entry of 2,493 (`tools/source-size-baseline:14`),
+    and #434 asks for the Renovate criteria to be split out of it.
+    This phase removes the drift and container machinery, about 170
+    lines, and decision 3 adds back fewer, so the file shrinks. The
+    ratchet's own `--update` lowers the entry, which keeps the gain.
+
+20. **Nothing can answer open question 1 from the alerts
+    themselves.** Every managed repository has zero open Dependabot
+    alerts today, so the absence of `[SECURITY]` pull requests
+    proves nothing either way, and Renovate's INFO log does not
+    mention the alerts query. A debug log is the only reading left,
+    and the workflow has no input for one.
+
+21. **`images` has Dependabot alerts disabled** -- the alerts API
+    answers 403 "Dependabot alerts are disabled for this
+    repository". It is managed by Renovate, so the central runner
+    reads no alerts there whatever its token can do, and it never
+    gets a security pull request. Out of scope here, since enabling
+    alerts is a repository setting rather than anything this plan
+    changes, and recorded under Future work.
+
+22. **Twelve of the 22 carry a `PUSH-AUDIT.md`, and 14 have a merge
+    queue.** The push-audit block says a phase that lands in another
+    repository is audited against that repository's default branch
+    as it lands. Twelve runbooks of four judgment sub-agents each,
+    over the same two-file change, is the cost decision 7 weighs.
+    Default branches are `develop` everywhere except `actions` and
+    `cloudgood`, which use `main`.
+
+Two claims held: `ConvergedTemplatesTest.test_this_repository_runs_renovate_verbatim`
+is where the scope said, and the audit's issue title, spec path and
+template directory (`scripts/tests/test_metadata.py:137-139` and
+`:348`) need no change, because `templates/renovate/` survives,
+holding `renovate.json` and its README.
+
+#### Decisions
+
+1. **One pull request here first, then 22 sweep pull requests, then
+   one closing pull request here.** The audit change has to land
+   before the sweep so that its issues are the work queue; the
+   temporary runner rule has to outlive every sweep pull request,
+   because a repository not yet swept still carries a disabled
+   `renovate.yml` whose dependencies would otherwise be proposed;
+   and the organisation secret cannot go until the last copy that
+   reads it has gone. Phase 3's `Merged` cell therefore names 24
+   pull requests, the 22 as `<repo> <sha> (#pr)`.
+
+2. **The criterion requires the preset and nothing it implies.** The
+   `Renovate` check keeps `renovate.json` must exist, and becomes:
+   `.github/workflows/renovate.yml` must not exist; `renovate.json`
+   must extend the preset; and decision 3's override rule. The three
+   findings that test what the preset carries -- the version-comment
+   preset, the `pre-commit` manager and the `shellcheck-py`
+   versioning rule -- go from the check, together with their
+   repository-level wrappers, the drift comparison and the container
+   detection, because a repository that extends the preset has all
+   three by construction. Their *config-level* predicates stay:
+   `RenovateFleetPresetTest` runs them over the real
+   `renovate-fleet.json`, and once the criterion trusts the preset to
+   carry those three properties, those tests are what hold the
+   preset to them. This retires the finding
+   `PLAN-renovate-shellcheck-audit.md` added a week ago, which is
+   the reason to say so plainly: that plan's goal, a hook revision
+   Renovate cannot look up being reported rather than discovered,
+   still holds, because a repository without the rule is now a
+   repository without the preset, and the test that the preset
+   carries the rule is unchanged.
+
+3. **The criterion also fails a top-level key the preset sets.** This
+   is the decision most likely to be argued with. Survey item 14
+   found every repository overriding the preset's schedule, and the
+   override is invisible -- the configuration validates, Renovate
+   runs, and the cadence simply does not change. A check that
+   accepted it would report a repository as on the preset while the
+   preset governs nothing there. The rule is read, not listed: the
+   check loads `renovate-fleet.json` from the audit's own checkout,
+   the way it reads the template today (`read_within` on
+   `DEVELOPMENT_ROOT`), and fails any key in the repository's
+   `renovate.json` that also appears at the preset's top level,
+   other than `$schema`, `extends` and `packageRules`, naming each.
+   The argument against is that it forbids a repository from
+   deliberately setting, say, its own `minimumReleaseAge`. A
+   repository that genuinely needs a different policy can still say
+   so in a `packageRules` entry scoped to what it is about, which is
+   reviewable and narrower; the top level is the fleet's.
+   `RenovateReducedConfigTest.test_neither_config_restates_a_fleet_key`
+   already holds this repository's own configs to the same rule.
+
+4. **No split of `packaging.py` in this phase.** #434 asks for the
+   Renovate criteria to move to their own module. Doing that in the
+   same pull request as a change of meaning puts a 600-line move
+   beside a 100-line semantic diff, which is the review #434 itself
+   declined to ask for. This phase shrinks the file and lowers the
+   ratchet entry; #434 gets a comment with the new size and stays
+   open.
+
+5. **This repository moves its runner-facing references, not just
+   its deletions.** The preset's Node-major rule and its
+   Renovate-major note name only `renovate-fleet.yml` from the first
+   pull request, not the last, which is safe because phase 2's
+   temporary runner rule already disables every dependency in the
+   fleet's remaining `renovate.yml` files. The runner rule itself is
+   narrowed to `.github/workflows/renovate.yml` in the first pull
+   request, since `templates/renovate/renovate.yml` is gone, and
+   removed in the last. The root `renovate.json` loses both its
+   `dtolnay/rust-toolchain` rule and its `templates/` custom manager
+   (survey item 17), so it holds one local rule, the weekly window
+   for the runner's own two actions.
+
+6. **The sweep's rules are fixed here, so 22 pull requests are one
+   review.** Each repository's `renovate.json` is reduced by these
+   rules and no others:
+   - **Drop** every top-level key the preset sets: `schedule`,
+     `assignees`, `dependencyDashboard`, `gitAuthor`,
+     `minimumReleaseAge`, `rollbackPrs`, `pre-commit`; and
+     `customManagers:githubActionsVersions` from `extends`.
+   - **Drop** the `packageRules` entries that restate the preset or
+     name the deleted workflow: `automerge: false` for minor, patch
+     and digest; the Renovate-major `prBodyNotes` entry; the
+     Node-major disable naming `.github/workflows/renovate.yml`; and
+     the `shellcheck-py/shellcheck-py` versioning rule.
+   - **Keep** everything else verbatim and in order, including
+     deprecated spellings such as `matchPackagePatterns` in
+     `client-python-k3s` and `occystrap`: migrating them is not this
+     plan's change, and Renovate still migrates them on read.
+   - **Add** `local>shakenfist/development:renovate-fleet` as the
+     first entry of `extends`, keeping any other preset there
+     (`andris` keeps `customManagers:dockerfileVersions`).
+
+   The rules are applied by a script, not by hand, so that one
+   reading of the script and its output table is the review of all
+   22; any entry the rules do not classify is a stop, not a
+   judgement call. `ryll` and `visual-digest-rust` keep their
+   `lockFileMaintenance` schedule, `before 4am on monday`, which the
+   preset's `timezone` now reads in Sydney time rather than UTC --
+   recorded in each pull request's description rather than changed.
+
+7. **The sweep pull requests get their repository's mechanical
+   push-audit tier each, and one judgment audit between them.** The
+   push-audit block wants each to be audited against its own
+   repository as it lands. Every one is the same two-file change by
+   the same script, so four judgment sub-agents in each of the
+   twelve repositories with a runbook would read the same diff
+   twelve times. Instead each pull request runs its repository's
+   `pre-commit` and the runbook's diff-level greps, and the judgment
+   tier runs once, in this repository, over the script and the
+   staged table of all 22 diffs, before any is pushed (step 3f).
+   Phase 5 cites that audit. This is a departure from the block's
+   letter, and its spirit is kept by auditing the one artefact that
+   produced every diff; the back brief asks for agreement on it.
+
+8. **Answer open question 1 with a debug pass, then delete its
+   log.** Step 3c adds a `log_level` input to `renovate-fleet.yml`,
+   a choice of `info` and `debug` defaulting to `info` and passed as
+   `LOG_LEVEL`, so the conductor's bare dispatches are unchanged and
+   the defaults test (phase 2, decision 12) gains a line. After the
+   first pull request merges, one dispatch with `debug` and the
+   filter set to `shakenfist/development` reads what Renovate logs
+   about the vulnerability-alerts query: alerts fetched (even none),
+   or a permission error. This repository is public, and a debug
+   log carries the resolved configuration and every request URL;
+   Renovate redacts the token, but the run's logs are deleted with
+   `gh run delete` once the answer is recorded, since nothing else
+   needs them.
+
+9. **Two canaries before the rest.** `actions` first -- no merge
+   queue, default branch `main`, and the repository whose workflows
+   the fleet consumes -- then `instar`, the most complex
+   configuration. After each merges, the next hourly pass must
+   succeed and that repository's dependency dashboard must show the
+   preset's schedule taking effect (updates reported as awaiting
+   schedule rather than opened). Then the other 20, in any order the
+   merge queues allow.
+
+#### Steps
+
+Steps 3a to 3d write files in this repository and are sub-agent
+work; they are one pull request. Step 3e and everything under
+*Sweep* are run by the management session with the operator
+watching, since they change live state in other repositories, and
+nothing there is pushed, opened or deleted without an explicit yes.
+
+| Step | Effort | Model | Isolation | Brief for sub-agent |
+|------|--------|-------|-----------|---------------------|
+| 3a | high | opus | none | Rewrite the `Renovate` check in `scripts/audit/checks/packaging.py` (`class Renovate`, about line 552) per decisions 2 and 3 of phase 3 in `docs/plans/PLAN-renovate-cadence.md`. The check fails when `renovate.json` is missing; when `.github/workflows/renovate.yml` exists (say that the fleet runner in shakenfist/development manages the repository and a re-enabled copy races it, so delete the file); when `renovate.json` does not extend `RENOVATE_FLEET_PRESET` (use `extends_fleet_preset`); and when `renovate.json` sets a top-level key that `renovate-fleet.json`'s top level also sets, other than `$schema`, `extends` and `packageRules`, naming every such key in one finding. Read the preset from the audit's own checkout with `read_within(DEVELOPMENT_ROOT, ...)`, exactly as the check reads the template today, and raise `ToolFailure` if it cannot be read or parsed -- an unreadable preset is our outage, never the audited repository's `fail` (see *What each status means* in `docs/consistency-audits.md`). A malformed `renovate.json` must not abort the run: follow what `renovate_config()` (about line 820) already does and test it. Report all findings at once so one fix closes the issue. Remove what the new check no longer calls: `RENOVATE_CONTAINER_ACTION`, `RENOVATE_VERSION_COMMENT_PRESETS` only if nothing else reads it, `RENOVATE_WORKFLOW_TEMPLATE`, `RENOVATE_PIN_RE`, `RENOVATE_USES_RE`, `RENOVATE_BUMPED_RES`, `RENOVATE_DRIFT_SHOWN`, `renovate_workflow_drift`, `_without_renovate_bumps`, `_quote_line`, `renovate_workflow_runs_container`, the repository-level wrappers `renovate_reads_version_comments`, `renovate_manages_pre_commit` and `renovate_versions_shellcheck_py`, `uses_shellcheck_py_hook` and `uses_remote_pre_commit_hooks` -- but **keep** the config-level predicates `renovate_config_reads_version_comments`, `renovate_config_manages_pre_commit` and `renovate_config_versions_shellcheck_py`, and say in a comment above them that `RenovateFleetPresetTest` runs them over the real preset, which is what now holds the preset to carrying those properties. `git grep` each removed name across `scripts/` first and keep anything another check imports. Rewrite the comment above `RENOVATE_FLEET_PRESET` (about line 40-54), whose warning about preset edits becomes more true, not less. In `scripts/tests/test_packaging_renovate.py`: remove the module-level read of `templates/renovate/renovate.yml` (line 23) so that the tests no longer depend on a file step 3b deletes; delete the classes that test removed findings (`RenovatePreCommitManagerTest`, `RenovateShellcheckVersioningTest`, `RenovateVersionCommentsTest`, `RenovateWithoutDockerTest`, the drift tests near line 759) but first move any test of a kept config-level predicate into `RenovateFleetPresetTest` or a small new class, so no kept function loses its coverage; and add a class for the new check covering: pass (preset extended, no workflow, no overridden key); workflow present; extends missing; extends present but not a list; one overridden key; several overridden keys named together; `$schema`, `extends` and `packageRules` never reported; a key the preset does not set (for example `lockFileMaintenance`, `constraints`, `customManagers`) passing; all findings reported together; `renovate.json` missing; malformed `renovate.json`; and the preset unreadable raising. Follow the `CheckTestCase` convention in *Testing a change* of `docs/consistency-audits.md`. Then run `python3 tools/source-size-ratchet.py --update` and keep its lowered `tools/source-size-baseline` entry for `packaging.py`; never raise one. Mutation-test with the `mutation-check` skill, each mutant under `timeout`: drop the workflow finding, drop the extends finding, drop the override finding, report only the first overridden key, report `extends` as an override, and swallow the preset read failure. Keep the script under this session's scratchpad and report every mutant with the test that killed it. Do not touch the spec, the templates or any other file; 3b and 3d own them. |
+| 3b | medium | sonnet | none | Delete `.github/workflows/renovate.yml` and `templates/renovate/renovate.yml` with `git rm`, then settle every reference listed in survey item 17 of phase 3 in `docs/plans/PLAN-renovate-cadence.md`, except `docs/audits/renovate.md`, `templates/renovate/README.md` and `ARCHITECTURE.md`, which step 3d owns. In `scripts/tests/test_registry.py`: delete `test_this_repository_runs_renovate_verbatim`; narrow `test_a_pinned_rust_toolchain_states_its_toolchain` to `.github/workflows/renovate-fleet.yml` alone, rewriting its docstring and failure message so neither mentions the deleted files; correct the `ConvergedTemplatesTest` docstring (about line 1242). In `.pre-commit-config.yaml`, rewrite the actionlint comment (about lines 44-50) so it no longer cites `renovate.yml`, and count the copy-directly templates that remain with `ls` rather than subtracting one. In `scripts/tests/test_npm_dependencies.py` (about line 262-276), keep the test, since what it proves about `npm install --prefix` is still true of `renovate-fleet.yml`, but rename the fixture and fix the docstring's "this template". In `renovate-fleet.json`: the Node-major rule's `matchFileNames` becomes `.github/workflows/renovate-fleet.yml` alone, and the rule's `description` and the Renovate-major `prBodyNotes` entry name only that file; update `test_the_real_preset_disables_node_majors_in_the_workflows` and `test_the_renovate_major_note_names_each_workflow_to_move` in `scripts/tests/test_packaging_renovate.py` to assert the whole new set, so adding a file back fails them. In `renovate-runner.json`, narrow the temporary rule's `matchFileNames` to `.github/workflows/renovate.yml` and rewrite its description to say it lasts until the fleet's last copy is deleted; update `test_the_runner_suppresses_the_renovate_workflows_and_nothing_else`. In the root `renovate.json`, delete the `dtolnay/rust-toolchain` rule and the whole `customManagers` block, after confirming `git grep -l '# renovate:' -- templates` lists only `templates/renovate/README.md`; then delete `test_only_the_doomed_renovate_copies_keep_rust_toolchain_unpinned` and change `test_the_root_config_holds_two_local_rules` to one, renamed to match. In `.github/workflows/renovate-fleet.yml`, rewrite the two header comments (lines 4 and 22) about the per-repository copies so they say what is true once this pull request has merged: the copies are being deleted, and a re-enabled one races this runner. Source must not cite a plan or narrate its history (`plan-source-references`, `plan-history-in-source`). Do not touch `REVIEWS.md` or `.vscode/`. Run `git grep -n 'renovate\.yml' -- ':!docs/plans' ':!docs/audits/compliance.md' ':!REVIEWS.md' ':!.vscode'` at the end and report every remaining hit with why it stays. |
+| 3c | low | sonnet | none | Add a `log_level` input to `.github/workflows/renovate-fleet.yml`'s `workflow_dispatch`: `type: choice`, options `info` and `debug`, default `info`, with a description saying the conductor sends no inputs so scheduled runs log at `info`. Pass it to the Renovate step's `env:` as `LOG_LEVEL: ${{ inputs.log_level \|\| 'info' }}`, beside the two existing inputs and in their style; check how those two are passed and match it. Extend `test_the_dispatch_defaults_are_the_scheduled_run` in `scripts/tests/test_renovate_fleet_workflow.py` (about line 116) to assert the `log_level` default is `info`, and add a test that the input offers exactly `info` and `debug`. Mutation-test two mutants under `timeout`: default `debug`, and a third option added. Run `pre-commit run --all-files`. |
+| 3d | high | opus | none | Rewrite the Renovate documentation around the preset and the central runner. Read phase 3's decisions in `docs/plans/PLAN-renovate-cadence.md` and the new `Renovate` check from step 3a first. `docs/audits/renovate.md`: rewrite *What we check* to the four rules of the new check, with the rationale for each, especially why a top-level key the preset sets is a failure (survey item 14: every repository overrode the schedule); delete *The workflow is the template's*; move what is still true of the workflow -- *Renovate without Docker*, and from `templates/renovate/README.md` the *Lock files*, *The version pin* and *Installing without the token* sections -- under *The central runner*, rewritten to describe `.github/workflows/renovate-fleet.yml` rather than a per-repository copy, since every fact there is now a fact about the one runner; and rewrite *The central runner* so it no longer says the copies are disabled but present -- say the criterion fails a repository that still carries one. `templates/renovate/README.md`: it now describes one file, `renovate.json`, which extends the preset; keep *Customisation* and its subsections, *Prerequisites* and *Projects using these templates*, delete *This template is being retired*, and point at the spec for everything about the runner rather than restating it. Keep each fact in one place and point at it from the other; no fact about the runner is stated on both pages. `ARCHITECTURE.md:52`: drop `renovate.yml` from the supporting-workflows list, since the runner already has its own entry above it. `AGENTS.md` changes only if a convention changed, and none did. `docs/` and `ARCHITECTURE.md` must not cite phase numbers (`plan-phase-references`). Run `tools/mermaid-lint.sh` if you touch a diagram, and `pre-commit run --all-files`. |
+| 3e | high | opus | none | Management session, not a sub-agent. Preview the audit change against the fleet before the pull request is marked ready. Clone each of the 23 managed repositories fresh into the scratchpad at its default branch, run `python3 scripts/audit-check.py --repo-path <clone> --repo-name <repo>` from this worktree for each, then `scripts/audit-manage-issues.py --dry-run` over the results as `docs/consistency-audits.md` describes -- never without `--dry-run`. Expect, per survey item 16: `development` compliant, `images` N/A, and the other 21 non-compliant, of which 15 would get a new `Consistency: Renovate` issue and six would have theirs rewritten; and every finding naming `schedule` among the overridden keys. Any other count is a finding to explain before merging, not a number to record. Then stage the sweep, below, and record both here. |
+
+#### Sweep
+
+Operator-gated, in this order. The management session runs each
+step and stops where a step says so.
+
+1. **Merge the first pull request.** Then, with the operator's yes,
+   dispatch `consistency-audit.yml` to file the issues now rather
+   than at Sunday's run, and record the issue numbers against the
+   table in step 3.
+2. **Answer open question 1** (decision 8): dispatch
+   `renovate-fleet.yml` with `log_level: debug` and
+   `autodiscover_filter: shakenfist/development`; record what the log
+   says about vulnerability alerts, quoting the line; then delete the
+   run with `gh run delete` and record that it was deleted.
+3. **Stage all 22** (step 3f). A script in the scratchpad clones
+   each repository, applies decision 6's rules to `renovate.json`,
+   deletes `.github/workflows/renovate.yml`, and writes a table:
+   repository, each key or rule dropped with the rule that dropped
+   it, each kept rule, and any entry the rules do not classify. An
+   unclassified entry stops the script for that repository. For each
+   staged clone, run the repository's own `pre-commit run
+   --all-files` where it has a config, `renovate-config-validator`
+   on the new `renovate.json` (the development hook's installed
+   environment will do), and `audit-check.py`, which must report
+   `renovate` and `renovate-lockstep-groups` compliant. Then the
+   judgment tier of this repository's `PUSH-AUDIT.md`, run once over
+   the script and the table (decision 7). **Stop**: the operator
+   reads the table and the audit before anything is pushed.
+4. **Canaries** (decision 9). `actions`, then `instar`: branch,
+   commit, push and open the pull request with `Fixes
+   shakenfist/<repo>#<n>` for its `Renovate` issue, with the
+   operator's yes for each. Merging stays with the operator. After
+   each merges, read the next hourly pass's result and that
+   repository's dashboard, and record both.
+5. **The other 20**, the same way, `images` with no issue to close.
+   Record each pull request's merge commit for the `Merged` cell as
+   it lands.
+6. **The closing pull request** (step 3h, below the table), once the
+   fleet has no `renovate.yml`: verify that with the API rather than
+   trusting the merge list, then remove the temporary rule.
+7. **Delete the organisation secret**, with the operator's yes, since
+   it needs `admin:org`: `gh secret delete RENOVATE_TOKEN --org
+   shakenfist`. The next hourly pass must succeed, probe included;
+   record its run id. Close #402 with a comment saying why it no
+   longer has a subject.
+8. **Watch the first Saturday** (Sydney) after the last sweep pull
+   request merges, and record it in the closing pull request.
+
+| Step | Effort | Model | Isolation | Brief for sub-agent |
+|------|--------|-------|-----------|---------------------|
+| 3f | medium | sonnet | none | Write the staging script for *Sweep* step 3 into this session's scratchpad, not the repository. Input: the 22 repository names in phase 2's *Cutover* step 3, minus `development`. For each, clone `shakenfist/<repo>` at its default branch (`develop` except `actions` and `cloudgood`, which use `main`) into the scratchpad, `git rm .github/workflows/renovate.yml`, and rewrite `renovate.json` by decision 6's rules in phase 3 of `docs/plans/PLAN-renovate-cadence.md` and no others. Match each dropped `packageRules` entry by its matchers and effect, never by its description text, and print, per repository, every dropped and kept entry with its reason. An entry no rule classifies stops that repository with the entry printed. Preserve key order and the file's indentation, and end the file with a newline. Then for each clone run its own `pre-commit run --all-files` if `.pre-commit-config.yaml` exists (report failures that predate the change separately, by running it on an untouched clone too), the Renovate validator on the new `renovate.json`, and `python3 scripts/audit-check.py --repo-path <clone> --repo-name <repo>` from the development worktree, reporting the `renovate` and `renovate-lockstep-groups` verdicts. Commit nothing, push nothing. Report the table and every verdict. |
+| 3g | medium | sonnet | none | Management session, not a sub-agent: *Sweep* steps 4 and 5. Per repository, commit the staged change with the subject `Move Renovate onto the fleet preset.`, push the branch `renovate-fleet-preset`, and open the pull request, each with the operator's yes. The body says what was dropped and why, in a sentence per rule, links this plan's decision 6 by permalink, notes the `lockFileMaintenance` timezone shift where it applies, and closes the repository's `Renovate` issue. |
+| 3h | medium | sonnet | none | The closing pull request, in a new worktree from `main` once *Sweep* step 6's API check shows no `renovate.yml` in any managed repository. Remove the temporary `packageRules` entry from `renovate-runner.json`, leaving no `packageRules` key, and update `RenovateRunnerConfigTest` (`test_the_runner_config_holds_exactly_these_keys` and `test_the_runner_suppresses_the_renovate_workflows_and_nothing_else`, which becomes a test that the runner config holds no package rules). Rewrite the sentence in `docs/audits/renovate.md` that describes the temporary rule. Mutation-test one mutant under `timeout`: the rule restored. The management session adds the Saturday watch, the secret deletion and the closing records to this plan in the same pull request. |
+
+#### Record
+
+**Step 3e: the preview matches survey item 16 exactly**
+(2026-11-25). Each of the 23 managed repositories and `private-ci`
+was cloned fresh at its default branch's tip, and `audit-check.py`
+run over each from this branch at `0935894`; `development`'s result
+was taken from this branch rather than from its `main` clone, since
+`main` still carries the workflow this branch deletes. The
+`renovate` verdicts: `development` passes, `images` and
+`private-ci` are N/A, and the other 21 fail. Every one of the 21
+fails on all three of the new findings at once -- the workflow
+present, the preset not extended, and the same seven top-level keys
+overridden, `assignees`, `dependencyDashboard`, `gitAuthor`,
+`minimumReleaseAge`, `pre-commit`, `rollbackPrs` and `schedule` --
+so survey item 14's `schedule` is named in all 21.
+
+`audit-manage-issues.py --dry-run` over those results would create
+15 `Consistency: Renovate` issues and update the body of six:
+`agent-python#159`, `client-python#437`, `client-python-k3s#158`,
+`client-python-ova#64`, `cloudgood#26` and `divergulent#150`. That is
+the count survey item 16 predicted, so nothing stops the merge.
+
+#### Execution notes
+
+Dates are Australian Eastern Daylight Time (UTC+11).
+
+**The back brief's answers** (2026-11-25). The operator agreed
+decisions 2 and 7 as written and had already kept decision 3 when
+the plan was committed. He authorised this session to push the
+branch and open the first pull request once its definition of done
+had been checked. Everything under *Sweep* stays gated as written.
+
+**Steps 3a to 3d ran in sequence, and 3e beside 3d** (2026-11-25).
+All four write this worktree and 3b and 3d read what 3a produced,
+so none ran in parallel. Step 3e's clones and audit runs are
+read-only and live outside the worktree, and 3d changed only
+documentation, so the preview ran while 3d was still writing.
+
+**Three departures, all kept** (2026-11-25). Step 3a's
+`source-size-ratchet.py --update` also lowered `test_registry.py`'s
+entry from 1,582 to 1,581, its length on `main`; the tool only ever
+lowers, so it stays. Step 3b found
+`test_renovate_installs_without_the_token` reading the deleted
+template and pointed it at `renovate-fleet.yml`, where two steps
+hold `RENOVATE_TOKEN` -- the probe and the Renovate run -- so it now
+asserts that no holder runs `npm` or `npx` rather than that there is
+exactly one holder. And the management session, reviewing 3d,
+rewrote five comments in `renovate-fleet.yml` that described state
+that no longer exists: two about the per-repository copies and
+template, and three left over from phase 2's cron, among them a
+timeout still called provisional until a dry run measured a pass.
+
+**A test failure that did not reproduce** (2026-11-25, step 3c).
+The 3c sub-agent reported four failures in `test_audit_update_docs`
+and said they failed on a clean tree too. The management session's
+run of the whole suite straight afterwards, 2,827 tests, passed, as
+did every run since, so nothing was changed for them.
+
+#### Risks and mitigations
+
+* **A sweep that keeps a local override changes nothing, quietly.**
+  Survey item 14 is the live case: every repository's `after 9pm`
+  would have outlived a sweep briefed to drop only restatements.
+  Mitigation: decision 3 makes the criterion fail any top-level key
+  the preset sets, so a missed override is an open issue, and the
+  staging script's `audit-check.py` run must report `renovate`
+  compliant before anything is pushed. The management session checks
+  both in the 3f report.
+* **The audit change files 15 issues at once.** That is the intended
+  work queue, not a side effect, and step 3e previews the exact count
+  with `--dry-run` before merging. A count that differs from survey
+  item 16 stops the merge.
+* **A preset edit is live fleet-wide on merge.** Decision 5 edits the
+  preset's Node-major rule and its note in the first pull request.
+  Both changes only drop file names whose dependencies the runner's
+  temporary rule already disables in every repository, so nothing
+  Renovate proposes changes; the 3b tests assert the whole new sets.
+* **Deleting the organisation secret cannot be undone by
+  re-reading it.** GitHub never returns a secret's value. The
+  mitigation is the order: the secret goes only after the API shows
+  no `renovate.yml` anywhere, and the next hourly pass, whose probe
+  checks push access to every managed repository, proves the
+  environment copy is what the runner uses. If that pass failed, the
+  recovery is a new token from the bot account, not the old value;
+  the operator confirms before step 7 that he can mint one.
+* **A debug log in a public repository.** Decision 8 limits it to one
+  run filtered to this repository and deletes the run once read. The
+  management session reads the log for anything token-shaped before
+  recording a quote from it.
+* **The preset's schedule starts on merge, one repository at a
+  time.** Each swept repository moves from a daily window to
+  Saturday, majors and CI tooling to the first of the month, and
+  takes digest pinning from the preset for the first time, which
+  arrives as one grouped CI-tooling pull request on the next first
+  of the month. That is the volume this plan exists to produce, and
+  phase 4 measures it; `vulnerabilityAlerts` keep their own
+  schedule throughout, which phase 1 established.
+* **The temporary rule could be removed early.** If it went before a
+  repository was swept, that repository's disabled `renovate.yml`
+  would receive update pull requests. *Sweep* step 6 checks every
+  managed repository through the API before 3h starts, rather than
+  trusting a list of merged pull requests.
+
+#### Definition of done
+
+Every item is checked by the management session against the files,
+the API and the commands, not against a sub-agent's summary.
+
+* No managed repository carries `.github/workflows/renovate.yml`:
+  ```
+  for r in actions agent-python andris client-python \
+      client-python-k3s client-python-ova clingwrap cloudgood \
+      development divergulent hunkydory images instar kerbside \
+      kerbside-client kerbside-patches library-utilities occystrap \
+      ryll sfui shakenfist uncalibrated-sextant visual-digest-rust; do
+    gh api "repos/shakenfist/$r/contents/.github/workflows/renovate.yml" \
+      >/dev/null 2>&1 && echo "$r still has it"
+  done
+  ```
+  prints nothing. The list is the 23 in phase 2's *Cutover* step 3;
+  a repository onboarded since is checked too.
+* Every managed `renovate.json` extends the preset and sets no
+  top-level key the preset sets, checked by fetching each one and
+  comparing keys with `renovate-fleet.json`, and the first
+  consistency audit after the last sweep pull request merges reports
+  `renovate` compliant for every repository in scope.
+* `templates/renovate/` holds `renovate.json` and `README.md` and
+  nothing else, and `git grep -n 'renovate\.yml' -- ':!docs/plans'
+  ':!docs/audits/compliance.md' ':!REVIEWS.md' ':!.vscode'` prints
+  only the history in `docs/audits/scheduled-workflow-health.md`,
+  the fixture name in `scripts/tests/test_ci_workflows.py`, and lines
+  that name the file in order to refuse it: the check's
+  `RENOVATE_REPOSITORY_WORKFLOW` constant, its fixtures in
+  `scripts/tests/test_packaging_renovate.py`, the warning at the head
+  of `renovate-fleet.yml`, and the spec's lines describing the
+  refusal. (This item first listed only the history, the fixture name
+  and the spec, which missed the three that must name the file;
+  corrected on 2026-11-25 when the first pull request was checked
+  against it.) Until step 3h lands, `renovate-runner.json`'s
+  temporary rule, its test and the spec's sentence describing it are
+  hits too.
+* `renovate-runner.json` has no `packageRules` key, and
+  `renovate-fleet.json`'s Node-major rule names
+  `.github/workflows/renovate-fleet.yml` alone.
+* The `Renovate` check's three new findings and its preset-read
+  failure each kill a named mutant, and the script's path and count
+  are in the commit message.
+* `tools/source-size-baseline`'s entry for `packaging.py` is lower
+  than 2,493 and equals the file's length.
+* `python3 -m unittest discover -s scripts/tests -t scripts` passes,
+  `pre-commit run --all-files` passes, and `python3
+  scripts/audit-check.py --repo-path . --repo-name development`
+  reports `renovate` compliant and no verdict worse than on `main`.
+* *Record* holds: step 3e's preview counts against survey item 16;
+  the staged table and the judgment audit's result; the canaries'
+  passes and dashboards; open question 1's answer with its run id
+  and the statement that the run was deleted; the run id of the
+  first pass after the organisation secret was deleted, and that it
+  succeeded; and the first Saturday's runs and pull requests.
+* `gh secret list --org shakenfist` lists no `RENOVATE_TOKEN`, and
+  #402 is closed with its reason.
+* Open question 1 reads *Answered*, and the Execution table's
+  `Merged` cell for phase 3 names all 24 pull requests.
+
+#### Back brief
+
+Before step 3a, back brief the operator on decisions 2 and 3: what
+the criterion stops checking, and the one new rule it adds, which
+fails a repository for a top-level key the preset sets. The second
+is cheap to propose and expensive to change once fifteen issues
+carry its wording. Confirm also decision 7, the single judgment
+audit in place of one per repository, since it departs from the
+push-audit block's letter.
+
+Then stop at *Sweep* step 3, before anything is pushed in another
+repository, with the staged table and the audit; and again before
+step 7, the secret deletion, which cannot be undone.
 
 ### Phase 4: re-measure
 
@@ -2699,9 +3288,10 @@ trade-off the operator asked to keep visible.
 
 Run `PUSH-AUDIT.md` over the union of the `Merged` ranges of
 phases 1 to 3 in this repository. Phase 3's per-repository sweep
-pull requests each run their own repository's push audit, where one
-exists, as they land; cite those audits here rather than re-running
-them.
+pull requests each run their own repository's mechanical push-audit
+tier as they land, and the judgment tier ran once over the script
+and the staged table that produced all 22 (phase 3, decision 7);
+cite both here rather than re-running them.
 
 ## Agent guidance
 
@@ -3067,6 +3657,12 @@ chosen to defer to here, so that we do not forget them.
   `extends` of the preset as well as reading the local file, with
   tests showing it accepts a group defined there; until then it
   reports a promoted group as missing.
+* `images` has Dependabot alerts disabled (phase 3, survey item 21).
+  It is managed by Renovate, so it can never receive a `[SECURITY]`
+  pull request however the runner's token is scoped. Enabling alerts
+  there is a repository setting and the operator's call; nothing in
+  this plan depends on it. A fleet criterion that alerts are enabled
+  wherever Renovate manages a repository would catch the next one.
 
 ### Bugs fixed during this work
 

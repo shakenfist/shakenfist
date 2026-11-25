@@ -178,6 +178,18 @@ compares the published binary's `--contract-hash` with the checkout's
 proto and, when they differ, builds the proxy from the checkout and
 passes it to the image build as `KERBSIDE_PROXY`.
 
+The demo's shell scripts are linted by `tox -e shellcheck` in
+`sanity_checks`, not in the demo lane. The lane's path filter would
+leave `tools/`, which holds most of the repository's shell, unchecked
+while looking like CI shellcheck coverage. Adding a step inside
+`sanity_checks` renames no gate job, so the ruleset is unaffected.
+
+A new workflow whose only trigger is `workflow_dispatch` cannot be run
+from the pull request that adds it: GitHub offers dispatch only for
+workflows already on the default branch. The demo lane's runner probe
+was first written that way, and needed a path-filtered `pull_request`
+trigger to be run at all before merging.
+
 Two behaviours only matter when driving CI by hand: on a
 `workflow_dispatch` run of `functional-tests.yml` an unselected target
 skips cleanly via a job-level `if:` (it does not report red), and
@@ -298,6 +310,69 @@ asserts every required context in the exported ruleset
 `export-repo-config.yml`) still matches a job name in
 `.github/workflows/`.
 
+### Why the gates are shaped this way
+
+Each of these is a constraint the gate design rests on, and each has
+a tempting simplification that breaks it.
+
+- **The tiers share one workflow file.** A gate aggregates through
+  `needs:`, which cannot reach a job in another workflow file, so the
+  cloud lanes stay in `functional-tests.yml` behind an
+  `if: github.event_name` condition rather than moving to a workflow
+  of their own, and each other gating workflow carries its own
+  `Can enqueue: ...` gate. The pattern, and the ruleset's merge-queue
+  parameters, are copied from shakenfist/shakenfist rather than
+  re-derived; change them across the fleet or not at all. One
+  consequence of those parameters (`ALLGREEN`, up to five entries per
+  merge, a five-minute wait): pull requests queued together, such as
+  a stack of Renovate bumps, share one queue run. Renovate's automerge
+  is off, so a person still puts each one in the queue.
+- **A gate needs every job whose failure should block it, directly.**
+  The jq treats `skipped` as satisfied, which path skips require, and
+  a failed job's dependents report `skipped`. A `Can merge` that
+  needed only jobs downstream of `sanity_checks` would go green on a
+  tree that failed lint. The workflow comment above the gates says
+  the same.
+- **A lane job is never itself a required check.** If `check_paths`
+  failed, GitHub would report the lane as skipped, which satisfies a
+  required check, and a filter failure would silently green the smoke
+  tier. The gate turns that failure into a red check instead.
+- **The smoke workflows skip `check_paths` on
+  `github.event_name != 'merge_group'`, not run it only on
+  `== 'pull_request'`.** Nothing consumes its output in the queue, but
+  a skipped need cascades: the narrower condition would skip the lane
+  on `schedule` and `workflow_dispatch` too, and the nightlies would
+  never run again.
+- **The queue does not re-run the smoke lanes against the merged
+  tree.** The cost is accepted: two pull requests that are each green
+  can still conflict in the proxy-path coverage only those lanes
+  have. Their nightlies bound that risk, so such a conflict surfaces
+  within a day.
+- **The gate's `[ $ALL_SUCCESS == true ]` leaves the variable
+  unquoted**, byte-identical with the shakenfist/shakenfist template.
+  It fails closed either way, so review has declined to change one
+  copy on its own.
+
+### Bypassing the queue
+
+The develop ruleset has two bypass actors: the
+`shakenfist-review-marks` GitHub App, which `prune-reviews.yml` pushes
+as (GitHub refuses the built-in Actions app as a bypass actor), and the
+organisation team "SF Can Skip Merge Queue". GitHub applies a bypass to
+the whole ruleset, not to one rule, so a member of that team sees a
+plain "Merge pull request" button that skips the queue with no warning.
+That is kept deliberately: forcing a merge is what you need when CI
+itself is broken. Use "Merge when ready" to go through the queue, and
+see "Releasing" in [development.md](/components/kerbside/development/#releasing) for why a
+bypassed merge cannot be tagged.
+
+A pull request created or pushed with a workflow token starts no
+`pull_request` workflows, so it has no check runs and cannot enter the
+queue. The nightly "Repository configuration changed" pull request from
+`export-repo-config.yml` is one. Close and reopen it to attach the
+checks. A `@shakenfist-bot please retest` comment does not help, because
+a dispatched run never attaches to the pull request's checks.
+
 ### Documentation checks
 
 `docs_checks` runs `tools/check-backend-tls-claims.py`, which fails
@@ -403,8 +478,8 @@ now a fleet consistency audit,
 which checks every repository whose workflows can run on `merge_group`,
 and every reusable workflow that inherits such an event.
 
-For the design rationale see
-[plans/PLAN-two-tier-ci.md](/components/kerbside/plans/PLAN-two-tier-ci/).
+For the constraints the rest of the gate design rests on, see
+[Why the gates are shaped this way](#why-the-gates-are-shaped-this-way).
 
 ### The credential scan
 
@@ -910,6 +985,16 @@ tab alerts nobody. A dispatch on any other ref is the interactive
 debugging case: it says nothing about develop's coverage and files
 nothing, and nor does a pull request, whose red is already visible
 there.
+
+The lane became a pull request gate on 2026-08-08, after four
+consecutive green nightlies (16 to 35 minutes each) rather than the
+ten first proposed. A false failure on an experimental project costs a
+re-run. Nightly-only signal builds up at one run a day at best on an
+underspecced CI cluster. And the lane's failures since bring-up had
+been real defects, a `kerbside-proxy` compile break against a
+dependency bump, rather than flakes. If the `l` runner pool saturates,
+the fallback is to demote the lane back to schedule-only, not to weaken
+its assertions.
 
 Every run uploads an artifact bundle with the Kerbside unit journals
 and the ryll, SF daemon and libvirt logs, redacted before upload; the

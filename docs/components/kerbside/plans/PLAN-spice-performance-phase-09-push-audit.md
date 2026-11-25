@@ -324,9 +324,14 @@ the others.
 - The private-data probe set was run over the text this phase
   adds, and *Execution notes* says so.
 - Phase 9 reads `Complete` in both the master plan's Execution
-  table and `docs/plans/index.md`, with no `Merged` cell, and the
-  plan's own status reads `In progress` with phase 2 named as the
-  reason.
+  table and `docs/plans/index.md`, and the plan's own status reads
+  `In progress` with phase 2 named as the reason.
+  - *Corrected 2026-11-25:* this read "with no `Merged` cell". A
+    push-audit phase cannot record its own merge commit while it is
+    running, but it can be recorded afterwards, and an empty cell
+    loses the range a later reader needs. The cell names the audit
+    and its follow-up, 163c56c663 (#720) and 8a9e6ff6dd (#723),
+    which is the form phase 6's cell already uses.
 
 ## Future work
 
@@ -487,6 +492,16 @@ the finding the survey got wrong.
 | "which is small next to the ACK-window backlog" | `docs/performance/proxy-backpressure.md:260` | **Untouched by phase 7**, whose bench has no spice-server and no ACK window. |
 | The throughput gap, 9.27 against 1.64 Mbit at 1% loss | `docs/performance/quic-transport-bench.md` owns the data | **A loss effect.** At 0% loss the controllers tie, and phase 1's rig had no loss term, which phase 7 added. |
 | "not phase 1's profiles" | this plan, as first written | **False.** `PROFILES='20:50 80:10 80:50'` at `docs/performance/proxy-backpressure.md:87` includes 80 ms / 10 Mbit. Only 150 ms / 2 Mbit is new. |
+
+*Corrected 2026-11-25:* the edit the first row calls for was never
+made. It did not become one of the thirteen findings below, so the
+follow-up pull request never carried it, and the page kept a
+statement this audit had already declared false. The page now says
+that the module ships with the kernel and is simply not loaded by
+default, keeps the queue prediction, and points at the QUIC bench's
+sensitivity arm for the loss result. The lesson is about the
+disposition machinery rather than the claim: a correction stated in
+an *Outcome* table and nowhere else does not get made.
 
 ### Floor checklist: kerbside
 
@@ -750,6 +765,12 @@ to be tracked, and both are Michael's to file:
   API knows the lifetime. Note that kerbside#411 -- the `.vv`
   construction being duplicated three times -- is a dependency
   rather than a home: adding a key means touching every copy.
+- *Filed 2026-11-25:* #766 for the BBR recommendation and #767 for
+  the `.vv` key, each carrying the wording above. #411 has landed in
+  the meantime, so #767 records that there is now one renderer and
+  one key list rather than three copies. Both are named in the
+  master plan's *Future work*, which is what survives this plan's
+  retirement.
 
 ### Corrections this audit made to its own plan
 

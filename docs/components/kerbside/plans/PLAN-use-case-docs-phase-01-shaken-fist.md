@@ -16,7 +16,7 @@ reviewed at medium and that is the precedent.
 
 The master plan proposed seven use-case pages. One exists —
 `docs/use-cases/ovirt.md`, landed 2026-08-10 as
-`PLAN-two-tier-ci-phase-04-docs.md`'s deliverable — and it settles
+[`PLAN-two-tier-ci-phase-04-docs.md`](https://github.com/shakenfist/kerbside/blob/49058af04507c5326b19bc1cc4510fcd3ec11f45/docs/plans/PLAN-two-tier-ci-phase-04-docs.md)'s deliverable — and it settles
 the format, the directory, and the index placement. This phase
 writes the second, for Shaken Fist.
 
@@ -109,7 +109,7 @@ accurate in every particular.
 
 5. **The static-source row's precondition has been met.** It
    defers the demo mechanics to `docs/installation.md` "per
-   PLAN-demo-install.md decision 2", which was still a promise
+   [PLAN-demo-install.md](https://github.com/shakenfist/kerbside/blob/b3a1a5a4272398f45e27b86c1586d221c92b90b5/docs/plans/PLAN-demo-install.md) decision 2", which was still a promise
    when written. It landed 2026-08-22: `docs/installation.md:160`
    is `## Try it: the demo stack`, and `docs/index.md`'s
    standalone row already links `installation.md#try-it-the-demo-stack`.
@@ -219,7 +219,7 @@ one of the five required checks (`docs/testing.md:155`).
 5. **The "Status and limitations" table says what is not proven,
    one row per claim, per the master plan's own instruction.** At
    least these are known: multi-node Shaken Fist is not covered by
-   any lane (`PLAN-two-tier-ci.md:365-367` lists a multinode SF
+   any lane ([`PLAN-two-tier-ci.md:365-367`](https://github.com/shakenfist/kerbside/blob/894caf514644fbc780d6121b811906ea27f885f1/docs/plans/PLAN-two-tier-ci.md) lists a multinode SF
    lane as future work), and the `synthesize_host_subject` path
    exists precisely because some clusters publish no
    `spice_server_cert_subject`. The implementer adds what else
@@ -258,7 +258,7 @@ resolves against `docs/plans/`, does not exist yet, and fails
 | Risk | Mitigation |
 |------|------------|
 | The page duplicates `console-sources.md` and the two drift apart, leaving two descriptions of a security control. | The primary risk of the phase, and decision 3 is the control. Checked at review, not by the implementer: read the new "How it works" against `console-sources.md:67-146` and confirm no fact about the exchange is *stated* on both pages rather than stated once and linked. The definition of done names the six specifics that may not cross over. |
-| The page overstates what is proven, because the sf-e2e lane is green and it is tempting to read that as coverage of everything. | The lane is single-node. Decision 5 makes the "Status and limitations" table mandatory and the definition of done requires the multi-node gap to appear in it. Reviewer checks that row exists against `PLAN-two-tier-ci.md:365-367`. |
+| The page overstates what is proven, because the sf-e2e lane is green and it is tempting to read that as coverage of everything. | The lane is single-node. Decision 5 makes the "Status and limitations" table mandatory and the definition of done requires the multi-node gap to appear in it. Reviewer checks that row exists against [`PLAN-two-tier-ci.md:365-367`](https://github.com/shakenfist/kerbside/blob/894caf514644fbc780d6121b811906ea27f885f1/docs/plans/PLAN-two-tier-ci.md). |
 | The format does not in fact generalise, and forcing the Shaken Fist material into the oVirt section order produces a worse page than a different order would. | This is the reason Shaken Fist is second rather than sixth — see decision 2. If it happens, the back brief is the place to say so, and the outcome is a corrected format recorded in the master plan for phases 2-4, not a one-off deviation in this page. |
 | Promoting the plan to a master plan acquires a push-audit phase that nobody costed. | Stated in decision 1 rather than discovered at phase 5, and carried in the Execution table from the start. Each phase records its merge commit as it lands, because the shared block is explicit that the range cannot be reconstructed reliably afterwards. |
 | `README.md` grows a bullet per use-case page, against the readme-discipline policy that new features are documented in `docs/`, not added as README bullets. | The policy permits touching README when the curated doc links change, which is exactly this. But six more bullets is the wrong end state. Step 1b adds the second entry and rewords oVirt's "first of the per-deployment guides"; the closeout phase should collapse them to a single link to the Use Cases index section. Recorded here so phase 5 inherits it. |

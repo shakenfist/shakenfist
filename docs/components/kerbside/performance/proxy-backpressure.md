@@ -250,14 +250,24 @@ These are follow-ups, not work done here:
   upstream alternative is a byte-denominated or RTT-aware ACK window
   in spice-server. Either one changes the bound this measurement
   found.
-- **BBR on the client leg was not measured.** This host's kernel has
-  only `reno` and `cubic` loaded. Loading `tcp_bbr` needs root, and
-  an unprivileged network namespace cannot autoload it. With the
-  module loaded, `CC=bbr tools/shaped-link/run-matrix.sh` sets it as
-  the server namespace's default congestion control, which covers the
-  proxy's client-leg sockets. On these profiles BBR could only trim
-  the bottleneck queue (about 20 ms at 20 ms RTT, one BDP), which is
-  small next to the ACK-window backlog.
+- **BBR on the client leg was not measured here.** `tcp_bbr` ships
+  with this host's kernel but is not loaded by default, so
+  `tcp_available_congestion_control` offers only `reno` and `cubic`
+  until root runs `modprobe tcp_bbr`; an unprivileged network
+  namespace cannot autoload it, which is why this rig did not. With
+  the module loaded, `CC=bbr tools/shaped-link/run-matrix.sh` sets it
+  as the server namespace's default congestion control, which covers
+  the proxy's client-leg sockets. On these profiles BBR could only
+  trim the bottleneck queue (about 20 ms at 20 ms RTT, one BDP), which
+  is small next to the ACK-window backlog.
+  - That queue prediction is about depth, and it is not falsified.
+    What it does not cover is loss, which
+    [the QUIC transport bench](/components/kerbside/performance/quic-transport-bench/#sensitivity-arm-bbr)
+    went on to measure: the kernel's BBR carried 9.27 Mbit against
+    Cubic's 1.64 at 1% loss on 80 ms / 10 Mbit, and cut the no-loss
+    interactive p95 from 171 ms to 104 ms. The trade is not uniform,
+    since on 150 ms / 2 Mbit BBR's p95 under loss sits above Cubic's.
+    Recommending it on the proxy host is issue #766.
 - **qemu's damage-path series changes the message sizes** that
   the ACK window counts. [The streaming re-baseline](/components/kerbside/performance/streaming-rebaseline/)
   reruns the rig against it.

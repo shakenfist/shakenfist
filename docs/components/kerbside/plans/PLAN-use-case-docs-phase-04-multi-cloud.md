@@ -19,7 +19,7 @@ The master plan sets no review effort for any page.
 
 Four use-case pages exist and agree on a format.
 `docs/use-cases/ovirt.md` landed 2026-08-10 as
-[PLAN-two-tier-ci-phase-04-docs.md](/components/kerbside/plans/PLAN-two-tier-ci-phase-04-docs/)'s
+[PLAN-two-tier-ci-phase-04-docs.md](https://github.com/shakenfist/kerbside/blob/49058af04507c5326b19bc1cc4510fcd3ec11f45/docs/plans/PLAN-two-tier-ci-phase-04-docs.md)'s
 deliverable and settles it; `shakenfist.md` followed
 2026-09-18 as phase 1, merge commit `2f0e526`; `openstack.md`
 2026-09-20 as phase 2, merge commit `a7df5e5`; and

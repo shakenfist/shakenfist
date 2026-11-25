@@ -6,7 +6,7 @@ Kerbside has source drivers for oVirt, Shaken Fist and a
 static fleet. Proxmox has been deferred since 2026-08-02 for
 want of a driver, leaving a "no source yet" row in
 `docs/index.md`'s use-case table and the feasibility research
-parked in PLAN-two-tier-ci.md's future-work section — a
+parked in [PLAN-two-tier-ci.md](https://github.com/shakenfist/kerbside/blob/894caf514644fbc780d6121b811906ea27f885f1/docs/plans/PLAN-two-tier-ci.md)'s future-work section — a
 footnote it had outgrown. It moved here on 2026-09-20, and
 that section now points at this plan.
 
@@ -483,7 +483,7 @@ and cited from phase 2's *Outcome*.
 
 ## Relationship to other plans
 
-- **PLAN-two-tier-ci.md** — where the feasibility research
+- **[PLAN-two-tier-ci.md](https://github.com/shakenfist/kerbside/blob/894caf514644fbc780d6121b811906ea27f885f1/docs/plans/PLAN-two-tier-ci.md)** — where the feasibility research
   was done and still lives, now pointing here. Its future
   work also proposes the Proxmox CI lane that phase 5 builds,
   in the merge tier. The cloud lanes have since left the merge

@@ -16,7 +16,7 @@ rather than organised by the decision a prospective
 operator is actually making.
 
 Identified during two-tier CI planning
-(PLAN-two-tier-ci.md, 2026-08-02); tracked here as a
+([PLAN-two-tier-ci.md](https://github.com/shakenfist/kerbside/blob/894caf514644fbc780d6121b811906ea27f885f1/docs/plans/PLAN-two-tier-ci.md), 2026-08-02); tracked here as a
 standalone plan because the suite is broader than that
 plan's mission.
 
@@ -43,10 +43,10 @@ Proposed pages:
 |------|-------|
 | Shaken Fist VDI | Broker embedded in SF; Ed25519 VDI console tokens ([`PLAN-kerbside-vdi-tokens.md`](https://github.com/shakenfist/kerbside/blob/d152faf7fbcf4ab44da09b3336989f11a4bcbdd8/docs/plans/PLAN-kerbside-vdi-tokens.md)); the sf-e2e lane is the worked example |
 | OpenStack | Nova 2025.1 spice-direct; Kolla-Ansible deployment via kerbside-patches; much of docs/index.md's OpenStack section moves here |
-| oVirt | Front-door architecture per PLAN-two-tier-ci.md; written by that plan's phase 4 as the FIRST page, establishing the format |
+| oVirt | Front-door architecture per [PLAN-two-tier-ci.md](https://github.com/shakenfist/kerbside/blob/894caf514644fbc780d6121b811906ea27f885f1/docs/plans/PLAN-two-tier-ci.md); written by that plan's phase 4 as the FIRST page, establishing the format |
 | Multi-cloud aggregation | One kerbside brokering several sources at once — the distinctive value proposition. Resurveyed 2026-09-22 and corrected: it is no longer one sentence. It is the `docs/index.md` Use Cases row plus a "One entry point across clouds" bullet on each of the three cloud pages — `ovirt.md:40`, `shakenfist.md:63` and `openstack.md:65` — and the last of those has grown to nine lines carrying the substantive material phase 2 found: several OpenStack clouds may be configured at once, a presented token is offered to each in `sources.yaml` order until one validates it, and the coupling that follows. The page therefore decides which of four places owns each fact rather than writing on a blank sheet. Covers the consequences: users keep one console entry point while workloads move between providers (cloud migration without retraining or re-plumbing client access), and multiple clouds in different regions present as a single VDI estate |
 | Placement topologies | The inverse of aggregation: kerbside instances placed by user population rather than by cloud — e.g. a kerbside per regional office, close to its users, so SPICE over the WAN is exactly the kerbside-to-hypervisor backend leg: firewall-inspected, audited, a single controllable egress point at the office edge, and — conditionally — TLS'd. Corrected 2026-09-22, having said "TLS'd (with host-subject pinning)" unconditionally: `rust/kerbside-proxy/src/backend.rs:92` dials the insecure port first and escalates only when the hypervisor rejects plaintext with NEED_SECURED *and* a secure port is configured, and `:198-211` maps an empty `host_subject` or `ca_cert` to `None`, so pinning happens only when the source supplied a subject. OpenStack never does — `kerbside/api.py:665-671` is the only `add_console()` on that path and passes neither field. Multiple kerbsides against one cloud is natural for scraped sources (SF, oVirt); the OpenStack flow assumes one kerbside URL per Nova deployment, so per-group placement there needs the broker to route — document as a caveat |
-| Standalone / static source | The static driver (`kerbside/sources/static.py`) for labs, demos, and direct-qemu style fleets. **`docs/installation.md` owns the demo mechanics** — the commands, in order, with their real output — per PLAN-demo-install.md decision 2, delivered 2026-08-22 as that plan's phase 5 (`docs/installation.md` "Try it: the demo stack"). This page owns the framing: why you would run a static source, how it works, what it cannot do, linking to the installation demo rather than restating it |
+| Standalone / static source | The static driver (`kerbside/sources/static.py`) for labs, demos, and direct-qemu style fleets. **`docs/installation.md` owns the demo mechanics** — the commands, in order, with their real output — per [PLAN-demo-install.md](https://github.com/shakenfist/kerbside/blob/b3a1a5a4272398f45e27b86c1586d221c92b90b5/docs/plans/PLAN-demo-install.md) decision 2, delivered 2026-08-22 as that plan's phase 5 (`docs/installation.md` "Try it: the demo stack"). This page owns the framing: why you would run a static source, how it works, what it cannot do, linking to the installation demo rather than restating it |
 | Proxmox | Deferred until the source exists; the design record is [PLAN-proxmox-source.md](/components/kerbside/plans/PLAN-proxmox-source/), whose phase 6 is this page |
 
 `docs/index.md`'s introduction slims down to the generic
@@ -58,7 +58,7 @@ readme-discipline policy).
 ## Status
 
 All six writable pages exist. The oVirt page landed
-2026-08-10 as PLAN-two-tier-ci.md phase 4's deliverable, and
+2026-08-10 as [PLAN-two-tier-ci.md](https://github.com/shakenfist/kerbside/blob/894caf514644fbc780d6121b811906ea27f885f1/docs/plans/PLAN-two-tier-ci.md) phase 4's deliverable, and
 settles the format; `shakenfist.md` followed 2026-09-18 as
 phase 1 (`2f0e526`), `openstack.md` 2026-09-20 as phase 2
 (`a7df5e5`), `standalone.md` 2026-09-21 as phase 3
@@ -137,7 +137,7 @@ the range is not reliably reconstructable afterwards.
 | 6. Push audit | [PLAN-use-case-docs-phase-06-push-audit.md](/components/kerbside/plans/PLAN-use-case-docs-phase-06-push-audit/) | Complete | |
 
 The oVirt page is not a phase: it landed 2026-08-10 as
-`PLAN-two-tier-ci-phase-04-docs.md`'s deliverable. That plan
+[`PLAN-two-tier-ci-phase-04-docs.md`](https://github.com/shakenfist/kerbside/blob/49058af04507c5326b19bc1cc4510fcd3ec11f45/docs/plans/PLAN-two-tier-ci-phase-04-docs.md)'s deliverable. That plan
 predates the `plan-push-audit-phase` shared block, carries
 neither the phase nor a `Merged` column, and is already
 `Complete`; by the block's own rule such a plan is not

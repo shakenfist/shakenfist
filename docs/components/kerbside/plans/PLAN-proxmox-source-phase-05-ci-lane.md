@@ -137,7 +137,7 @@ Out of scope:
    token, must be checked in `pve-http-server`'s source before an
    oracle depends on it.
 
-9. **PLAN-two-tier-ci.md placed this lane in the merge tier.**
+9. **[PLAN-two-tier-ci.md](https://github.com/shakenfist/kerbside/blob/894caf514644fbc780d6121b811906ea27f885f1/docs/plans/PLAN-two-tier-ci.md) placed this lane in the merge tier.**
    Its *Future work* says the Proxmox lane lands "directly in the
    merge tier". The cloud lanes have since left the merge queue
    for the nightly tier (`docs/testing.md`, *CI tiers*). That plan

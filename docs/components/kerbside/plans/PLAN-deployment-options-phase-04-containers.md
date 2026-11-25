@@ -32,7 +32,7 @@ Out of scope:
 - Publishing an image, a production compose file, or a Helm chart.
   These are #553 and the master plan's Future work. This phase
   documents their absence and does not fill it (decision 2).
-- Changing `demo/`. It is `PLAN-demo-install.md`'s, which is
+- Changing `demo/`. It is [`PLAN-demo-install.md`](https://github.com/shakenfist/kerbside/blob/b3a1a5a4272398f45e27b86c1586d221c92b90b5/docs/plans/PLAN-demo-install.md)'s, which is
   complete. Its walkthrough in `installation.md` is linked, not
   restated.
 - `installation.md`'s "Deploying for real" table. Phase 6 owns it.

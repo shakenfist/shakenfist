@@ -22,8 +22,8 @@ for:
   text from the peer
 
 Today the only thing that speaks this protocol is `instar-fetch`, a fetcher
-that serves one already-open file. Nothing in the `instar` binary invokes it
-yet.
+that serves one already-open file. `instar info` starts it for an input given
+as a `file://` URL; no other operation does yet.
 
 ## Location
 
@@ -228,10 +228,11 @@ read, never bytes from the peer. The fetcher's own stderr remains available
 for diagnostics that never become part of the protocol.
 
 That stderr carries one line per refused or non-`Ok` request, so its volume
-is set by the peer rather than by the fetcher. Nothing reads it today -- the
-only peer is the privileged side itself -- but whatever eventually routes it
-into a log owns that rate, and should bound or sample it rather than assume
-the fetcher is quiet.
+is set by the peer rather than by the fetcher. The only peer today is the
+privileged side itself, and the fetcher's stderr reaches the user only when
+the operation was run with `--verbose`; otherwise it is discarded. Whatever
+eventually routes it into a log owns that rate, and should bound or sample it
+rather than assume the fetcher is quiet.
 
 ## Usage
 
@@ -295,6 +296,75 @@ lost framing to a request that really is outstanding. The client's read
 deadline is what covers it, and no correct client can produce the shape,
 since the request header is fixed-size.
 
+## Lifecycle
+
+The fetcher is a child of the host process, started and stopped by it. The
+code is in the VMM's `fetch.rs`; a `RemoteSource` owns the child process and
+the `FetchClient` together, because they are one lifetime.
+
+**Spawning.** The host resolves `instar-fetch` from the directory it loads its
+guest binaries from (`INSTAR_BIN_DIR`, then the executable's own directory,
+then `/usr/lib/instar/`). It opens the input read-only and refuses anything
+that is not a regular file itself, in terms of the path the user gave, so a
+bad input is reported as a sentence and never as a dead socket. It then
+creates the socketpair and spawns the child, **before it opens `/dev/kvm`**. A
+child cannot inherit a descriptor its parent has not opened yet, so the order
+is a guarantee that holds whatever flags anyone else's `open` uses. It is the
+second protection and not the only one: kvm-ioctls opens `/dev/kvm` with
+`O_CLOEXEC`, but that is a default in a dependency, and the ordering is the
+part instar keeps itself.
+
+**What crosses the `exec`.** The child holds exactly descriptors 0, 1, 2, 3
+and 4, and a test reads `/proc/<pid>/fd` of a live fetcher and asserts that
+whole set rather than the absence of one descriptor:
+
+| Descriptor | What it is |
+|------------|------------|
+| 0 | `/dev/null` |
+| 1 | `/dev/null`; instar's stdout is the document the user parses, so a hostile child must not hold it |
+| 2 | stderr, inherited under `--verbose` and `/dev/null` otherwise |
+| 3 | the child's end of the socket |
+| 4 | the open input file |
+
+The socketpair and `File::open` both set close-on-exec, so the two the child
+needs are placed with `dup2` in a `pre_exec` closure, which clears the flag on
+the copy. That closure runs between `fork` and `exec`, in a process that may
+have inherited a lock no thread is left to release, so it calls `dup2` twice
+and does nothing else: no allocation, no lock, no formatting.
+
+The two `dup2` calls cannot be given the raw descriptors, because the image is
+opened first and tends to hold 3 while the socketpair holds 4 and 5. Moving
+the socket onto 3 would close the image, and moving the image onto 4 would then
+copy the socket a second time; no ordering of the two calls escapes it, since
+each call's target is the other's source. The host therefore first duplicates
+both onto numbers at or above 5 with `F_DUPFD_CLOEXEC`, which leaves the two
+`dup2` calls independent of each other and lets `exec` close the staged copies
+by itself. The host's own copies of all four descriptors are closed once the
+fork has happened; a copy of the child's socket end left open in the host
+would stop the child ever seeing the connection close.
+
+**Reaping.** `RemoteSource` reaps the child in a `Drop`, not at each call
+site, so the paths nobody writes down -- a `?` out of the middle of an
+operation, a panic in the vCPU loop -- are covered. The drop closes the
+socket, which makes the fetcher's `recv` return zero so that it exits 0, then
+polls for up to two seconds, then sends `SIGKILL` and waits. The wait is
+bounded because a `Drop` that blocks for ever is worse than a leaked process.
+A fetcher that needs the `SIGKILL` is a bug, and the host says so on stderr,
+naming the pid and the elapsed time.
+
+**`std::process::exit` skips it.** A `Drop` does not run when the process calls
+`exit`, so an operation that serves a remote input must return its errors
+through `main` rather than exiting underneath them. `instar info` does. A
+read-only operation that calls `exit` on an error path cannot be given a
+remote input until it stops.
+
+**Behind the VMM's backing store.** A store reading through a client answers
+`read_at` with the client's own `read_at`, adding no bounds logic of its own.
+It refuses a write, naming the input as read-only. A flush succeeds: a guest's
+flush request reaches the store whether or not the device is read-only, a
+read-only local file answers it successfully, and a remote store has nothing
+buffered that a success could be lying about.
+
 ## Dependencies
 
 - `libc`: the `socketpair` and `setsockopt` calls. This is the crate's only
@@ -303,8 +373,9 @@ since the request header is fixed-size.
 ## Current Status
 
 The only thing that speaks this protocol today is `instar-fetch` serving one
-open file. It is built and packaged, but nothing in the `instar` binary
-starts it or links the client. Tests cover the layout, each malformed shape
+open file. It is built and packaged, and `instar info` starts it for a
+`file://` input and reads the sandbox's virtual disk through the client; no
+other operation does yet, and nothing here touches the network. Tests cover the layout, each malformed shape
 decoding to a typed error, an end-to-end comparison of the fetcher against
 `pread`, a set of hostile peers, and a fuzz target on every decode entry
 point.

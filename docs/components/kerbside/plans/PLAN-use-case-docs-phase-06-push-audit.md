@@ -76,9 +76,9 @@ redoes them. The other three shape the step plan.
 
 **1. "Audited by that plan rather than this one" is
 false.** `PLAN-use-case-docs.md:139-141` says the oVirt
-page "landed 2026-08-10 as `PLAN-two-tier-ci-phase-04-docs.md`'s
+page "landed 2026-08-10 as [`PLAN-two-tier-ci-phase-04-docs.md`](https://github.com/shakenfist/kerbside/blob/49058af04507c5326b19bc1cc4510fcd3ec11f45/docs/plans/PLAN-two-tier-ci-phase-04-docs.md)'s
 deliverable, and is audited by that plan rather than this
-one". `PLAN-two-tier-ci.md:278-283` carries a four-row
+one". [`PLAN-two-tier-ci.md:278-283`](https://github.com/shakenfist/kerbside/blob/894caf514644fbc780d6121b811906ea27f885f1/docs/plans/PLAN-two-tier-ci.md) carries a four-row
 Execution table with columns `| Phase | Plan | Status |` —
 no `Merged` column, no push-audit phase — and
 `docs/plans/index.md:21` records the plan as `Complete`. It
@@ -279,7 +279,7 @@ tree.
       `docs/plans/index.md` phase 6 fragment agree on the
       status, checked by reading both.
 - [ ] `docs/plans/PLAN-use-case-docs.md` no longer claims
-      the oVirt page is audited by `PLAN-two-tier-ci.md`,
+      the oVirt page is audited by [`PLAN-two-tier-ci.md`](https://github.com/shakenfist/kerbside/blob/894caf514644fbc780d6121b811906ea27f885f1/docs/plans/PLAN-two-tier-ci.md),
       and carries a `**Phase 6 — push audit.**` paragraph.
 - [ ] `pre-commit run --all-files` is clean.
 
