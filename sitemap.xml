@@ -1205,6 +1205,10 @@
          <lastmod>2026-11-25</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-http-input-phase-03-backing/</loc>
+         <lastmod>2026-11-25</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-http-input/</loc>
          <lastmod>2026-11-25</lastmod>
     </url>
@@ -1777,30 +1781,6 @@
          <lastmod>2026-11-25</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-demo-install-phase-01-db-upgrade/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-demo-install-phase-02-conf-example/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-demo-install-phase-03-compose-demo/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-demo-install-phase-04-ci-lane/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-demo-install-phase-05-docs/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-demo-install/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/</loc>
          <lastmod>2026-11-25</lastmod>
     </url>
@@ -1905,46 +1885,6 @@
          <lastmod>2026-11-25</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-01-smoke-tests/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-02-vendoring/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-03-sfui-canonical/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-04-base-login/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-05-consoles/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-06-remaining-pages/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-07-polling/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-08-terminate-post/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion-phase-09-teardown/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-sfui-conversion/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-spice-performance-phase-01-proxy-backpressure/</loc>
          <lastmod>2026-11-25</lastmod>
     </url>
@@ -1974,26 +1914,6 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-spice-performance/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-two-tier-ci-phase-04-docs/</loc>
-         <lastmod>2026-11-25</lastmod>
-    </url>
-    <url>
-         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-two-tier-ci/</loc>
          <lastmod>2026-11-25</lastmod>
     </url>
     <url>
