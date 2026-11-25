@@ -93,12 +93,12 @@ in the canonical block (which lives in shakenfist/development, at
 `templates/shared-blocks/plan-status-vocabulary.md`) cannot leave this
 checker rejecting a status the template tells authors to write.
 
-Three plans predate the Execution-table convention and are counted by hand,
+Two plans predate the Execution-table convention and are counted by hand,
 and three more keep a table which is a placeholder rather than a phase list.
 They are named in `HAND_COUNTED` and `PROVISIONAL` rather than detected, so
 that a plan cannot join them by quietly omitting or stubbing its table:
 adding a name is a deliberate edit, and the index preamble names the same
-six for readers.
+five for readers.
 
 `order.yml` is registration, not navigation. Nothing in this repository
 renders it -- `mkdocs.yml.tmpl` lists the Plans nav by hand -- but the format

@@ -407,9 +407,10 @@ are load-bearing:
 The deploy prerequisite for the remote path -- the CI key present on the
 suite host as `~/.ssh/id_rsa`, which every node already trusts for
 `debian` -- is in place: `shakenfist/actions`' `smoke-cluster.yml`
-copies `id_ci` onto the primary for every functional job. So a node-exec
-skip is now a real signal rather than the expected state, and should be
-read as the mesh or the key being broken.
+copies `id_ci` onto the primary for every functional job, in its
+"Authorise the primary to reach other nodes over the mesh" step. So a
+node-exec skip is now a real signal rather than the expected state, and
+should be read as the mesh or the key being broken.
 
 Two things these assertions deliberately do not do. They add **no new SF
 API surface**: they observe kernel and libvirt state out of band rather
@@ -742,6 +743,15 @@ symptom -- a create refused 507 while the cluster has room, which is
 drift which refuses nothing is invisible. The node-exec helpers make the
 assertion cheap to write; it is tracked as
 [#5059](https://github.com/shakenfist/shakenfist/issues/5059).
+
+The same helpers would answer two neighbouring questions nothing asks
+today: whether an instance's disks reach libvirt with the type, bus and
+cache mode requested (`test_disk_specs.py` only sees the guest's view),
+tracked as [#5071](https://github.com/shakenfist/shakenfist/issues/5071);
+and whether deleting an instance removes its directory and nvram from
+the hypervisor, the instance-side counterpart of the dnsmasq-directory
+check in `dhcp_state.py`, tracked as
+[#5072](https://github.com/shakenfist/shakenfist/issues/5072).
 
 ### Upgrade data verification
 

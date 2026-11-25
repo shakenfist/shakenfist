@@ -920,9 +920,11 @@ class BaseTestCase(testtools.TestCase):
         except process.ProcessExecutionError as e:
             self.skipTest(
                 'Cannot exec on node %s (%s) over the mesh: %s. The CI key '
-                'is deployed to the suite host by every functional job, so '
-                'this is the mesh or the key being broken rather than an '
-                'expected skip; see docs/developer_guide/ci.md.'
+                'is deployed to the suite host by every functional job (the '
+                '"Authorise the primary to reach other nodes over the mesh" '
+                'step of shakenfist/actions\' smoke-cluster.yml), so this is '
+                'the mesh or the key being broken rather than an expected '
+                'skip; see docs/developer_guide/ci.md.'
                 % (node.get('name'), node.get('ip'), e))
 
     def _node_link_names(self, node):

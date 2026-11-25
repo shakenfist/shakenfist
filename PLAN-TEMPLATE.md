@@ -242,8 +242,7 @@ copy lives in shakenfist/development at
     `**Merged**:` line in the phase's own section -- beside
     `**Status**` where the phase has one, otherwise directly
     under the heading. Nothing checks that form, so a wrong
-    SHA is caught only in
-    review.
+    SHA is caught only in review.
 
 <!-- shared-block: plan-phase-landing v1 -->
 Phase landing (shared block; do not edit -- the canonical copy
