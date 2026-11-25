@@ -1084,3 +1084,32 @@ longer, and the two share one definition of which devices are ours so they
 cannot drift apart. A host which cannot be asked counts as in use, because
 the two errors are not equal: a bridge left behind is reaped by a later
 maintain pass, while a bridge taken from a live domain is an outage.
+
+## An arm which blames the caller catches the caller's own exception type
+
+The database servicer's `GetNamespaceClaims` validates `coverage_state` and
+`ReleaseNamespaceClaimHolds` refuses a request which names no holds, and each
+answered that with `INVALID_ARGUMENT` out of an `except ValueError` arm around
+the handler's whole body. `ValueError` is not the fault, it is the *type of*
+the fault, and the body raises it from elsewhere too: a stored claim or hold
+row which will not fit its wire message raises `ValueError` out of
+`NamespaceClaim(**claim)`, and anything added to the body later brings its own.
+Those are the database tier's faults. Reported as `INVALID_ARGUMENT` with a
+message naming a parameter, they send a caller away to fix a request which was
+correct, with the one status code that says no retry will help (issue 5074).
+
+So the validator raises its own type -- `exceptions.InvalidClaimState`,
+`NoHoldsNamed`, `RelationshipValueTooLong`, each a `ValueError` subclass so
+that callers which already catch `ValueError` are unaffected -- and the arm
+catches that type. Everything else falls through to the generic arm, which
+records the exception on the node that can act on it and reports `INTERNAL`.
+
+This is the "[a guard has to sit where the exception is
+raised](#a-guard-has-to-sit-where-the-exception-is-raised)" rule read from the
+other end: before writing a handler arm which blames the caller, list what
+else inside the `try` can raise that type. If the answer is "anything", the
+arm is a label, not a diagnosis. The width and the message compound: a
+`str(e)` reply at least described whatever had been raised, so narrowing the
+arm is a prerequisite for replacing it with written prose -- which is what
+the work on not returning SQL text to a caller (issue 5027) does to every
+one of these handlers.

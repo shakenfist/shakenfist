@@ -344,6 +344,43 @@ class BadObjectVersion(DatabaseException):
     ...
 
 
+# Database request arguments
+#
+# A caller's argument mistake, raised before any work is attempted. Each
+# is a ValueError subclass, so callers which already catch ValueError
+# around these validators are unaffected, and each is a distinct type so
+# that a database servicer handler can catch the one fault it reports as
+# an argument error rather than every ValueError its body can raise. See
+# "an arm which blames the caller catches the caller's own exception
+# type" in docs/developer_guide/coding_rules.md (issue 5074).
+class DatabaseArgumentError(ValueError):
+    """The caller passed an argument the database layer refuses."""
+    ...
+
+
+class RelationshipValueTooLong(DatabaseArgumentError):
+    """A relationship_value wider than the column which has to store it.
+
+    Written once and then unreadable, because every read builds an
+    ObjectReference from the row (issue 4559), so the write refuses.
+    """
+    ...
+
+
+class InvalidClaimState(DatabaseArgumentError):
+    """A claim coverage state a claim listing cannot filter on."""
+    ...
+
+
+class NoHoldsNamed(DatabaseArgumentError):
+    """A hold release which named no holds and did not ask for all of them.
+
+    Refused rather than widened: releasing everything a caller did not
+    ask for cannot be undone.
+    """
+    ...
+
+
 class FederationException(Exception):
     """An identity token could not be turned into a grant.
 

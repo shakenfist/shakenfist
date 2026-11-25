@@ -3234,7 +3234,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     request.namespace, request.coverage_state):
                 reply.claims.append(self._claim_message(claim))
             return reply
-        except ValueError as e:
+        except exceptions.InvalidClaimState as e:
             # A coverage_state the public layer would have refused. This
             # is the caller's mistake, not a database fault, but it is
             # still an error status rather than an empty list, for the
@@ -3243,6 +3243,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             # failure that did not happen -- and instead of str(e),
             # which the rest of this file no longer passes on. What was
             # refused is recorded here instead.
+            #
+            # The validator's own type rather than ValueError:
+            # _claim_message() raises ValueError for a stored row which
+            # will not fit its wire message, and that is this tier's
+            # fault, not the caller's (issue 5074).
             LOG.warning(f'database GetNamespaceClaims refused its arguments: {e}')
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             context.set_details('coverage_state is not a valid claim state')
@@ -3402,12 +3407,16 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             for clamp in result['clamps']:
                 reply.clamps.add(**clamp)
             return reply
-        except ValueError as e:
+        except exceptions.NoHoldsNamed as e:
             # A request naming no holds and not asking for all of them.
             # The caller's mistake rather than a database fault, so it
             # gets an argument status rather than a recorded exception,
             # and never the release of everything it did not ask for.
-            # The only ValueError this handler's own code raises, so the
+            #
+            # That guard's own type rather than ValueError, so a
+            # ValueError from anywhere else in the body -- a stored hold
+            # which will not fit its wire message, for one -- is
+            # recorded as this tier's fault instead (issue 5074). The
             # message is written rather than str(e), for the reason on
             # _rpc_error(). What was refused is recorded here instead.
             LOG.warning(f'database ReleaseNamespaceClaimHolds refused its arguments: {e}')

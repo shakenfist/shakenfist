@@ -63,6 +63,8 @@ metrics. The headlines:
 - A signal handler only sets flags.
 - A backfill cannot finish while the old writers are still running.
 - A schema backfill runs in bounded batches.
+- An arm which blames the caller catches the caller's own exception
+  type.
 
 ## Things that will bite you
 
