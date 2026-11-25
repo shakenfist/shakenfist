@@ -631,6 +631,60 @@ class FakeUntargetedOp:
         self.uuid = uuid
 
 
+class RouteMissingOperationTest(base.ShakenFistTestCase):
+    """A claimed work item which names an operation with no row any more.
+
+    The same event as in the sf-queues dispatcher, and benign for the
+    same reason: a work item exists only because its operation existed,
+    and the deleted-object sweep only hard deletes an object it has
+    re-read in a final state. Here a folded coalescing sibling is a
+    second way of reaching such a state. Issue 5056 reported it at ERROR
+    in the sibling dispatcher.
+    """
+
+    def _route(self):
+        from shakenfist.daemons.network import workitem
+
+        op_class = mock.MagicMock()
+        op_class.from_db.return_value = None
+
+        job = workitem.Job.__new__(workitem.Job)
+        with mock.patch.object(workitem, 'mariadb') as mock_mariadb, \
+                mock.patch.object(workitem, 'LOG') as mock_log, \
+                mock.patch.object(workitem, 'get_object_class',
+                                  return_value=op_class):
+            routed = job._route_item(
+                QUEUE_NAME, 'job-1',
+                {'operation_type': 'net_op', 'operation_uuid': 'op-1'},
+                10, 2)
+        return routed, op_class, mock_log, mock_mariadb
+
+    def test_missing_operation_resolves_the_item_and_routes_nothing(self):
+        routed, _, _, mock_mariadb = self._route()
+
+        self.assertIsNone(routed)
+        mock_mariadb.resolve_work_item.assert_called_once_with(
+            QUEUE_NAME, 'job-1')
+
+    def test_missing_operation_warns_with_the_operation_named(self):
+        _, _, mock_log, _ = self._route()
+
+        mock_log.with_fields.assert_called_once_with({
+            'queue': QUEUE_NAME,
+            'job': 'job-1',
+            'operation_type': 'net_op',
+            'operation_uuid': 'op-1',
+        })
+        mock_log.with_fields.return_value.warning.assert_called_once()
+        mock_log.with_fields.return_value.error.assert_not_called()
+
+    def test_the_lookup_suppresses_the_generic_failure_audit(self):
+        _, op_class, _, _ = self._route()
+
+        op_class.from_db.assert_called_once_with(
+            'op-1', suppress_failure_audit=True)
+
+
 class RoutingKeyTest(base.ShakenFistTestCase):
     """The partition key must be stable and shared by all ops targeting the
     same network -- the safety invariant in workitem.py depends on it."""
@@ -694,7 +748,7 @@ class PartitionedDispatchTest(base.ShakenFistTestCase):
                     (threading.current_thread().name, op.uuid))
 
         mock_op_class = mock.MagicMock()
-        mock_op_class.from_db.side_effect = lambda u: ops[u]
+        mock_op_class.from_db.side_effect = lambda u, **kwargs: ops[u]
 
         dequeues = {'count': 0}
 
@@ -940,7 +994,7 @@ class DispatcherStopTest(base.ShakenFistTestCase):
              {'operation_type': 'net_op', 'operation_uuid': f'op-{i}'})
             for i in range(count)]
 
-    def load(self, op_uuid):
+    def load(self, op_uuid, **kwargs):
         return FakeNetOp(op_uuid, self.NETWORK)
 
     def run_dispatcher(self, dequeue, fake_execute, load=None, clear=None):
@@ -1019,7 +1073,7 @@ class DispatcherStopTest(base.ShakenFistTestCase):
         def fake_execute(queue_name, op, batch_size, defer_delays):
             executed.append(int(op.uuid[3:]))
 
-        def load(op_uuid):
+        def load(op_uuid, **kwargs):
             if op_uuid == 'op-1':
                 self.abort()
             return self.load(op_uuid)
@@ -1146,7 +1200,7 @@ class DispatcherStopTest(base.ShakenFistTestCase):
         self.assertEqual([1], self.resolved)
 
     def test_an_item_which_cannot_be_routed_does_not_end_dispatch(self):
-        def load(op_uuid):
+        def load(op_uuid, **kwargs):
             if op_uuid == 'op-0':
                 return FakeUnroutableOp(op_uuid)
             return self.load(op_uuid)
@@ -1154,7 +1208,7 @@ class DispatcherStopTest(base.ShakenFistTestCase):
         self.assert_poison_item_left_claimed(load)
 
     def test_an_item_which_cannot_be_loaded_does_not_end_dispatch(self):
-        def load(op_uuid):
+        def load(op_uuid, **kwargs):
             if op_uuid == 'op-0':
                 raise ValueError('unloadable')
             return self.load(op_uuid)
@@ -1168,7 +1222,7 @@ class DispatcherStopTest(base.ShakenFistTestCase):
         # call the tier answered with a failure is usually permanent for
         # that item, so pausing on it would retry it forever and dispatch
         # nothing queued behind it. It is skipped like any unloadable item.
-        def load(op_uuid):
+        def load(op_uuid, **kwargs):
             if op_uuid == 'op-0':
                 raise exceptions.DatabaseCallFailed(
                     'refused', grpc.StatusCode.INVALID_ARGUMENT)
@@ -1182,7 +1236,7 @@ class DispatcherStopTest(base.ShakenFistTestCase):
         def fake_execute(queue_name, op, batch_size, defer_delays):
             executed.append(op.uuid)
 
-        def load(op_uuid):
+        def load(op_uuid, **kwargs):
             if op_uuid == 'op-1' and not load.failed:
                 load.failed = True
                 raise exceptions.DatabaseUnavailable('down')

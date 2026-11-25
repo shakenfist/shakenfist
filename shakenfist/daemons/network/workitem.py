@@ -396,12 +396,26 @@ class Job(util_concurrency.Job):
         """
         op_type = workitem.get('operation_type')
         op_uuid = workitem.get('operation_uuid')
-        op = get_object_class(op_type).from_db(op_uuid)
+        # The failure audit is suppressed because from_db() would write it
+        # onto an operation which no longer has a row, so no caller can
+        # ever read it back; the log line below carries the same facts.
+        op = get_object_class(op_type).from_db(
+            op_uuid, suppress_failure_audit=True)
         if not op:
+            # Not an error, and not lost work, for the reason the sibling
+            # dispatcher in shakenfist/daemons/queues/workitem.py records
+            # at length: a work item exists only because its operation
+            # existed, so a missing row means the operation reached a
+            # final state and was then hard deleted before this item was
+            # dequeued. Here a folded coalescing sibling is a second way
+            # of reaching that final state. Logged rather than dropped
+            # because the implied age is a real signal (issue 5056).
             LOG.with_fields({
+                'queue': queue_name,
+                'job': jobname,
                 'operation_type': op_type,
                 'operation_uuid': op_uuid,
-            }).error('Operation not found')
+            }).warning('Operation not found, it has been hard deleted')
             mariadb.resolve_work_item(queue_name, jobname)
             return None
 

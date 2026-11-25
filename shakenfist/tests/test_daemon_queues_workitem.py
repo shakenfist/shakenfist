@@ -426,6 +426,85 @@ class StateReadsPerDispatchTest(base.ShakenFistTestCase):
         mock_op.execute.assert_not_called()
 
 
+class MissingOperationTest(base.ShakenFistTestCase):
+    """A work item which names an operation with no row any more.
+
+    A work item exists only because its operation existed -- the
+    operation, its state and the work item are written in one
+    transaction, and a defer re-enqueues an operation it has just read --
+    and the deleted-object sweep only hard deletes an object it has
+    re-read in a final state. So this is the hard delete of an operation
+    which has already finished, racing a work item which had not been
+    dequeued yet, rather than lost work. Issue 5056: it was reported at
+    ERROR, and the message named neither the operation nor its type, so
+    no occurrence of it could be investigated.
+    """
+
+    def _run(self, payload):
+        """Dispatch ``payload`` against an operation which is not there.
+
+        Returns the mocked operation class and the job, so a caller can
+        assert on the lookup and on what was logged.
+        """
+        op_class = mock.MagicMock()
+        op_class.from_db.return_value = None
+
+        job = workitem.Job.__new__(workitem.Job)
+        job.queue_name = QUEUE_NAME
+        job.jobname = 'test-job'
+        job.batch_size = None
+        job.log = mock.MagicMock()
+        job.workitem = payload
+
+        with mock.patch(
+                'shakenfist.daemons.queues.workitem.get_object_class',
+                return_value=op_class):
+            job._cluster_operation_execute()
+
+        return op_class, job
+
+    def test_missing_operation_warns_with_the_operation_named(self):
+        _, job = self._run({
+            'operation_type': 'node_inst_netdesc_op',
+            'operation_uuid': OP_UUID,
+            'defer_count': 3
+        })
+
+        job.log.with_fields.assert_called_once_with({
+            'operation_type': 'node_inst_netdesc_op',
+            'operation_uuid': OP_UUID,
+            'defer_count': 3
+        })
+        job.log.with_fields.return_value.warning.assert_called_once()
+        job.log.error.assert_not_called()
+        job.log.with_fields.return_value.error.assert_not_called()
+
+    def test_defer_count_defaults_to_zero_in_the_log(self):
+        """A work item written by the enqueue carries no defer_count."""
+        _, job = self._run({
+            'operation_type': 'node_inst_netdesc_op',
+            'operation_uuid': OP_UUID
+        })
+
+        job.log.with_fields.assert_called_once_with({
+            'operation_type': 'node_inst_netdesc_op',
+            'operation_uuid': OP_UUID,
+            'defer_count': 0
+        })
+
+    def test_the_lookup_suppresses_the_generic_failure_audit(self):
+        """The audit event would land on an object with no row, so no
+        caller can read it back, and its one shared signature is what
+        made the generic event untriageable (issue 3906)."""
+        op_class, _ = self._run({
+            'operation_type': 'node_inst_netdesc_op',
+            'operation_uuid': OP_UUID
+        })
+
+        op_class.from_db.assert_called_once_with(
+            OP_UUID, suppress_failure_audit=True)
+
+
 class WorkItemResolutionTest(base.ShakenFistTestCase):
     """Which failures resolve the work item and which leave it claimed.
 

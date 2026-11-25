@@ -431,9 +431,12 @@ class DatabaseBackedObject:
                 # event must not be logged as an error. All 170-odd
                 # unsuppressed call sites share this one log signature, which
                 # made it untriageable at ERROR (issue 3906). A call site for
-                # which a miss has a real consequence logs its own error with
-                # its own signature (see _cluster_operation_execute() in
-                # daemons/queues/workitem.py).
+                # which a miss means something logs its own message, with its
+                # own signature and the fields which make an occurrence of it
+                # identifiable, and suppresses this event rather than letting
+                # it stand in -- see _cluster_operation_execute() in
+                # daemons/queues/workitem.py, where the event would in any
+                # case land on an object no caller can read it back from.
                 eventlog.add_event(
                     EVENT_TYPE_AUDIT, cls.object_type, object_uuid,
                     'attempt to lookup non-existent object',
