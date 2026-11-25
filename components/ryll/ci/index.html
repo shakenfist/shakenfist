@@ -16664,7 +16664,7 @@ enqueue</code> status check:</p>
 <tr>
 <td><code>cargo audit</code></td>
 <td>self-hosted <code>s</code></td>
-<td>RustSec advisory check</td>
+<td>RustSec advisory check with the <code>cargo audit</code> CLI: fails on a vulnerability, prints unmaintained and unsound warnings without failing. It does not use <code>rustsec/audit-check</code>, whose check-run update fails intermittently (<a href="https://github.com/rustsec/audit-check/issues/56">rustsec/audit-check#56</a>)</td>
 </tr>
 <tr>
 <td><code>cargo deny</code></td>
