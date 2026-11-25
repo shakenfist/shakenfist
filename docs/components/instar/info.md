@@ -19,6 +19,61 @@ in the backing chain, validating paths against a security allowlist to prevent
 directory traversal attacks. See [chain-discovery.md](/components/instar/chain-discovery/) for
 the full chain discovery design.
 
+## A `file://` input
+
+An input that starts with a scheme and `://` is a URL rather than a path.
+`instar info file:///srv/images/disk.qcow2` reads the same image as
+`instar info /srv/images/disk.qcow2` and prints the same bytes on stdout, in
+both `human` and `json` output. The difference is how the image is read: the
+host starts a separate, untrusted `instar-fetch` process and the sandbox's
+virtual disk is served from what that process sends back, rather than from a
+file the host opens itself. See [fetch-protocol.md](/components/instar/crates/fetch-protocol/)
+for how the two are joined and for the process's lifetime.
+
+```bash
+instar info file:///srv/images/disk.qcow2
+instar info file://localhost/srv/images/disk.qcow2
+```
+
+What is accepted is deliberately narrow. After `file://` comes either nothing
+or `localhost`, then an absolute path. These are refused, each with a message
+saying why:
+
+- another host (`file://other.example/x`), since instar reads local files only
+- a relative path (`file://disk.qcow2`) or no path at all (`file://localhost`)
+- a query (`?`) or a fragment (`#`), which would mean something other than
+  the file name the user typed
+- a `%` escape, since instar does not decode them, so the path it opens is
+  always the text that was typed
+- a NUL byte
+
+**`file:/path`, with one slash, is a path and not a URL.** A URL is
+recognised by `scheme://`, so `file:/srv/images/disk.qcow2` is taken as a
+relative path whose first component is a directory called `file:`, and
+reports `No such file or directory`. Write three slashes.
+
+Every other scheme is refused by name: `https`, `http`, `s3` and `nbd` each
+have a message saying that instar does not accept that scheme yet, and any
+other scheme gets a generic one. None of them works today. An argument with
+no `://`, such as `weird:name`, is a path exactly as it always was.
+
+`--chain` is refused over a URL. It would not fail to work -- chain discovery
+opens the image and each of its parents directly, so over `file://` it would
+succeed without ever reading a byte through the fetcher, and look like a
+feature that is supported when it is not.
+
+The fetcher's own stderr is shown only with `--verbose`. It reports what it
+is serving and that its peer closed the socket, even on a run that goes well,
+so a default run is silent on stderr for a URL exactly as it is for a path.
+Nothing is lost on a failure: the message the user reads is written by instar
+from the fetcher's status, not taken from its output.
+
+The virtual disk's size comes from the capacity the fetcher advertises. The
+`disk size` figure still comes from the host's `stat` of the file, because
+the fetcher reports an apparent size and nothing for how much of it is
+allocated. That is only possible because a `file://` input has a local path;
+an input without one would have no such figure.
+
 ## Version compatibility
 
 Different qemu-img versions produce slightly different output formats:

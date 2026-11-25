@@ -33,8 +33,9 @@ binaries (`.bin` files, loaded into the KVM sandbox at runtime) at
 `/usr/lib/instar/`.
 
 They also install a host-side executable, `instar-fetch`, at
-`/usr/lib/instar/instar-fetch` (mode 755). It is not a guest binary, and
-nothing invokes it yet: it is a component for later work to use.
+`/usr/lib/instar/instar-fetch` (mode 755). It is not a guest binary: instar
+starts it as a separate process to serve an input given as a `file://` URL
+(see [info.md](/components/instar/info/)).
 
 ## Tarball (any Linux)
 
@@ -47,8 +48,7 @@ instar --help
 
 The tarball contains the VMM, the guest `.bin` files and the host-side
 `instar-fetch` executable together; instar finds them by looking in the
-directory containing the executable. As with the packages, nothing invokes
-`instar-fetch` yet.
+directory containing the executable, as it does for the packages.
 
 ## System requirements
 

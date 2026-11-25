@@ -10,7 +10,7 @@ sharpest form yet and adds one of its own. The sharpest form:
 static driver's options, it already contains the *framing* — an
 "Intended use-cases" list and a "Not intended for production use"
 paragraph — which is precisely what decision 2 of
-[PLAN-demo-install.md](/components/kerbside/plans/PLAN-demo-install/) assigns to this page.
+[PLAN-demo-install.md](https://github.com/shakenfist/kerbside/blob/b3a1a5a4272398f45e27b86c1586d221c92b90b5/docs/plans/PLAN-demo-install.md) assigns to this page.
 The new hazard: the survey found that framing is factually wrong
 about the driver's central behaviour, so this phase cannot simply
 decide what to delegate. It has to correct the thing it delegates
@@ -24,7 +24,7 @@ and 2 followed, and this phase does the same.
 
 Three use-case pages exist and agree on a format.
 `docs/use-cases/ovirt.md` landed 2026-08-10 as
-[PLAN-two-tier-ci-phase-04-docs.md](/components/kerbside/plans/PLAN-two-tier-ci-phase-04-docs/)'s
+[PLAN-two-tier-ci-phase-04-docs.md](https://github.com/shakenfist/kerbside/blob/49058af04507c5326b19bc1cc4510fcd3ec11f45/docs/plans/PLAN-two-tier-ci-phase-04-docs.md)'s
 deliverable and settles it; `docs/use-cases/shaken-fist.md`
 followed 2026-09-18 as phase 1, merge commit `2f0e526`; and
 `docs/use-cases/openstack.md` landed 2026-09-20 as phase 2, merge
@@ -70,7 +70,7 @@ Out of scope, explicitly:
 
 - **The demo recipe.** `docs/installation.md:160-319` owns the
   commands, in order, with their real output, per
-  [PLAN-demo-install.md](/components/kerbside/plans/PLAN-demo-install/) decision 2 settled
+  [PLAN-demo-install.md](https://github.com/shakenfist/kerbside/blob/b3a1a5a4272398f45e27b86c1586d221c92b90b5/docs/plans/PLAN-demo-install.md) decision 2 settled
   2026-08-22. This page links it. It does not restate one command.
 - **`demo/README.md`.** It is the reference for the compose stack
   itself and stays that.
@@ -91,7 +91,7 @@ nothing in it needed correcting at source.** That is unusual
 enough to be worth stating. `kerbside/sources/static.py` exists
 (133 lines). `docs/installation.md` carries "Try it: the demo
 stack" at `:160`, delivered 2026-08-22 as
-[PLAN-demo-install.md](/components/kerbside/plans/PLAN-demo-install/)'s phase 5.
+[PLAN-demo-install.md](https://github.com/shakenfist/kerbside/blob/b3a1a5a4272398f45e27b86c1586d221c92b90b5/docs/plans/PLAN-demo-install.md)'s phase 5.
 That plan's decision 2 is settled and says exactly what the
 master plan's row says it says, including the sentence this
 phase's scope is built on: the use-case page "owns the framing —

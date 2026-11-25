@@ -6,6 +6,17 @@ take priority over INI file settings. That path is hardcoded as `INI_PATH` in
 `kerbside/config.py`; there is no setting which relocates it. See
 `etc/kerbside.conf.example` for a complete configuration example.
 
+That example is documentation, not an installed file: `etc/` is not part of
+the wheel, so a `pip install` does not bring it. This is deliberate, unlike
+the migrations, which ship because the installed code executes them; an example
+is read by a person, here or in the repository, and shipping a copy would make
+two to keep in agreement. A unit test (`kerbside/tests/unit/test_conf_example.py`)
+fails if a setting on `Config` is missing from it, if it names a setting that
+does not exist, or if a commented-out default differs from the real one. Its
+`.conf.example` name does not match the `kerbside.ini` it is installed as;
+renaming it was considered and declined, because its first lines name the
+install path and the rename would gain nothing else.
+
 INI values are read literally, with no `configparser` interpolation, so a value
 is written the same way in the INI file as in the environment. A
 percent-encoded database password such as `p%40ss` is written as-is; `%%` is

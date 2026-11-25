@@ -19,7 +19,7 @@ followed, and this phase does the same.
 ## Situation
 
 Two use-case pages exist. `docs/use-cases/ovirt.md` landed
-2026-08-10 as `PLAN-two-tier-ci-phase-04-docs.md`'s deliverable
+2026-08-10 as [`PLAN-two-tier-ci-phase-04-docs.md`](https://github.com/shakenfist/kerbside/blob/49058af04507c5326b19bc1cc4510fcd3ec11f45/docs/plans/PLAN-two-tier-ci-phase-04-docs.md)'s deliverable
 and settles the format; `docs/use-cases/shaken-fist.md` landed
 2026-09-18 as phase 1 of this plan, merge commit `2f0e526`, and
 confirms it. Both have identical section headings, which is what

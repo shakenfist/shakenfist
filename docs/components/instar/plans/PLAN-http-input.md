@@ -496,8 +496,8 @@ there is a confined process to put it in.
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 1. Guest I/O wait | [PLAN-http-input-phase-01-guest-wait.md](/components/instar/plans/PLAN-http-input-phase-01-guest-wait/) | Complete | a8387ffe |
-| 2. Fetch protocol and a file-backed fetcher | [PLAN-http-input-phase-02-protocol.md](/components/instar/plans/PLAN-http-input-phase-02-protocol/) | Not started | |
-| 3. Remote backing store | PLAN-http-input-phase-03-backing.md | Not started | |
+| 2. Fetch protocol and a file-backed fetcher | [PLAN-http-input-phase-02-protocol.md](/components/instar/plans/PLAN-http-input-phase-02-protocol/) | Complete | 49d6b9b9 |
+| 3. Remote backing store | [PLAN-http-input-phase-03-backing.md](/components/instar/plans/PLAN-http-input-phase-03-backing/) | Not started | |
 | 4. Confinement | PLAN-http-input-phase-04-confinement.md | Not started | |
 | 5. HTTP backend | PLAN-http-input-phase-05-http.md | Not started | |
 | 6. Cache and prefetch | PLAN-http-input-phase-06-prefetch.md | Not started | |
@@ -557,20 +557,28 @@ socket at all -- `std::os::unix::net` offers only `SOCK_STREAM` and
 wrapper in the pattern of `src/vmm/src/ioevent.rs`, rather than a
 new dependency in the privileged process.
 
-**3. Remote backing store.** `BackingStore` gains a second kind,
+**3. Remote backing store.** `BackingStore` gains a remote kind,
 the read-only operations accept a URL, and the fetcher's lifecycle
 is owned: started before `/dev/kvm` is opened, reaped on every exit
 path. End state: `instar info file:///path` works end to end
 through the socket.
 
-Phase 2's survey sharpened two things here. `BackingStore` is a
-plain struct today -- `src/vmm/src/backing.rs` holds a `File`, a
-capacity, a size and a sparse flag, with no enum, trait or
-indirection -- so "gains a second kind" means introducing the
-polymorphism as well as the remote implementation. And the VMM has
-never spawned a child process: the only `Command::new` under
-`src/vmm/src/` runs `qemu-img --version`, so there is no
-descriptor-passing, reaping or child signal handling to extend. Phase
+Phase 2's survey sharpened two things here, and one of them has
+since gone stale. It said `BackingStore` was a plain struct with no
+enum, trait or indirection, so that "gains a second kind" meant
+introducing the polymorphism as well as the remote implementation.
+That was true on 2026-11-19 and stopped being true on 2026-11-21,
+when #938 landed `b6f13211` "Let a backing store span several
+files": `src/vmm/src/backing.rs` now holds a private
+`enum Storage { Single(File), Concatenated(Vec<ConcatMember>) }`,
+and `read_at` already dispatches on it with an early return for the
+non-`Single` arm. The polymorphism is there; this phase adds a third
+variant to it, which touches none of the roughly forty
+`BackingStore` call sites. The second thing still holds, re-verified
+2026-11-25: the VMM has never spawned a child process -- the only
+`Command::new` under `src/vmm/src/` runs `qemu-img --version` -- so
+there is no descriptor-passing, reaping or child signal handling to
+extend. Phase
 2's review round added a third thing this phase does not have to do:
 the fetch client's `read_at` zero-fills past the advertised capacity,
 exactly as the local store does past the end of its file, because a
@@ -584,9 +592,38 @@ size and one that shrinks fails with `UnexpectedEof` -- again what the
 local store does with a file that changes under it -- and the
 fetcher's stderr carries one line per refused or non-`Ok` request, so
 whatever routes that stderr into a log owns a rate the peer sets and
-should bound or sample it. This phase should also fix #932, the
-virtqueue error the host cannot read that hangs the guest, because it
-multiplies the ways the host can fail to answer a request.
+should bound or sample it. This phase was also to fix #932, the
+virtqueue error the host cannot read that hangs the guest, because
+it multiplies the ways the host can fail to answer a request. It
+does not have to:
+#945 fixed #932 on 2026-11-22 as `8ed88fc9`, giving the I/O thread
+shared fatal state and a way to kick the vCPU out of `KVM_RUN`, and
+the issue is closed.
+
+Planned 2026-11-25. The phase plan narrowed the scope to `info`
+alone rather than every read-only operation, because the end state
+named above is `info`, because `Kvm::new()` is called at eighteen
+separate sites with their own input-opening preambles, and because
+phase 7 already owns the refusal-by-name policy that would edit all
+eighteen again. Its survey also found that the host reads the input
+*path* for three things that are not the device's bytes -- the
+apparent size and the allocated block count behind the disk-size
+column, the VMDK flat-descriptor preflight, and the LUKS probe --
+all of which keep working for a `file://` input because it still
+resolves to a path. That is what makes this phase an oracle and not
+yet the hard problem; phase 5 is where the path goes away.
+
+Built 2026-11-25, with six departures from the phase plan recorded in
+its execution notes. What later phases need from them: `info` is the
+only operation that accepts a URL, so the "read-only operations accept
+a URL" above is phase 7's to finish; a URL is recognised by `://`, so
+`file:/path` with one slash is a path; `--chain` over a URL is refused
+because it would succeed without the fetcher; a remote store answers a
+flush successfully and refuses a write; the child's stdin and stdout
+are `/dev/null` and its stderr follows `--verbose`; and the two
+descriptors are staged clear of 3 and 4 before the fork, which only
+the end-to-end run through the real binary can catch. Its findings for
+phases 4, 5 and 7 are in Future work below.
 
 **4. Confinement.** Landlock, seccomp-bpf, user and mount
 namespaces, rlimits (`RLIMIT_FSIZE` 0 and `RLIMIT_NPROC` 0 are the
@@ -1109,24 +1146,39 @@ chosen to defer to here, so that we do not forget them.
   fails) stays out of scope. The phase 1 plan's Measurements section
   records that qemu-img keeps its own output on the same failure,
   which is evidence for whoever takes it.
-* **Issue #932**, a virtqueue error the host cannot read, which is
-  never completed and so hangs the guest now that the wait is
-  unbounded. Every trigger is an instar bug rather than image-supplied
-  data, and the fix is shared fatal state plus a way to kick the vCPU
-  out of `KVM_RUN`, so phase 1 documented the case in
+* **Issue #932** (fixed elsewhere: #945, 2026-11-22, `8ed88fc9`),
+  a virtqueue error the host cannot read, which was never completed
+  and so hung the guest once the wait became unbounded. Every
+  trigger is an instar bug rather than image-supplied data, and the
+  fix is shared fatal state plus a way to kick the vCPU out of
+  `KVM_RUN`, so phase 1 documented the case in
   `docs/guest-architecture.md` instead of fixing it. It is the one
   real cost of removing the spin budget.
 * **Issue #933**, `docs/testing.md`'s test-structure list naming 11 of
   35 test modules. Phase 1 added its own two and the shared rig, and
   marked the list as curated rather than complete; completing it, with
   a CI guard in `tools/ci/check-test-partition.py`, is the fix.
-* **#932 should be fixed in phase 3, not later.** Phase 1 made the
-  guest's wait unbounded and made the host complete a failed request
-  with an error status, which is what makes a remote read's failure
-  survivable. But an error the host cannot *read* is still never
-  completed, and phase 3 multiplies the ways the host can fail to
-  answer by putting a socket and another process behind every read,
-  so the hang stops being a corner case once the fetcher exists.
+* **#932 was to be fixed in phase 3, and was fixed before it.**
+  Phase 1 made the guest's wait unbounded and made the host complete
+  a failed request with an error status, which is what makes a remote
+  read's failure survivable; an error the host could not *read* was
+  still never completed, and phase 3 multiplies the ways the host can
+  fail to answer by putting a socket and another process behind every
+  read. #945 fixed that on 2026-11-22 (`8ed88fc9`), so phase 3
+  inherits the fix rather than carrying it, and phase 3's planning
+  removed the instruction from its section above.
+* **The host's own reads of the input path, for phase 5.** Phase 3's
+  survey found three that are not the device's bytes:
+  `std::fs::metadata` on the input for the apparent size and
+  `metadata.blocks()` for the disk-size column, the VMDK flat
+  descriptor preflight, and the LUKS probe. A `file://` input still
+  resolves to a path, so phase 3 leaves all three alone and its
+  output stays byte-identical to the path case. Phase 5 is the first
+  phase with no path, and each of the three then has to be routed
+  through the client, derived from the protocol, or refused --
+  including deciding what `disk size` means for a source that has no
+  allocated block count, which is a question to **measure** against
+  real `qemu-img` on a remote source rather than to guess.
 * **The measured datagram ceiling, for phase 6's block-size
   decision.** On a stock Linux host a socket pair that asks for the
   largest buffers is granted 425984 bytes an end, giving a
@@ -1137,6 +1189,29 @@ chosen to defer to here, so that we do not forget them.
   phase 6 raising that default is a change to one constant, because
   the headers and the requested buffers are already built for the
   256 KiB maximum.
+
+* **Whatever routes the fetcher's stderr into a log in phase 5 owns a
+  rate a peer sets.** Phase 3 did not solve this; it gated the problem.
+  The child's stderr follows the caller's `--verbose` and is
+  `/dev/null` otherwise, so by default nothing reads it at all. Once
+  the bytes come from a server, one line per refused or non-`Ok`
+  request is a volume the server chooses, and the routing that makes
+  it visible needs a bound or a sample of its own.
+* **kvm-ioctls 0.25.1 opens `/dev/kvm` with `O_CLOEXEC`, for phase 4.**
+  Measured in the registry copy: `Kvm::new()` calls
+  `open_with_cloexec(true)`, which opens with `O_RDWR | O_CLOEXEC`, and
+  the crate offers `open_with_cloexec(false)` for callers who want
+  otherwise. Phase 3 spawns the fetcher before `Kvm::new()`, so the
+  descriptor cannot cross the `exec` for two independent reasons. The
+  ordering is the one instar owns, since the flag is a default in a
+  dependency that a bump could change, so phase 4's descriptor-hygiene
+  test should keep asserting the whole set rather than lean on either.
+* **`run_check` and `compare_images` call `std::process::exit`, which
+  blocks phase 7.** The fetcher is reaped by a `Drop`, and a `Drop`
+  does not run on `exit`. `info` returns its errors through `main`, so
+  phase 3 is unaffected, but a URL cannot be wired into `check` or
+  `compare` until each returns its errors through `main` instead.
+  `panic = "abort"` is set nowhere, so a panic does unwind and reap.
 
 ### Bugs fixed during this work
 

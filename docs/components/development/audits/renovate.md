@@ -2,95 +2,141 @@
 
 ## What we check
 
-* `.github/workflows/renovate.yml` exists -- runs renovate hourly on a
-  self-hosted runner. `RENOVATE_AUTODISCOVER_FILTER` is
-  `${{ github.repository }}`, supplied by the runtime, so the file is
-  copied verbatim rather than edited per repository.
-* `renovate.yml` does not run `renovatebot/github-action`, which needs
-  a Docker daemon on the runner.
-* `renovate.yml` matches the template's apart from the versions
-  Renovate bumps: the value of each `PINNED_*_VERSION` variable
-  (`PINNED_RENOVATE_VERSION` and `PINNED_HASHIN_VERSION`) and the ref
-  of each action it uses.
-* `renovate.json` exists. Nothing is checked about what it holds
-  beyond the entries below, so a repository that keeps the fleet
-  policy locally rather than extending the preset still passes; the
-  preset is the convention, not a requirement this check enforces. It
-  is not expected to be byte-identical to the template's copy.
-* `renovate.json` extends `customManagers:githubActionsVersions`, so
-  the Renovate version pinned in `renovate.yml` is bumped. Naming it
-  directly passes, and so does extending the fleet preset, which
-  names it.
-* `renovate.json` enables the `pre-commit` manager, where the
-  repository has remote pre-commit hooks to manage. Enabling it
-  directly passes, and so does extending the fleet preset, which
-  enables it.
-* `renovate.json` carries a `versioning` `packageRule` for
-  `shellcheck-py/shellcheck-py`, where `.pre-commit-config.yaml` uses
-  that hook. Naming it directly passes, and so does extending the
-  fleet preset, which carries it.
+Renovate reaches every managed repository from one workflow in this
+repository, the central runner below, and the policy it applies
+lives once, in the fleet preset below. This criterion checks that a
+repository is set up to be governed by both. It reports every finding
+in the one issue, so that one change closes it.
+
+* `renovate.json` exists and is a JSON object. The runner manages a
+  repository only when it carries a Renovate configuration, so a
+  repository without one gets no dependency updates at all, and the
+  runner's push probe looks for `renovate.json` by that name alone. A
+  file that is there but does not parse to an object is a finding of
+  its own rather than an abort of the run, since Renovate cannot read
+  it either.
+* `.github/workflows/renovate.yml` does not exist. The runner manages
+  the repository, and a per-repository Renovate workflow, enabled
+  again, races it: two Renovate instances over one repository race on
+  branch creation and produce duplicate or half-written pull requests.
+  A disabled copy fails too, since it is one click from running again.
+  The check does not look inside the file: whatever it runs, the
+  container action included, it should not be there.
+* `renovate.json` extends `local>shakenfist/development:renovate-fleet`,
+  as an entry of an `extends` list; an `extends` that is not a list is
+  named as the reason. Without the preset a configuration still
+  validates and Renovate still runs, on its own defaults rather than
+  the fleet's policy: among other things, with no weekly window and no
+  `pre-commit` manager.
+* `renovate.json` sets no top-level key that the preset also sets,
+  other than `$schema`, `extends` and `packageRules`. Every such key is
+  named in the one finding. Keys the preset does not set --
+  `constraints`, `lockFileMaintenance`, `customManagers`, a manager's
+  own block such as `github-actions` -- pass.
+
+The set of keys the last rule forbids is read, not listed: the check
+loads `renovate-fleet.json` from the audit's own checkout and takes
+its top level. A key added to the preset is therefore protected from
+the next run, and a repository that already sets it starts failing at
+that run, which is worth knowing before adding one. If the audit
+cannot read or parse its own copy of the preset, it reports an error
+rather than a verdict: that is our outage, not the repository's.
+
+### Why a key the preset sets is a failure
+
+A repository's own configuration is resolved after the presets it
+extends, so a key it sets at its top level replaces the preset's value
+outright. When the fleet came to move onto the preset, every managed
+repository carried `"schedule": ["after 9pm"]` from the days when each
+kept the whole policy locally, and that silently beat the preset's
+Saturday window. Nothing about it looks wrong: the configuration
+validates, Renovate runs, and the cadence simply does not change. A
+check that accepted it would report a repository as on the preset
+while the preset governed nothing there. The other keys the
+repositories carried -- `assignees`, `dependencyDashboard`,
+`gitAuthor`, `minimumReleaseAge`, `rollbackPrs` and a `pre-commit`
+block -- restated the preset's values, which is harmless only until
+the preset changes and the local copy does not.
+
+The three exceptions are not overrides. `$schema` only names the
+schema, `extends` is how a repository reaches the preset at all, and
+Renovate appends a repository's `packageRules` to the preset's rather
+than replacing them.
+
+This forbids a repository from deliberately setting, say, its own
+`minimumReleaseAge`. A repository that genuinely needs a different
+policy can still have one, in a `packageRules` entry scoped to the
+packages or files it is about, which is narrower and is reviewed as a
+rule rather than hidden in a top-level value; the top level is the
+fleet's.
+
+Before the central runner, this criterion required a per-repository
+workflow copied verbatim from a template, and checked that
+`renovate.json` enabled the `pre-commit` manager, extended
+`customManagers:githubActionsVersions` and carried a versioning rule
+for `shellcheck-py/shellcheck-py`. The workflow and its template are
+gone. The other three are properties of the preset now, which a
+repository that extends it has by construction; see
+[The fleet preset](#the-fleet-preset) for what holds the preset to
+them.
 
 ### The central runner
 
-Everything above describes the arrangement the criterion checks: a
-copy of `renovate.yml` in each repository, running Renovate over that
-repository alone. The fleet has moved to a single workflow that runs
-Renovate over every repository from one place, in this repository as
-`.github/workflows/renovate-fleet.yml`. The conductor's periodic tier in
-shakenfist/private-ci dispatches it about once an hour. The workflow has
-no `schedule:` trigger, because GitHub's own cron delivered roughly one
-hourly event in seven: over 35.6 hours of an hourly schedule it started 5
-runs, created at whatever minute it chose. The conductor sends no inputs,
-so every scheduled run gets the dispatch defaults, a real write pass over
-the whole fleet. It can still be dispatched by hand with a Renovate
-`dryRun` mode and an autodiscover filter as inputs, so a pass can be
-read-only or confined to one repository. The conductor's own
-documentation is private-ci's `docs/periodic-ci.md`.
+The fleet runs Renovate from a single workflow in this repository,
+`.github/workflows/renovate-fleet.yml`, which works over every managed
+repository in one pass. The conductor's periodic tier in
+shakenfist/private-ci dispatches it about once an hour. The workflow
+has no `schedule:` trigger, because GitHub's own cron delivered
+roughly one hourly event in seven: over 35.6 hours of an hourly
+schedule it started 5 runs, created at whatever minute it chose. The
+conductor sends no inputs, so every scheduled run gets the dispatch
+defaults: a real write pass over the whole fleet, logging at `info`.
+By hand it can be dispatched with a Renovate `dryRun` mode, an
+autodiscover filter that confines the pass to one repository, and a
+`debug` log level for a deliberate one-off look at what Renovate is
+doing; this repository is public, and so are its run logs. The
+conductor's own documentation is private-ci's `docs/periodic-ci.md`.
 
 The consequence is a dependency: if the conductor is down the runner
 stops, and with it dependency updates and security pull requests for
 the whole fleet. There is no fallback schedule, deliberately, since one
-would hide an outage behind a cadence that merely looked poor. The runner
-installs Renovate from npm in a step that holds no secret, exactly as
-the template does, for the reasons given under
-[Renovate without Docker](#renovate-without-docker) and in the template
-README.
+would hide an outage behind a cadence that merely looked poor.
 
-The cutover order mattered. Every per-repository copy had to be
-disabled before the runner was triggered on a recurring basis, because
-two Renovate instances working the same repository race on branch
-creation to produce duplicate or half-written pull requests, and the
-runner's concurrency group cannot prevent that: the two runs are
-different workflows in different repositories. Every copy is disabled
-now, so re-enabling one while the runner is dispatched reintroduces that
-race.
+No repository runs its own Renovate workflow. Each used to carry a
+copy of one, running Renovate over that repository alone; the copies
+were disabled before the runner was dispatched on a recurring basis,
+because the runner's concurrency group cannot keep it from racing
+them -- the two runs are different workflows in different
+repositories. The copies are being deleted, and the criterion fails a
+repository that still carries one.
 
 Its global configuration is `renovate-runner.json` at the root of this
-repository. That file decides two things. Which repositories are
-discovered: autodiscovery over `shakenfist/*`, with `requireConfig`
-set to `required`, so Renovate manages a repository that carries a
-Renovate configuration and ignores one that does not, and with
-onboarding off, so it opens no pull request to add a configuration
-where there is none. And one temporary `packageRules` entry that
-disables every dependency in `.github/workflows/renovate.yml` and
-`templates/renovate/renovate.yml`. Matching the files rather than the
-packages covers everything in them at once, whichever of the Renovate
-pin, the actions or the container action a given copy carries, and the
-rule is to be removed when the per-repository copies are. The file is
-validated by its own hook in default mode, which accepts global
+repository. That file decides which repositories are discovered:
+autodiscovery over `shakenfist/*`, with `requireConfig` set to
+`required`, so Renovate manages a repository that carries a Renovate
+configuration and ignores one that does not, and with onboarding off,
+so it opens no pull request to add a configuration where there is
+none. It also holds one temporary `packageRules` entry, which disables
+every dependency in `.github/workflows/renovate.yml`, so that a
+repository whose disabled copy has not yet been deleted is proposed no
+updates for a file that no longer runs. Matching the file rather than
+the packages covers everything in it at once, whichever of the
+Renovate pin, the actions or the container action a given copy
+carries. The rule is removed when the fleet's last copy is. The file
+is validated by its own hook in default mode, which accepts global
 options, while every other Renovate configuration is validated with
 `--no-global`; `scripts/tests/test_hooks.py` holds each configuration
 in the tree to exactly one of the two.
 
 The job runs on an ephemeral VM, `[self-hosted, vm, debian-13, s]`,
-and names the `renovate-write` environment, not the static pool the
-per-repository copies use. `RENOVATE_TOKEN` pushes branches to every
-repository the runner manages, and the static runners share one user
-and one home directory between jobs, so code another job ran could
-leave a `.pth` file or a `~/.gitconfig` hook there for this job to run
-with that token. A VM starts from the image and is thrown away after
-one job, which is the same reasoning `consistency-audit.yml` applies
-to its token-holding jobs. The environment is where that token is meant to be
+and names the `renovate-write` environment, rather than running on the
+static pool. `RENOVATE_TOKEN` pushes branches to every repository the
+runner manages, and the static runners share one user and one home
+directory between jobs, so code another job ran could leave a `.pth`
+file or a `~/.gitconfig` hook there for this job to run with that
+token. A VM starts from the image and is thrown away after one job,
+which is the same reasoning `consistency-audit.yml` applies to its
+token-holding jobs. The environment is where that token is meant to be
 held, with deployment restricted to `main`, so that a branch which has
 edited the workflow cannot dispatch itself and run with the
 organisation's push credential. That restriction is a repository
@@ -98,14 +144,17 @@ setting rather than anything in the tree, and naming an environment
 does not create it: a workflow referencing one that does not exist
 gets an environment created for it, with no protection rules and no
 secrets. So the protection is real only once somebody has configured
-it, which is a thing to verify out of band before the cutover rather
-than something this file can promise. The workflow's own check of the
-ref is the weaker half of the pair -- a branch can edit a condition
-out of its own copy -- and it makes a branch dispatch show as skipped
-rather than failed. The cost is that a VM pays the whole
-install on every run, with no cache to reuse.
+it, which is a thing to verify out of band rather than something the
+workflow can promise. The workflow's own check of the ref is the
+weaker half of the pair -- a branch can edit a condition out of its
+own copy -- and it makes a branch dispatch show as skipped rather than
+failed. The cost is that a VM pays the whole install on every run,
+with no cache to reuse. It needs outbound access to GitHub
+(`setup-node` downloads Node from its `actions/node-versions`
+releases), the npm registry, PyPI and Rust's distribution server, and
+no Docker daemon.
 
-Before Renovate starts, every run probes the token with
+Before anything is installed, every run probes the token with
 `scripts/renovate-check-push.py`. For each unarchived repository in
 the organisation whose default branch carries a `renovate.json` it
 asks GitHub whether the token has push permission, and the job fails
@@ -132,60 +181,155 @@ that the token reaches every repository while every workflow branch
 still fails. The cutover's canary is what establishes that capability,
 by watching a workflow-file update land.
 
-The per-repository copies of `renovate.yml` are still present and
-still running. Disabling them, deleting them, and changing this
-criterion to match are later work, not part of adding the runner, and
-"What we check" above is accurate for as long as they exist.
+The checkout is of this repository alone, for `renovate-runner.json`
+and the probe, and sets `persist-credentials: false`. Renovate clones
+each repository it manages itself, with `RENOVATE_TOKEN`, into
+`RENOVATE_BASE_DIR`, a directory under `runner.temp`, so no job
+credential is left in a `.git/config` anywhere. Renovate's lookup
+cache lives there too, so it does not survive between runs and every
+pass repeats its datasource lookups against GitHub and the registries.
+If that ever shows up as rate limiting, an `actions/cache` of the
+cache directory would bring persistence back.
 
-### Renovate without Docker
+#### Renovate without Docker
 
-`renovatebot/github-action` runs Renovate as a container. The static
-runner pool is gaining ephemeral pods on a Kubernetes cluster, and
-they have no Docker daemon, so the action fails on every run a pod
-takes. The template now sets up Node and runs a pinned Renovate from
-npm, which works on a VM and a pod alike. A workflow step that still
-uses the action is a finding. The action named in a comment is not.
+The runner does not use `renovatebot/github-action`. That action runs
+Renovate as the `ghcr.io/renovatebot/renovate` container, so it needs
+a Docker daemon on the runner, which the VM does not have. Instead the
+workflow installs Node with `actions/setup-node`, installs a pinned
+Renovate with `npm`, and runs it. The rest of this section is what
+follows from Renovate leaving its container.
 
-The template pins Renovate behind a `# renovate:` comment, which only
-the built-in `customManagers:githubActionsVersions` preset reads. A
-copy of the new workflow without that preset reaching `renovate.json`,
-directly or through the fleet preset, runs a Renovate that never bumps
-itself, so that is a finding too.
-`regexManagers:githubActionsVersions`, the preset's name before
-Renovate renamed it, also passes.
+#### Lock files
 
-Both findings go in the one issue, so a repository still on the old
-copy is told to change both files at once. The template README covers
-what else changes when Renovate leaves its container. The one that
-matters is lock files, which Renovate now refreshes with the runner's
-own tools. The template provides npm always, a Rust toolchain when
-the repository has a `Cargo.lock`, and `hashin` when it has a
-`requirements*.txt`, so every repository can copy it unmodified.
+The container installed tools such as `cargo` on demand to refresh
+lock files (Renovate's `binarySource=install`). Outside the container
+Renovate uses whatever is on the runner's `PATH`
+(`binarySource=global`), so the workflow has to provide each tool a
+lock file needs, or Renovate's pull requests carry an "artifact update
+problem" instead of a refreshed lock file. For the lock files the
+fleet has:
 
-### The workflow is the template's
+| Lock file | Tool Renovate runs | Provided by |
+|-----------|--------------------|-------------|
+| `package-lock.json` | `npm` | `actions/setup-node` |
+| `Cargo.lock` | `cargo update` | `dtolnay/rust-toolchain`, pinned to a commit |
+| `requirements*.txt` | `hashin`, for a file with `--hash` lines | A venv under `runner.temp` |
 
-`renovate.yml` is copied verbatim, so any difference from
-`templates/renovate/renovate.yml` is drift, except the versions
-Renovate bumps in each copy on its own schedule: the value of each
-`PINNED_*_VERSION` variable, and the ref after `@` on each `uses:` line
-(with the version comment digest pinning leaves after it). A copy
-whose Renovate or whose actions are ahead of or behind the template's
-still matches; the action's name still has to. `node-version` is not
-among them: the fleet preset stops Renovate bumping it, and it is the
-line the check exists to hold.
+The Rust and `hashin` steps run on every pass, because the
+repositories being managed are not in the workspace to be looked at:
+Renovate clones them later, so `hashFiles()` has nothing to test. Both
+are `continue-on-error`, since they run for the whole fleet: a rustup
+or PyPI outage should cost the repositories that need the tool an
+artifact update problem, not cost every repository its pass.
 
-The drift that prompted this was Node. Renovate proposed Node 26 for
-the workflow's `setup-node` step, the pull request merged in eleven
-repositories, and each one's Renovate, which needs Node `^24.11.0`,
-then failed on every hourly run. The fleet preset now stops Renovate
-proposing that bump, but a copy can still drift by hand, and the
-workflow is where Node has to match the Renovate it runs.
+The Rust step installs stable with rustup's minimal profile (`rustc`,
+`cargo` and the standard library, no clippy, rustfmt or docs) and
+makes it rustup's default. It sets no override, so a repository with a
+`rust-toolchain.toml` still gets the toolchain it names: rustup reads
+that file from the directory Renovate runs `cargo` in, and installs
+the toolchain on first use. The action is pinned to a commit rather
+than to `@stable`, which is a branch, so the code running in the job
+that holds the token is not whatever that ref points at on the day.
+The step gives `toolchain: stable` explicitly, because the action
+takes its input's default from the ref name, and a bare sha would
+otherwise work only by virtue of which branch it happens to sit on.
 
-The finding names each place the copy differs, up to three, with the
-copy's line and the template's, and counts the rest. A copy still on
-the container action gets only that finding, which already says to
-copy the template. If the audit cannot read its own template, it
-reports an error rather than a verdict.
+A requirements file without `--hash` lines needs no tool: Renovate
+edits the pins as text. One with them needs `hashin`, which Renovate
+runs to replace the old version's hashes with every hash PyPI
+publishes for the new one. andris's `.devcontainer/wheel/requirements.txt`
+was the first such file in the fleet, and its first bump
+(shakenfist/andris#69) carried the new pin with the old hashes and an
+artifact update problem whose stderr was empty: Renovate runs its
+tools without a shell, so a missing `hashin` fails to spawn rather
+than printing "not found". Only the `hashin` script is put on `PATH`,
+through a directory of its own, so the venv's `python3` and `pip` do
+not shadow the runner's for the other tools Renovate runs.
+
+`hashin` is pinned with a `# renovate:` comment like Renovate itself,
+so it is bumped the same way. Its install step holds no secret, and
+Renovate passes its tools only an allowlist of environment variables
+(`PATH`, `HOME`, proxy and certificate settings), not
+`RENOVATE_TOKEN`, so `hashin` and its dependencies never see the
+token. Those dependencies (`packaging` and `pip`) are resolved within
+their declared ranges on each run, as Renovate's npm tree is.
+
+A repository that adds another kind of lock file -- `uv.lock`,
+`poetry.lock`, `go.sum`, `pnpm-lock.yaml` and so on -- needs a step of
+the same shape in the runner's workflow: unconditional, and
+`continue-on-error`.
+
+#### The version pin
+
+The Renovate version is pinned exactly, in an environment variable
+of the "Install Renovate" step, with a comment Renovate reads:
+
+```yaml
+# renovate: datasource=npm depName=renovate
+PINNED_RENOVATE_VERSION: 44.257.5
+```
+
+`customManagers:githubActionsVersions` is a preset built into
+Renovate, and the fleet preset extends it. It matches that comment
+above any `*_VERSION` key in `.github/workflows`, so Renovate bumps
+its own pin like any other dependency. Without the preset nothing
+reads the comment and the pin ages silently. The variable is not named
+`RENOVATE_*`, because Renovate reads those as its own configuration.
+
+An exact pin trades a floating major tag, which picked up every
+release unasked, for a pull request. It pins Renovate itself, not its
+dependency tree: with no lockfile, `npm` resolves Renovate's
+dependencies within their declared ranges on each fresh install.
+
+`node-version` follows Renovate's `engines.node` (`^24.11.0` for
+44.x), and the fleet preset keeps the two in step with two
+`packageRules` entries.
+
+- **Renovate majors carry a note.** A Renovate major that raises
+  `engines.node` needs `node-version` raised in the same pull request,
+  but the bump itself only touches the pin, so the rule's
+  `prBodyNotes` puts that check in front of the reviewer.
+- **Node majors for the runner are never proposed.** Renovate's
+  github-actions manager proposes Node majors for `setup-node`, and
+  one taken before the pinned Renovate's `engines.node` accepts it
+  fails every run with "Unsupported node environment detected". In
+  October 2026 a Node 26 bump did that to nine repositories at once.
+  The rule disables Node majors in
+  `.github/workflows/renovate-fleet.yml` alone, a file only this
+  repository has; Node in any other workflow is still proposed as
+  usual.
+
+#### Installing without the token
+
+`RENOVATE_TOKEN` can write to every repository Renovate manages, so
+the workflow keeps it out of the install. Two steps hold it: the push
+probe, which runs a standard-library Python script before anything is
+installed, and the Renovate run itself. The "Install Renovate" step
+holds no secret: it runs `npm install --ignore-scripts` into a
+directory under `runner.temp`, so no package in the freshly resolved
+tree runs an install script at all, and then `npm rebuild re2`. `re2`
+is the one native dependency Renovate uses. It is Renovate's RE2
+regular expression engine, and without its build Renovate falls back
+to `RegExp` and warns on every run. The rebuild runs only that
+package's scripts, still without the token. The "Self-hosted
+Renovate" step holds the token and runs the installed binary, so it
+fetches nothing from the registry.
+
+This was once `npx --yes renovate@<pin>` in one step that held the
+token (shakenfist/development#322). An install script anywhere in the
+tree, from a dependency Renovate pulls in within its declared ranges,
+would have run with write access to the fleet on the next hourly run.
+
+The split closes install time, not run time. Code from the tree that
+Renovate imports still runs in the step that holds the token, so a
+compromised dependency release can still reach it that way until the
+tree is fixed by a lockfile. Nor does a step-level split protect
+against anything earlier in the same job, which can write
+`GITHUB_PATH` or `GITHUB_ENV` or leave a shim in the workspace for the
+token-holding step to run; the pinned actions and the ephemeral VM
+are what bound that. `minimumReleaseAge` does not help here either: it
+governs the pull requests Renovate opens, not what `npm` installs.
 
 ### The fleet preset
 
@@ -206,9 +350,9 @@ hour and 10 open at once (Renovate's own defaults, written down rather
 than inherited). Minor, patch and digest updates are never merged
 automatically. The CI tooling group puts GitHub Actions and pre-commit
 hook revisions, every update type, digests included, into one monthly
-pull request. The two rules that keep `node-version` and the pinned
-Renovate in step, and the `shellcheck-py/shellcheck-py` versioning
-rule, are in it too.
+pull request. The two rules that keep the runner's `node-version` and
+its pinned Renovate in step, and the `shellcheck-py/shellcheck-py`
+versioning rule, are in it too.
 
 `helpers:pinGitHubActionDigests` makes Renovate rewrite a third-party
 `uses:` reference to a full commit sha with a trailing comment naming
@@ -223,28 +367,6 @@ that schedule. Pinning reaches whatever a repository's
 `github-actions` manager scans, which in this repository means
 `templates/` as well as `.github/`, so a template and its deployed
 twin are pinned in the same pull request.
-
-Pinning does not reach what the central runner's own global
-configuration disables. `renovate-runner.json` switches off every
-dependency in `.github/workflows/renovate.yml` and
-`templates/renovate/renovate.yml`, so the fleet runner proposes
-nothing for either file; both are pinned today only because each
-repository still runs its own hourly Renovate, which reads
-`renovate.json` and sees them. When those copies are disabled, that
-rule has to lose the `templates/renovate/renovate.yml` path or the
-pins in the template stop being maintained -- the template outlives
-the deployed copies the rest of the rule is there for.
-
-One reference in those two files is not pinned, by a second local
-rule in this repository's `renovate.json`: `dtolnay/rust-toolchain`
-stays on `@stable`. That action takes its `toolchain` input's default
-from the ref name, so a sha needs a `with: toolchain: stable` block
-that Renovate will not write, and that block in the template would
-make every fleet copy of `renovate.yml` drift from it under this
-criterion. The fleet runner's own workflow is pinned, with the input
-given. The rule goes when the two files do, and
-`scripts/tests/test_packaging_renovate.py` fails while either
-reference is pinned or either file is gone.
 
 The fleet's own actions are the exception, carried as a `packageRules`
 entry. `shakenfist/**` references are not pinned: every repository
@@ -273,7 +395,7 @@ at once rather than waiting for Saturday. One rule is an exception to
 that. A `packageRules` entry with `enabled: false` suppresses even a
 vulnerability fix, and
 the preset's Node-major disable rule is one, so Node majors in the
-Renovate workflows are the one update type the immediate security path
+runner's workflow are the one update type the immediate security path
 does not reach.
 
 Renovate reads a `local>` preset from the default branch of the
@@ -292,18 +414,17 @@ a global self-hosted configuration, which accepts a self-hosted-only
 key such as `onboarding` in a file that is meant to be a repository
 preset.
 
-Two of the checks above, the `pre-commit` manager and the version
-comments, accept a repository that extends the preset. Each one reads
-the parsed configuration through a helper that knows nothing about any
-preset, and a single predicate beside them recognises the `extends`
-string; a check passes when either says so. Keeping the name out of
-the helpers is what stops a repository being passed on a string alone.
-That is still trust by name, and it holds only while the preset keeps
-its promises, so the tests load the real `renovate-fleet.json` and
-assert that each helper accepts it on its own. A commit that removed
-the manager or the version comment extend from the preset would
-otherwise leave every repository in the fleet passing on a promise
-nothing kept.
+The criterion trusts the preset by name: it requires the `extends`
+string and does not look at what the preset carries. That holds only
+while the preset keeps its promises, so the tests load the real
+`renovate-fleet.json` and assert that it enables the `pre-commit`
+manager, extends the preset that reads version comments, and carries
+the `shellcheck-py/shellcheck-py` versioning rule. Each assertion uses
+a predicate that reads the parsed configuration and knows nothing
+about the preset's name, so the preset passes on its contents rather
+than on a string. A commit that removed one of the three from the
+preset would otherwise leave every repository in the fleet passing on
+a promise nothing kept.
 
 What stays local to a repository is what only that repository needs:
 `development`'s `templates/` patterns below, the Python constraints,
@@ -319,47 +440,22 @@ revisions age untouched. That matters more than the usual stale
 dependency: pre-commit hooks are the linters gating every commit, so an
 unwatched pin means the thing judging everything else is itself
 unjudged. `instar` was four months behind on `actionlint` while its
-cargo, dockerfile and github-actions dependencies were current.
+cargo, dockerfile and github-actions dependencies were current. The
+fleet preset enables the manager, so every repository that extends it
+has it.
 
-Any of renovate's three enabling forms passes, as does extending the
-fleet preset, which enables the manager for the repository:
-
-```json
-{"pre-commit": {"enabled": true}}
-{"enabledManagers": ["pre-commit", "..."]}
-{"extends": [":enablePreCommit"]}
-```
-
-The check applies only when there is something to bump: a repository
-with no `.pre-commit-config.yaml`, or one whose hooks are all
-`repo: local`, passes without the manager. `sfui`'s
-`"pre-commit": {"enabled": true}` is the form repositories carried
-before the preset.
-
-Enabling the manager is not enough for the shellcheck hook. A
-repository whose `.pre-commit-config.yaml` uses
-`shellcheck-py/shellcheck-py` must also carry a `versioning`
-`packageRule` naming it, either itself or by extending the fleet
-preset, or the hook is never bumped. The check fires on the presence
-of the hook, not on a stale pin, and accepts any non-empty
-`versioning` string on a rule selecting it; the preset's own test
-holds the real rule's shape. The rule is matched as Renovate matches
-it -- exact, glob and `/regex/` entries, `matchDepNames` as well as
-`matchPackageNames`, and the deprecated spellings Renovate migrates --
-so a hand-written rule Renovate applies is not reported. A rule
-narrowed away from the `pre-commit` manager (by `matchManagers`,
-`matchFileNames` and the like) or carrying `enabled: false` still
-passes, although Renovate never applies it to the hook: that is the
-cheaper direction to be wrong in, leaving a pin unwatched rather than
-filing an issue against a repository that is configured correctly.
-See
+Enabling the manager is not enough for the shellcheck hook, which
+needs a `versioning` rule before Renovate can order its tags. The
+preset carries that rule too, and the rule is inert in a repository
+that does not use the hook. See
 [the template README](https://github.com/shakenfist/development/blob/main/templates/renovate/README.md#shellcheck-pys-four-part-tags)
 for why the rule is needed.
 
-`images` and `private-ci` use the hook but are scoped out of this
-criterion by their `only_checks` entries, so no finding reports them
-and their pins age unwatched. Widening either entry is a decision
-about that exemption rather than about this check.
+`images` and `private-ci` are scoped out of this criterion by their
+`only_checks` entries, so no finding reports whether they extend the
+preset, and a hook pin that ages there goes unreported. Widening
+either entry is a decision about that exemption rather than about
+this check.
 
 ### Repositories that ship workflow templates
 
@@ -388,10 +484,12 @@ a second home for workflow files. It stays in `development`'s own
 here.
 
 `customManagers:githubActionsVersions` has the same blind spot, and
-its file patterns cannot be extended from outside the preset. So
-`development` also carries a `customManagers` entry with the preset's
-match string and `templates/` as its only file pattern. That keeps the
-template's Renovate pin moving with the copy the repository runs.
+its file patterns cannot be extended from outside the preset. No
+template under `templates/` carries a `# renovate:` version comment
+today, so `development` needs nothing for it. A template that gains
+one needs a local `customManagers` entry with the preset's match
+string and `templates/` as its file pattern, or its pin is never
+bumped.
 
 ### Python version constraints
 

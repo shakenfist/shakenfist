@@ -470,7 +470,7 @@ copy lives in shakenfist/development at
 - **`PLAN-use-case-docs.md`** (Complete) set the page format,
   the planned-row index convention, and the backend-TLS claim
   guard this plan reuses.
-- **`PLAN-demo-install.md`** (Complete) owns `installation.md`'s
+- **[`PLAN-demo-install.md`](https://github.com/shakenfist/kerbside/blob/b3a1a5a4272398f45e27b86c1586d221c92b90b5/docs/plans/PLAN-demo-install.md)** (Complete) owns `installation.md`'s
   demo walkthrough. Phase 4 links it and does not restate it.
 
 ## Agent guidance

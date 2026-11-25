@@ -318,7 +318,7 @@ first phase.
 | 6. Push audit of phases 1-5 (kerbside, kerbside-patches and ryll #406) | [PLAN-spice-performance-phase-06-push-audit.md](/components/kerbside/plans/PLAN-spice-performance-phase-06-push-audit/) | Complete | 2a34fe7ea9 (#668), 17a31ebf75 (#701) |
 | 7. QUIC client leg: experiments (verdict: no-go, as measured) | [PLAN-spice-performance-phase-07-quic-experiments.md](/components/kerbside/plans/PLAN-spice-performance-phase-07-quic-experiments/) | Complete | e0f53fb04a (#716) |
 | 8. QUIC client leg: implementation (abandoned: phase 7's gate said no-go) | | Abandoned | |
-| 9. Push audit of phases 6 and 7 (kerbside) | [PLAN-spice-performance-phase-09-push-audit.md](/components/kerbside/plans/PLAN-spice-performance-phase-09-push-audit/) | Complete | 163c56c663 (#720) |
+| 9. Push audit of phases 6 and 7 (kerbside) | [PLAN-spice-performance-phase-09-push-audit.md](/components/kerbside/plans/PLAN-spice-performance-phase-09-push-audit/) | Complete | 163c56c663 (#720), 8a9e6ff6dd (#723) |
 
 **Phase 1** sets `TCP_NOTSENT_LOWAT` on the client leg and caps
 the backend leg's receive buffer, with the values made
@@ -1415,6 +1415,28 @@ Other deferred items:
   experiment is kept; drop them if the experiment is removed. A
   productised transcoder would need no separate lane once ryll#499
   lets it build without openh264.
+- **The kernel's BBR on the proxy host** (phase 7, "worth its own
+  plan"). On the shaped links the kernel's BBR carried 9.27 Mbit
+  against Cubic's 1.64 at 1% loss on 80 ms / 10 Mbit, and cut the
+  no-loss interactive p95 from 171 ms to 104 ms. It is a
+  `net.ipv4.tcp_congestion_control` change and it applies to
+  today's per-channel TCP client leg. Two caveats a recommendation
+  has to carry: `tcp_bbr` ships with the kernel but is not loaded
+  by default, so the recommendation must say how the module gets
+  loaded as well as which sysctl to set; and the trade is not
+  uniform, since on 150 ms / 2 Mbit BBR's p95 under loss sits
+  above Cubic's. `tools/quic-bench/` is the bench to re-run it
+  with. Filed in #766 (2026-11-25).
+- **The `.vv` file does not emit `ticket-valid-until`** (phase 7,
+  "worth an issue"), although
+  `docs/spice/console-vv-extensions.md` defines the key and
+  recommends it for Kerbside specifically, and the API knows the
+  lifetime: the proxy `.vv`'s token row carries the unix timestamp
+  Kerbside enforces on the token. Phase 9 recorded #411, the `.vv`
+  construction being duplicated three times, as a dependency; that
+  has since landed, so there is one renderer and one key list to
+  change. The direct `.vv` is the harder half, its expiry being
+  the source's rather than ours. Filed in #767 (2026-11-25).
 
 ## Bugs fixed during this work
 

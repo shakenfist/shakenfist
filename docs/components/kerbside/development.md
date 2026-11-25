@@ -12,7 +12,25 @@ Kerbside uses Alembic for database schema migrations. The migration
 files are located in the `kerbside/migrations/versions/` directory.
 They live inside the package so that they ship in the wheel and
 `kerbside db upgrade` can run them from an install with no
-repository checkout present.
+repository checkout present. Shipping a root-level `alembic/` as data
+instead was rejected: files outside the package cannot be addressed
+with `importlib.resources`, so every install would need a resolution
+hack to find them.
+
+There are two copies of `alembic.ini`. The one at the repository root
+serves the bare `alembic` CLI below, and the one in
+`kerbside/migrations/` ships in the wheel for `kerbside db`. They differ
+on purpose, and each file's header says how: most importantly, the
+packaged copy omits `prepend_sys_path = .`, which in an installed
+deployment would put the operator's working directory on `sys.path`
+for every `kerbside db upgrade`. A unit test asserts that omission. The
+root copy is kept, rather than routing developers through `kerbside db`
+as well, because `alembic revision` has no `kerbside` equivalent and
+developers would need both tools anyway.
+
+`kerbside/migrations/env.py` sets `target_metadata = None`, so
+`alembic revision --autogenerate` does not work; migrations are written
+by hand.
 
 ### Creating a new migration
 
@@ -322,6 +340,145 @@ consistency audit compares `.sfui-commit` against canonical
 feature branch commit -- or an ancestor of a merge commit -- is
 flagged even when every vendored file is byte for byte correct.
 
+Kerbside's own CI deliberately does not run `tools/vendor.sh --check`.
+It would clone sfui on every run to check what the daily `sfui-vendor`
+audit in shakenfist/development already checks, and its "behind
+canonical" verdict would depend on whatever sfui's `develop` happened
+to be that minute, so the same commit could pass and then fail. The
+`trailing-whitespace` and `end-of-file-fixer` hooks exclude the
+directory for a related reason: a hook that tidied a vendored file
+would make it read, to that audit and to `vendor.sh --check`, as a
+local edit.
+
+## The admin UI
+
+The admin UI is server-rendered: `kerbside/api.py`'s Flask views
+render five Jinja templates (`login`, `consoles`, `sessions`,
+`sources` and `audit`), all extending `kerbside/api/templates/base.html`
+and styled entirely by the vendored sfui copy. Every HTML page shares
+its URL with a JSON twin chosen by the `Accept` header, and the CI
+lane drivers under `tools/` use the JSON side, so a template change
+must leave the twin byte for byte as it was. The cheapest proof is a
+change that does not touch `kerbside/api.py`.
+
+### Template conventions
+
+- **Name every field a template renders; never iterate a context
+  dict.** The HTML branches and the JSON twins share one export, and
+  the exports are allowlists (`CONSOLE_PUBLIC_FIELDS` and
+  `SOURCE_PUBLIC_FIELDS` in `kerbside/db.py`), but a source's export
+  still carries its `url`, `username` and project fields beside what
+  the sources page shows. The HTML smoke tests in
+  `kerbside/tests/unit/test_api_html.py` put sentinel secrets in their
+  fixtures and assert that they never render.
+- **Those smoke tests assert on fixture data, never on markup**, so
+  that a template rewrite does not break them; their class docstrings
+  carry the rule, and the one deliberate exception
+  (`StaticAssetReferenceTestCase`, which checks that every `/static/`
+  reference resolves to a file).
+- **Asset URLs are root-relative absolute paths** (`/static/sfui/...`),
+  not `url_for()`. Kerbside does not support being mounted under a URL
+  prefix, and the templates do not pretend to.
+- **Each page names itself in `{% block title %}`**, as
+  `Kerbside <section>`. There is no `title` context variable: no view
+  ever passed one, and a page's name is presentation.
+- **Scripts are inline**, in the page's `{% block scripts %}` or a
+  shared fragment under `templates/includes/`, written in the
+  style already there (`var`, function statements, no arrow functions
+  or template literals). `kerbside/api/static/` holds only the vendored
+  copy. Moving them into files is part of adding a
+  Content-Security-Policy
+  ([#761](https://github.com/shakenfist/kerbside/issues/761)).
+
+### Navigation and the login page
+
+The section navigation is anchors styled by sfui's `.sf-nav`, not the
+`<sf-tabs>` component. `<sf-tabs>` implements the automatic-activation
+tab pattern: its arrow keys change the selection, which is right for
+swapping panels in one document and wrong for navigation, where every
+arrow keypress would load a page. Its `role="tab"` buttons would also
+promise a screen reader panels that are not there, could not be
+middle-clicked or copied as links, and would need the `navitems` list
+marshalled into an inline script. sfui's `docs/page-styles.md`
+records the same reasoning from the design system's side.
+
+The login page renders neither the navigation nor the logout button:
+`Root.get` passes `navitems=[]`, and `base.html` gates both on it.
+`navitems` stands in for "this session is authenticated" only because
+`/` is the one page an unauthenticated visitor can reach -- every
+other page answers a missing or expired token with a JSON 401 rather
+than a redirect ([#762](https://github.com/shakenfist/kerbside/issues/762)).
+A change that renders other pages to an unauthenticated visitor needs
+an explicit flag instead.
+
+### Disclosures rather than popovers and dropdowns
+
+Detail that does not fit a table cell -- a console's recent audit
+events, its token explanation, a source's CA certificate, a console's
+terminate actions, each session's channels -- sits in a native
+`<details class="sf-disclosure">`. A disclosure needs no script and no
+positioning code, is keyboard operable for free, and keeps its
+content as real markup rather than HTML packed into an attribute,
+which is how the Bootstrap popovers it replaced carried it. sfui
+deliberately has no dropdown or popover primitive. A popover
+component over the browser's Popover API was considered and is the
+option to reach for if disclosures ever prove clunky; nothing has
+needed one yet.
+
+Every disclosure's `id` is derived from its row (the source and
+uuid, the session id, the source name), never generated, so the poll
+below can match it across a morph.
+
+### Destructive actions
+
+Both terminate routes (`ConsolesTerminate` and `SessionTerminate`) are
+POST, and answer a GET with 405. POST rather than DELETE because
+neither is a clean delete of the resource its URL names:
+`ConsolesTerminate` tears down every session of a console and returns
+the tokens it affected. They keep their `Accept: text/html` 302 branch,
+but the browser asks for JSON, so `fetch` has no redirect to follow.
+
+The confirmation is two-step on the button itself -- the first
+activation relabels it `Confirm?`, the second fires -- rather than a
+modal, which would have needed a component sfui does not have. A
+failed terminate relabels the button `Failed`, because silence after
+a destructive click is the worst outcome and there is no toast to
+report it in. The handler in `templates/includes/two-step-terminate.html`
+disarms the button before it fires: a `fetch` does not navigate away,
+so a button still armed while the request was in flight would fire a
+second POST on a second click, and the poll would refuse to repaint it
+for as long as it stayed armed.
+
+The browser authenticates with the JWT cookie, so these POSTs are
+covered by flask-jwt-extended's double-submit CSRF check, which is
+what fixed the blind CSRF of
+[#133](https://github.com/shakenfist/kerbside/issues/133). With
+kerbside's wiring, measured against flask-jwt-extended 4.7.4 in August
+2026:
+
+| Request | Result |
+|---------|--------|
+| GET with the cookie | 200: CSRF protection does not cover GET, hence the move to POST |
+| POST with the cookie, no header | 401 `Missing CSRF token` |
+| POST with the cookie and `X-CSRF-TOKEN` | 200 |
+| POST with the cookie and a wrong token | 401 `CSRF double submit tokens do not match` |
+| POST with `Authorization: Bearer`, no cookie | 200 |
+
+The unit tests patch `verify_jwt_in_request` out, so nothing in CI
+asserts that table yet
+([#760](https://github.com/shakenfist/kerbside/issues/760)).
+"Previewing templates" below says where to look when a live terminate
+returns an unexpected 401.
+
+One destructive GET remains: the proxy `.vv` download
+(`ConsolesProxyVirtViewer`) writes a ticket and mints a token. Making
+it a POST would mean either a form submission, which does not satisfy
+the CSRF check because `JWT_CSRF_CHECK_FORM` defaults to off, or
+replacing a browser-native download on the product's core path with a
+`fetch` and a synthesised blob. It is mitigated instead by the
+`SameSite=Lax` cookie set in `kerbside/api.py`, and the residual risk
+is [#319](https://github.com/shakenfist/kerbside/issues/319).
+
 ### Page polling
 
 Every page rendered with `refresh=True` polls instead of reloading.
@@ -345,6 +502,22 @@ Two consequences bind anything added to a polled page:
   expired token answers these routes with a JSON 401, so a reload
   would trade a readable page for an error body. The refresh stamp
   becomes `stale since <time>` and the next tick retries.
+
+morphdom does not preserve a `<details>` element's open state by
+itself. Version 2.7.7 special-cases only form fields, and its attribute
+sync copies the incoming element's attributes onto the live one, which
+would close every disclosure an operator opened and re-open every one
+the server renders `open`. The poll's `onBeforeElUpdated` hook copies
+the live state onto the incoming element first, and skips an armed
+terminate button entirely, whose idle label a repaint would otherwise
+restore while it still fired on the next click.
+
+The poll is a template fragment included by `base.html`, not a static
+file, for the same reason as every other script on these pages (see
+"Template conventions" above). Whether it should become a shared sfui
+helper, now that both kerbside and private-ci's conductor dashboard run
+a fetch-and-morph loop, is
+[shakenfist/sfui#83](https://github.com/shakenfist/sfui/issues/83).
 
 ## Previewing templates
 
