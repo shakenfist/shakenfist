@@ -219,6 +219,10 @@
         state: stopped
         enabled: false
 
+    # Deregister only after the unit is stopped above. The registration is the
+    # daemon's node_daemon_states row and any state write upserts it, so a
+    # daemon still running when it is deregistered re-registers itself on its
+    # next state write (see Node.deregister_daemon()).
     - name: Deregister the database daemon so it stops counting as degraded
       ansible.builtin.command: /srv/shakenfist/venv/bin/sf-ctl deregister-daemon database
       changed_when: true

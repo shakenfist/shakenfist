@@ -598,8 +598,15 @@ class Node(dbo):
         Rows naming a daemon this release does not know about (one
         retired since the row was written) are ignored, so a stale row
         cannot hold the node degraded forever.
+
+        Returns None when the state rows could not be read, as
+        get_degraded_daemons() does: an empty list is the positive claim
+        that nothing is registered, which a database error must not get
+        to make.
         """
-        rows = mariadb.get_all_node_daemon_states(self.uuid) or []  # nopushdown: per-node scope, ~12 rows
+        rows = mariadb.get_all_node_daemon_states(self.uuid)  # nopushdown: per-node scope, ~12 rows
+        if rows is None:
+            return None
         return [r.daemon for r in rows if r.daemon in self.VALID_DAEMONS]
 
     def register_daemon(self, daemon):
@@ -607,7 +614,18 @@ class Node(dbo):
             raise NoSuchDaemon(
                 f'Cannot register daemon "{daemon}" on node {self.fqdn}, '
                 f'as that daemon is unknown.')
-        if mariadb.get_node_daemon_state(self.uuid, daemon) is not None:
+        registered = self.get_registered_daemons()
+        if registered is None:
+            # Whether the daemon is registered is unknown, and guessing "no"
+            # would write STOPPED over a daemon that may well be running --
+            # the very fault the guard below exists to prevent. Fail the
+            # registration instead: sf-ctl exits non-zero, the deploy task
+            # fails, and a re-run registers against a readable database.
+            raise DatabaseUnavailable(
+                f'Cannot register daemon "{daemon}" on node {self.fqdn}: '
+                f'its daemon state rows could not be read, so whether it is '
+                f'already registered is unknown.')
+        if daemon in registered:
             # Already registered: re-registering must be a true no-op. In
             # particular it must NOT reset the daemon state. A deploy runs
             # register-daemon on every pass, and with restart-on-change the
@@ -625,6 +643,18 @@ class Node(dbo):
         self.add_event(EVENT_TYPE_AUDIT, f'{daemon} daemon registered')
 
     def deregister_daemon(self, daemon):
+        """Remove a daemon's registration from this node.
+
+        The registration is the daemon's node_daemon_states row, and
+        set_daemon_state() upserts that row, so any state write after
+        this call registers the daemon again -- at STOPPING or STOPPED
+        from a daemon on its way down, which then holds the node degraded
+        until someone deregisters it a second time. The daemon must
+        therefore be stopped, and incapable of writing its state again,
+        before it is deregistered. The deploy's database teardown
+        (roles/node/tasks/config.yml) stops the unit first for this
+        reason.
+        """
         if daemon not in self.VALID_DAEMONS:
             raise NoSuchDaemon(
                 f'Cannot deregister daemon "{daemon}" on node {self.fqdn}, '

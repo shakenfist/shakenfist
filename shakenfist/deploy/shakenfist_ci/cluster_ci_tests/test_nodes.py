@@ -519,11 +519,12 @@ class TestNodes(base.BaseNamespacedTestCase):
             self.test_client.delete_instance(inst['uuid'])
 
     # Daemons whose restart is least disruptive to a shared cluster, most
-    # preferred first. Only consulted to choose which already-running
-    # daemon the idempotent re-registration below pokes at: if the no-op
-    # guard were broken the daemon would be left reading stopped, and the
-    # cleanup restarts it. Nothing here is on the API or scheduling path.
-    SAFE_DAEMONS_TO_REREGISTER = ['checksums', 'transfers', 'cleaner']
+    # preferred first. The idempotent re-registration below only ever pokes
+    # at one of these: if the no-op guard were broken the daemon would be
+    # left reading stopped, and the cleanup restarts it. Nothing here is on
+    # the API or scheduling path, and the test skips rather than reach for a
+    # daemon that is. register.yml registers both on every node.
+    SAFE_DAEMONS_TO_REREGISTER = ['transfers', 'cleaner']
 
     def test_register_daemon_leaves_a_running_daemon_running(self):
         """Re-registering a running daemon must be a true no-op.
@@ -555,14 +556,17 @@ class TestNodes(base.BaseNamespacedTestCase):
             for key, value in node.items()
             if key.startswith('daemon-') and key.endswith('-state')
             and value == 'daemon-running'}
-        if not running:
+        safe = [d for d in self.SAFE_DAEMONS_TO_REREGISTER if d in running]
+        if not safe:
+            # Never fall back to another daemon: on a broken guard the
+            # cleanup would restart it, and a shared cluster cannot have
+            # sf-api or sf-database restarted under its other tests.
             self.skipTest(
-                'Node %s reports no running daemon, so there is no '
-                'registration to re-assert. node=%s'
-                % (node.get('name'), json.dumps(node, sort_keys=True)))
-        preferred = [d for d in self.SAFE_DAEMONS_TO_REREGISTER
-                     if d in running]
-        daemon = (preferred or sorted(running))[0]
+                'Node %s reports none of %s running, so there is no daemon '
+                'safe to re-register. node=%s'
+                % (node.get('name'), self.SAFE_DAEMONS_TO_REREGISTER,
+                   json.dumps(node, sort_keys=True)))
+        daemon = safe[0]
 
         self.addCleanup(self._restore_running_daemon, node, daemon)
         # sf-ctl is a venv entry point, on neither PATH nor sudo's

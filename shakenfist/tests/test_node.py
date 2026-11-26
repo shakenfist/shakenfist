@@ -23,6 +23,7 @@ from pydantic import ValidationError
 import testtools
 
 from shakenfist import node as node_module
+from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import NoSuchDaemon
 from shakenfist.exceptions import NoSuchDaemonState
 from shakenfist.node import Node
@@ -460,8 +461,6 @@ class NodeDaemonStateTestCase(base.ShakenFistTestCase):
 
     @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states',
                 return_value=[])
-    @mock.patch('shakenfist.node.mariadb.get_node_daemon_state',
-                return_value=None)
     @mock.patch('shakenfist.node.mariadb.set_node_daemon_state',
                 return_value=True)
     @mock.patch('shakenfist.node.mariadb.update_node_attributes')
@@ -474,7 +473,7 @@ class NodeDaemonStateTestCase(base.ShakenFistTestCase):
     def test_register_daemon(
             self, mock_get_state, mock_set_state,
             mock_add_event, mock_update_attrs,
-            mock_set_daemon_state, mock_get_one_state, mock_get_all_states):
+            mock_set_daemon_state, mock_get_all_states):
         """Registering a daemon creates its state row, and nothing else.
 
         The registration *is* the row, so there must be no second record
@@ -491,9 +490,7 @@ class NodeDaemonStateTestCase(base.ShakenFistTestCase):
         mock_update_attrs.assert_not_called()
         mock_add_event.assert_called_once()
 
-    @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states',
-                return_value=[])
-    @mock.patch('shakenfist.node.mariadb.get_node_daemon_state')
+    @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states')
     @mock.patch('shakenfist.node.mariadb.set_node_daemon_state',
                 return_value=True)
     @mock.patch('shakenfist.node.mariadb.update_node_attributes')
@@ -504,7 +501,7 @@ class NodeDaemonStateTestCase(base.ShakenFistTestCase):
             value='created', update_time=1234567890.0))
     def test_register_daemon_already_registered_is_noop(
             self, mock_get_state, mock_add_event, mock_update_attrs,
-            mock_set_daemon_state, mock_get_one_state, mock_get_all_states):
+            mock_set_daemon_state, mock_get_all_states):
         """Re-registering an existing daemon must not reset its state.
 
         A deploy re-runs register-daemon every pass; with restart-on-change the
@@ -514,9 +511,9 @@ class NodeDaemonStateTestCase(base.ShakenFistTestCase):
         now reads the same row it protects, so a registration can no longer
         exist without the state row the guard looks for.
         """
-        mock_get_one_state.return_value = NodeDaemonStateData(
+        mock_get_all_states.return_value = [NodeDaemonStateData(
             node_uuid=TEST_UUID, daemon='api', value='daemon-running',
-            update_time=1234567890.0)
+            update_time=1234567890.0)]
 
         n = self._make_node()
         n.register_daemon('api')
@@ -524,6 +521,50 @@ class NodeDaemonStateTestCase(base.ShakenFistTestCase):
         mock_set_daemon_state.assert_not_called()
         mock_add_event.assert_not_called()
         mock_update_attrs.assert_not_called()
+
+    @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states')
+    @mock.patch('shakenfist.node.mariadb.set_node_daemon_state',
+                return_value=True)
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state')
+    @mock.patch(
+        'shakenfist.mariadb.get_state',
+        return_value=State(
+            value='created', update_time=1234567890.0))
+    def test_register_daemon_guard_is_per_daemon(
+            self, mock_get_state, mock_set_state, mock_add_event,
+            mock_set_daemon_state, mock_get_all_states):
+        """Another daemon's row does not make this daemon registered."""
+        mock_get_all_states.return_value = [NodeDaemonStateData(
+            node_uuid=TEST_UUID, daemon='queues', value='daemon-running',
+            update_time=1234567890.0)]
+
+        n = self._make_node()
+        n.register_daemon('api')
+
+        mock_set_daemon_state.assert_called_once()
+        self.assertEqual('api', mock_set_daemon_state.call_args[0][1])
+        self.assertEqual(
+            Node.DAEMON_STATE_STOPPED, mock_set_daemon_state.call_args[0][2])
+
+    @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states',
+                return_value=None)
+    @mock.patch('shakenfist.node.mariadb.set_node_daemon_state')
+    @mock.patch('shakenfist.eventlog.add_event')
+    def test_register_daemon_on_read_error_writes_nothing(
+            self, mock_add_event, mock_set_daemon_state, mock_get_all_states):
+        """An unreadable registration must fail, not be guessed absent.
+
+        Treating "could not read" as "not registered" would write STOPPED
+        over a daemon that is running -- the production fault the no-op
+        guard exists to prevent -- so the registration raises instead and
+        the deploy task that ran it fails.
+        """
+        n = self._make_node()
+        self.assertRaises(
+            DatabaseUnavailable, n.register_daemon, 'api')
+        mock_set_daemon_state.assert_not_called()
+        mock_add_event.assert_not_called()
 
     def test_register_invalid_daemon(self):
         """Test registering invalid daemon raises."""
@@ -579,7 +620,14 @@ class NodeDaemonStateTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states',
                 return_value=None)
     def test_get_registered_daemons_on_read_error(self, mock_get_all_states):
-        """A failed read reports nothing registered rather than raising."""
+        """A failed read is None, never the claim that nothing is registered."""
+        n = self._make_node()
+        self.assertIsNone(n.get_registered_daemons())
+
+    @mock.patch('shakenfist.node.mariadb.get_all_node_daemon_states',
+                return_value=[])
+    def test_get_registered_daemons_none_registered(self, mock_get_all_states):
+        """A readable node with no rows has nothing registered."""
         n = self._make_node()
         self.assertEqual([], n.get_registered_daemons())
 
