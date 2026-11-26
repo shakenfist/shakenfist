@@ -6,6 +6,12 @@
 ``_await_instance_event()`` are all read by the power state tests in
 ``guest_ci_tests/test_state_changes.py``.
 
+``_domain_disks()`` is covered here too, beside the two other helpers
+which read a domain with ``virsh``, even though its caller is
+``cluster_ci_tests/test_disk_specs.py`` rather than the power state
+tests: a module of its own would mean another copy of the ``base.py``
+loader below, for no coverage this file cannot give it.
+
 The helper reads ``system_client.get_instance()['power_state']`` exactly
 once and fails without waiting or retrying: a wait would let a later
 writer such as the cleaner correct a wrong value first, and pass a call
@@ -547,3 +553,203 @@ class DomainRootDiskPathTestCase(test_base.ShakenFistTestCase):
         self.assertRaises(
             AssertionError, self.harness._domain_root_disk_path,
             self.node, 'ffffffff-0000-0000-0000-000000000000')
+
+
+# Realistic `virsh dumpxml` output: libvirt's own rewrite of what
+# libvirt.tmpl handed it, so each disk has gained an alias and a drive
+# address and the implicit controllers are present. The domain is the one
+# cluster_ci_tests/test_disk_specs.py builds -- a sata root disk, its
+# config drive on the same bus, a blank scsi disk and a defaulted cdrom
+# moved to usb -- trimmed to the devices _domain_disks() reads.
+DUMPXML_UUID = '1234abcd-0000-0000-0000-000000000000'
+DUMPXML_DIR = '/srv/shakenfist/instances/%s' % DUMPXML_UUID
+
+
+def _dumpxml_disk(device, target, bus, fmt, source, driver=True):
+    driver_element = ''
+    if driver:
+        driver_element = (
+            "      <driver name='qemu' type='%s' cache='none'\n"
+            "              error_policy='stop' rerror_policy='stop'/>\n"
+            % fmt)
+    return (
+        "    <disk type='file' device='%s'>\n"
+        '%s'
+        "      <source file='%s' index='1'/>\n"
+        "      <target dev='%s' bus='%s'/>\n"
+        "      <alias name='%s-0-0'/>\n"
+        "      <address type='drive' controller='0' bus='0' target='0' "
+        "unit='0'/>\n"
+        '    </disk>\n'
+        % (device, driver_element, source, target, bus, bus))
+
+
+def _dumpxml(disks, trailer=''):
+    return (
+        "<domain type='kvm' id='7'>\n"
+        '  <name>sf:%s</name>\n'
+        '  <uuid>%s</uuid>\n'
+        '  <devices>\n'
+        '    <emulator>/usr/bin/kvm</emulator>\n'
+        '%s'
+        "    <controller type='sata' index='0'>\n"
+        "      <alias name='ide'/>\n"
+        '    </controller>\n'
+        "    <memballoon model='virtio' freePageReporting='on'>\n"
+        "      <stats period='10'/>\n"
+        '    </memballoon>\n'
+        '  </devices>\n'
+        '%s'
+        '</domain>\n'
+        % (DUMPXML_UUID, DUMPXML_UUID, ''.join(disks), trailer))
+
+
+DUMPXML_OUTPUT = _dumpxml([
+    _dumpxml_disk('disk', 'sda', 'sata', 'qcow2', '%s/sda' % DUMPXML_DIR),
+    _dumpxml_disk('disk', 'sdb', 'sata', 'raw', '%s/sdb' % DUMPXML_DIR),
+    _dumpxml_disk('disk', 'sdc', 'scsi', 'qcow2', '%s/sdc' % DUMPXML_DIR),
+    _dumpxml_disk('cdrom', 'sdd', 'usb', 'raw', '%s/sdd.raw' % DUMPXML_DIR),
+])
+
+# An nvme disk has no <disk> element at all: it is rendered as
+# qemu:commandline arguments, which libvirt echoes back untouched.
+DUMPXML_NVME = _dumpxml(
+    [_dumpxml_disk('disk', 'vda', 'virtio', 'qcow2',
+                   '%s/vda' % DUMPXML_DIR)],
+    trailer=(
+        "  <qemu:commandline\n"
+        "      xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>\n"
+        "    <qemu:arg value='-drive'/>\n"
+        "    <qemu:arg value='file=%s/nvme1,format=qcow2,if=none,"
+        "id=NVME1,werror=stop,rerror=stop,discard=unmap'/>\n"
+        "    <qemu:arg value='-device'/>\n"
+        "    <qemu:arg value='nvme,drive=NVME1,serial=nvme-1'/>\n"
+        '  </qemu:commandline>\n' % DUMPXML_DIR))
+
+DUMPXML_NO_DISKS = _dumpxml([])
+
+DUMPXML_NO_TARGET = _dumpxml([
+    "    <disk type='file' device='disk'>\n"
+    "      <driver name='qemu' type='qcow2' cache='none'/>\n"
+    "      <source file='%s/sda'/>\n"
+    '    </disk>\n' % DUMPXML_DIR,
+])
+
+DUMPXML_NO_DRIVER = _dumpxml([
+    _dumpxml_disk('disk', 'sda', 'sata', 'qcow2', '%s/sda' % DUMPXML_DIR,
+                  driver=False),
+])
+
+# One target device name claimed by a disk on each of two buses, which is
+# what a collision in instance._get_disk_device() would look like from
+# here. libvirt would refuse such a domain, so this is a parser test
+# rather than a domain a hypervisor could hold.
+DUMPXML_DUPLICATE_TARGET = _dumpxml([
+    _dumpxml_disk('disk', 'sda', 'sata', 'qcow2', '%s/sda' % DUMPXML_DIR),
+    _dumpxml_disk('cdrom', 'sda', 'usb', 'raw', '%s/sda.raw' % DUMPXML_DIR),
+])
+
+
+class DomainDisksTestCase(test_base.ShakenFistTestCase):
+    """Unit tests for ``BaseTestCase._domain_disks()``.
+
+    test_requested_bus_and_type_reach_libvirt asserts on what this
+    returns, so a parser which quietly dropped a disk, or read an
+    attribute off the wrong element, would turn that assertion into a
+    weaker one rather than fail. These tests pin the shape of the answer
+    and every way the helper is allowed to refuse to give one.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.node_exec = mock.MagicMock()
+        self.harness = _DomainAutostartHarness(self.node_exec)
+        self.node = {'name': 'sf2', 'ip': '192.168.1.2'}
+
+    def test_every_disk_is_reported_by_target(self):
+        self.node_exec.return_value = (DUMPXML_OUTPUT, '')
+
+        result = self.harness._domain_disks(self.node, DUMPXML_UUID)
+
+        self.assertEqual(
+            {
+                'sda': {'device': 'disk', 'bus': 'sata',
+                        'format': 'qcow2', 'cache': 'none'},
+                'sdb': {'device': 'disk', 'bus': 'sata',
+                        'format': 'raw', 'cache': 'none'},
+                'sdc': {'device': 'disk', 'bus': 'scsi',
+                        'format': 'qcow2', 'cache': 'none'},
+                'sdd': {'device': 'cdrom', 'bus': 'usb',
+                        'format': 'raw', 'cache': 'none'},
+            }, result)
+        self.node_exec.assert_called_once_with(
+            self.node, ['virsh', 'dumpxml', 'sf:%s' % DUMPXML_UUID],
+            sudo=True)
+
+    def test_an_nvme_disk_is_invisible(self):
+        # Documented, not incidental: a caller asserting on an nvme disk
+        # has to read the domain's qemu arguments instead.
+        self.node_exec.return_value = (DUMPXML_NVME, '')
+
+        result = self.harness._domain_disks(self.node, DUMPXML_UUID)
+
+        self.assertEqual(['vda'], list(result.keys()))
+
+    def test_a_disk_without_a_driver_reports_none(self):
+        # The template always writes one, so this is a stale libvirt.tmpl
+        # on the node rather than an impossible domain, and it has to
+        # fail the caller's assertion rather than raise here.
+        self.node_exec.return_value = (DUMPXML_NO_DRIVER, '')
+
+        result = self.harness._domain_disks(self.node, DUMPXML_UUID)
+
+        self.assertEqual(
+            {'sda': {'device': 'disk', 'bus': 'sata',
+                     'format': None, 'cache': None}}, result)
+
+    def test_no_disks_fails(self):
+        self.node_exec.return_value = (DUMPXML_NO_DISKS, '')
+
+        exc = self.assertRaises(
+            AssertionError, self.harness._domain_disks,
+            self.node, DUMPXML_UUID)
+
+        self.assertIn('No disks in virsh dumpxml', str(exc))
+        self.assertIn(DUMPXML_UUID, str(exc))
+        self.assertIn('memballoon', str(exc))
+
+    def test_a_disk_without_a_target_fails(self):
+        self.node_exec.return_value = (DUMPXML_NO_TARGET, '')
+
+        exc = self.assertRaises(
+            AssertionError, self.harness._domain_disks,
+            self.node, DUMPXML_UUID)
+
+        self.assertIn('has no target device name', str(exc))
+        self.assertIn(DUMPXML_UUID, str(exc))
+
+    def test_a_duplicate_target_fails(self):
+        # Rather than one disk silently replacing the other in the
+        # answer, which the caller would read as a disk never having
+        # been defined at all.
+        self.node_exec.return_value = (DUMPXML_DUPLICATE_TARGET, '')
+
+        exc = self.assertRaises(
+            AssertionError, self.harness._domain_disks,
+            self.node, DUMPXML_UUID)
+
+        self.assertIn('both claim target device sda', str(exc))
+        self.assertIn(DUMPXML_UUID, str(exc))
+
+    def test_output_which_is_not_xml_fails(self):
+        # virsh writes its errors to stderr and exits non zero, which
+        # _node_exec() raises on, so this is a truncated or otherwise
+        # unexpected stdout rather than an error message.
+        self.node_exec.return_value = ('<domain type=\'kvm\'>\n', '')
+
+        exc = self.assertRaises(
+            AssertionError, self.harness._domain_disks,
+            self.node, DUMPXML_UUID)
+
+        self.assertIn('is not XML', str(exc))
+        self.assertIn(DUMPXML_UUID, str(exc))

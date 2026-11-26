@@ -744,13 +744,22 @@ drift which refuses nothing is invisible. The node-exec helpers make the
 assertion cheap to write; it is tracked as
 [#5059](https://github.com/shakenfist/shakenfist/issues/5059).
 
-The same helpers would answer two neighbouring questions nothing asks
-today: whether an instance's disks reach libvirt with the type, bus and
-cache mode requested (`test_disk_specs.py` only sees the guest's view),
-tracked as [#5071](https://github.com/shakenfist/shakenfist/issues/5071);
-and whether deleting an instance removes its directory and nvram from
-the hypervisor, the instance-side counterpart of the dnsmasq-directory
-check in `dhcp_state.py`, tracked as
+The same helpers answer a neighbouring question for disks.
+`cluster_ci_tests/test_disk_specs.py`'s
+`test_requested_bus_and_type_reach_libvirt` builds an instance whose
+root disk is on a bus which is not the cluster default, with an extra
+disk on a third bus and a cdrom beside it, and asserts on the `<disk>`
+elements `virsh dumpxml` returns on that instance's hypervisor: device
+type, target bus, driver format and cache mode. The reader is
+`_domain_disks()` on `BaseTestCase`, beside the `virsh dominfo` and
+`virsh domblklist` helpers. An nvme disk is invisible to it, because
+libvirt has no `<disk>` element for one and Shaken Fist renders it as
+`qemu:commandline` arguments instead.
+
+One question in the same family is still unasked: whether deleting an
+instance removes its directory and nvram from the hypervisor, the
+instance-side counterpart of the dnsmasq-directory check in
+`dhcp_state.py`, tracked as
 [#5072](https://github.com/shakenfist/shakenfist/issues/5072).
 
 ### Upgrade data verification
