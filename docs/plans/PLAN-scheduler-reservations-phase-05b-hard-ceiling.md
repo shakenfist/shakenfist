@@ -244,7 +244,10 @@ a module docstring and `:2589` prints it in the report's own output:
 "These placements SUCCEEDED. CLAIM_ENFORCEMENT_HARD is False, so".
 5a's step 5 named `tests/test_ci_headroom_report.py:1845`, which pins
 that text, but not the text itself. The test and the tool move
-together or the test fails.
+together or the test fails. (*Corrected 2026-11-26 during step 3:*
+this finding undercounts the tool. There are **eight** sites, not two
+— lines 50, 51, 348, 738, 1717, 2589, 2590 and 2806 — and every one
+was stale.)
 
 **F13 — a code comment predicts this phase will do something it must
 not.** `shakenfist/instance.py:1349-1356` explains why the advisory
@@ -275,6 +278,23 @@ sites across five test modules, plus the tool of F12:
 The patch count grew because placeable-capacity phase 3 added 474
 lines to `test_mariadb_capacity_admission.py`, several of which wrap
 themselves in the same `mock.patch.object`.
+
+(*Corrected 2026-11-26 during steps 2 and 3:* this enumeration is a
+floor rather than a ceiling, and three classes of site are missing
+from it. **One unit test it does not list went red on the flip**:
+`AdmitBranchSelectionTestCase.test_the_claim_increment_is_advisory_this_phase`,
+which asserts advisory behaviour by name instead of by patching the
+constant. **Three live-suite tests would have gone red in merge CI**
+— `test_a_claim_that_would_overflow_is_admitted_and_reported`,
+`test_every_over_claim_dimension_is_reported`, and the setup of
+`test_a_move_in_a_claimed_namespace_reports_nothing` — which matters
+because `test_mariadb_capacity_admission_live.py` runs in CI through
+`tools/ci-enum-widening-test.sh` and the `schema_enum_widening` job,
+not only in a local live suite. And **one test case was green while
+asserting an impossible state**: `AdmitAdvisoryClaimTestCase` expected
+an `enforce=True` admission over a claim, which the primitive can no
+longer produce. Grepping for the constant finds the sites that patch
+it; it does not find the sites that assert what it used to mean.)
 
 **F15 — the three facts this phase inherits from private-ci, one of
 which contradicts 3g's own earlier record.** From private-ci#322 and
@@ -406,14 +426,22 @@ at `:1677` is a different subject and is untouched.
 
 **D8 — the advisory over-limit event stays a warning, and F13's
 comment is corrected rather than obeyed.** After the flip the event
-fires only where the guard did not refuse: a move, which charges
-nothing on the namespace side, and an unguarded admission by a
-ground-truth writer, which has no candidate to walk to. Neither is a
-refused create, so "will be an error because then the create does not
-happen" is wrong, and `log_as_error` stays off. The comment is
-rewritten to say which two paths still reach it — this is the kind of
-stale instruction that gets obeyed by a later reader who trusts it
-more than the code.
+fires only where the guard did not refuse, which is not a refused
+create, so "will be an error because then the create does not happen"
+is wrong, and `log_as_error` stays off. The comment is rewritten to
+say which path still reaches it — this is the kind of stale
+instruction that gets obeyed by a later reader who trusts it more than
+the code.
+
+(*Corrected 2026-11-26 during step 2:* this decision said **two**
+paths still reach the event, a move and an unguarded ground-truth
+write. A move reaches **neither** it nor the guard.
+`shakenfist/mariadb.py`'s admission opens its cluster-or-claim section
+with `if old_node_key is not None: pass`, whose comment reads "A move
+is likewise not refusable at this stage: there is nothing new to
+refuse" — a move changes no namespace's usage, so it charges no claim
+and leaves no read-back to report. The unguarded ground-truth write is
+the only path left, and D8's conclusion is unchanged.)
 
 **D9 — the 403 is declared in the OpenAPI response list, with its own
 example, and carries no `Retry-After` header entry.** F8's
@@ -571,8 +599,11 @@ dependency.
     failure of the `tox py3` hook is retried and reported as a flake
     only after the suite has been run directly and passed.
 17. The first merge-queue run after the push is read, and
-    `test_placements_draw_down_the_claim_and_report_exceedance` is
+    `test_placements_draw_down_the_claim_and_the_ceiling_refuses` is
     reported as passing on every platform, with the run id recorded.
+    (Renamed from `..._and_report_exceedance` by step 3, because the
+    test now proves that the ceiling refuses rather than that it
+    reports.)
 18. The master plan's Execution table reads `Complete` for this phase,
     `index.md`'s count agrees with the table, and plan-blocker b21 is
     cleared with a note recording the reading.
@@ -855,3 +886,54 @@ the editable `shakenfist_client` the tool imports -- the data rule's
 `-I` is for untrusted downloaded data, and this is the repository's own
 tool reading a database passed to it by path from outside its
 directory.
+
+**Steps 2 and 3 land as one commit, 2026-11-26 (AEDT), which the step
+plan did not anticipate.** The plan gives them a commit subject each,
+and there is no order in which both are green. The repository's `py3`
+pre-commit hook runs the *whole* unit suite (`pass_filenames: false`)
+on any change under `shakenfist/` or `tools/`, and the two steps are
+the two halves of one behavioural change: step 2 makes three existing
+tests false, and step 3 is what makes them true again. Committing step
+2 alone would mean a commit the repository's own gate refuses, and
+reordering does not help, because inverted assertions fail against
+advisory behaviour exactly as advisory assertions fail against
+enforcement. So they are one commit naming both halves, under step 2's
+subject, and step 3's subject is not used. The split was a planning
+error rather than a change of mind.
+
+**Three facts the steps proved wrong have been corrected at their
+source** rather than only noted here: D8 claimed two paths still reach
+the over-limit event when only one does, F12 undercounted
+`tools/ci_headroom_report.py` by six sites, and F14's test enumeration
+missed a unit test, three live-suite tests which run in merge CI, and
+a test case that was green while asserting a state the primitive can
+no longer produce. Each correction is marked and dated where the
+original claim is.
+
+**One gap found by step 2 was ruled out of scope with evidence rather
+than deferred.** The preflight redirect in
+`shakenfist/operations/node_inst_netdesc_op.py` records
+`CAPACITY_GUARD_STAGE` when every candidate refuses, which would be
+wrong for an all-claim refusal because that stage is classified
+transient. It is unreachable: the redirect always passes the
+instance's existing placement as the old node, and the admission skips
+the cluster and claim guards entirely for a move, so the only stages
+reachable on that path are `node` and `cluster`. Checked rather than
+assumed, and left alone.
+
+**The wire contract was corrected too, which no step owned.**
+`protos/database.proto` published "claim ceilings are advisory for one
+release" in the comment on `claim_over_limit`, so the interface
+definition between sf-api and sf-database stated the opposite of the
+behaviour being shipped. The comment was corrected and the stubs
+regenerated through `tox -e genprotos`; the regeneration touched only
+`protos/database.proto` and `shakenfist/protos/database_pb2.pyi`, and
+only that comment, so no unrelated generated churn rode along with it.
+
+**Step 2 took a second round.** A sweep for the class of comment the
+flip falsifies found five more in `shakenfist/mariadb.py` and
+`shakenfist/instance.py` after the step reported, one of them plainly
+wrong ("With claim_guarded False the increment above cannot refuse").
+Its own report had named three; the sweep is what found the rest,
+which is the argument for sweeping a class rather than accepting the
+list that comes back.

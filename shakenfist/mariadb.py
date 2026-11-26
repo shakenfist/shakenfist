@@ -29041,20 +29041,28 @@ _TRANSACTION_BASE_DELAY = 0.005
 # demand clause is what refused.
 CAPACITY_DIMENSIONS = ('cpus', 'memory_mb', 'disk_gb')
 
-# Is a namespace claim's ceiling enforced, or merely recorded? Claim
-# ceilings are advisory for now, so learned footprints can calibrate
-# before rejections start: an admission that pushes a claim's used_*
-# past its limit_* is admitted and reported (claim_over_limit plus the
-# offending dimensions) rather than refused. Flipping this to True
-# together with an HTTP 403 refusal path is pending caller migration
-# (see docs/plans/PLAN-scheduler-reservations.md).
+# Is a namespace claim's ceiling enforced, or merely recorded? It is
+# enforced: an admission which would push a claim's used_* past its
+# limit_* matches no row, the transaction rolls back, and the placement
+# is refused at the 'claim' stage -- which the create path publishes as
+# an HTTP 403 naming the claim and what it was short by.
 #
-# Deliberately a module constant and not a config option: a `hard`
-# setting whose refusal path does not exist yet is a trap for the
-# operator who sets it. It is *not* folded into the node and cluster
-# fail-open either -- see the three guard flags in
-# _direct_admit_instance_placement().
-CLAIM_ENFORCEMENT_HARD = False
+# It was advisory for one release first, so that learned footprints
+# could be calibrated against real traffic before any create was
+# refused: the same condition was admitted and reported instead
+# (claim_over_limit plus the offending dimensions). That is why the
+# read-back below still exists and why the over-limit event it feeds is
+# still reachable: an unguarded ground-truth write charges a claim
+# without being refusable, so a claim can still come to sit over its
+# limits with no create having been refused.
+#
+# Deliberately a module constant and not a config option: a cluster
+# where some admissions are bounded by the quota a namespace declared
+# and others are not cannot answer whether a namespace stayed inside
+# what it asked for, and that question is the whole point of a claim.
+# It is *not* folded into the node and cluster fail-open either -- see
+# the three guard flags in _direct_admit_instance_placement().
+CLAIM_ENFORCEMENT_HARD = True
 
 # Why an admission was made without a guard. Admission fails open when
 # a capacity row is missing, but "missing" covers two conditions which
@@ -29149,9 +29157,10 @@ class AdmitPlacementResult(TypedDict):
     node_used_memory_mb: int
     node_used_disk_gb: int
     node_expected_demand: float
-    # Advisory claim accounting (D5/D16), kept apart from failing_stage
-    # and dimensions because those two mean "this placement was refused"
-    # and an over-claim placement is admitted.
+    # The claim over-limit accounting, kept apart from failing_stage and
+    # dimensions because those two mean "this placement was refused"
+    # while these report a placement which was *admitted* over a claim
+    # -- which only an unguarded ground-truth write now is.
     claim_over_limit: bool
     claim_dimensions: list[CapacityDimensionDetailDict]
     # Which claim this placement was weighed against, in dashed uuid
@@ -30252,14 +30261,18 @@ def _direct_admit_instance_placement(
     where a libvirt domain already is -- a guard cannot refuse reality.
     A node with no capacity row admits unguarded and says so.
 
-    The three guards are flagged independently (D6). The claim guard is
-    off this release because D16 makes claim ceilings advisory for one
-    release (CLAIM_ENFORCEMENT_HARD), so an admission which pushes a
-    claim past its limits is admitted and *reported*: step 7 re-reads
-    the claim row it just wrote and returns ``claim_over_limit`` with
-    the offending dimensions in ``claim_dimensions``. That is a
-    separate field from ``dimensions``, which means "why this placement
-    was refused" and must keep meaning only that.
+    The three guards are flagged independently. The claim guard refuses
+    an admission which would push a namespace past the limits its own
+    claim declared (CLAIM_ENFORCEMENT_HARD). Step 7 still re-reads the
+    claim row on an *admitted* placement and returns
+    ``claim_over_limit`` with the offending dimensions in
+    ``claim_dimensions``: an unguarded ground-truth write charges a
+    claim without being refusable, so a claim can still come to sit over
+    its limits with no create having been refused. (A move charges
+    nothing on the namespace side at all, so it neither refuses nor
+    reports here.) ``claim_dimensions`` is a separate field from
+    ``dimensions``, which means "why this placement was refused" and
+    must keep meaning only that.
 
     Rowcount semantics: SQLAlchemy's mysqldb dialect sets the
     ``CLIENT_FOUND_ROWS`` flag, so ``rowcount`` is the number of rows
@@ -30336,16 +30349,16 @@ def _direct_admit_instance_placement(
             # create the row on its next pass.
             outcome['unguarded'] = True
 
-        # Three guards, three flags (D6). The node and cluster guards
-        # share the fail-open above, because it is a statement about
-        # *this node's* limits being absent from the totals they test.
-        # The claim guard does not: a claim's limits are
+        # Three guards, three flags. The node and cluster guards share
+        # the fail-open above, because it is a statement about *this
+        # node's* limits being absent from the totals they test. The
+        # claim guard does not: a claim's limits are
         # namespace-denominated and node-independent, so a missing node
         # capacity row says nothing about whether the namespace has
         # exceeded what it claimed, and dropping the claim guard for
         # that reason would be dropping it for a reason that is not
-        # true. What does drop it, this release only, is D16's advisory
-        # period -- see CLAIM_ENFORCEMENT_HARD.
+        # true. Nothing drops it now but a ground-truth write, which
+        # clears enforce for all three -- see CLAIM_ENFORCEMENT_HARD.
         node_guarded = enforce and node_present
         cluster_guarded = enforce and node_present
         claim_guarded = enforce and CLAIM_ENFORCEMENT_HARD
@@ -30574,17 +30587,20 @@ def _direct_admit_instance_placement(
                     outcome['node_expected_demand'] = float(
                         row.expected_demand)
 
-            # Advisory claim accounting (D5). With claim_guarded False
-            # the increment above cannot refuse, so an over-claim
-            # namespace has just pushed its used_* past its limit_*;
-            # that has to be *recorded* rather than lost. Read the row
-            # back by primary key -- for the same reason as the node
+            # The claim over-limit accounting. A guarded create which
+            # would take a namespace over was refused above, but an
+            # unguarded ground-truth write charges a claim without being
+            # refusable, so a namespace can still have just pushed its
+            # used_* past its limit_* by the time we get here -- and
+            # that has to be *recorded* rather than lost, because
+            # nothing else in the system is watching for it. Read the
+            # row back by primary key -- for the same reason as the node
             # counters just above, and legally for the same reason: this
             # is a read after our own write, on a row this transaction
             # already holds the lock on, which is what the ER_CHECKREAD
             # invariant permits. A second RPC would instead make every
-            # create in a claimed namespace pay a probe round trip
-            # (D5 rejects probe-then-force for exactly that).
+            # create in a claimed namespace pay a probe round trip,
+            # which is why probe-then-force was rejected here.
             if claim_charged:
                 # Name the claim before reading it back, so a caller
                 # recording the exceedance against the namespace can say
@@ -31114,11 +31130,12 @@ def admit_instance_placement(
          'claim_over_limit': bool, 'claim_dimensions': [...],
          'claim_uuid': str}
 
-    ``claim_over_limit`` and ``claim_dimensions`` are the advisory
-    accounting of D16: the placement *was* admitted, and the namespace's
-    claim is now over its limits in the named dimensions. They are
-    separate from ``failing_stage``/``dimensions``, which describe a
-    refusal. ``claim_uuid`` names the claim this placement was weighed
+    ``claim_over_limit`` and ``claim_dimensions`` are the over-limit
+    accounting: the placement *was* admitted -- which, now that a claim
+    ceiling refuses, means an unguarded ground-truth write -- and the
+    namespace's claim is now over its limits in the named dimensions.
+    They are separate from ``failing_stage``/``dimensions``, which
+    describe a refusal. ``claim_uuid`` names the claim this placement was weighed
     against -- the one charged on an admission, whether or not it went
     over, and the one that refused when ``failing_stage`` is
     ``'claim'`` -- so an event recorded against the namespace can say
@@ -32184,9 +32201,10 @@ def _direct_update_namespace_claim(
         Only dimensions actually being shrunk are considered, because
         the SQL floor is only applied to those, and this has to diagnose
         the guard that ran rather than a guard it might have run. The
-        difference is not theoretical while ceilings are advisory:
-        used_* legitimately sits above limit_* then, so a claim at
-        limit 4 and usage 10 being *grown* to 8 satisfies
+        difference is not theoretical: used_* can legitimately sit above
+        limit_*, because an unguarded ground-truth write charges a claim
+        no guard bounds, so a claim at limit 4 and usage 10 being
+        *grown* to 8 satisfies
         ``used > requested`` without a floor ever having been tested.
         Reporting that would hand the operator a durable 409 saying a
         claim cannot be shrunk below its usage, for a request that was a

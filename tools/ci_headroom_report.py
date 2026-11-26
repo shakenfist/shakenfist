@@ -47,13 +47,15 @@ the ledger refusing the write. A number made by adding them answers
 neither question.
 
 For the same reason 'placement admitted over namespace capacity claim' is
-counted third and never as a refusal. Advisory claim mode admits that
-placement deliberately -- CLAIM_ENFORCEMENT_HARD is False for a release
-precisely so exceedances are observed before they are refused -- so it is
-the system doing what the operator asked, and it is reported because it
-is a calibration signal for the claim machinery, not because anything went
-wrong. Counting it as a refusal would manufacture refusals on a healthy
-cluster.
+counted third and never as a refusal. That event says a placement was
+*admitted* over a claim, which is not something a scheduled create can
+do any more -- a claim ceiling refuses one -- so what reaches it is an
+unguarded ground-truth write, recording where a libvirt domain already
+is. A guard cannot refuse reality, so the write lands, charges the claim
+and says so. It is reported because a claim which has come to sit over
+its limits with nothing refused is a signal about the claim's size, not
+because anything was denied. Counting it as a refusal would manufacture
+refusals on a healthy cluster.
 
 Like the stage census, both new tallies count every string they observe
 rather than a list held here: a failing_stage or a dimension name this
@@ -345,10 +347,10 @@ NO_REASON = '(no reason recorded)'
 # The three are read in one pass over the census file and tallied in three
 # separate places, which is the whole point: 'instance placement denied' is
 # the ledger refusing a write, 'placement admitted over namespace capacity
-# claim' is a placement which was ADMITTED, over an advisory claim the
-# operator set, and 'placement recorded despite exceeding capacity guard' is
-# the forced ground-truth write -- a placement recorded even though the
-# guard refused it. None of the three is ever added to another. The forced
+# claim' is a placement which was ADMITTED over a claim the operator set,
+# and 'placement recorded despite exceeding capacity guard' is the forced
+# ground-truth write -- a placement recorded even though the guard
+# refused it. None of the three is ever added to another. The forced
 # write is the one event which tells the forced-write mechanism apart from
 # the never-reconciled window (issue 4087), and the bundles it could be read
 # from raw expire, so dropping it here would leave the durable record
@@ -735,8 +737,10 @@ class GuardCensus:
     for a node the scheduler had already chosen.
 
     The claim tally is a third thing again, and the one most easily
-    misread: a claim exceedance is an ADMITTED placement. Advisory mode
-    exists so exceedances are observed before they are refused, so it is
+    misread: a claim exceedance is an ADMITTED placement. A scheduled
+    create which would take a namespace past its claim is refused, so an
+    exceedance can only be an unguarded ground-truth write, which lands
+    because a guard cannot refuse a domain that already exists. It is
     never a refusal and never enters ``denials``.
 
     The forced-write tally is a fourth: a ground-truth writer (the
@@ -1714,8 +1718,8 @@ def guard_record(census):
     record['unrecognised_stages'] = guard.unrecognised_stages
     record['unrecognised_dimensions'] = guard.unrecognised_dimensions
 
-    # An admitted placement, never a refusal: advisory claim mode exists so
-    # exceedances are observed before they are refused.
+    # An admitted placement, never a refusal: a claim ceiling refuses a
+    # scheduled create, so an exceedance is an unguarded ground-truth write.
     record['claims'] = guard.claims
     record['claim_malformed'] = guard.claim_malformed
     record['claim_namespaces'] = collections.OrderedDict(
@@ -2586,11 +2590,11 @@ def print_guard_census(record):
         print('    No placement drew a namespace past a capacity claim, or no')
         print('    namespace in this cluster has one.')
         return
-    print('    These placements SUCCEEDED. CLAIM_ENFORCEMENT_HARD is False, so')
-    print('    advisory mode admits over a claim on purpose and this is the')
-    print('    system doing what the operator asked. It is the signal a')
-    print('    declared footprint needs revising, and it is never added')
-    print('    to the refusal count above.')
+    print('    These placements SUCCEEDED. A claim ceiling refuses a')
+    print('    scheduled create, so what landed here is an unguarded')
+    print('    ground-truth write -- a guard cannot refuse a domain which')
+    print('    already exists. It is the signal a declared footprint needs')
+    print('    revising, and it is never added to the refusal count above.')
     if guard['claim_malformed']:
         print('    %d carried no usable claim_dimensions list.'
               % guard['claim_malformed'])
@@ -2803,11 +2807,12 @@ def print_verdict(record):
     else:
         print('  Guard refusals: none in the census window.')
     if guard['state'] == 'collected' and guard['claims']:
-        print('  %d %s admitted OVER a namespace capacity claim. Advisory mode'
+        print('  %d %s admitted OVER a namespace capacity claim, which only'
               % (guard['claims'], plural(guard['claims'], 'placement was',
                                          'placements were')))
-        print('  did what the operator asked; this is calibration data, not a')
-        print('  failure, and it is no part of the refusal counts above.')
+        print('  an unguarded ground-truth write can now be; this is data')
+        print('  about the claim\'s size, not a failure, and it is no part')
+        print('  of the refusal counts above.')
 
     if census['truncated']:
         print('  The census may have been truncated, so every count above is a')

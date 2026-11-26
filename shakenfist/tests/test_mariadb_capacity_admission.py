@@ -319,15 +319,25 @@ class AdmitBranchSelectionTestCase(_PlacementMixin, base.ShakenFistTestCase):
                 sets.index(f' used_{dimension}='),
                 f'peak_used_{dimension} must be assigned first: {sets}')
 
-    def test_the_claim_increment_is_advisory_this_phase(self):
-        # D4/D16: claim ceilings are advisory for one release, so the
-        # increment lands with nothing but the primary key in its WHERE.
+    def test_the_claim_increment_is_guarded_by_the_claims_own_ceiling(self):
+        # The ceiling is enforced, so the increment carries it in its
+        # WHERE rather than naming the primary key alone: a drawdown
+        # which would take used_* past limit_* matches no row, and the
+        # transaction rolls back. The guard being *in the statement* is
+        # what makes it atomic -- a check made before the UPDATE would
+        # be a race, and this is the assertion that says the check is
+        # not one.
         router = _PlacementRouter(claim=_claim_row())
         self._run(router)
         [update] = [text for text in router.statements('UPDATE')
                     if 'UPDATE namespace_claims' in text]
         self.assertIn('used_cpus=', update)
-        self.assertNotIn('<=', update.split('WHERE', 1)[1])
+        where = update.split('WHERE', 1)[1]
+        for dimension in ('cpus', 'memory_mb', 'disk_gb'):
+            self.assertIn(
+                f'namespace_claims.used_{dimension} + %s <= '
+                f'namespace_claims.limit_{dimension}', where,
+                f'the {dimension} ceiling is not in the increment: {where}')
 
     def test_the_claim_guard_survives_a_missing_node_capacity_row(self):
         # The node, cluster and claim guards are independent flags. A
@@ -336,18 +346,11 @@ class AdmitBranchSelectionTestCase(_PlacementMixin, base.ShakenFistTestCase):
         # limits being absent from the totals those guards test, and a
         # claim's limits are namespace-denominated and node-independent,
         # so a missing node row must not drop the claim guard with them.
-        #
-        # CLAIM_ENFORCEMENT_HARD is False for now, which makes the
-        # property unobservable through default behaviour -- with the
-        # guard off either way there is nothing to see. So it is pinned
-        # here against the flag computation itself, by flipping the
-        # constant the way the pending hard ceiling will (see
-        # PLAN-scheduler-reservations.md): if claim_guarded ever gets
-        # folded back into node_present, this fails the day the
-        # constant flips rather than the day a namespace overspends.
-        with mock.patch.object(mariadb, 'CLAIM_ENFORCEMENT_HARD', True):
-            router = _PlacementRouter(claim=_claim_row(), node_row=None)
-            result = self._run(router)
+        # If claim_guarded ever gets folded back into node_present, a
+        # namespace mid-upgrade stops being bounded by what it claimed
+        # and this is what says so.
+        router = _PlacementRouter(claim=_claim_row(), node_row=None)
+        result = self._run(router)
 
         self.assertTrue(result['admitted'])
         # The node had no capacity row, so its guard and the cluster's
@@ -362,11 +365,11 @@ class AdmitBranchSelectionTestCase(_PlacementMixin, base.ShakenFistTestCase):
 
     def test_enforce_false_still_disables_the_claim_guard(self):
         # Ground-truth writers (enforce=False) record where a domain
-        # already is, and a guard cannot refuse reality -- that stays
-        # true once claim enforcement is made hard.
-        with mock.patch.object(mariadb, 'CLAIM_ENFORCEMENT_HARD', True):
-            router = _PlacementRouter(claim=_claim_row())
-            self._run(router, enforce=False)
+        # already is, and a guard cannot refuse reality -- which is the
+        # one thing an enforced claim ceiling does not change, and the
+        # reason the over-limit read-back below still has a caller.
+        router = _PlacementRouter(claim=_claim_row())
+        self._run(router, enforce=False)
         [update] = [text for text in router.statements('UPDATE')
                     if 'UPDATE namespace_claims' in text]
         self.assertNotIn('<=', update.split('WHERE', 1)[1])
@@ -380,8 +383,16 @@ class AdmitBranchSelectionTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertIn('namespace_claims.expires_at > now()', select)
 
 
-class AdmitAdvisoryClaimTestCase(_PlacementMixin, base.ShakenFistTestCase):
-    """D5's record-don't-refuse accounting, read back after the write.
+class AdmitOverClaimAccountingTestCase(
+        _PlacementMixin, base.ShakenFistTestCase):
+    """The over-limit read-back, taken after the write it reads.
+
+    An admission which has just pushed a namespace past the limits its
+    own claim declared has to *say* so, because nothing else in the
+    system watches for it. Only an unguarded write can get there -- a
+    guarded one is refused by the ceiling -- so these admissions are
+    unguarded, which is a ground-truth writer recording where a libvirt
+    domain already is.
 
     The router returns the same canned claim row for both the branch
     probe and the read-back, so a row seeded with post-increment
@@ -393,7 +404,7 @@ class AdmitAdvisoryClaimTestCase(_PlacementMixin, base.ShakenFistTestCase):
             'instance_uuid': str(INST1), 'namespace': 'ci-1',
             'node_uuid': str(NODE1), 'old_node_uuid': '', 'cpus': 4,
             'memory_mb': 4096, 'disk_gb': 20, 'demand_add': 10.0,
-            'target_load': 0.75, 'enforce': True,
+            'target_load': 0.75, 'enforce': False,
             'placement_json': PLACEMENT_JSON,
         }
         args.update(kwargs)
@@ -406,7 +417,9 @@ class AdmitAdvisoryClaimTestCase(_PlacementMixin, base.ShakenFistTestCase):
         result = self._run(router)
 
         self.assertTrue(result['admitted'])
-        # Advisory, so nothing about this reads as a refusal.
+        # The placement landed, so nothing about this reads as a
+        # refusal: 'failing_stage' and 'dimensions' mean "this was
+        # refused" and must keep meaning only that.
         self.assertEqual('', result['failing_stage'])
         self.assertEqual([], result['dimensions'])
 
@@ -442,9 +455,10 @@ class AdmitAdvisoryClaimTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertEqual([], result['claim_dimensions'])
 
     def test_exactly_at_the_limit_is_not_over_it(self):
-        # The guard hard claim enforcement will restore is
-        # used + x <= limit, so a claim sitting exactly on its ceiling
-        # has not exceeded it.
+        # The guard is used + x <= limit, so a claim sitting exactly on
+        # its ceiling has not exceeded it -- and the read-back has to
+        # recompute the same comparison, or an exactly-full namespace
+        # would be reported over on every placement.
         router = _PlacementRouter(claim=_claim_row(
             limit_cpus=8, used_cpus=8, limit_memory_mb=16384,
             used_memory_mb=8192, limit_disk_gb=100, used_disk_gb=40))
@@ -757,12 +771,12 @@ class AdmitDenialTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertFalse(detail['memory_mb']['exceeded'])
 
     def test_claim_denial_reports_the_claim_limits(self):
-        # Claims are advisory while CLAIM_ENFORCEMENT_HARD is False, so
-        # the claim's WHERE is a bare primary key and the only way it
-        # matches no row is that the row went away between the probe and
-        # the transaction. The denial path still has to report why,
-        # because hard enforcement turns the guard back on and reaches it
-        # the ordinary way.
+        # A rowcount of zero on the claim increment is the ceiling
+        # refusing, and the denial has to say which dimension was over
+        # and by how much against what -- a refusal an operator cannot
+        # size a claim from is not actionable. The figures come from a
+        # read taken after the rollback, so this is also what says that
+        # read happens at all.
         router = _PlacementRouter(
             claim=_claim_row(limit_cpus=8, used_cpus=6),
             rowcounts={'claim_update': 0})
@@ -779,13 +793,11 @@ class AdmitDenialTestCase(_PlacementMixin, base.ShakenFistTestCase):
         # grow, not merely which namespace overspent: a namespace whose
         # claim was grown by delete-and-create leaves a trail spanning
         # several claims, and the namespace name alone cannot pick one
-        # out. The guard is flipped on here because that is the only way
-        # to reach the stage the way a real refusal will.
-        with mock.patch.object(mariadb, 'CLAIM_ENFORCEMENT_HARD', True):
-            router = _PlacementRouter(
-                claim=_claim_row(limit_cpus=8, used_cpus=6),
-                rowcounts={'claim_update': 0})
-            result = self._run(router)
+        # out.
+        router = _PlacementRouter(
+            claim=_claim_row(limit_cpus=8, used_cpus=6),
+            rowcounts={'claim_update': 0})
+        result = self._run(router)
 
         self.assertEqual('claim', result['failing_stage'])
         self.assertEqual(str(CLAIM1), result['claim_uuid'])
@@ -837,8 +849,7 @@ class AdmitDenialTestCase(_PlacementMixin, base.ShakenFistTestCase):
                 claim=_claim_row(), rowcounts={'node_claim': 0}),
         }
         for stage, router in scenarios.items():
-            with mock.patch.object(mariadb, 'CLAIM_ENFORCEMENT_HARD', True):
-                result = self._run(router)
+            result = self._run(router)
             self.assertEqual(stage, result['failing_stage'])
             if stage == 'claim':
                 self.assertNotEqual(
@@ -955,8 +966,7 @@ class AdmitDenialTestCase(_PlacementMixin, base.ShakenFistTestCase):
 
         router = _PlacementRouter(claim=_claim_row(limit_cpus=8, used_cpus=6),
                                   rowcounts={'claim_update': 0})
-        with mock.patch.object(mariadb, 'CLAIM_ENFORCEMENT_HARD', True):
-            claim = self._run(router)
+        claim = self._run(router)
         self.assertEqual('claim', claim['failing_stage'])
         for dimension in claim['dimensions']:
             self.assertNotIn('held', dimension)
@@ -1051,15 +1061,14 @@ class MockDoubleClaimDenialTestCase(base.ShakenFistTestCase):
         args.update(kwargs)
         return self.db._mariadb_admit_instance_placement(**args)
 
-    def test_a_forced_claim_denial_names_the_claim_that_refused(self):
+    def test_a_claim_denial_names_the_claim_that_refused(self):
         claim = self.db.set_namespace_claim(
             'ci-1', limit_cpus=2, limit_memory_mb=16384, limit_disk_gb=100,
             claim_uuid=CLAIM1)
         self.db.set_node_capacity(
             NODE1, limit_cpus=48, limit_memory_mb=196608, limit_disk_gb=500)
 
-        with mock.patch.object(mariadb, 'CLAIM_ENFORCEMENT_HARD', True):
-            result = self._admit()
+        result = self._admit()
 
         self.assertEqual('claim', result['failing_stage'])
         self.assertEqual(claim['uuid'], result['claim_uuid'])
@@ -1073,8 +1082,7 @@ class MockDoubleClaimDenialTestCase(base.ShakenFistTestCase):
         self.db.set_node_capacity(
             NODE1, limit_cpus=2, limit_memory_mb=196608, limit_disk_gb=500)
 
-        with mock.patch.object(mariadb, 'CLAIM_ENFORCEMENT_HARD', True):
-            result = self._admit()
+        result = self._admit()
 
         self.assertEqual('node', result['failing_stage'])
         self.assertEqual('', result['claim_uuid'])
@@ -1146,12 +1154,12 @@ class AdmitMoveTestCase(_PlacementMixin, base.ShakenFistTestCase):
                               if 'UPDATE cluster_capacity' in text])
 
     def test_a_move_does_not_draw_down_a_claim_either(self):
-        # ...and with no claim branch there is no advisory read-back
+        # ...and with no claim branch there is no over-limit read-back
         # either: a move consumes nothing new on the namespace side, so
         # it cannot have pushed the claim over anything. A claim already
-        # over its limits (which advisory mode allows) must therefore
-        # not be reported again on every subsequent move of an unrelated
-        # instance.
+        # over its limits -- which an unguarded ground-truth write can
+        # still produce -- must therefore not be reported again on every
+        # subsequent move of an unrelated instance.
         router = _PlacementRouter(claim=_claim_row(
             limit_cpus=8, used_cpus=10))
         result = self._run(router)
@@ -2013,8 +2021,8 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
         'node_used_cpus': 0, 'node_used_memory_mb': 0,
         'node_used_disk_gb': 0, 'node_expected_demand': 0.0,
         # Nothing was charged -- the transaction rolled back -- so this
-        # is not the advisory accounting; it is which claim refused, and
-        # therefore which claim an operator has to grow.
+        # is not the over-limit accounting; it is which claim refused,
+        # and therefore which claim an operator has to grow.
         'claim_over_limit': False, 'claim_dimensions': [],
         'claim_uuid': str(CLAIM1),
         'unguarded_reason': '',
@@ -2135,9 +2143,9 @@ class ServicerRoundTripTestCase(base.ShakenFistTestCase):
         unpacked, _ = self._unpack(reply)
         self.assertNotIn('held', unpacked['dimensions'][0])
 
-    def test_over_claim_round_trip_preserves_the_advisory_detail(self):
-        # An admitted placement carrying advisory over-limit detail: the
-        # two dimension lists must not bleed into each other, because
+    def test_over_claim_round_trip_preserves_the_over_limit_detail(self):
+        # An admitted placement carrying over-limit detail: the two
+        # dimension lists must not bleed into each other, because
         # 'dimensions' means refused and this one was not.
         reply = self._admit_reply(self.OVER_CLAIM)
         self.assertEqual([], list(reply.dimensions))

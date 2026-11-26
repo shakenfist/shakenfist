@@ -209,16 +209,29 @@ class CapacityAdmissionDenied(SchedulerException):
     rollback, so a caller walking the scheduler's candidate list can
     say why each candidate was refused.
 
+    ``claim_uuid`` is the namespace capacity claim which refused, and is
+    the thing an operator has to grow, so a refusal which cannot name it
+    cannot be acted on. It is empty on every other stage, and empty is a
+    real answer rather than a missing one: a node or cluster denial has
+    no claim to name, and a claim denial whose claim was deleted between
+    the guarded UPDATE and the read-back has none left to name either.
+    Callers test for the name rather than for a value, the convention
+    the admission reply's own ``claim_uuid`` field already follows,
+    which is also why it is defaulted here: a node or cluster denial
+    would otherwise have to pass an empty string to say nothing.
+
     A denial is not a failure: it means the cluster is full, not that
     the database was unreachable. Those are told apart by the RPC's
     separate ``success`` and ``admitted`` fields, and the unreachable
     case raises WriteException instead."""
 
     def __init__(self, failing_stage: str,
-                 dimensions: list[dict[str, Any]]) -> None:
+                 dimensions: list[dict[str, Any]],
+                 claim_uuid: str = '') -> None:
         super().__init__(failing_stage)
         self.failing_stage = failing_stage
         self.dimensions = dimensions
+        self.claim_uuid = claim_uuid
 
     def __str__(self) -> str:
         exceeded = [d['dimension'] for d in self.dimensions

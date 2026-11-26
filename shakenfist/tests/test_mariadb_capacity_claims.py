@@ -582,9 +582,10 @@ class UpdateNamespaceClaimTestCase(_ClaimMixin, base.ShakenFistTestCase):
         self.assertEqual(12.0, detail['cpus']['used'])
 
     def test_a_stale_grow_retries_rather_than_reporting_below_usage(self):
-        # An advisory over-limit claim -- limit 4, usage 10, which this
-        # release permits -- being *grown* to 8. The claim UPDATE misses,
-        # standing in for a concurrent writer moving the row.
+        # A claim sitting over its own limits -- limit 4, usage 10,
+        # which an unguarded ground-truth write can still produce --
+        # being *grown* to 8. The claim UPDATE misses, standing in for a
+        # concurrent writer moving the row.
         #
         # The shrink floor was never applied to cpus, because cpus is not
         # being shrunk, so it cannot be what blocked this. Diagnosing it

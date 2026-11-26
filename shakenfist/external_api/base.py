@@ -221,12 +221,14 @@ def retryable_error(httpcode: int, message: str) -> flask.Response:
 # publishing the same classification on the instance it refuses (issue
 # 4568): shakenfist/instance.py cannot import the API layer, and a
 # second copy of the classification is how the API and the instance come
-# to disagree about one refusal. Anybody splitting a stage out of either
-# set -- the claim stage, once mariadb.CLAIM_ENFORCEMENT_HARD lets a
-# namespace claim refuse a placement, because a refusal against a quota
-# the namespace declared is not one a wait clears -- edits constants.py,
-# not here.
+# to disagree about one refusal. Anybody adding a stage, or moving one
+# between the sets, edits constants.py and not here. The claim stage is
+# what that looks like in practice: it is in neither set, because a
+# refusal against the quota a namespace declared for itself is not one
+# a wait clears, and that reasoning lives beside its definition there
+# rather than at this re-export.
 CAPACITY_GUARD_STAGE = constants.CAPACITY_GUARD_STAGE
+CAPACITY_CLAIM_STAGE = constants.CAPACITY_CLAIM_STAGE
 TRANSIENT_CAPACITY_STAGES = constants.TRANSIENT_CAPACITY_STAGES
 PERMANENT_CAPACITY_STAGES = constants.PERMANENT_CAPACITY_STAGES
 
@@ -286,6 +288,105 @@ def capacity_error(message: str, stage: str) -> flask.Response:
         'status': 507,
         'stage': stage,
         'transient': transient,
+    }))
+    return resp
+
+
+def claim_capacity_error(
+        claim_uuid: str,
+        dimensions: list[dict[str, Any]]) -> flask.Response:
+    """A 403 for a namespace which has used the capacity it claimed.
+
+    Every other capacity refusal is a 507 -- the cluster cannot serve
+    the request. This one is a 403, because the cluster could: the
+    ceiling the namespace declared for itself is what refused, so the
+    remedy belongs to whoever owns the claim rather than to whoever runs
+    the cluster, and a client which read a 507 here would wait for
+    capacity that is already free.
+
+    The body is assembled by mutating ``sf_api.error()``'s response for
+    the reason ``capacity_error()`` above sets out at length: that
+    function is third-party and pinned, fields cannot be passed into it,
+    and adding them there would give its 300-odd other call sites keys
+    that only ever mean something for a capacity refusal. So this body
+    is a superset of the same shape -- ``error`` and ``status``, plus the
+    ``stage`` and ``transient`` the 507 publishes, plus ``claim`` and
+    ``dimensions``.
+
+    ``transient`` is read through ``capacity_refusal_is_transient()``
+    rather than written as False here, for the reason the stage is the
+    sole discriminator everywhere else: one classification with one
+    home, which the instance's own refusal record reads too. The claim
+    stage is in neither classified set, so the answer is False, and
+    there is no ``Retry-After`` to go with it -- the whole point of the
+    classification is that this refusal has no wait to recommend.
+
+    ``dimensions`` may be empty, and empty is meaningful rather than
+    missing. The uuid comes from the row the guarded UPDATE named, while
+    the per-dimension numbers come from a read taken after that
+    transaction rolled back: a claim deleted or replaced in between
+    leaves a uuid with no figures behind it. So the figures are
+    optional, and where they are absent the message says which claim
+    refused and recommends nothing -- telling an operator to grow a
+    claim by four vCPUs is worse than saying nothing at all when the
+    claim is already gone.
+
+    The message is composed here rather than passed in, unlike
+    ``capacity_error()``'s: it is derived from the same two inputs as
+    the body, so the sentence a human reads and the fields a client
+    parses cannot come to disagree about what was over, and the rule
+    about recommending nothing has one place to be enforced.
+    """
+    # Only the dimensions which actually refused, and only the three
+    # fields an operator acts on. The denial's own detail dicts also
+    # carry the guard's working -- whether the comparison was charged,
+    # what was requested, how much of a node's usage was booked -- which
+    # is why a denial is not published verbatim: those describe how the
+    # guard decided, and this response describes what to do about it.
+    reported = []
+    for detail in dimensions:
+        if not detail.get('exceeded'):
+            continue
+        entry = {'dimension': detail['dimension']}
+        for field in ('limit', 'used', 'shortfall'):
+            if field in detail:
+                entry[field] = detail[field]
+        reported.append(entry)
+
+    # A shortfall is reported per dimension where the denial carried
+    # one; a reply from an sf-database predating that field carries
+    # none, and the dimension name alone is still worth saying.
+    over = ', '.join(
+        '%s by %g' % (d['dimension'], d['shortfall'])
+        if 'shortfall' in d else str(d['dimension'])
+        for d in reported)
+
+    # The uuid is the thing an operator grows, so it leads the sentence
+    # when there is one. There may not be: a claim-stage denial whose
+    # uuid did not survive the rollback is still a claim refusal, and
+    # still must not be published as a 507 a client would retry.
+    named = ('namespace capacity claim %s' % claim_uuid if claim_uuid
+             else 'the capacity claim for this namespace')
+
+    if over:
+        message = (
+            '%s cannot admit this instance: it is over on %s. Grow the '
+            'claim or delete instances in this namespace.' % (named, over))
+    else:
+        message = (
+            '%s refused this instance. The claim could not be read back '
+            'after the refusal, so what it is over by is not reported.'
+            % named)
+
+    transient = constants.capacity_refusal_is_transient(CAPACITY_CLAIM_STAGE)
+    resp = sf_api.error(403, message, suppress_traceback=True)
+    resp.set_data(json.dumps({
+        'error': message,
+        'status': 403,
+        'stage': CAPACITY_CLAIM_STAGE,
+        'transient': transient,
+        'claim': claim_uuid,
+        'dimensions': reported,
     }))
     return resp
 

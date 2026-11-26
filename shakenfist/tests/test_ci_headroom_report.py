@@ -1840,11 +1840,15 @@ class GuardCensusTestCase(HeadroomReportTestCase):
             'so a reader can no longer tell which instrument saw what.')
 
     def test_a_claim_exceedance_is_never_counted_as_a_refusal(self):
-        """An admitted placement over an advisory claim is not a refusal.
+        """An admitted placement over a claim is not a refusal.
 
-        CLAIM_ENFORCEMENT_HARD is False on purpose so exceedances are
-        observed before they are refused. Counting one as a refusal would
-        manufacture refusals on a cluster which did what it was asked.
+        A claim ceiling refuses a scheduled create, so a placement which
+        was admitted *over* a claim is an unguarded ground-truth write:
+        the cleaner or startup reconciliation recording where a libvirt
+        domain already is, which lands because a guard cannot refuse
+        reality and which charges the claim on its way through. Counting
+        one as a refusal would manufacture refusals on a cluster where
+        nothing was denied.
         """
         census = self._census([
             claim_event(claim_dimensions=[
@@ -1862,7 +1866,7 @@ class GuardCensusTestCase(HeadroomReportTestCase):
         self.assertNotIn(
             'Guard refusals: YES', output,
             'A claim exceedance was reported as a refusal. It is an ADMITTED '
-            'placement; advisory mode did what the operator asked.')
+            'placement: nothing was denied, so nothing should be counted.')
 
     def test_a_forced_write_is_counted_apart_from_refusals(self):
         """The forced ground-truth write is a recorded placement.
