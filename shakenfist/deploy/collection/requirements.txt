@@ -23,4 +23,40 @@
 # on the client it builds and says this if they are missing, so an older
 # client is a diagnosable failure rather than an AttributeError traceback.
 # Every other module here works with the released client.
-shakenfist-client
+#
+# The floor is the first release which has every verb, and every keyword
+# argument, that the other four modules pass -- derived by walking their
+# client calls and checking each one against every client-python release
+# tag (issue #3310). 0.7.4 and earlier lack allocate_network(provide_dns=),
+# which sf_network passes whenever the operator sets dns. Below the floor
+# the symptom is a TypeError or an AttributeError from inside a module,
+# which reads like a module bug; above it, nothing in this collection calls
+# an API the client does not have.
+#
+# No upper bound, deliberately: capping it would make every new client
+# release an incompatibility by declaration rather than by evidence, and
+# the API is additive.
+#
+# A floor here only helps someone who installs with pip. ansible-galaxy
+# collection install does not read this file at all -- a collection's
+# Python requirements are documentation, not dependencies -- so the
+# modules still cannot assume the client they get satisfies it.
+# sf_instance._create_accepts_timeout() is there for exactly that reason:
+# create_instance(timeout=) only arrived in 0.8.4, which is above this
+# floor, so the capability check stays whatever this line says.
+#
+# The floor is where the modules stop working, not where they stop being
+# at their best. Two of sf_instance's capacity-wait behaviours degrade
+# gracefully between the floor and 0.8.4, and both are deliberate:
+#
+#   * below 0.8.3 an APIException carries no .text, so a 507's
+#     machine-readable refusal body cannot be read and the wait falls back
+#     to its own budget (_refusal_body);
+#   * below 0.8.4 create_instance() takes no timeout, so the create's own
+#     wait and the module's await budget are deducted rather than merged
+#     (_create_accepts_timeout).
+#
+# A deployer who wants the full behaviour should ask for 0.8.4 or newer.
+# This line is not raised to it because a floor is a statement about what
+# breaks, and raising it would refuse installs that work.
+shakenfist-client>=0.7.5
