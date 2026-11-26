@@ -992,9 +992,9 @@
 # all three override paths (validate refused anything in between). Its
 # cert_dest_dir and file names are the kerbside role's kerbside_pki_dir,
 # kerbside_proxy_cert_name, kerbside_proxy_key_name and
-# kerbside_proxy_cacert_name, which the role reads itself and are not passed
-# here: the same expressions as the role's defaults, so an inventory value for
-# any of them, or for kerbside_config_dir, reaches both.
+# kerbside_proxy_cacert_name, read from the role itself rather than
+# recomputed here, so an inventory value for any of them, or for
+# kerbside_config_dir, reaches both.
 # ---------------------------------------------------------------------------
 - name: Deploy Kerbside
   hosts: kerbside:&reachable
@@ -1036,10 +1036,30 @@
         kerbside_sf_ca_cert: "{{ kerbside_sf_ca_slurp.content | b64decode }}"
 
     # Creates the kerbside group the certificate's key is readable by.
+    #
+    # public, so the role's defaults are in scope for the certificate
+    # include below, which has to name the paths and ownership the role
+    # will read the certificate from. Those are the role's defaults, and
+    # recomputing them here with literal fallbacks -- which is what this
+    # play used to do -- put a copy of another repository's defaults in
+    # this file: a default changed in Kerbside would have left the
+    # certificate where the role does not look (issue #4708). public is
+    # per play, which is why the validate play above does the same thing
+    # separately for kerbside_collection_version.
+    #
+    # Role defaults keep their precedence when exposed this way, so an
+    # inventory value for any of them still wins. The role also defaults
+    # kerbside_public_fqdn and kerbside_proxy_cert_path to the empty
+    # string, which are now in scope here too: an unset fqdn reads as ''
+    # rather than as undefined. That is not a new hole, because the
+    # validate play above runs the role's validate entry point with
+    # any_errors_fatal and it refuses an empty kerbside_public_fqdn, so
+    # the run has already ended before this play starts.
     - name: Bootstrap Kerbside
       ansible.builtin.include_role:
         name: shakenfist.kerbside.kerbside
         tasks_from: bootstrap
+        public: true
 
     - name: Issue this host's Kerbside proxy certificate (generated on the control node)
       ansible.builtin.include_role:
@@ -1059,12 +1079,16 @@
              or ':' in kerbside_public_fqdn }}
         cert_san_dns: "{{ [] if kerbside_cert_fqdn_is_address else [kerbside_public_fqdn] }}"
         cert_san_ip: "{{ [kerbside_public_fqdn] if kerbside_cert_fqdn_is_address else [] }}"
-        cert_dest_dir: "{{ kerbside_pki_dir | default((kerbside_config_dir | default('/etc/kerbside')) ~ '/pki') }}"
-        cert_dest_cert_name: "{{ kerbside_proxy_cert_name | default('server-cert.pem') }}"
-        cert_dest_key_name: "{{ kerbside_proxy_key_name | default('server-key.pem') }}"
-        cert_dest_ca_name: "{{ kerbside_proxy_cacert_name | default('ca-cert.pem') }}"
-        cert_owner: "{{ kerbside_file_owner | default('root') }}"
-        cert_group: "{{ kerbside_group | default('kerbside') }}"
+        # The role's own defaults, in scope because the bootstrap include
+        # above is public. No fallbacks: a fallback here would be a second
+        # copy of a value Kerbside owns, and a wrong one the day Kerbside
+        # changes it.
+        cert_dest_dir: "{{ kerbside_pki_dir }}"
+        cert_dest_cert_name: "{{ kerbside_proxy_cert_name }}"
+        cert_dest_key_name: "{{ kerbside_proxy_key_name }}"
+        cert_dest_ca_name: "{{ kerbside_proxy_cacert_name }}"
+        cert_owner: "{{ kerbside_file_owner }}"
+        cert_group: "{{ kerbside_group }}"
         cert_key_mode: "0640"
       when: kerbside_proxy_cert_path | default('') | length == 0
 

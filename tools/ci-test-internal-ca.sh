@@ -31,48 +31,21 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-COLLECTION_DIR="${REPO_ROOT}/shakenfist/deploy/collection"
-
-CURRENT_CASE='setup'
-LAST_LOG=''
-
-fail() {
-    echo "FAIL [${CURRENT_CASE}]: $*" >&2
-    if [ -n "${LAST_LOG}" ] && [ -f "${LAST_LOG}" ]; then
-        echo "---- last 40 lines of ${LAST_LOG##*/} ----" >&2
-        tail -n 40 "${LAST_LOG}" >&2
-    fi
-    exit 1
-}
-
-need() {
-    command -v "$1" > /dev/null || fail "$1 not found on PATH: $2"
-}
+# fail, need, REPO_ROOT, COLLECTION_DIR, sf_test_workdir,
+# sf_test_link_collection and sf_test_ansible_env.
+# shellcheck source=tools/ci-test-ansible-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/ci-test-ansible-lib.sh"
 
 need certtool 'install the gnutls-bin package'
 need openssl 'install the openssl package'
 need ansible-playbook 'install ansible-core (the sanity job gets it with ansible-lint)'
 
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/ci-test-internal-ca.XXXXXX")"
-trap 'rm -rf "${WORK}"' EXIT
+sf_test_workdir ci-test-internal-ca
+sf_test_link_collection "${WORK}/collections"
+sf_test_ansible_env "${WORK}/collections"
 
 CA="${WORK}/ca"
 DEST="${WORK}/dest"
-mkdir -p "${WORK}/collections/ansible_collections/shakenfist" "${WORK}/logs" \
-    "${WORK}/ansible-tmp"
-ln -s "${COLLECTION_DIR}" "${WORK}/collections/ansible_collections/shakenfist/shakenfist"
-
-# An empty config, so neither a developer's ~/.ansible.cfg nor an
-# installed copy of the collection changes what runs.
-: > "${WORK}/ansible.cfg"
-export ANSIBLE_CONFIG="${WORK}/ansible.cfg"
-export ANSIBLE_COLLECTIONS_PATH="${WORK}/collections"
-export ANSIBLE_COLLECTIONS_SCAN_SYS_PATH=false
-export ANSIBLE_LOCAL_TEMP="${WORK}/ansible-tmp"
-export ANSIBLE_REMOTE_TMP="${WORK}/ansible-tmp"
-export ANSIBLE_NOCOLOR=1
-export ANSIBLE_STDOUT_CALLBACK=default
 
 cat > "${WORK}/play.yml" << 'EOF'
 ---

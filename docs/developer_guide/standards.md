@@ -502,6 +502,15 @@ Current hooks:
   `requirements.yml`, the `kerbside_source` entry point, the node role's
   `argument_specs` or defaults, the `internal_ca` role or the script change. The
   sanity-checks workflow runs the same script
+
+The three rootless Ansible tests above share their sandbox --
+`fail`, `need`, the working directory, the collection symlink and the
+`ANSIBLE_*` environment which keeps a developer's own Ansible
+installation out of the run -- through `tools/ci-test-ansible-lib.sh`,
+which they source. Each keeps its own `run_play` and `assert_*` helpers,
+because each drives a different thing. `KEEP_WORK=1` leaves the working
+directory behind for any of them.
+
 - `flake8` - Style check via tox, on changed files
 - `py3` - Unit tests via tox
 - `check-from-db-by-ref-namespace` - Every `*_from_db_by_ref` call passes a

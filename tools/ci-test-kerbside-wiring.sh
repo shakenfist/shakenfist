@@ -61,29 +61,13 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-COLLECTION_DIR="${REPO_ROOT}/shakenfist/deploy/collection"
+# fail, need, REPO_ROOT, COLLECTION_DIR, sf_test_workdir,
+# sf_test_link_collection and sf_test_ansible_env.
+# shellcheck source=tools/ci-test-ansible-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/ci-test-ansible-lib.sh"
+
 SITE_YML="${REPO_ROOT}/examples/_shared/site.yml"
 REQUIREMENTS="${REPO_ROOT}/examples/_shared/requirements.yml"
-
-CURRENT_CASE='setup'
-LAST_LOG=''
-
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/ci-test-kerbside-wiring.XXXXXX")"
-trap '[ -n "${KEEP_WORK:-}" ] || rm -rf "${WORK}"' EXIT
-
-fail() {
-    echo "FAIL [${CURRENT_CASE}]: $*" >&2
-    if [ -n "${LAST_LOG}" ] && [ -f "${LAST_LOG}" ]; then
-        echo "---- last 40 lines of ${LAST_LOG##*/} ----" >&2
-        tail -n 40 "${LAST_LOG}" >&2
-    fi
-    exit 1
-}
-
-need() {
-    command -v "$1" > /dev/null || fail "$1 not found on PATH: $2"
-}
 
 need ansible-playbook 'install ansible-core (the sanity job gets it with ansible-lint)'
 need ansible-galaxy 'install ansible-core (the sanity job gets it with ansible-lint)'
@@ -95,20 +79,13 @@ PY="$(python3 -c 'import sys; print(sys.executable)')"
 "${PY}" -c 'import jinja2, yaml' 2> /dev/null \
     || fail "${PY} cannot import jinja2 and yaml (ansible-core depends on both)"
 
-mkdir -p "${WORK}/sf/ansible_collections/shakenfist" "${WORK}/logs" "${WORK}/ansible-tmp" \
-    "${WORK}/vars" "${WORK}/certs" "${WORK}/site/group_vars" "${WORK}/site/host_vars"
-ln -s "${COLLECTION_DIR}" "${WORK}/sf/ansible_collections/shakenfist/shakenfist"
-
-# An empty config and a private ansible home, so neither a developer's
-# ~/.ansible.cfg nor an installed copy of either collection changes what runs.
-: > "${WORK}/ansible.cfg"
-export ANSIBLE_CONFIG="${WORK}/ansible.cfg"
-export ANSIBLE_HOME="${WORK}/ansible-home"
-export ANSIBLE_COLLECTIONS_SCAN_SYS_PATH=false
-export ANSIBLE_LOCAL_TEMP="${WORK}/ansible-tmp"
-export ANSIBLE_REMOTE_TMP="${WORK}/ansible-tmp"
-export ANSIBLE_NOCOLOR=1
-export ANSIBLE_STDOUT_CALLBACK=default
+sf_test_workdir ci-test-kerbside-wiring
+sf_test_link_collection "${WORK}/sf"
+# No collections path: half the cases below are about what happens when
+# shakenfist.kerbside is not installed, so each run names its own.
+sf_test_ansible_env
+mkdir -p "${WORK}/vars" "${WORK}/certs" "${WORK}/site/group_vars" \
+    "${WORK}/site/host_vars"
 
 LAST_LOG="${WORK}/logs/galaxy-install.log"
 ansible-galaxy collection install -r "${REQUIREMENTS}" -p "${WORK}/kerbside" \
@@ -378,6 +355,23 @@ for task in cert_tasks:
     if 'kerbside_proxy_cert_path' not in str(task.get('when', '')):
         sys.exit(f'{task["name"]!r} is not skipped when the certificate overrides are set')
 
+# The bootstrap include is public, and comes before the certificate includes.
+# That is the whole reason the certificate tasks below may name the role's
+# variables instead of recomputing them (#4708): public exposes the role's
+# defaults to the rest of this play, and nothing else in the play does -- it
+# is per play, so the validate play's public include does not carry here.
+# Without it every cert_dest_* renders empty and the certificate is installed
+# at "/", which no test caught until this one.
+bootstrap_index = d_includes.index((KERBSIDE, 'bootstrap'))
+bootstrap_task = d_tasks[bootstrap_index]
+if not bootstrap_task['ansible.builtin.include_role'].get('public'):
+    sys.exit(f'{bootstrap_task["name"]!r} is not public, so the kerbside role\'s defaults are not in '
+             'scope for the certificate includes which name them, and every cert_dest_* below '
+             'renders empty')
+if bootstrap_index > min(d_includes.index(i) for i in d_includes if i[0] == INTERNAL_CA):
+    sys.exit(f'{DEPLOY!r} runs an internal_ca include before {bootstrap_task["name"]!r}, so the '
+             "role's defaults are not in scope yet where they are read")
+
 # Both plays tell kerbside_source whether this host is a Shaken Fist node, and
 # the Deploy play gives it the CA it read, after reading it.
 COLOCATED = "{{ inventory_hostname in groups['allsf'] }}"
@@ -467,6 +461,12 @@ for play in (validate, deploy):
 # kerbside_proxy_key_file and kerbside_cacert_file, as kerbside_file_owner and
 # kerbside_group. site.yml derives the one from the variables which decide the
 # other, so the two must agree with nothing overridden, and with each override.
+#
+# site.yml names those variables rather than recomputing them with literal
+# fallbacks, which is only possible because the Bootstrap include before it
+# is public (#4708). Both sides therefore resolve against the same values,
+# and the check is that site.yml names the variables which decide where the
+# role looks -- not that it carries its own copy of what they default to.
 env = jinja2.Environment()
 
 
@@ -474,9 +474,13 @@ def resolve(name, values, seen=()):
     value = values[name]
     if not isinstance(value, str) or '{' not in value:
         return value
-    refs = meta.find_undeclared_variables(env.parse(value))
-    context = {r: resolve(r, values, seen + (name,)) for r in refs if r in values and r not in seen}
-    return env.from_string(value).render(context)
+    return resolve_expression(value, values, seen + (name,))
+
+
+def resolve_expression(expression, values, seen=()):
+    refs = meta.find_undeclared_variables(env.parse(expression))
+    context = {r: resolve(r, values, seen) for r in refs if r in values and r not in seen}
+    return env.from_string(expression).render(context)
 
 
 OVERRIDES = [
@@ -497,13 +501,32 @@ for task in cert_tasks:
     if missing:
         sys.exit(f'{task["name"]!r} leaves {missing} to internal_ca, whose defaults are not what the kerbside '
                  'role reads')
+    # No literal fallback, because a fallback is a second copy of a value
+    # Kerbside owns: a default changed there would leave the certificate
+    # where the role does not look. Every name has to be one the role
+    # defines, so that the public include is what supplies it.
+    for name in COMPARED:
+        expression = str(task_vars[name])
+        refs = meta.find_undeclared_variables(env.parse(expression))
+        if not refs:
+            sys.exit(f'{task["name"]!r} passes {name} as a literal, {expression!r}, rather than '
+                     'reading the variable the kerbside role decides it with')
+        unknown = sorted(refs - set(role_defaults) - set(role_vars))
+        if unknown:
+            sys.exit(f'{task["name"]!r} derives {name} from {unknown}, which the installed kerbside '
+                     'role does not define, so site.yml and the role can disagree about it')
+        if 'default(' in expression:
+            sys.exit(f'{task["name"]!r} passes {name} with a default() fallback, {expression!r}: that '
+                     "is a copy of the kerbside role's own default, and wrong the day Kerbside "
+                     'changes it (#4708)')
+
     for override in OVERRIDES:
-        site = {k: env.from_string(str(task_vars[k])).render(override) for k in COMPARED}
         # Role vars outrank inventory; defaults do not. Every override names a
         # default.
         values = dict(role_defaults)
         values.update(override)
         values.update(role_vars)
+        site = {k: resolve_expression(str(task_vars[k]), values) for k in COMPARED}
         label = override or 'no override'
         for site_name, role_file in PATHS:
             installed = f"{site['cert_dest_dir']}/{site[site_name]}"
@@ -1279,16 +1302,26 @@ PYEOF
 # site.yml's "Deploy Kerbside" play passes it. The task is extracted from
 # site.yml by name and run as it stands, so the test cannot drift from what the
 # play does; only ca_path and kerbside_public_fqdn are extra vars.
+#
+# The play carries the installed kerbside role's defaults as play vars,
+# because that is what site.yml's public bootstrap include puts in scope at
+# the point the extracted task runs (#4708). They cannot be had here the way
+# site.yml has them: kerbside's bootstrap creates a group and installs
+# packages, which needs root, and this runs without it. Reading them from the
+# installed role rather than writing them out keeps the stand-in honest -- a
+# default changed in Kerbside changes this too. The two extra vars still
+# outrank them, which is how each case picks its own fqdn.
 # issue_proxy_cert CA_DIR PUBLIC_FQDN: leaves the certificate in CA_DIR.
 issue_proxy_cert() {
     local ca_dir="$1" public="$2" out
     if [ ! -f "${WORK}/issue-proxy-cert.yml" ]; then
-        out="$("${PY}" - "${SITE_YML}" "${WORK}/issue-proxy-cert.yml" "${DEPLOY_PLAY}" << 'PYEOF' 2>&1
+        out="$("${PY}" - "${SITE_YML}" "${WORK}/issue-proxy-cert.yml" "${DEPLOY_PLAY}" \
+            "${KERBSIDE_ROLE}/defaults/main.yml" << 'PYEOF' 2>&1
 import sys
 
 import yaml
 
-site, dest, name = sys.argv[1:]
+site, dest, name, defaults_path = sys.argv[1:]
 with open(site) as f:
     plays = yaml.safe_load(f)
 deploy = [p for p in plays if p.get('name') == name]
@@ -1297,12 +1330,15 @@ if len(deploy) != 1:
 issue = [t for t in deploy[0]['tasks'] if t.get('name', '').startswith('Issue this host')]
 if len(issue) != 1:
     sys.exit("expected one task issuing the host's Kerbside proxy certificate")
+with open(defaults_path) as f:
+    role_defaults = yaml.safe_load(f) or {}
 bootstrap = {
     'name': 'Create the CA',
     'ansible.builtin.include_role': {'name': 'shakenfist.shakenfist.internal_ca', 'tasks_from': 'bootstrap'},
 }
 with open(dest, 'w') as f:
     yaml.safe_dump([{'name': 'Issue', 'hosts': 'localhost', 'gather_facts': False,
+                     'vars': role_defaults,
                      'tasks': [bootstrap] + issue}], f, sort_keys=False)
 PYEOF
 )" || fail "${out}"

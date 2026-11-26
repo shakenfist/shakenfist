@@ -40,50 +40,30 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-COLLECTION_DIR="${REPO_ROOT}/shakenfist/deploy/collection"
+# fail, need, REPO_ROOT, COLLECTION_DIR, sf_test_workdir,
+# sf_test_link_collection and sf_test_ansible_env.
+# shellcheck source=tools/ci-test-ansible-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/ci-test-ansible-lib.sh"
 
-CURRENT_CASE='setup'
-LAST_LOG=''
+# fail() dumps the stub's log too: what the role asked sf-ctl to do is
+# usually the thing a reader wants, and it is not in any ansible log.
+FAIL_EXTRA=dump_stub_log
 
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/ci-test-kerbside-cluster-config.XXXXXX")"
-trap 'rm -rf "${WORK}"' EXIT
+need ansible-playbook 'install ansible-core (the sanity job gets it with ansible-lint)'
+
+sf_test_workdir ci-test-kerbside-cluster-config
+sf_test_link_collection "${WORK}/collections"
+sf_test_ansible_env "${WORK}/collections"
+mkdir -p "${WORK}/vars"
 
 STUB="${WORK}/sf-ctl"
 STUB_LOG="${WORK}/sf-ctl.log"
 ROWS="${WORK}/rows.json"
 
-fail() {
-    echo "FAIL [${CURRENT_CASE}]: $*" >&2
-    if [ -n "${LAST_LOG}" ] && [ -f "${LAST_LOG}" ]; then
-        echo "---- last 40 lines of ${LAST_LOG##*/} ----" >&2
-        tail -n 40 "${LAST_LOG}" >&2
-    fi
-    echo "---- the stub sf-ctl's log ----" >&2
-    stub_log >&2
-    exit 1
+dump_stub_log() {
+    echo "---- the stub sf-ctl's log ----"
+    stub_log
 }
-
-need() {
-    command -v "$1" > /dev/null || fail "$1 not found on PATH: $2"
-}
-
-need ansible-playbook 'install ansible-core (the sanity job gets it with ansible-lint)'
-
-mkdir -p "${WORK}/collections/ansible_collections/shakenfist" "${WORK}/logs" \
-    "${WORK}/ansible-tmp" "${WORK}/vars"
-ln -s "${COLLECTION_DIR}" "${WORK}/collections/ansible_collections/shakenfist/shakenfist"
-
-# An empty config, so neither a developer's ~/.ansible.cfg nor an
-# installed copy of the collection changes what runs.
-: > "${WORK}/ansible.cfg"
-export ANSIBLE_CONFIG="${WORK}/ansible.cfg"
-export ANSIBLE_COLLECTIONS_PATH="${WORK}/collections"
-export ANSIBLE_COLLECTIONS_SCAN_SYS_PATH=false
-export ANSIBLE_LOCAL_TEMP="${WORK}/ansible-tmp"
-export ANSIBLE_REMOTE_TMP="${WORK}/ansible-tmp"
-export ANSIBLE_NOCOLOR=1
-export ANSIBLE_STDOUT_CALLBACK=default
 # The stub logs this when it is set, so it must come only from the play.
 unset SHAKENFIST_NODE_MESH_IP
 
