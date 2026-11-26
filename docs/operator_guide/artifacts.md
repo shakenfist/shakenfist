@@ -162,6 +162,34 @@ something artifacts have of their own; [the database
 internals](../developer_guide/database_internals.md#the-transient-failure-retry-budget-rides-on-the-work-item)
 describe where the counter lives and why.
 
+## What an image fetch cost, and whether it was cached
+
+An instance which needs an image either gets it from a copy the cluster
+already holds, or the node pulls it from the source. Which way it went
+has always been visible as a status event on the artifact -- `fetching
+image from within the cluster` or `fetching image from the internet` --
+but only as a message, so a hit rate, or the bytes a cluster pulls from
+the internet, meant reading every fetch by hand.
+
+Each fetch now also records an `image fetch complete` usage event
+carrying:
+
+* `cached` -- true when the image came from within the cluster, false
+  when it came from the source. Counting these gives the cache hit
+  rate.
+* `bytes` -- the size of the blob fetched.
+* `seconds` -- how long the fetch took.
+* `blob_uuid` -- the blob the fetch produced.
+
+A fetch happens at most once per artifact version per node, so this is
+nothing like the rate at which a maintenance pass or a poll writes
+events, and the per-fetch cost of recording it is not worth avoiding.
+
+This covers the image fetch only. The transcode cache -- the separate
+decision about whether a post-transcode version of an image already
+exists -- is not instrumented, so a transcode hit rate still has to be
+read out of the surrounding events.
+
 ## Sharing artifacts
 
 Artifacts in the system namespace can be shared with all other namespaces.

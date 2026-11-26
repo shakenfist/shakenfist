@@ -222,6 +222,20 @@ class TransferImageTestCase(base.ShakenFistTestCase):
 
     URL = 'https://example.com/an-image.qcow2'
 
+    @staticmethod
+    def _fetch_extra(mock_events):
+        """The extra payload of the one 'image fetch complete' event.
+
+        Found by message rather than by position, because the fetch
+        emits status events either side of it.
+        """
+        for call in mock_events.call_args_list:
+            if len(call.args) > 2 and call.args[2] == 'image fetch complete':
+                return call.kwargs['extra']
+        raise AssertionError(
+            'no image fetch complete event was emitted: %r'
+            % (mock_events.call_args_list,))
+
     def _helper(self, index=1):
         artifact = mock.MagicMock()
         artifact.source_url = self.URL
@@ -248,6 +262,54 @@ class TransferImageTestCase(base.ShakenFistTestCase):
 
         mock_blob_get.assert_called_once_with('sf://blob/blob-1')
         self.assertEqual(fetched_blob, b)
+
+    def test_a_cluster_fetch_is_recorded_as_a_cache_hit(self, mock_events):
+        """An image the cluster already held is a hit, and the event
+        says so with what it cost. Nothing counted this, so the hit rate
+        could not be had without reading every fetch by hand (#852).
+        """
+        cached_blob = mock.MagicMock(uuid='blob-1')
+        fetched_blob = mock.MagicMock(uuid='blob-1')
+        fetched_blob.size = 4096
+        helper = self._helper()
+
+        with mock.patch('shakenfist.images.blob.Blob.from_db',
+                        return_value=cached_blob), \
+                mock.patch.object(
+                    helper, '_open_connection',
+                    side_effect=AssertionError(
+                        'the source must not be consulted')), \
+                mock.patch.object(
+                    helper, '_blob_get', return_value=fetched_blob):
+            helper.transfer_image(cached_only=True)
+
+        extra = self._fetch_extra(mock_events)
+        self.assertTrue(extra['cached'])
+        self.assertEqual(4096, extra['bytes'])
+        self.assertEqual('blob-1', extra['blob_uuid'])
+        self.assertIn('seconds', extra)
+
+    def test_a_source_fetch_is_recorded_as_a_cache_miss(self, mock_events):
+        """The other half: what the cluster had to pull from the source,
+        which is what makes the bytes worth counting.
+        """
+        fetched_blob = mock.MagicMock(uuid='blob-9')
+        fetched_blob.size = 1048576
+        helper = self._helper()
+
+        with mock.patch('shakenfist.images.blob.Blob.from_db',
+                        return_value=None), \
+                mock.patch.object(
+                    helper, '_open_connection',
+                    side_effect=exceptions.HTTPError('status code 404')), \
+                mock.patch.object(
+                    helper, '_http_get_inner', return_value=fetched_blob):
+            helper.transfer_image()
+
+        extra = self._fetch_extra(mock_events)
+        self.assertFalse(extra['cached'])
+        self.assertEqual(1048576, extra['bytes'])
+        self.assertEqual('blob-9', extra['blob_uuid'])
 
     def test_cached_only_with_no_versions_raises(self, _mock_events):
         helper = self._helper(index=0)

@@ -18,6 +18,7 @@ from shakenfist.artifact import BLOB_URL
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import QCOW2_CLUSTER_SIZE
 from shakenfist.constants import TRANSCODE_DESCRIPTION
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
@@ -543,7 +544,16 @@ class ImageFetchHelper:
         # Both the branch and the fetch read `resolved`, so there is one
         # answer to "what are we fetching, and what may we check it
         # against" rather than two which can drift apart.
-        if resolved.url.startswith(BLOB_URL):
+        # Whether the cluster already held this image is the one thing
+        # about an image fetch nothing counted. The two branches below
+        # have always said which way it went, but only as a message, so
+        # a cache hit rate -- or the bytes a cluster pulls from the
+        # internet -- could not be had without reading every fetch by
+        # hand (issue 852).
+        cached = resolved.url.startswith(BLOB_URL)
+        fetch_started = time.time()
+
+        if cached:
             add_event_multi(
                 EVENT_TYPE_STATUS, self.objects,
                 'fetching image from within the cluster')
@@ -553,6 +563,20 @@ class ImageFetchHelper:
                 EVENT_TYPE_STATUS, self.objects,
                 'fetching image from the internet')
             b = self._http_get_inner(resolved)
+
+        # One event per fetch, carrying the outcome and what it cost, so
+        # the hit rate and the bytes are a count over the event stream
+        # rather than a reading exercise. A fetch happens at most once
+        # per artifact version per node, so this is nothing like the
+        # rate at which a pass or a poll writes events.
+        add_event_multi(
+            EVENT_TYPE_USAGE, self.objects, 'image fetch complete',
+            extra={
+                'cached': cached,
+                'seconds': time.time() - fetch_started,
+                'bytes': b.size,
+                'blob_uuid': str(b.uuid),
+            })
 
         return b
 
