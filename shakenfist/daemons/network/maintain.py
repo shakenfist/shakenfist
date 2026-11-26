@@ -63,6 +63,14 @@ STRAY_VXLAN_HANDLING_FAILING: bool = False
 # that time back (issue 4971).
 PASS_INTERVAL_SECONDS = 30
 
+# When each network was last health checked, by uuid. A pass works
+# through the networks it is on longest-waiting first and stops once it
+# has spent its health check budget, so this is what makes the
+# remainder the next pass's first business rather than starving them
+# (issue 4971). Pruned against what a pass visited, like the report
+# caches above, so a deleted network does not linger.
+HEALTH_CHECK_LAST: dict[str, float] = {}
+
 
 def forget_unvisited_quiesces(visited_networks):
     """Drop once-per-episode report entries for networks a pass did not visit.
@@ -78,6 +86,21 @@ def forget_unvisited_quiesces(visited_networks):
     QUIESCE_REPORTED.intersection_update(visited)
     network.DHCP_PROBE_FAILURE_REPORTED.intersection_update(visited)
     network.DHCP_PROBE_SERVING_REPORTED.intersection_update(visited)
+    for uuid in set(HEALTH_CHECK_LAST) - visited:
+        del HEALTH_CHECK_LAST[uuid]
+
+
+def health_check_order(network_uuids):
+    """The networks a pass should health check, longest-waiting first.
+
+    A network never checked by this process sorts first, then the one
+    checked longest ago. The uuid breaks ties so the order is stable
+    for a set of networks checked in the same pass, which keeps the
+    rotation deterministic rather than dependent on dictionary order.
+    """
+    return sorted(
+        network_uuids,
+        key=lambda u: (HEALTH_CHECK_LAST.get(str(u), 0.0), str(u)))
 
 
 # Instance states in which a domain on this node may still be attached
@@ -678,7 +701,7 @@ class Job(util_concurrency.Job):
         return False
 
     def _report_pass_cost(self, pass_started, networks_considered,
-                          health_seconds):
+                          health_seconds, networks_deferred):
         """Report what one maintenance pass cost.
 
         The log line is emitted every pass. It is deliberately the
@@ -705,10 +728,28 @@ class Job(util_concurrency.Job):
         pass_seconds = time.time() - pass_started
         fields = {
             'networks': networks_considered,
+            'networks_deferred': networks_deferred,
             'pass_seconds': round(pass_seconds, 3),
             'health_check_seconds': round(health_seconds, 3),
         }
         LOG.with_fields(fields).info('Maintenance pass complete')
+
+        # Spending the budget is worth saying out loud, because it means
+        # some networks were not checked at all this pass. It is not an
+        # overrun -- the bound is what stops the overrun -- so it is
+        # reported whether or not the pass was slow, and against the node
+        # for the same reason the overrun is: no single network is at
+        # fault.
+        if networks_deferred:
+            n = Node.from_db(config.NODE_NAME, suppress_failure_audit=True)
+            if n:
+                n.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'maintain pass spent its %.1f second health check '
+                    'budget and deferred %d networks to a later pass' % (
+                        config.MAINTAIN_HEALTH_CHECK_BUDGET_SECONDS,
+                        networks_deferred),
+                    extra=fields)
 
         if pass_seconds < PASS_INTERVAL_SECONDS:
             return
@@ -750,6 +791,7 @@ class Job(util_concurrency.Job):
             pass_started = time.time()
             health_seconds = 0.0
             networks_considered = 0
+            networks_deferred = 0
 
             # Queue-depth safety guard. If the network queue family is
             # already backed up, piling more reconciliation requests on
@@ -815,8 +857,12 @@ class Job(util_concurrency.Job):
                     if resv and resv.reservation_type == ReservationType.ROUTED:
                         routed_by_network[resv.user_uuid].append(addr)
 
-            # Ensure we are on every network we have a host for
-            for network_uuid in host_networks:
+            # Ensure we are on every network we have a host for, taking
+            # the ones which have waited longest for a health check
+            # first. With a health check budget the tail of this list
+            # may not be checked this pass, and the order is what makes
+            # that tail the next pass's first business.
+            for network_uuid in health_check_order(host_networks):
                 n = network.Network.from_db(
                     network_uuid, suppress_failure_audit=True)
                 if not n:
@@ -853,6 +899,26 @@ class Job(util_concurrency.Job):
                     # Network state changed in the last minute, punt for now
                     continue
 
+                # Health check budget. A healthy network is checked in
+                # milliseconds, so this is never reached on a well
+                # cluster whatever the network count; what it bounds is
+                # the degraded case, where every unreachable dnsmasq
+                # costs a full DHCP_PROBE_TIMEOUT and the pass can take
+                # longer to check its networks than the interval it runs
+                # at (issue 4971). The networks not reached this pass
+                # are the ones this list starts with next pass.
+                #
+                # This sits below the seen_vxids append on purpose: a
+                # network missing from seen_vxids looks stray to the
+                # reaper at the end of the pass, so deferring a network
+                # before that point would have its devices deleted for
+                # no reason other than the pass running out of time.
+                budget = config.MAINTAIN_HEALTH_CHECK_BUDGET_SECONDS
+                if budget and health_seconds >= budget:
+                    networks_deferred += 1
+                    continue
+
+                HEALTH_CHECK_LAST[str(n.uuid)] = time.time()
                 networks_considered += 1
                 health_started = time.time()
                 network_okay = n.is_okay()
@@ -1010,7 +1076,8 @@ class Job(util_concurrency.Job):
             forget_unvisited_quiesces(host_networks)
 
             self._report_pass_cost(
-                pass_started, networks_considered, health_seconds)
+                pass_started, networks_considered, health_seconds,
+                networks_deferred)
 
             # Determine if there are any extra vxids
             extra_vxids = set(vxid_to_mac.keys()) - set(seen_vxids)

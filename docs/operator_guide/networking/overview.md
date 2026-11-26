@@ -748,6 +748,38 @@ overrun. If you see it, the log line's `health_check_seconds` says
 whether the cost is in the health checks (and so in the probes, and so
 most likely in how many networks are unwell) or elsewhere.
 
+### Bounding the health checks
+
+`MAINTAIN_HEALTH_CHECK_BUDGET_SECONDS` (10 seconds by default, a third
+of the interval) is how long one pass may spend health checking before
+it defers the rest to a later pass. Setting it to zero disables the
+bound.
+
+Because a healthy network is checked in milliseconds, a well cluster
+never reaches this however many networks it has: the bound costs
+nothing until something is actually wrong. What it stops is the
+degraded case, where enough unreachable `dnsmasq` processes to spend
+2 seconds each would otherwise take the pass past its own cadence.
+
+Networks are checked longest-waiting first, so the bound defers work
+rather than starving it: the networks a pass did not reach are the ones
+the next pass starts with. A network deferred this way is still counted
+as one this node is on, so it is not mistaken for a stray and reaped
+while it waits.
+
+When a pass does defer, it says so against the node:
+
+```
+maintain pass spent its 10.0 second health check budget and deferred 37 networks to a later pass
+```
+
+Unlike the overrun event this is not in itself a fault -- the bound
+working is the pass declining to overrun. It does mean some networks
+went unchecked, so drift on them is repaired a pass or more later than
+it otherwise would be. Seeing it regularly on a healthy cluster means
+the budget is too small for the network count; seeing it during an
+incident is the bound doing its job.
+
 ## Stray vxlan reaping
 
 Which networks a node should be carrying is a closed question: a network

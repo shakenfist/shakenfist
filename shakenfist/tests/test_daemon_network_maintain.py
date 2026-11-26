@@ -114,6 +114,7 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
             maintain.EXTRA_VLANS_WARNED.clear()
             maintain.STRAY_VXLAN_HANDLING_FAILING = False
             maintain.QUIESCE_REPORTED.clear()
+            maintain.HEALTH_CHECK_LAST.clear()
 
         _clear()
         self.addCleanup(_clear)
@@ -131,7 +132,8 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
                            namespace_routes=None,
                            root_routes=None,
                            namespace_routes_error=None,
-                           clock_step=0.0):
+                           clock_step=0.0,
+                           health_check_budget=10.0):
         """Drive Job.execute() through exactly one pass of the outer loop
         and return a dict of the mocks that callers will most likely
         want to assert on.
@@ -190,6 +192,7 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
             mc.MAINTAIN_RECONCILE_COOLDOWN_SECONDS = 60
             mc.MAINTAIN_RECONCILE_CIRCUIT_K = 5
             mc.MAINTAIN_STRAY_VXLAN_GRACE_SECONDS = 300
+            mc.MAINTAIN_HEALTH_CHECK_BUDGET_SECONDS = health_check_budget
 
             md = active['daemon']
             md.check_abort_path.side_effect = [True, False]
@@ -416,6 +419,114 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
 
         active['node'].from_db.assert_not_called()
 
+    def test_health_check_budget_defers_the_rest_of_the_pass(self):
+        """Once a pass has spent its health check budget it stops
+        checking networks. Each network's checks cost 6 seconds here
+        against a 10 second budget, so the third network is the first
+        one not reached.
+        """
+        nets = [_build_mock_network(uuid='net-a', vxid=1, is_okay=True),
+                _build_mock_network(uuid='net-b', vxid=2, is_okay=True),
+                _build_mock_network(uuid='net-c', vxid=3, is_okay=True),
+                _build_mock_network(uuid='net-d', vxid=4, is_okay=True)]
+        active = self._run_one_iteration(
+            network_node=True, networks=nets,
+            clock_step=6.0, health_check_budget=10.0)
+
+        self.assertTrue(nets[0].is_okay.called)
+        self.assertTrue(nets[1].is_okay.called)
+        self.assertFalse(nets[2].is_okay.called)
+        self.assertFalse(nets[3].is_okay.called)
+
+        fields = _pass_cost_fields(active)
+        self.assertEqual(2, fields['networks'])
+        self.assertEqual(2, fields['networks_deferred'])
+
+    def test_a_zero_budget_checks_every_network(self):
+        """Zero disables the bound, which is how an operator gets the
+        old unbounded behaviour back.
+        """
+        nets = [_build_mock_network(uuid='net-a', vxid=1, is_okay=True),
+                _build_mock_network(uuid='net-b', vxid=2, is_okay=True),
+                _build_mock_network(uuid='net-c', vxid=3, is_okay=True),
+                _build_mock_network(uuid='net-d', vxid=4, is_okay=True)]
+        active = self._run_one_iteration(
+            network_node=True, networks=nets,
+            clock_step=6.0, health_check_budget=0.0)
+
+        for n in nets:
+            self.assertTrue(n.is_okay.called, n.uuid)
+        self.assertEqual(0, _pass_cost_fields(active)['networks_deferred'])
+
+    def test_deferred_networks_are_checked_first_next_pass(self):
+        """The bound defers work rather than starving it. A network the
+        budget stopped this pass has waited longest by definition, so
+        the next pass starts with it -- without which the same networks
+        at the head of the list would be checked every pass and the tail
+        never.
+        """
+        nets = [_build_mock_network(uuid='net-a', vxid=1, is_okay=True),
+                _build_mock_network(uuid='net-b', vxid=2, is_okay=True),
+                _build_mock_network(uuid='net-c', vxid=3, is_okay=True)]
+        self._run_one_iteration(
+            network_node=True, networks=nets,
+            clock_step=6.0, health_check_budget=10.0)
+
+        # net-c was the one deferred, so it is the next pass's first
+        # business.
+        for n in nets:
+            n.is_okay.reset_mock()
+        active = self._run_one_iteration(
+            network_node=True, networks=nets,
+            clock_step=6.0, health_check_budget=10.0)
+
+        checked = [n.uuid for n in nets if n.is_okay.called]
+        self.assertIn('net-c', checked)
+        first_loaded = [
+            call.args[0]
+            for call in active['network'].Network.from_db.call_args_list]
+        self.assertEqual('net-c', first_loaded[0])
+
+    def test_a_deferred_network_is_not_reaped_as_a_stray(self):
+        """A network the budget deferred must still count as a network
+        this node is on. The stray reaper works from the vxids the pass
+        saw, so a deferred network left out of that set would have its
+        devices deleted for no reason other than the pass running out of
+        time to check it.
+        """
+        from shakenfist.daemons.network import maintain
+
+        nets = [_build_mock_network(uuid='net-a', vxid=1, is_okay=True),
+                _build_mock_network(uuid='net-b', vxid=2, is_okay=True),
+                _build_mock_network(uuid='net-c', vxid=3, is_okay=True)]
+        self._run_one_iteration(
+            network_node=True, networks=nets,
+            clock_step=6.0, health_check_budget=10.0,
+            vxid_to_mac={1: '02:00:00:00:00:01',
+                         2: '02:00:00:00:00:02',
+                         3: '02:00:00:00:00:03'})
+
+        # vxid 3 belongs to the deferred net-c. A stray would have been
+        # recorded in the history cache on its way to being reaped.
+        self.assertEqual({}, maintain.EXTRA_VLANS_HISTORY)
+
+    def test_spending_the_budget_is_reported_on_the_node(self):
+        """Deferring networks means some were not checked at all, which
+        an operator should be able to see without reading the logs.
+        """
+        nets = [_build_mock_network(uuid='net-a', vxid=1, is_okay=True),
+                _build_mock_network(uuid='net-b', vxid=2, is_okay=True),
+                _build_mock_network(uuid='net-c', vxid=3, is_okay=True)]
+        active = self._run_one_iteration(
+            network_node=True, networks=nets,
+            clock_step=6.0, health_check_budget=10.0)
+
+        node = active['node'].from_db.return_value
+        messages = [c.args[1] for c in node.add_event.call_args_list]
+        self.assertTrue(
+            any('deferred 1 networks to a later pass' in m
+                for m in messages), messages)
+
     def test_queue_depth_guard_skips_pass(self):
         """When summed queue depth exceeds the threshold the per-network
         loop is skipped entirely and an audit event fires on the Node.
@@ -502,6 +613,7 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
             mc.MAINTAIN_RECONCILE_COOLDOWN_SECONDS = 60
             mc.MAINTAIN_RECONCILE_CIRCUIT_K = 5
             mc.MAINTAIN_STRAY_VXLAN_GRACE_SECONDS = 300
+            mc.MAINTAIN_HEALTH_CHECK_BUDGET_SECONDS = 10.0
 
             active['daemon'].check_abort_path.side_effect = [True, False]
             active['daemon'].clear_abort_path.return_value = None
