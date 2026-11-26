@@ -287,11 +287,49 @@ jobs:
           publish-venv/bin/pip3 install --upgrade pip
           publish-venv/bin/pip3 install ansible-core
 
+      # The token reaches ansible-galaxy through its galaxy server
+      # configuration, not through --api-key, and never through the run:
+      # script's text. A "${{ secrets.* }}" expression in a run: script is
+      # substituted into the script before the script runs, so the token
+      # becomes part of the script file on disk and part of the command
+      # line the process is started with -- and /proc/<pid>/cmdline is
+      # world readable, which on a self-hosted runner means every other
+      # process on the host. GitHub masks the value in logs, but in
+      # neither of those places.
+      #
+      # ANSIBLE_GALAXY_SERVER_LIST naming a single server is what lets
+      # publish find it without --server, and the per-server TOKEN
+      # variable is ansible-core's own way to supply a token out of band
+      # (the alternative, a mode-0600 ansible.cfg under RUNNER_TEMP,
+      # would leave a file to clean up). The URL is ansible-core's
+      # GALAXY_SERVER default verbatim: g_connect() special-cases exactly
+      # this string and rewrites it to .../api/, so this is the same
+      # endpoint --api-key resolved to.
+      #
+      # Checked against a local API stub before the change: the request
+      # ansible-galaxy sends this way -- version probe and the
+      # v3/artifacts/collections/ POST, both carrying "Authorization:
+      # Token <value>" -- is identical to what --api-key produces. Only
+      # where the token lives has changed.
+      #
+      # The ":?" expansion is because this job has never run (issue
+      # #4613) and the secret is scoped to the "release" environment, so
+      # a token configured at the wrong level resolves to an empty
+      # string rather than failing. ansible-galaxy would then attempt an
+      # unauthenticated publish and report a 401 from Galaxy, which
+      # reads like a bad token rather than a missing one. It is written
+      # as one expansion rather than a shell if, because this job has no
+      # checkout (see above) and so cannot call a script in tools/ the
+      # way a longer guard here would have to.
       - name: Publish to Ansible Galaxy
+        env:
+          ANSIBLE_GALAXY_SERVER_LIST: galaxy
+          ANSIBLE_GALAXY_SERVER_GALAXY_URL: https://galaxy.ansible.com
+          ANSIBLE_GALAXY_SERVER_GALAXY_TOKEN: ${{ secrets.ANSIBLE_GALAXY_TOKEN }}
         run: |
+          : "${ANSIBLE_GALAXY_SERVER_GALAXY_TOKEN:?is empty: ANSIBLE_GALAXY_TOKEN is a secret of the release environment, not a repository secret}"
           publish-venv/bin/ansible-galaxy collection publish \
-              ${{ runner.temp }}/dist-collection/*.tar.gz \
-              --api-key "${{ secrets.ANSIBLE_GALAXY_TOKEN }}"
+              ${{ runner.temp }}/dist-collection/*.tar.gz
 
   github-release:
     name: Create GitHub Release

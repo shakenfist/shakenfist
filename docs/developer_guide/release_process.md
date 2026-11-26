@@ -113,6 +113,36 @@ publishing jobs, and only builds and checks the packages.
 - **Ansible Galaxy**: The `shakenfist.shakenfist` collection
 - **GitHub Releases**: The package files
 
+### The Ansible Galaxy publish has never run
+
+`publish-collection` was added on 2026-06-26 and only runs on a `v*` tag
+push. No tag has been pushed since, so `shakenfist.shakenfist` has never
+been published and the job has never executed. Expect the next release to
+be the first time anyone sees it work. Issue
+[#4613](https://github.com/shakenfist/shakenfist/issues/4613) tracks that.
+
+What *is* established, and what is not:
+
+- **The token exists.** `ANSIBLE_GALAXY_TOKEN` is a secret of the
+  `release` environment, not a repository secret and not an organisation
+  secret. Look for it under Settings > Environments > release, not under
+  Settings > Secrets. The publish step refuses to run when it resolves
+  empty, so a token moved to the wrong level fails with that sentence
+  rather than with a 401 from Galaxy.
+- **The namespace exists.** The `shakenfist` Galaxy namespace is owned by
+  `mikalstill` and `shakenfist-bot`, and already carries
+  `shakenfist.k3s` and `shakenfist.kerbside`.
+- **The artifact installs.** `tools/build-collection.py` installs the
+  tarball it just built into a temporary collections path and checks that
+  the manifest names `shakenfist.shakenfist` at the built version and
+  that a role and a module both survived packaging. That runs on every
+  pull request, not only on a tag, so a collection which builds but is
+  not usable fails long before a release.
+- **The publish itself is still unexercised.** Nothing short of a tag
+  push sends the HTTP request, so the Galaxy end -- the token's
+  permissions on that namespace, and whether Galaxy accepts the
+  version string setuptools_scm produces -- is unverified.
+
 ## Verifying a release
 
 ### Verify the signed tag
@@ -161,6 +191,22 @@ cosign verify-attestation \
 
 - Verify the Trusted Publisher is configured correctly in PyPI
 - Ensure the workflow filename and environment name match exactly
+
+### Ansible Galaxy publish fails
+
+- `ANSIBLE_GALAXY_SERVER_GALAXY_TOKEN: ... is empty` means the secret did
+  not resolve. It is an *environment* secret on `release`; check it is
+  still there and that the job still declares `environment: release`
+- A 401 or 403 from Galaxy means the token resolved but is not accepted:
+  regenerate it from the Galaxy profile of an owner of the `shakenfist`
+  namespace, and check that owner still owns it
+- A rejected version usually means the tag was not a plain `v0.X.Y`.
+  `tools/build-collection.py` converts the setuptools_scm version to
+  semver, and a local build (`python3 tools/build-collection.py`) prints
+  the collection version it would publish
+- This job has never succeeded, so a first failure is as likely to be the
+  job as the release; see
+  [The Ansible Galaxy publish has never run](#the-ansible-galaxy-publish-has-never-run)
 
 ### Tag signing fails
 

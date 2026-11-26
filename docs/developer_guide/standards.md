@@ -534,6 +534,17 @@ Current hooks:
   defaults or config template, `examples/_shared/site.yml` (whose wiring of
   those entry points it checks structurally), or the script change. The sanity-checks
   workflow runs the same script
+- `test-cross-node-reductions` - Runs `examples/_shared/site.yml`'s
+  cluster-wide reductions (`network_node_ip`, `mariadb_gateway_hosts`,
+  `all_mesh_hosts` and `max_hypervisor_mtu`) against a dry six-node
+  inventory, without root and without connecting to anything, by running
+  `tools/ci-test-cross-node-reductions.sh`. The expressions are extracted
+  from `site.yml` rather than copied, and the cases include a hypervisor
+  and a database node absent from the reachability probe -- the shape of the
+  2026-07-20 deploy failure, where a reduction over a runtime-gathered fact
+  was taken over the whole inventory group. It needs only `ansible-core`,
+  and only runs when `site.yml`, the script or the shared library changes.
+  The sanity-checks workflow runs the same script
 - `test-kerbside-wiring` - Checks how `examples/_shared/site.yml` and the node
   role's `kerbside_source` entry point wire in the `kerbside` role of the
   `shakenfist.kerbside` collection (which is tested in the Kerbside repository),
@@ -544,6 +555,15 @@ Current hooks:
   `requirements.yml`, the `kerbside_source` entry point, the node role's
   `argument_specs` or defaults, the `internal_ca` role or the script change. The
   sanity-checks workflow runs the same script
+
+The three rootless Ansible tests above share their sandbox --
+`fail`, `need`, the working directory, the collection symlink and the
+`ANSIBLE_*` environment which keeps a developer's own Ansible
+installation out of the run -- through `tools/ci-test-ansible-lib.sh`,
+which they source. Each keeps its own `run_play` and `assert_*` helpers,
+because each drives a different thing. `KEEP_WORK=1` leaves the working
+directory behind for any of them.
+
 - `flake8` - Style check via tox, on changed files
 - `py3` - Unit tests via tox
 - `check-from-db-by-ref-namespace` - Every `*_from_db_by_ref` call passes a

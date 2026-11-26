@@ -100,9 +100,16 @@ The modules require the Shaken Fist client SDK on the Ansible control node:
 pip install shakenfist-client
 ```
 
-(or `pip install -r requirements.txt` from the collection root). The control
-node never needs the Shaken Fist server package. The roles additionally
-require `ansible >= 2.15` (see `meta/runtime.yml`).
+(or `pip install -r requirements.txt` from the collection root, which asks
+for `shakenfist-client>=0.7.5` -- the first release carrying every client
+verb and keyword argument these modules pass). The control node never needs
+the Shaken Fist server package. The roles additionally require
+`ansible >= 2.15` (see `meta/runtime.yml`).
+
+That floor is advice rather than a dependency: `ansible-galaxy collection
+install` does not read `requirements.txt`, so it only helps a control node
+installed with `pip`. Below it the symptom is a `TypeError` or an
+`AttributeError` from inside a module rather than a resolution failure.
 
 `sf_claim` needs more than that. It calls the namespace capacity claim verbs
 (`get_namespace_claims`, `create_namespace_claim`, `update_namespace_claim`

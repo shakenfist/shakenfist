@@ -336,6 +336,17 @@ jobs:
           . /tmp/venv-test/bin/activate
           tools/ci-test-kerbside-cluster-config.sh
 
+      # Rootless run of site.yml's cluster-wide reductions against a dry
+      # six-node inventory, including the cases where a hypervisor or a
+      # database node did not answer the reachability probe. Needs only
+      # the ansible-core the lint step above installs, and connects to
+      # nothing: every host is ansible_connection=local.
+      - name: Test the cross-node reductions
+        timeout-minutes: 5
+        run: |
+          . /tmp/venv-test/bin/activate
+          tools/ci-test-cross-node-reductions.sh
+
       # Rootless test of how examples/_shared/site.yml and the node role's
       # kerbside_source entry point wire in the kerbside role, which lives in
       # Kerbside's shakenfist.kerbside collection and is tested there. Needs

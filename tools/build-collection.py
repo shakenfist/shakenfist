@@ -18,6 +18,8 @@
 #
 # Used by the build-collection job in .github/workflows/release.yml, and by
 # shakenfist/actions' deploy-collection.sh. Run from the repository root.
+import json
+import os
 import pathlib
 import re
 import shutil
@@ -30,6 +32,22 @@ from packaging.version import Version
 
 COLLECTION_DIR = pathlib.Path('shakenfist/deploy/collection')
 OUTPUT_DIR = pathlib.Path('dist-collection')
+
+NAMESPACE = 'shakenfist'
+NAME = 'shakenfist'
+
+# What has to be there once the tarball is installed. Not an inventory of
+# the collection -- it is the three things an installed copy is useless
+# without, chosen so this list does not have to be edited every time a
+# role or module is added: the manifest Galaxy reads, one native module
+# (so plugins/ was packaged at all), and one role's entry point (so
+# roles/ was too). A build_ignore entry or a packaging change which drops
+# either tree fails here instead of on an operator's control node.
+REQUIRED_INSTALLED_PATHS = (
+    pathlib.Path('MANIFEST.json'),
+    pathlib.Path('plugins/modules/sf_instance.py'),
+    pathlib.Path('roles/node/tasks/main.yml'),
+)
 
 
 def collection_version():
@@ -61,6 +79,58 @@ def collection_version():
     return raw, semver
 
 
+def verify_installable(galaxy_bin, tarball, semver):
+    """Install the tarball we just built, and check what comes out.
+
+    The release workflow's publish-collection job has never run (issue
+    #4613): no tag has been pushed since the job was added, so the only
+    thing which has ever been established about the artifact is that
+    ansible-galaxy was willing to build it. "Willing to build it" is not
+    "an operator can install it and get the roles": a build_ignore entry,
+    a packaging change or a rename can produce a tarball which builds
+    cleanly and installs to something unusable, and the first person to
+    find out would be whoever installed the first published release.
+
+    Installing from a local tarball needs no network -- galaxy.yml
+    declares no dependencies -- so this is a tar extraction and a few
+    stats, and it runs wherever the collection is built: the release
+    job, every pull request, and shakenfist/actions' deploy-collection.sh.
+    It does not exercise the publish itself, which only a tag can.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        dest = pathlib.Path(tmp) / 'collections'
+        # ANSIBLE_COLLECTIONS_PATH as well as --collections-path, only to
+        # keep the log readable: without it ansible-galaxy warns that the
+        # install path is not one of the configured collection paths,
+        # which is true, intended, and exactly the sort of line that
+        # misleads whoever is watching a release for the first time.
+        env = dict(os.environ, ANSIBLE_COLLECTIONS_PATH=str(dest))
+        subprocess.check_call([
+            str(galaxy_bin), 'collection', 'install', str(tarball),
+            '--collections-path', str(dest), '--force'], env=env)
+
+        installed = dest / 'ansible_collections' / NAMESPACE / NAME
+        missing = [str(path) for path in REQUIRED_INSTALLED_PATHS
+                   if not (installed / path).exists()]
+        if missing:
+            raise SystemExit(
+                'the built collection installed to %s without %s -- the '
+                'tarball is not a usable collection'
+                % (installed, ', '.join(sorted(missing))))
+
+        manifest = json.loads((installed / 'MANIFEST.json').read_text())
+        info = manifest.get('collection_info') or {}
+        found = (info.get('namespace'), info.get('name'), info.get('version'))
+        expected = (NAMESPACE, NAME, semver)
+        if found != expected:
+            raise SystemExit(
+                'the installed collection calls itself %s but it was built '
+                'as %s, so the version injected into the staged galaxy.yml '
+                'did not reach the artifact' % (found, expected))
+
+        print('Built collection installs as %s.%s %s' % expected)
+
+
 def main():
     raw, semver = collection_version()
     print('Shaken Fist version %s -> collection version %s' % (raw, semver))
@@ -84,6 +154,15 @@ def main():
         subprocess.check_call([
             str(galaxy_bin), 'collection', 'build', str(staged),
             '--output-path', str(OUTPUT_DIR), '--force'])
+
+    # Named rather than globbed: ansible-galaxy derives the file name from
+    # the staged galaxy.yml, so naming it here is also a check that it
+    # wrote the file we think it did. A glob would quietly verify a
+    # leftover tarball from an earlier build instead.
+    verify_installable(
+        galaxy_bin,
+        OUTPUT_DIR / ('%s-%s-%s.tar.gz' % (NAMESPACE, NAME, semver)),
+        semver)
 
 
 if __name__ == '__main__':

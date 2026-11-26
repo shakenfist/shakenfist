@@ -466,11 +466,14 @@ class InstanceCreationException(Exception):
 def _create_accepts_timeout(client):
     """Does this client's create_instance() take a timeout?
 
-    The collection requires shakenfist-client unpinned, so the control
-    node's client is whatever pip resolved and may predate the argument.
-    Feature-detect rather than assume: guessing wrong is a TypeError that
-    stops every instance creation, and there is no version to test
-    against that is not itself a guess about backports.
+    The collection's requirements.txt declares a floor, but it is not a
+    dependency anything enforces: ansible-galaxy collection install does
+    not read that file, so the control node's client is whatever is
+    installed there and may predate the argument. The floor is also below
+    the release which added it. Feature-detect rather than assume:
+    guessing wrong is a TypeError that stops every instance creation, and
+    there is no version to test against that is not itself a guess about
+    backports.
     """
     try:
         signature = inspect.signature(client.create_instance)
@@ -508,11 +511,11 @@ def _refusal_body(e):
 
     Read from e.text, which every client release back to v0.8.3 sets.
     e.headers would carry the Retry-After as well, but it exists only on
-    clients newer than any release, and the collection requires
-    shakenfist-client unpinned -- so the body is the only part of the
-    response this module can rely on. A proxy's HTML 507, a truncated body,
-    or JSON which is not an object is not a body the server wrote, and
-    reads as None.
+    clients newer than any release, and the client the control node has
+    is not one requirements.txt can insist on -- ansible-galaxy does not
+    read it -- so the body is the only part of the response this module
+    can rely on. A proxy's HTML 507, a truncated body, or JSON which is
+    not an object is not a body the server wrote, and reads as None.
     """
     try:
         body = json.loads(getattr(e, 'text', None))
@@ -1448,10 +1451,11 @@ def run_module():
             # returns as soon as the POST is accepted
             # (shakenfist/client-python#369).
             #
-            # The collection requires shakenfist-client unpinned, so the
-            # control node can be running a client older than the one that
-            # grew this argument -- it is not in any release up to and
-            # including v0.8.3. Passing it blindly there is a TypeError
+            # requirements.txt declares a floor, but it is below the
+            # release that grew this argument (it is not in any release up
+            # to and including v0.8.3), and ansible-galaxy does not read
+            # that file anyway -- so the control node can be running a
+            # client without it. Passing it blindly there is a TypeError
             # and every instance creation in the fleet stops working, so
             # ask before passing it. The elapsed-time deduction below
             # covers the older client: it cannot get the task down to
