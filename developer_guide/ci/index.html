@@ -16075,6 +16075,30 @@ deterministic if the test chose the nodes, and choosing two hypervisors
 which are <em>not</em> the network node is what makes it sharp, since after
 teardown the network must vanish from both while remaining on the
 network node.</p>
+<h3 id="reconciling-a-nodes-accounting-with-libvirt">Reconciling a node's accounting with libvirt<a class="headerlink" href="#reconciling-a-nodes-accounting-with-libvirt" title="Permanent link">&para;</a></h3>
+<p><code>cluster_ci_tests/test_nodes.py</code>'s
+<code>test_node_accounting_agrees_with_libvirt</code> is the one assertion which
+holds Shaken Fist's per-node accounting against the hypervisor rather
+than against another part of Shaken Fist. Three figures in an
+<code>/admin/resources</code> <code>per_node</code> entry are measurements of libvirt and not
+ledger entries -- <code>instances_active</code>, <code>cpu_measured</code> and <code>ram_measured</code>,
+all built in one pass over <code>get_active_sf_domains()</code> by <code>sf-resources</code>
+-- and both CPU and memory admission measure a node against them, so a
+node whose measurement has drifted from what it is running refuses or
+admits work on a number which is not true.</p>
+<p>The sample is one <code>sh -c</code> per node (<code>BaseTestCase._node_sf_domains()</code>),
+which prints the node's clock and then a <code>virsh dominfo</code> per active
+domain: one ssh round trip, because a reading is only worth comparing if
+nothing changed while it was taken. <code>/admin/resources</code> is read between
+two samples, and a node is judged only when those two agree. A node
+whose domains moved across the read is resampled, and a publish is
+allowed to catch up, so only a node which disagreed in every comparable
+reading fails.</p>
+<p>The parsing and the arithmetic live in <code>shakenfist_ci/accounting.py</code>,
+which imports nothing from the rest of the suite, for the reason
+<code>sizing.py</code> does: <code>shakenfist/tests/test_ci_node_accounting.py</code> loads it
+by path and exercises it on every pull request, where the test which
+calls it runs only in the merge queue.</p>
 <h3 id="credentials-go-through-the-environment-not-argv">Credentials go through the environment, not argv<a class="headerlink" href="#credentials-go-through-the-environment-not-argv" title="Permanent link">&para;</a></h3>
 <p><code>_exec()</code> in the command-line tests writes every command it runs to stderr,
 and the harness prints it again on failure. So the namespace key reaches
