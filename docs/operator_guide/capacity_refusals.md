@@ -2,7 +2,10 @@
 
 When the scheduler cannot place an instance because the cluster is full, the
 `POST /instances` request fails with an HTTP `507 Insufficient Storage` status.
-This document describes the response format and what it means.
+A namespace which has used all of the capacity its own
+[claim](scheduler.md#namespace-capacity-claims) declared is refused with an
+HTTP `403` instead, described [below](#the-403-for-a-namespace-over-its-claim).
+This document describes both responses and what they mean.
 
 ## Which refusals are transient
 
@@ -52,6 +55,12 @@ fifteen seconds, in an hour, or after every instance on it had been deleted:
 - **No suitable node** (`404`) -- not a capacity fact at all; a node named in
   the request is not in the active node list.
 
+**A refusal by the namespace's own claim** (`capacity_claim`) is a third kind,
+described [below](#the-403-for-a-namespace-over-its-claim). It is not
+transient, because no wait returns capacity the namespace is itself holding.
+It is not permanent in the sense of the list above either, because deleting
+the namespace's instances or growing its claim does clear it.
+
 ## Is the refusal queued server-side?
 
 No. When the scheduler cannot place an instance, the server refuses the
@@ -98,7 +107,9 @@ rather than settled.
 
 ## The response body
 
-A scheduling `507` returns a JSON body with four fields:
+A scheduling `507` returns a JSON body with four fields. (The `403` for a
+namespace over its claim carries two more, described
+[below](#the-403-for-a-namespace-over-its-claim).)
 
 ```json
 {
@@ -125,6 +136,11 @@ The `stage` field names where the refusal happened:
   this stage appears in a create's 507 and never in a placement query's
   answer; see [the placement query](scheduler.md).
 
+- **`capacity_claim`** -- the namespace has used the capacity its own claim
+  declared, and every candidate in the scheduler's walk was refused for that
+  reason. This is the one stage published with a `403` rather than a `507`; see
+  [below](#the-403-for-a-namespace-over-its-claim).
+
 - **`unknown`** -- the refusal reached the API carrying no stage. This is a
   defensive value that should never appear in normal operation; if you see it,
   report it. It is never marked transient.
@@ -138,6 +154,69 @@ the `stage` name: the classification lives in one place in the server
 (`TRANSIENT_CAPACITY_STAGES` in `shakenfist/constants.py`, re-exported by
 `shakenfist/external_api/base.py`), and a client that reproduces the list will
 drift from it.
+
+## The 403 for a namespace over its claim
+
+A [namespace capacity claim](scheduler.md#namespace-capacity-claims) is a
+ceiling the namespace declared for itself, and it is enforced: an instance
+which would take the namespace past it is refused. Every other capacity refusal
+is a `507` because the cluster cannot serve the request. This one is an HTTP
+`403 Forbidden`, because the cluster could have served it: what refused is the
+namespace's own ceiling, so the remedy belongs to whoever owns the claim rather
+than to whoever runs the cluster, and a client which read a `507` here would
+wait for capacity that is already free.
+
+```json
+{
+  "error": "namespace capacity claim <uuid> cannot admit this instance: it is over on cpus by 4. Grow the claim or delete instances in this namespace.",
+  "status": 403,
+  "stage": "capacity_claim",
+  "transient": false,
+  "claim": "uuid of the claim which refused",
+  "dimensions": [
+    {"dimension": "cpus", "limit": 16.0, "used": 14.0, "shortfall": 4.0}
+  ]
+}
+```
+
+`error`, `status`, `stage` and `transient` mean what they mean in a `507`.
+`stage` is always `capacity_claim` and `transient` is always `false`. The
+response carries **no `Retry-After` header at all**, because there is no wait to
+recommend: the capacity is not scarce on the cluster, it is held by the
+namespace's own instances.
+
+- **`claim`** is the uuid of the claim which refused.
+- **`dimensions`** lists *only* the dimensions which are actually over, each as
+  `dimension` plus, where the refusal could report them, `limit`, `used` and
+  `shortfall`. `shortfall` is defined in
+  [the subsystem internals](../developer_guide/subsystem_internals.md#scheduler-and-node-capacity-metrics).
+
+**`dimensions` can be empty, and that is meaningful.** The claim's
+uuid is taken from the row the refusing transaction named, but the figures are
+read after that transaction rolled back. If the claim was deleted or replaced in
+between, the response still says which claim refused but has no figures, and its
+message deliberately recommends nothing: telling an operator to grow a claim by
+four vCPUs is worse than saying nothing when the claim is already gone. Read
+`dimensions` as detail if there is any, never as a required field.
+
+What to do about one:
+
+- **Grow the claim** by the `shortfall` the body reports, per dimension, or
+- **delete instances** in the namespace, which returns what they were using.
+
+A `403` is published only when *every* candidate in the scheduler's walk was
+refused at the claim stage. That is all of them or none, because the claim's
+limits are namespace-denominated and do not depend on which node is asked. Any
+other mixture of refusing stages keeps its `507`. As with the `507`, read
+`transient` rather than the status code: `capacity_refusal_is_transient()`
+(`shakenfist/external_api/base.py`) answers `false` for `capacity_claim`, and
+the stage is in neither `TRANSIENT_CAPACITY_STAGES` nor the permanent set in
+`shakenfist/constants.py`.
+
+Only an admission which counts against the claim can be refused this way. A
+placement recorded for an instance which is already running on a node is not
+refusable, so a claim can still be found over its limits; the
+`placement admitted over namespace capacity claim` event records that.
 
 ## The refusal on the instance
 

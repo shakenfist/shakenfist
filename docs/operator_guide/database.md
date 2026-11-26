@@ -1072,12 +1072,15 @@ Two behaviours differ deliberately from instance admission:
   full, the reconciler simply has not built the row yet. Only the
   statements that need a total are refused this way: a shrink or an
   expiry change, which claim nothing, go through.
-- **Claim ceilings are advisory in this release.** The instance admission
-  transaction does not enforce the claim guard: a placement that pushes a
-  namespace past its claim is admitted, and the exceedance is detected by
-  reading the claim row back inside the same transaction and reported in
-  the reply, which `Instance` turns into a `placement admitted over
-  namespace capacity claim` audit event. See [the scheduler operator
+- **Claim ceilings are enforced.** The instance admission transaction
+  enforces the claim guard: a placement that would push a namespace past
+  its claim matches no row and is refused, and the create answers 403
+  (see [capacity refusals](capacity_refusals.md#the-403-for-a-namespace-over-its-claim)).
+  An admission which cannot be refused, an unguarded ground-truth write,
+  can still leave a claim over its limits; that is detected by reading the
+  claim row back inside the same transaction and reported in the reply,
+  which `Instance` turns into a `placement admitted over namespace
+  capacity claim` audit event. See [the scheduler operator
   guide](scheduler.md#namespace-capacity-claims) for the operator view.
   What was a single fail-open flag is split into three for this: the node
   and cluster guards keep failing open on a node with no capacity row,

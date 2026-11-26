@@ -318,11 +318,11 @@ Two decisions deliberately diverge from placement admission:
   its ordinary cadence; creating a claim unguarded writes a promise
   against totals nothing has computed, which the next pass folds into
   `claimed_*` whether it fits or not.
-- **Claim ceilings are advisory** for one release.
+- **Claim ceilings are enforced.**
   `_direct_admit_instance_placement()` splits what was a single
   `guarded = enforce and node_present` into `node_guarded`,
   `cluster_guarded` (both unchanged) and `claim_guarded = enforce and
-  CLAIM_ENFORCEMENT_HARD`, a module constant set `False`. The node and
+  CLAIM_ENFORCEMENT_HARD`, a module constant set `True`. The node and
   cluster fail-open is a statement about *this node's* limits being
   absent from the totals those guards test; a claim's limits are
   namespace-denominated and node-independent, so a missing node capacity
@@ -332,6 +332,13 @@ Two decisions deliberately diverge from placement admission:
   we hold the lock on, which the invariant permits — and returned in
   `claim_over_limit` / `claim_dimensions`, deliberately separate from
   `failing_stage` and `dimensions`, which both mean "this was refused".
+  An admission which was *refused* at the claim stage is a different
+  path: the guarded `UPDATE` matches no row, the transaction rolls back,
+  and when every candidate in the walk was refused that way the create
+  answers 403 rather than 507; see [capacity
+  refusals](../operator_guide/capacity_refusals.md#the-403-for-a-namespace-over-its-claim).
+  The read-back remains for the admissions which cannot be refused, the
+  unguarded ground-truth writes.
   `Instance._event_claim_over_limit()` turns them into the audit
   events -- one on the instance and the same facts again on the
   namespace, because a claim's own events die with the claim and the
@@ -341,10 +348,10 @@ Two decisions deliberately diverge from placement admission:
   Read-back rather than the probe-then-force idiom beside it because
   probe-then-force would make every create in a claimed namespace pay a
   probe round trip, and the namespaces that want claims are the ones
-  creating instances hardest; it also leaves the eventual flip to hard
-  enforcement as moving an existing predicate into a `WHERE` clause.
-  That flip is `CLAIM_ENFORCEMENT_HARD` and nothing else: do not add an
-  enforcement knob or a 403 path ahead of it.
+  creating instances hardest; it also made the flip to hard enforcement
+  a matter of moving an existing predicate into a `WHERE` clause.
+  That flip was `CLAIM_ENFORCEMENT_HARD` and nothing else, with no
+  separate enforcement knob ahead of it, and the 403 path arrived with it.
 
 `NamespaceClaim` (`shakenfist/namespace_claim.py`) is an ordinary
 `DatabaseBackedObject` over these rows, with two states that are two

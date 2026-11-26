@@ -209,9 +209,10 @@ Atomic reservation-table scheduling is being built per
 the capacity tables and their reconciler are described under
 [Guarded counters for finite resources](docs/developer_guide/database_internals.md#guarded-counters-for-finite-resources).
 Placement admission consumes those tables, and per-namespace capacity
-claims exist but their ceilings are advisory this release. Enforcing
-those ceilings and moving more pre-filter logic into SQL is still to
-come; the plan is where that work is tracked.
+claims exist and their ceilings are enforced: a namespace over its claim is
+refused with a 403 rather than the 507 of a full cluster. Moving more
+pre-filter logic into SQL is still to come; the plan is where that work is
+tracked.
 
 ## State Machines
 
