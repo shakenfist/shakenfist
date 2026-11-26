@@ -492,6 +492,17 @@ Current hooks:
   defaults or config template, `examples/_shared/site.yml` (whose wiring of
   those entry points it checks structurally), or the script change. The sanity-checks
   workflow runs the same script
+- `test-cross-node-reductions` - Runs `examples/_shared/site.yml`'s
+  cluster-wide reductions (`network_node_ip`, `mariadb_gateway_hosts`,
+  `all_mesh_hosts` and `max_hypervisor_mtu`) against a dry six-node
+  inventory, without root and without connecting to anything, by running
+  `tools/ci-test-cross-node-reductions.sh`. The expressions are extracted
+  from `site.yml` rather than copied, and the cases include a hypervisor
+  and a database node absent from the reachability probe -- the shape of the
+  2026-07-20 deploy failure, where a reduction over a runtime-gathered fact
+  was taken over the whole inventory group. It needs only `ansible-core`,
+  and only runs when `site.yml`, the script or the shared library changes.
+  The sanity-checks workflow runs the same script
 - `test-kerbside-wiring` - Checks how `examples/_shared/site.yml` and the node
   role's `kerbside_source` entry point wire in the `kerbside` role of the
   `shakenfist.kerbside` collection (which is tested in the Kerbside repository),
