@@ -16895,7 +16895,7 @@ many manual runs came before it. See
 <a href="/components/development/consistency-audits/">../consistency-audits.md</a> for what a run
 does.</p>
 <!-- consistency-audit:begin -->
-<p><em>Generated 2026-11-22T23:11:49.596779+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
+<p><em>Generated 2026-11-25T19:54:48.733652+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <h2 id="bypass-actor-identity">bypass-actor-identity<a class="headerlink" href="#bypass-actor-identity" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/bypass-actor-identity/">bypass-actor-identity.md</a></p>
 <table>
@@ -21181,7 +21181,7 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>client-python</strong> (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:142</li>
-<li><strong>private-ci</strong> (Status): 10 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:1585, docs/capacity-claims.md:248, docs/capacity-claims.md:249, docs/capacity-claims.md:1512, docs/capacity-claims.md:1545, docs/k3s-node-scaler.md:6, docs/k3s-node-scaler.md:12, docs/k3s-node-scaler.md:76, docs/k3s-node-scaler.md:171, docs/k3s-node-scaler.md:225</li>
+<li><strong>private-ci</strong> (Status): 10 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:1585, docs/capacity-claims.md:248, docs/capacity-claims.md:249, docs/capacity-claims.md:1521, docs/capacity-claims.md:1554, docs/k3s-node-scaler.md:6, docs/k3s-node-scaler.md:12, docs/k3s-node-scaler.md:76, docs/k3s-node-scaler.md:171, docs/k3s-node-scaler.md:225</li>
 </ul>
 <h2 id="plan-retirement">plan-retirement<a class="headerlink" href="#plan-retirement" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/plan-retirement/">plan-retirement.md</a></p>
@@ -21211,8 +21211,8 @@ does.</p>
 </tr>
 <tr>
 <td>client-python</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/459" title="GitHub Issue: shakenfist/client-python #459">client-python#459</a></td>
 </tr>
 <tr>
 <td>client-python-k3s</td>
@@ -21236,8 +21236,8 @@ does.</p>
 </tr>
 <tr>
 <td>development</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/441" title="GitHub Issue: shakenfist/development #441">development#441</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>divergulent</td>
@@ -21261,8 +21261,8 @@ does.</p>
 </tr>
 <tr>
 <td>kerbside</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/730" title="GitHub Issue: shakenfist/kerbside #730">kerbside#730</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside-client</td>
@@ -21301,8 +21301,8 @@ does.</p>
 </tr>
 <tr>
 <td>shakenfist</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/5037" title="GitHub Issue: shakenfist/shakenfist #5037">shakenfist#5037</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>uncalibrated-sextant</td>
@@ -21318,13 +21318,11 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>development</strong> (Status): 2 plan(s) terminal for more than 90 days: PLAN-consistency.md (Superseded, at least 90 days), PLAN-llm-doc-structure.md (Complete, at least 90 days); 16 terminal plan(s) not yet eligible</li>
-<li><strong>divergulent</strong> (Status): 2 plan(s) terminal for more than 90 days: PLAN-initial.md (Complete, at least 90 days), PLAN-prompt-injection-screening.md (Complete, at least 90 days); 2 terminal plan(s) not yet eligible; 3 row(s) already retired: PLAN-faster-full-run.md, PLAN-full-machine-run.md, PLAN-generated-marking.md</li>
-<li><strong>instar</strong> (Status): 23 plan(s) terminal for more than 90 days: PLAN-375-guest-idt.md (Complete, at least 91 days), PLAN-audit.md (Complete, at least 91 days), PLAN-bench-refcount-growth.md (Complete, at least 91 days), PLAN-bench.md (Complete, at least 91 days), PLAN-bitmap.md (Complete, at least 91 days) (+18 more); 7 terminal plan(s) not yet eligible; 1 row(s) already retired: PLAN-dd.md</li>
-<li><strong>kerbside</strong> (Status): 3 plan(s) terminal for more than 90 days: PLAN-demo-install.md (Complete, at least 90 days), PLAN-sfui-conversion.md (Complete, at least 90 days), PLAN-two-tier-ci.md (Complete, at least 90 days); 6 terminal plan(s) not yet eligible; 4 row(s) already retired: PLAN-host-subject.md, PLAN-kerbside-vdi-tokens.md, PLAN-rust-proxy.md, PLAN-test-harness.md; 1 row(s) naming a plan in another repository: line 35</li>
+<li><strong>client-python</strong> (Status): 1 plan(s) terminal for more than 90 days: PLAN-vdi-console-tokens.md (Complete, at least 91 days); 2 terminal plan(s) not yet eligible</li>
+<li><strong>divergulent</strong> (Status): 2 plan(s) terminal for more than 90 days: PLAN-initial.md (Complete, at least 93 days), PLAN-prompt-injection-screening.md (Complete, at least 93 days); 2 terminal plan(s) not yet eligible; 3 row(s) already retired: PLAN-faster-full-run.md, PLAN-full-machine-run.md, PLAN-generated-marking.md</li>
+<li><strong>instar</strong> (Status): 24 plan(s) terminal for more than 90 days: PLAN-375-guest-idt.md (Complete, at least 90 days), PLAN-amend.md (Complete, at least 90 days), PLAN-audit.md (Complete, at least 90 days), PLAN-bench-refcount-growth.md (Complete, at least 90 days), PLAN-bench.md (Complete, at least 90 days) (+19 more); 6 terminal plan(s) not yet eligible; 1 row(s) already retired: PLAN-dd.md</li>
 <li><strong>ryll</strong> (Status): 20 plan(s) terminal for more than 90 days: PLAN-bug-reports.md (Complete, at least 90 days), PLAN-bugreport-trigger-snapshot.md (Complete, at least 90 days), PLAN-capture.md (Complete, at least 90 days), PLAN-cursor-rendering.md (Complete, at least 90 days), PLAN-display-draw-ops.md (Complete, at least 90 days) (+15 more); 2 terminal plan(s) not yet eligible; 6 row(s) already retired: PLAN-crate-extraction.md, PLAN-deferred-debt.md, PLAN-hamburger-menu.md, PLAN-initial.md, PLAN-pip-distribution.md (+1 more); 12 plan(s) in 1 table(s) with no Status column, which can never become eligible: OPEN-QUESTIONS.md, PLAN-crate-release.md, PLAN-display-iteration-followups.md, PLAN-macbook-bugreport-fixes.md, PLAN-main-event-drops.md (+7 more)</li>
-<li><strong>shakenfist</strong> (Status): 3 plan(s) terminal for more than 90 days: PLAN-artifact-fetch-retry-with-backoff.md (Complete, at least 90 days), PLAN-attribute-field-masks.md (Complete, at least 90 days), PLAN-ci-node-exec-assertions.md (Complete, at least 90 days); 12 terminal plan(s) not yet eligible; 13 row(s) already retired: PLAN-auth-federation.md, PLAN-byo-mariadb.md, PLAN-eventlog-direct-mariadb.md, PLAN-fix-cluster-operation-targets-unique-constraint.md, PLAN-health-checks.md (+8 more)</li>
-<li><strong>uncalibrated-sextant</strong> (Status): 1 plan(s) terminal for more than 90 days: PLAN-first-playable.md (Complete, at least 118 days); 7 terminal plan(s) not yet eligible</li>
+<li><strong>uncalibrated-sextant</strong> (Status): 1 plan(s) terminal for more than 90 days: PLAN-first-playable.md (Complete, at least 120 days); 7 terminal plan(s) not yet eligible</li>
 </ul>
 <h2 id="plan-source-references">plan-source-references<a class="headerlink" href="#plan-source-references" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/plan-source-references/">plan-source-references.md</a></p>
@@ -21379,8 +21377,8 @@ does.</p>
 </tr>
 <tr>
 <td>development</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/448" title="GitHub Issue: shakenfist/development #448">development#448</a></td>
 </tr>
 <tr>
 <td>divergulent</td>
@@ -21399,8 +21397,8 @@ does.</p>
 </tr>
 <tr>
 <td>instar</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/977" title="GitHub Issue: shakenfist/instar #977">instar#977</a></td>
 </tr>
 <tr>
 <td>kerbside</td>
@@ -21462,6 +21460,8 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>client-python</strong> (Status): 2 of 4 plan reference(s) in source or configuration do not resolve, in 2 file(s) (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository)</li>
+<li><strong>development</strong> (Status): 2 of 2 plan reference(s) in source or configuration do not resolve, in 1 file(s) (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository)</li>
+<li><strong>instar</strong> (Status): 1 of 134 plan reference(s) in source or configuration do not resolve, in 1 file(s) (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository)</li>
 <li><strong>private-ci</strong> (Status): 4 of 169 plan reference(s) in source or configuration do not resolve, in 3 file(s) (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository)</li>
 </ul>
 <h2 id="plan-template">plan-template<a class="headerlink" href="#plan-template" title="Permanent link">&para;</a></h2>
@@ -21747,8 +21747,8 @@ does.</p>
 <tbody>
 <tr>
 <td>actions</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/255" title="GitHub Issue: shakenfist/actions #255">actions#255</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>agent-python</td>
@@ -21812,8 +21812,8 @@ does.</p>
 </tr>
 <tr>
 <td>kerbside</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/729" title="GitHub Issue: shakenfist/kerbside #729">kerbside#729</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside-client</td>
@@ -21869,10 +21869,8 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>actions</strong> (Status): shared block source-file-size is stale (v1 embedded, v2 current; copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)</li>
 <li><strong>client-python-k3s</strong> (Status): shared block source-file-size is stale (v1 embedded, v2 current; copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)</li>
 <li><strong>divergulent</strong> (Status): shared block source-file-size is stale (v1 embedded, v2 current; copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)</li>
-<li><strong>kerbside</strong> (Status): shared block source-file-size is stale (v1 embedded, v2 current; copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)</li>
 <li><strong>occystrap</strong> (Status): shared block source-file-size is stale (v1 embedded, v2 current; copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)</li>
 <li><strong>uncalibrated-sextant</strong> (Status): shared block source-file-size is stale (v1 embedded, v2 current; copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)</li>
 </ul>
@@ -23094,8 +23092,8 @@ does.</p>
 <tbody>
 <tr>
 <td>actions</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/268" title="GitHub Issue: shakenfist/actions #268">actions#268</a></td>
 </tr>
 <tr>
 <td>agent-python</td>
@@ -23104,8 +23102,8 @@ does.</p>
 </tr>
 <tr>
 <td>andris</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/andris/issues/114" title="GitHub Issue: shakenfist/andris #114">andris#114</a></td>
 </tr>
 <tr>
 <td>client-python</td>
@@ -23124,8 +23122,8 @@ does.</p>
 </tr>
 <tr>
 <td>clingwrap</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/clingwrap/issues/159" title="GitHub Issue: shakenfist/clingwrap #159">clingwrap#159</a></td>
 </tr>
 <tr>
 <td>cloudgood</td>
@@ -23144,8 +23142,8 @@ does.</p>
 </tr>
 <tr>
 <td>hunkydory</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/hunkydory/issues/175" title="GitHub Issue: shakenfist/hunkydory #175">hunkydory#175</a></td>
 </tr>
 <tr>
 <td>images</td>
@@ -23154,33 +23152,33 @@ does.</p>
 </tr>
 <tr>
 <td>instar</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/978" title="GitHub Issue: shakenfist/instar #978">instar#978</a></td>
 </tr>
 <tr>
 <td>kerbside</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/770" title="GitHub Issue: shakenfist/kerbside #770">kerbside#770</a></td>
 </tr>
 <tr>
 <td>kerbside-client</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside-client/issues/36" title="GitHub Issue: shakenfist/kerbside-client #36">kerbside-client#36</a></td>
 </tr>
 <tr>
 <td>kerbside-patches</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside-patches/issues/2149" title="GitHub Issue: shakenfist/kerbside-patches #2149">kerbside-patches#2149</a></td>
 </tr>
 <tr>
 <td>library-utilities</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/library-utilities/issues/104" title="GitHub Issue: shakenfist/library-utilities #104">library-utilities#104</a></td>
 </tr>
 <tr>
 <td>occystrap</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/occystrap/issues/207" title="GitHub Issue: shakenfist/occystrap #207">occystrap#207</a></td>
 </tr>
 <tr>
 <td>private-ci</td>
@@ -23189,39 +23187,54 @@ does.</p>
 </tr>
 <tr>
 <td>ryll</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/806" title="GitHub Issue: shakenfist/ryll #806">ryll#806</a></td>
 </tr>
 <tr>
 <td>sfui</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/sfui/issues/84" title="GitHub Issue: shakenfist/sfui #84">sfui#84</a></td>
 </tr>
 <tr>
 <td>shakenfist</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/5079" title="GitHub Issue: shakenfist/shakenfist #5079">shakenfist#5079</a></td>
 </tr>
 <tr>
 <td>uncalibrated-sextant</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/uncalibrated-sextant/issues/38" title="GitHub Issue: shakenfist/uncalibrated-sextant #38">uncalibrated-sextant#38</a></td>
 </tr>
 <tr>
 <td>visual-digest-rust</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/visual-digest-rust/issues/83" title="GitHub Issue: shakenfist/visual-digest-rust #83">visual-digest-rust#83</a></td>
 </tr>
 </tbody>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>agent-python</strong> (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json extends neither local&gt;shakenfist/development:renovate-fleet nor customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped; .pre-commit-config.yaml uses shellcheck-py/shellcheck-py but renovate.json has no versioning packageRule for it, itself or by extending local&gt;shakenfist/development:renovate-fleet, so the github-tags lookup fails on its four-part tags and the hook revision is never bumped</li>
-<li><strong>client-python</strong> (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json extends neither local&gt;shakenfist/development:renovate-fleet nor customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped; .pre-commit-config.yaml uses shellcheck-py/shellcheck-py but renovate.json has no versioning packageRule for it, itself or by extending local&gt;shakenfist/development:renovate-fleet, so the github-tags lookup fails on its four-part tags and the hook revision is never bumped</li>
-<li><strong>client-python-k3s</strong> (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json extends neither local&gt;shakenfist/development:renovate-fleet nor customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped; .pre-commit-config.yaml uses shellcheck-py/shellcheck-py but renovate.json has no versioning packageRule for it, itself or by extending local&gt;shakenfist/development:renovate-fleet, so the github-tags lookup fails on its four-part tags and the hook revision is never bumped</li>
-<li><strong>client-python-ova</strong> (Status): .pre-commit-config.yaml uses shellcheck-py/shellcheck-py but renovate.json has no versioning packageRule for it, itself or by extending local&gt;shakenfist/development:renovate-fleet, so the github-tags lookup fails on its four-part tags and the hook revision is never bumped</li>
-<li><strong>cloudgood</strong> (Status): renovate.yml differs from templates/renovate/renovate.yml beyond the versions Renovate bumps (line 59 is <code>- name: Self-hosted Renovate</code> where the template has <code># A requirements file pinned with --hash lines needs hashin, which</code>; the template's <code>run: |</code> is missing before line 63; line 69 is <code>run: npx --yes "renovate@${PINNED_RENOVATE_VERSION}"</code> where the template has <code>run: "${RUNNER_TEMP}/renovate-bin/node_modules/.bin/renovate"</code>); copy the template verbatim</li>
-<li><strong>divergulent</strong> (Status): renovate.yml differs from templates/renovate/renovate.yml beyond the versions Renovate bumps (line 98, <code># npm rebuild exits 0 when no package matched, so a Renovate</code>, is not in the template; line 104, <code># Renovate's lockfile/artifact refresh runs package managers of</code>, is not in the template; line 116, <code>RENOVATE_ALLOW_SCRIPTS: "false"</code>, is not in the template); copy the template verbatim</li>
+<li><strong>actions</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>agent-python</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>andris</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>client-python</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>client-python-k3s</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>client-python-ova</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>clingwrap</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>cloudgood</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>divergulent</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>hunkydory</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>instar</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>kerbside</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>kerbside-client</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>kerbside-patches</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>library-utilities</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>occystrap</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>ryll</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>sfui</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>shakenfist</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>uncalibrated-sextant</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
+<li><strong>visual-digest-rust</strong> (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local&gt;shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local&gt;shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about</li>
 </ul>
 <h2 id="reusable-workflow-secrets">reusable-workflow-secrets<a class="headerlink" href="#reusable-workflow-secrets" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/reusable-workflow-secrets/">reusable-workflow-secrets.md</a></p>
@@ -23409,8 +23422,8 @@ does.</p>
 </tr>
 <tr>
 <td>development</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/449" title="GitHub Issue: shakenfist/development #449">development#449</a></td>
 </tr>
 <tr>
 <td>divergulent</td>
@@ -23491,10 +23504,11 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>andris</strong> (Status): 8 of 136 in-scope files reviewed at HEAD (8 imported from shakenfist/development); 128 need review (threshold 5)</li>
-<li><strong>kerbside</strong> (Status): 84 of 378 in-scope files reviewed at HEAD (7 imported from shakenfist/development); 294 need review (threshold 5)</li>
-<li><strong>kerbside-client</strong> (Status): 6 of 30 in-scope files reviewed at HEAD (6 imported from shakenfist/development); 24 need review (threshold 5)</li>
-<li><strong>sfui</strong> (Status): 5 of 49 in-scope files reviewed at HEAD (5 imported from shakenfist/development); 44 need review (threshold 5)</li>
+<li><strong>andris</strong> (Status): 9 of 140 in-scope files reviewed at HEAD (9 imported from shakenfist/development); 131 need review (threshold 5)</li>
+<li><strong>development</strong> (Status): 236 of 253 in-scope files reviewed at HEAD; 17 need review (threshold 5)</li>
+<li><strong>kerbside</strong> (Status): 129 of 378 in-scope files reviewed at HEAD (7 imported from shakenfist/development); 249 need review (threshold 5)</li>
+<li><strong>kerbside-client</strong> (Status): 7 of 30 in-scope files reviewed at HEAD (7 imported from shakenfist/development); 23 need review (threshold 5)</li>
+<li><strong>sfui</strong> (Status): 6 of 49 in-scope files reviewed at HEAD (6 imported from shakenfist/development); 43 need review (threshold 5)</li>
 </ul>
 <h2 id="review-scope-completeness">review-scope-completeness<a class="headerlink" href="#review-scope-completeness" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/review-scope-completeness/">review-scope-completeness.md</a></p>
@@ -23574,8 +23588,8 @@ does.</p>
 </tr>
 <tr>
 <td>kerbside</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/731" title="GitHub Issue: shakenfist/kerbside #731">kerbside#731</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside-client</td>
@@ -23629,10 +23643,6 @@ does.</p>
 </tr>
 </tbody>
 </table>
-<p>Details for non-compliant projects:</p>
-<ul>
-<li><strong>kerbside</strong> (Status): 1 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them</li>
-</ul>
 <h2 id="review-tracking-templates">review-tracking-templates<a class="headerlink" href="#review-tracking-templates" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/review-tracking-templates/">review-tracking-templates.md</a></p>
 <table>
@@ -23646,8 +23656,8 @@ does.</p>
 <tbody>
 <tr>
 <td>actions</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/263" title="GitHub Issue: shakenfist/actions #263">actions#263</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>agent-python</td>
@@ -23656,8 +23666,8 @@ does.</p>
 </tr>
 <tr>
 <td>andris</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/andris/issues/104" title="GitHub Issue: shakenfist/andris #104">andris#104</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>client-python</td>
@@ -23696,8 +23706,8 @@ does.</p>
 </tr>
 <tr>
 <td>hunkydory</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/hunkydory/issues/174" title="GitHub Issue: shakenfist/hunkydory #174">hunkydory#174</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>images</td>
@@ -23716,8 +23726,8 @@ does.</p>
 </tr>
 <tr>
 <td>kerbside-client</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside-client/issues/35" title="GitHub Issue: shakenfist/kerbside-client #35">kerbside-client#35</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside-patches</td>
@@ -23746,8 +23756,8 @@ does.</p>
 </tr>
 <tr>
 <td>sfui</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/sfui/issues/81" title="GitHub Issue: shakenfist/sfui #81">sfui#81</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>shakenfist</td>
@@ -23766,14 +23776,6 @@ does.</p>
 </tr>
 </tbody>
 </table>
-<p>Details for non-compliant projects:</p>
-<ul>
-<li><strong>actions</strong> (Status): .github/workflows/prune-reviews.yml differs from templates/review-tracking/prune-reviews.yml. Copy them byte for byte from templates/review-tracking/ in shakenfist/development</li>
-<li><strong>andris</strong> (Status): .github/workflows/prune-reviews.yml differs from templates/review-tracking/prune-reviews.yml. Copy them byte for byte from templates/review-tracking/ in shakenfist/development</li>
-<li><strong>hunkydory</strong> (Status): .github/workflows/prune-reviews.yml differs from templates/review-tracking/prune-reviews.yml. Copy them byte for byte from templates/review-tracking/ in shakenfist/development</li>
-<li><strong>kerbside-client</strong> (Status): .github/workflows/prune-reviews.yml differs from templates/review-tracking/prune-reviews.yml. Copy them byte for byte from templates/review-tracking/ in shakenfist/development</li>
-<li><strong>sfui</strong> (Status): .github/workflows/prune-reviews.yml differs from templates/review-tracking/prune-reviews.yml. Copy them byte for byte from templates/review-tracking/ in shakenfist/development</li>
-</ul>
 <h2 id="rust-unwrap-lint">rust-unwrap-lint<a class="headerlink" href="#rust-unwrap-lint" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/rust-unwrap-lint/">rust-unwrap-lint.md</a></p>
 <table>
@@ -24522,7 +24524,7 @@ does.</p>
 <tr>
 <td>kerbside</td>
 <td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/732" title="GitHub Issue: shakenfist/kerbside #732">kerbside#732</a></td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/771" title="GitHub Issue: shakenfist/kerbside #771">kerbside#771</a></td>
 </tr>
 <tr>
 <td>kerbside-client</td>
@@ -24552,7 +24554,7 @@ does.</p>
 <tr>
 <td>ryll</td>
 <td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/751" title="GitHub Issue: shakenfist/ryll #751">ryll#751</a></td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/807" title="GitHub Issue: shakenfist/ryll #807">ryll#807</a></td>
 </tr>
 <tr>
 <td>sfui</td>
@@ -24578,9 +24580,9 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>kerbside</strong> (Status): kerbside/api/static/sfui: 18 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
-<li><strong>private-ci</strong> (Status): conductor/static/sfui: 40 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
-<li><strong>ryll</strong> (Status): ryll/src/web/assets/sfui: 5 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
+<li><strong>kerbside</strong> (Status): kerbside/api/static/sfui: 1 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
+<li><strong>private-ci</strong> (Status): conductor/static/sfui: 41 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
+<li><strong>ryll</strong> (Status): ryll/src/web/assets/sfui: 1 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
 </ul>
 <h2 id="undeclared-direct-dependency">undeclared-direct-dependency<a class="headerlink" href="#undeclared-direct-dependency" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/undeclared-direct-dependency/">undeclared-direct-dependency.md</a></p>
@@ -24700,8 +24702,8 @@ does.</p>
 </tr>
 <tr>
 <td>shakenfist</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/5038" title="GitHub Issue: shakenfist/shakenfist #5038">shakenfist#5038</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>uncalibrated-sextant</td>
@@ -24715,10 +24717,6 @@ does.</p>
 </tr>
 </tbody>
 </table>
-<p>Details for non-compliant projects:</p>
-<ul>
-<li><strong>shakenfist</strong> (Status): Imported but declared only as a transitive pin: annotated-types (pyproject.toml:145). Declare each above the # START_OF_INDIRECT_DEPS marker; the reconciler drops the generated copy on its next run</li>
-</ul>
 <h2 id="unused-declared-dependency">unused-declared-dependency<a class="headerlink" href="#unused-declared-dependency" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/unused-declared-dependency/">unused-declared-dependency.md</a></p>
 <table>
