@@ -26,7 +26,7 @@ many manual runs came before it. See
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-11-22T23:11:49.596779+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-11-25T19:54:48.733652+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## bypass-actor-identity
 
@@ -1049,7 +1049,7 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 Details for non-compliant projects:
 
 - **client-python** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:142
-- **private-ci** (Status): 10 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:1585, docs/capacity-claims.md:248, docs/capacity-claims.md:249, docs/capacity-claims.md:1512, docs/capacity-claims.md:1545, docs/k3s-node-scaler.md:6, docs/k3s-node-scaler.md:12, docs/k3s-node-scaler.md:76, docs/k3s-node-scaler.md:171, docs/k3s-node-scaler.md:225
+- **private-ci** (Status): 10 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:1585, docs/capacity-claims.md:248, docs/capacity-claims.md:249, docs/capacity-claims.md:1521, docs/capacity-claims.md:1554, docs/k3s-node-scaler.md:6, docs/k3s-node-scaler.md:12, docs/k3s-node-scaler.md:76, docs/k3s-node-scaler.md:171, docs/k3s-node-scaler.md:225
 
 ## plan-retirement
 
@@ -1060,17 +1060,17 @@ Criterion: [plan-retirement.md](/components/development/audits/plan-retirement/)
 | actions | compliant | - |
 | agent-python | N/A | - |
 | andris | compliant | - |
-| client-python | compliant | - |
+| client-python | non-compliant | shakenfist/client-python#459 |
 | client-python-k3s | compliant | - |
 | client-python-ova | compliant | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
-| development | non-compliant | shakenfist/development#441 |
+| development | compliant | - |
 | divergulent | non-compliant | shakenfist/divergulent#160 |
 | hunkydory | N/A | - |
 | images | N/A | - |
 | instar | non-compliant | shakenfist/instar#958 |
-| kerbside | non-compliant | shakenfist/kerbside#730 |
+| kerbside | compliant | - |
 | kerbside-client | N/A | - |
 | kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
@@ -1078,19 +1078,17 @@ Criterion: [plan-retirement.md](/components/development/audits/plan-retirement/)
 | private-ci | compliant | - |
 | ryll | non-compliant | shakenfist/ryll#734 |
 | sfui | compliant | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#5037 |
+| shakenfist | compliant | - |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#29 |
 | visual-digest-rust | N/A | - |
 
 Details for non-compliant projects:
 
-- **development** (Status): 2 plan(s) terminal for more than 90 days: PLAN-consistency.md (Superseded, at least 90 days), PLAN-llm-doc-structure.md (Complete, at least 90 days); 16 terminal plan(s) not yet eligible
-- **divergulent** (Status): 2 plan(s) terminal for more than 90 days: PLAN-initial.md (Complete, at least 90 days), PLAN-prompt-injection-screening.md (Complete, at least 90 days); 2 terminal plan(s) not yet eligible; 3 row(s) already retired: PLAN-faster-full-run.md, PLAN-full-machine-run.md, PLAN-generated-marking.md
-- **instar** (Status): 23 plan(s) terminal for more than 90 days: PLAN-375-guest-idt.md (Complete, at least 91 days), PLAN-audit.md (Complete, at least 91 days), PLAN-bench-refcount-growth.md (Complete, at least 91 days), PLAN-bench.md (Complete, at least 91 days), PLAN-bitmap.md (Complete, at least 91 days) (+18 more); 7 terminal plan(s) not yet eligible; 1 row(s) already retired: PLAN-dd.md
-- **kerbside** (Status): 3 plan(s) terminal for more than 90 days: PLAN-demo-install.md (Complete, at least 90 days), PLAN-sfui-conversion.md (Complete, at least 90 days), PLAN-two-tier-ci.md (Complete, at least 90 days); 6 terminal plan(s) not yet eligible; 4 row(s) already retired: PLAN-host-subject.md, PLAN-kerbside-vdi-tokens.md, PLAN-rust-proxy.md, PLAN-test-harness.md; 1 row(s) naming a plan in another repository: line 35
+- **client-python** (Status): 1 plan(s) terminal for more than 90 days: PLAN-vdi-console-tokens.md (Complete, at least 91 days); 2 terminal plan(s) not yet eligible
+- **divergulent** (Status): 2 plan(s) terminal for more than 90 days: PLAN-initial.md (Complete, at least 93 days), PLAN-prompt-injection-screening.md (Complete, at least 93 days); 2 terminal plan(s) not yet eligible; 3 row(s) already retired: PLAN-faster-full-run.md, PLAN-full-machine-run.md, PLAN-generated-marking.md
+- **instar** (Status): 24 plan(s) terminal for more than 90 days: PLAN-375-guest-idt.md (Complete, at least 90 days), PLAN-amend.md (Complete, at least 90 days), PLAN-audit.md (Complete, at least 90 days), PLAN-bench-refcount-growth.md (Complete, at least 90 days), PLAN-bench.md (Complete, at least 90 days) (+19 more); 6 terminal plan(s) not yet eligible; 1 row(s) already retired: PLAN-dd.md
 - **ryll** (Status): 20 plan(s) terminal for more than 90 days: PLAN-bug-reports.md (Complete, at least 90 days), PLAN-bugreport-trigger-snapshot.md (Complete, at least 90 days), PLAN-capture.md (Complete, at least 90 days), PLAN-cursor-rendering.md (Complete, at least 90 days), PLAN-display-draw-ops.md (Complete, at least 90 days) (+15 more); 2 terminal plan(s) not yet eligible; 6 row(s) already retired: PLAN-crate-extraction.md, PLAN-deferred-debt.md, PLAN-hamburger-menu.md, PLAN-initial.md, PLAN-pip-distribution.md (+1 more); 12 plan(s) in 1 table(s) with no Status column, which can never become eligible: OPEN-QUESTIONS.md, PLAN-crate-release.md, PLAN-display-iteration-followups.md, PLAN-macbook-bugreport-fixes.md, PLAN-main-event-drops.md (+7 more)
-- **shakenfist** (Status): 3 plan(s) terminal for more than 90 days: PLAN-artifact-fetch-retry-with-backoff.md (Complete, at least 90 days), PLAN-attribute-field-masks.md (Complete, at least 90 days), PLAN-ci-node-exec-assertions.md (Complete, at least 90 days); 12 terminal plan(s) not yet eligible; 13 row(s) already retired: PLAN-auth-federation.md, PLAN-byo-mariadb.md, PLAN-eventlog-direct-mariadb.md, PLAN-fix-cluster-operation-targets-unique-constraint.md, PLAN-health-checks.md (+8 more)
-- **uncalibrated-sextant** (Status): 1 plan(s) terminal for more than 90 days: PLAN-first-playable.md (Complete, at least 118 days); 7 terminal plan(s) not yet eligible
+- **uncalibrated-sextant** (Status): 1 plan(s) terminal for more than 90 days: PLAN-first-playable.md (Complete, at least 120 days); 7 terminal plan(s) not yet eligible
 
 ## plan-source-references
 
@@ -1106,11 +1104,11 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 | client-python-ova | compliant | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
-| development | compliant | - |
+| development | non-compliant | shakenfist/development#448 |
 | divergulent | compliant | - |
 | hunkydory | N/A | - |
 | images | N/A | - |
-| instar | compliant | - |
+| instar | non-compliant | shakenfist/instar#977 |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
@@ -1126,6 +1124,8 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 Details for non-compliant projects:
 
 - **client-python** (Status): 2 of 4 plan reference(s) in source or configuration do not resolve, in 2 file(s) (update the path, or use an absolute https://github.com/... URL for a plan in another repository)
+- **development** (Status): 2 of 2 plan reference(s) in source or configuration do not resolve, in 1 file(s) (update the path, or use an absolute https://github.com/... URL for a plan in another repository)
+- **instar** (Status): 1 of 134 plan reference(s) in source or configuration do not resolve, in 1 file(s) (update the path, or use an absolute https://github.com/... URL for a plan in another repository)
 - **private-ci** (Status): 4 of 169 plan reference(s) in source or configuration do not resolve, in 3 file(s) (update the path, or use an absolute https://github.com/... URL for a plan in another repository)
 
 ## plan-template
@@ -1200,7 +1200,7 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | non-compliant | shakenfist/actions#255 |
+| actions | compliant | - |
 | agent-python | N/A | - |
 | andris | compliant | - |
 | client-python | N/A | - |
@@ -1213,7 +1213,7 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 | hunkydory | compliant | - |
 | images | N/A | - |
 | instar | compliant | - |
-| kerbside | non-compliant | shakenfist/kerbside#729 |
+| kerbside | compliant | - |
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
@@ -1227,10 +1227,8 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 
 Details for non-compliant projects:
 
-- **actions** (Status): shared block source-file-size is stale (v1 embedded, v2 current; copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
 - **client-python-k3s** (Status): shared block source-file-size is stale (v1 embedded, v2 current; copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
 - **divergulent** (Status): shared block source-file-size is stale (v1 embedded, v2 current; copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
-- **kerbside** (Status): shared block source-file-size is stale (v1 embedded, v2 current; copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
 - **occystrap** (Status): shared block source-file-size is stale (v1 embedded, v2 current; copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
 - **uncalibrated-sextant** (Status): shared block source-file-size is stale (v1 embedded, v2 current; copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
 
@@ -1527,39 +1525,54 @@ Criterion: [renovate.md](/components/development/audits/renovate/)
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | compliant | - |
+| actions | non-compliant | shakenfist/actions#268 |
 | agent-python | non-compliant | shakenfist/agent-python#159 |
-| andris | compliant | - |
+| andris | non-compliant | shakenfist/andris#114 |
 | client-python | non-compliant | shakenfist/client-python#437 |
 | client-python-k3s | non-compliant | shakenfist/client-python-k3s#158 |
 | client-python-ova | non-compliant | shakenfist/client-python-ova#64 |
-| clingwrap | compliant | - |
+| clingwrap | non-compliant | shakenfist/clingwrap#159 |
 | cloudgood | non-compliant | shakenfist/cloudgood#26 |
 | development | compliant | - |
 | divergulent | non-compliant | shakenfist/divergulent#150 |
-| hunkydory | compliant | - |
+| hunkydory | non-compliant | shakenfist/hunkydory#175 |
 | images | N/A | - |
-| instar | compliant | - |
-| kerbside | compliant | - |
-| kerbside-client | compliant | - |
-| kerbside-patches | compliant | - |
-| library-utilities | compliant | - |
-| occystrap | compliant | - |
+| instar | non-compliant | shakenfist/instar#978 |
+| kerbside | non-compliant | shakenfist/kerbside#770 |
+| kerbside-client | non-compliant | shakenfist/kerbside-client#36 |
+| kerbside-patches | non-compliant | shakenfist/kerbside-patches#2149 |
+| library-utilities | non-compliant | shakenfist/library-utilities#104 |
+| occystrap | non-compliant | shakenfist/occystrap#207 |
 | private-ci | N/A | - |
-| ryll | compliant | - |
-| sfui | compliant | - |
-| shakenfist | compliant | - |
-| uncalibrated-sextant | compliant | - |
-| visual-digest-rust | compliant | - |
+| ryll | non-compliant | shakenfist/ryll#806 |
+| sfui | non-compliant | shakenfist/sfui#84 |
+| shakenfist | non-compliant | shakenfist/shakenfist#5079 |
+| uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#38 |
+| visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#83 |
 
 Details for non-compliant projects:
 
-- **agent-python** (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json extends neither local>shakenfist/development:renovate-fleet nor customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped; .pre-commit-config.yaml uses shellcheck-py/shellcheck-py but renovate.json has no versioning packageRule for it, itself or by extending local>shakenfist/development:renovate-fleet, so the github-tags lookup fails on its four-part tags and the hook revision is never bumped
-- **client-python** (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json extends neither local>shakenfist/development:renovate-fleet nor customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped; .pre-commit-config.yaml uses shellcheck-py/shellcheck-py but renovate.json has no versioning packageRule for it, itself or by extending local>shakenfist/development:renovate-fleet, so the github-tags lookup fails on its four-part tags and the hook revision is never bumped
-- **client-python-k3s** (Status): renovate.yml runs Renovate through renovatebot/github-action, which needs a Docker daemon the runner may not have; copy the template, which runs it from npm; renovate.json extends neither local>shakenfist/development:renovate-fleet nor customManagers:githubActionsVersions, so the Renovate version pinned in renovate.yml is never bumped; .pre-commit-config.yaml uses shellcheck-py/shellcheck-py but renovate.json has no versioning packageRule for it, itself or by extending local>shakenfist/development:renovate-fleet, so the github-tags lookup fails on its four-part tags and the hook revision is never bumped
-- **client-python-ova** (Status): .pre-commit-config.yaml uses shellcheck-py/shellcheck-py but renovate.json has no versioning packageRule for it, itself or by extending local>shakenfist/development:renovate-fleet, so the github-tags lookup fails on its four-part tags and the hook revision is never bumped
-- **cloudgood** (Status): renovate.yml differs from templates/renovate/renovate.yml beyond the versions Renovate bumps (line 59 is `- name: Self-hosted Renovate` where the template has `# A requirements file pinned with --hash lines needs hashin, which`; the template's `run: |` is missing before line 63; line 69 is `run: npx --yes "renovate@${PINNED_RENOVATE_VERSION}"` where the template has `run: "${RUNNER_TEMP}/renovate-bin/node_modules/.bin/renovate"`); copy the template verbatim
-- **divergulent** (Status): renovate.yml differs from templates/renovate/renovate.yml beyond the versions Renovate bumps (line 98, `# npm rebuild exits 0 when no package matched, so a Renovate`, is not in the template; line 104, `# Renovate's lockfile/artifact refresh runs package managers of`, is not in the template; line 116, `RENOVATE_ALLOW_SCRIPTS: "false"`, is not in the template); copy the template verbatim
+- **actions** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **agent-python** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **andris** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **client-python** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **client-python-k3s** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **client-python-ova** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **clingwrap** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **cloudgood** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **divergulent** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **hunkydory** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **instar** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **kerbside** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **kerbside-client** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **kerbside-patches** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **library-utilities** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **occystrap** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **ryll** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **sfui** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **shakenfist** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **uncalibrated-sextant** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
+- **visual-digest-rust** (Status): .github/workflows/renovate.yml exists, but the fleet runner in shakenfist/development manages this repository and a copy of the workflow enabled again races it; delete the file; renovate.json does not extend local>shakenfist/development:renovate-fleet, which carries the fleet's Renovate policy; add it to extends; renovate.json sets assignees, dependencyDashboard, gitAuthor, minimumReleaseAge, pre-commit, rollbackPrs, schedule at its top level, which local>shakenfist/development:renovate-fleet also sets, and a repository's own value wins over the preset's, so the fleet's policy does not apply here; delete them, and put any difference this repository needs in a packageRules entry scoped to what it is about
 
 ## reusable-workflow-secrets
 
@@ -1606,7 +1619,7 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 | client-python-ova | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
-| development | compliant | - |
+| development | non-compliant | shakenfist/development#449 |
 | divergulent | N/A | - |
 | hunkydory | compliant | - |
 | images | N/A | - |
@@ -1625,10 +1638,11 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **andris** (Status): 8 of 136 in-scope files reviewed at HEAD (8 imported from shakenfist/development); 128 need review (threshold 5)
-- **kerbside** (Status): 84 of 378 in-scope files reviewed at HEAD (7 imported from shakenfist/development); 294 need review (threshold 5)
-- **kerbside-client** (Status): 6 of 30 in-scope files reviewed at HEAD (6 imported from shakenfist/development); 24 need review (threshold 5)
-- **sfui** (Status): 5 of 49 in-scope files reviewed at HEAD (5 imported from shakenfist/development); 44 need review (threshold 5)
+- **andris** (Status): 9 of 140 in-scope files reviewed at HEAD (9 imported from shakenfist/development); 131 need review (threshold 5)
+- **development** (Status): 236 of 253 in-scope files reviewed at HEAD; 17 need review (threshold 5)
+- **kerbside** (Status): 129 of 378 in-scope files reviewed at HEAD (7 imported from shakenfist/development); 249 need review (threshold 5)
+- **kerbside-client** (Status): 7 of 30 in-scope files reviewed at HEAD (7 imported from shakenfist/development); 23 need review (threshold 5)
+- **sfui** (Status): 6 of 49 in-scope files reviewed at HEAD (6 imported from shakenfist/development); 43 need review (threshold 5)
 
 ## review-scope-completeness
 
@@ -1649,7 +1663,7 @@ Criterion: [review-scope-completeness.md](/components/development/audits/review-
 | hunkydory | compliant | - |
 | images | N/A | - |
 | instar | N/A | - |
-| kerbside | non-compliant | shakenfist/kerbside#731 |
+| kerbside | compliant | - |
 | kerbside-client | compliant | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
@@ -1661,19 +1675,15 @@ Criterion: [review-scope-completeness.md](/components/development/audits/review-
 | uncalibrated-sextant | N/A | - |
 | visual-digest-rust | N/A | - |
 
-Details for non-compliant projects:
-
-- **kerbside** (Status): 1 tracked file(s) are out of review scope only because no include pattern in .vscode/review-scope.toml names them
-
 ## review-tracking-templates
 
 Criterion: [review-tracking-templates.md](/components/development/audits/review-tracking-templates/)
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | non-compliant | shakenfist/actions#263 |
+| actions | compliant | - |
 | agent-python | N/A | - |
-| andris | non-compliant | shakenfist/andris#104 |
+| andris | compliant | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
 | client-python-ova | N/A | - |
@@ -1681,28 +1691,20 @@ Criterion: [review-tracking-templates.md](/components/development/audits/review-
 | cloudgood | N/A | - |
 | development | compliant | - |
 | divergulent | N/A | - |
-| hunkydory | non-compliant | shakenfist/hunkydory#174 |
+| hunkydory | compliant | - |
 | images | N/A | - |
 | instar | N/A | - |
 | kerbside | compliant | - |
-| kerbside-client | non-compliant | shakenfist/kerbside-client#35 |
+| kerbside-client | compliant | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
 | private-ci | N/A | - |
 | ryll | compliant | - |
-| sfui | non-compliant | shakenfist/sfui#81 |
+| sfui | compliant | - |
 | shakenfist | N/A | - |
 | uncalibrated-sextant | N/A | - |
 | visual-digest-rust | N/A | - |
-
-Details for non-compliant projects:
-
-- **actions** (Status): .github/workflows/prune-reviews.yml differs from templates/review-tracking/prune-reviews.yml. Copy them byte for byte from templates/review-tracking/ in shakenfist/development
-- **andris** (Status): .github/workflows/prune-reviews.yml differs from templates/review-tracking/prune-reviews.yml. Copy them byte for byte from templates/review-tracking/ in shakenfist/development
-- **hunkydory** (Status): .github/workflows/prune-reviews.yml differs from templates/review-tracking/prune-reviews.yml. Copy them byte for byte from templates/review-tracking/ in shakenfist/development
-- **kerbside-client** (Status): .github/workflows/prune-reviews.yml differs from templates/review-tracking/prune-reviews.yml. Copy them byte for byte from templates/review-tracking/ in shakenfist/development
-- **sfui** (Status): .github/workflows/prune-reviews.yml differs from templates/review-tracking/prune-reviews.yml. Copy them byte for byte from templates/review-tracking/ in shakenfist/development
 
 ## rust-unwrap-lint
 
@@ -1882,13 +1884,13 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 | hunkydory | N/A | - |
 | images | N/A | - |
 | instar | N/A | - |
-| kerbside | non-compliant | shakenfist/kerbside#732 |
+| kerbside | non-compliant | shakenfist/kerbside#771 |
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
 | private-ci | non-compliant | shakenfist/private-ci#305 |
-| ryll | non-compliant | shakenfist/ryll#751 |
+| ryll | non-compliant | shakenfist/ryll#807 |
 | sfui | N/A | - |
 | shakenfist | N/A | - |
 | uncalibrated-sextant | N/A | - |
@@ -1896,9 +1898,9 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 
 Details for non-compliant projects:
 
-- **kerbside** (Status): kerbside/api/static/sfui: 18 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
-- **private-ci** (Status): conductor/static/sfui: 40 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
-- **ryll** (Status): ryll/src/web/assets/sfui: 5 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **kerbside** (Status): kerbside/api/static/sfui: 1 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **private-ci** (Status): conductor/static/sfui: 41 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **ryll** (Status): ryll/src/web/assets/sfui: 1 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
 
 ## undeclared-direct-dependency
 
@@ -1927,13 +1929,9 @@ Criterion: [undeclared-direct-dependency.md](/components/development/audits/unde
 | private-ci | N/A | - |
 | ryll | N/A | - |
 | sfui | N/A | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#5038 |
+| shakenfist | compliant | - |
 | uncalibrated-sextant | N/A | - |
 | visual-digest-rust | N/A | - |
-
-Details for non-compliant projects:
-
-- **shakenfist** (Status): Imported but declared only as a transitive pin: annotated-types (pyproject.toml:145). Declare each above the # START_OF_INDIRECT_DEPS marker; the reconciler drops the generated copy on its next run
 
 ## unused-declared-dependency
 
