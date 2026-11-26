@@ -608,6 +608,114 @@ dependency.
     `index.md`'s count agrees with the table, and plan-blocker b21 is
     cleared with a note recording the reading.
 
+## Outcome
+
+**Complete. The flip ran, and the claim ceiling is now binding.**
+This phase's gate was a reading, and the reading was taken on
+2026-11-26 against D1 exactly as written: **Flip**. All six rows
+passed. Over-limit admissions read 0.00 a day against at most 3.3
+allowed; namespaces with any, 0 against at most 10; one instance
+exceeding the whole claim it was charged to, **0** against a required
+0, across 3,738 joined runs; exact-dimension exceedances 0.00 a day
+against at most 1 a day; claim-logic failures 0; and claims created
+3,913 against a floor of 500. The window was 2026-11-15 06:48:13 to
+2026-11-22 06:48:13 AEDT, exactly seven days, the binding-anchored
+one D2 pinned with the 2026-11-21 contention episode left in.
+
+What each step did:
+
+- **Step 1** read the window in the management session, validated the
+  readability floor before any other row was read, and cross-checked
+  the single-instance row against private-ci 3g's independent reading
+  of the same seven days. Both read 3,738 joined runs and both read
+  zero, so there is no disagreement to state.
+- **Steps 2 and 3** landed as one commit, `7b01ad3b2f`, because no
+  order of the two is green under the repository's whole-suite hook
+  (see *Execution notes*). `CLAIM_ENFORCEMENT_HARD` is `True`; a
+  create refused at the claim stage on every candidate is a 403 with
+  `transient: false`, no `Retry-After` and a body naming the claim,
+  while a mixed refusal stays a 507; the denial path now carries the
+  claim uuid through to the body and to the `instance placement
+  denied` event; and the cluster CI assertion and the unit sites
+  conditioned on advisory behaviour were inverted or lost their
+  wrappers. The discriminator, the 403 test and the event key were
+  each mutation tested rather than assumed.
+- **Step 4** landed as `5183aeac69`. `capacity_refusals.md` states the
+  claim refusal in full, once, and the other pages say the ceiling is
+  enforced and link to it. The release notes line was rewritten
+  rather than preserved, because v0.8 is unreleased, and the four
+  advisory mentions which are about something else were left alone.
+- **Step 5**, this section, closes the phase.
+
+**Which row came closest to failing is a question about structure,
+not margin.** Two rows have zero tolerance by construction, the
+single-instance row and the claim-logic failure row, and both read
+exactly zero. Every other row passed by a wide multiple. In phase 5a
+the single-instance row is the one that failed, reading 5, so the
+row that held the flip then is the row that most deserved watching
+now, and it is the one the per-job binding removed the cause of.
+
+**The flip refused nothing on the window's traffic.** Zero of 3,738
+runs exceeded the claim they were charged to in any dimension, so
+enforcement applied to the measured week would have changed no
+outcome.
+
+**What it will cost is future footprint growth, not present
+traffic.** The maximum peak-over-limit ratio in the window is 1.0000
+in all three dimensions, and 2,315 of 3,738 runs (61.9%) sit at a
+vCPU ratio of exactly 1.000: the claim is the peak, not the peak plus
+a margin. A job whose footprint grows has no slack to grow into, and
+its first run after the change is refused where today it is admitted
+with a warning. The canary for that is
+`conductor_bound_runner_mismatch_total`, which reads 0, per R4.
+
+**What the flip cost in the first CI runs after it is not yet
+known.** No CI has run on this branch. Item 17 below is outstanding
+for the same reason, and the brief's question is recorded here as
+open rather than guessed at.
+
+Future work:
+
+- The forward-looking pool report still flags three residue pools as
+  theoretically exposed. Two are the documented bound-job false
+  positive; the third was checked, and its small claim and large
+  instance never co-occurred. The pool mechanism therefore retains
+  exposure, even though the mis-assignment class was removed for the
+  three bound jobs.
+- Three comments in `shakenfist/mariadb.py` still call the claim
+  read-back "advisory". That is loose but asserts nothing false, and
+  it was deliberately left rather than swept file-wide.
+- This phase's `Merged` cell in the master plan's Execution table is
+  still `—`, because a phase cannot know the merge commit of its own
+  pull request. It is owed to the next close-out in that plan, or to
+  phase 9 if nothing else runs first.
+
+### Definition of done
+
+Items 1 to 16 and 18 were checked by the management session and are
+recorded here as it reported them. Item 17 is reported as not run.
+
+| # | Result | How it was checked |
+|---|--------|--------------------|
+| 1 | **pass** | *Observations* records 2026-11-15 06:48:13 AEDT to 2026-11-22 06:48:13 AEDT, equal to `2026-11-14T19:48:13Z`-`2026-11-21T19:48:13Z`, computed as exactly 7.0 days rather than asserted, and equal to the window D2 names |
+| 2 | **pass** | All six measures are in *Observations* in 4c's units, each with the tool that produced it, and the verdict is Flip with the arithmetic row by row; the readability floor was read first so no row rested on an unvalidated denominator |
+| 3 | **pass** | Reported beside private-ci 3g's independent reading of the same seven days: both 3,738 joined runs, both zero. No disagreement to state |
+| 4 | **n/a** | The verdict was Flip, so items 5 to 14 ran |
+| 5 | **pass** | `grep -n '^CLAIM_ENFORCEMENT_HARD' shakenfist/mariadb.py` shows `= True` at `:29065` |
+| 6 | **pass** | `capacity_refusal_is_transient('capacity_claim')` returns `False`, and the stage is in neither `TRANSIENT_CAPACITY_STAGES` nor `PERMANENT_CAPACITY_STAGES` |
+| 7 | **pass** | Asserted by `test_a_claim_refusal_on_every_candidate_is_a_403` and `test_a_mixed_claim_and_node_refusal_is_still_a_507`, and mutation tested rather than assumed: inverting the discriminator's comparison fails the 403 test and the 507 tests across three test cases, and the tree restored byte-identical |
+| 8 | **pass** | `test_a_claim_refusal_without_detail_recommends_nothing`, which also dies when `transient` is forced true |
+| 9 | **pass** | The `instance placement denied` event carries `claim`; deleting that key fails `test_a_claim_denial_names_the_claim_which_refused` and `test_a_node_denial_names_no_claim`, mutation tested with the tree restored byte-identical |
+| 10 | **pass** | The 403 is declared in the create endpoint's response list with `instance_post_403_example`; both that example and the 507's parse as JSON, and `test_post_instances_403_describes_the_claim_refusal` and the rest of `test_openapi_spec` pass |
+| 11 | **pass** | `grep -rn "CLAIM_ENFORCEMENT_HARD is False" shakenfist/ tools/` is empty, and no test wraps itself in `mock.patch.object(mariadb, 'CLAIM_ENFORCEMENT_HARD', True)` for what is now the default; six such wrappers were removed |
+| 12 | **pass** | The advisory sweep over `docs/` and `ARCHITECTURE.md`, excluding `docs/components/` and `docs/plans/`, returns only the four known traps (`developer_guide/ci.md:15-16`, `developer_guide/standards.md:76,78,89`, `user_guide/placement.md:73,81`, `operator_guide/scheduler.md:114`) and nothing about claim ceilings |
+| 13 | **pass** | `capacity_claim` appears only in `docs/operator_guide/capacity_refusals.md`, which names the stage, describes the 403 and both extra body fields and says `dimensions` may be absent; the other six pages mention the 403 in a clause and link there without restating its shape |
+| 14 | **pass** | `grep -i advisory docs/release_notes/v07-v08.md` finds nothing about claim ceilings, and the claim-creation status-code list below it is unchanged |
+| 15 | **pass** | The named selection ran 539 tests with 0 failures on the branch rebased onto `develop` at `e95538e30e` |
+| 16 | **pass** | `pre-commit run --all-files` passed all 16 hooks on the rebased branch, with the full unit suite among them; no hook was retried and no flake was accepted |
+| 17 | **not run** | Satisfiable only in the merge queue. `functional_lanes` in `.github/workflows/functional-tests.yml` runs only on `merge_group` or `workflow_dispatch` and is explicitly excluded on `pull_request`, so the cluster CI test cannot be exercised by opening the pull request. It stays outstanding, and a `workflow_dispatch` run is the way to get it before merge |
+| 18 | **pass** | Recorded below: the Execution row reads Complete, `index.md`'s count is 17 of 18 and agrees with the table; plan-blocker b21 is cleared by the management session, not by this step |
+
 ## Back brief
 
 Before executing any step, back-brief the operator on the plan and how

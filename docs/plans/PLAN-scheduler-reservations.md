@@ -360,7 +360,7 @@ table entirely (decision D8).
 | 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | Complete | `c273627a2` (#3952), `948055063` (#4008), `8fc8ba961` (#4139), `2b767a9b1` (#4154) |
 | 5. Caller migration and hard ceiling | [PLAN-scheduler-reservations-phase-05-callers.md](PLAN-scheduler-reservations-phase-05-callers.md) | Complete | `660d4f65e7` (#4800) |
 | 5a. The calibration re-run | [PLAN-scheduler-reservations-phase-05a-hard-ceiling.md](PLAN-scheduler-reservations-phase-05a-hard-ceiling.md) | Complete | `3797716023` (#4917) |
-| 5b. The hard ceiling | [PLAN-scheduler-reservations-phase-05b-hard-ceiling.md](PLAN-scheduler-reservations-phase-05b-hard-ceiling.md) | In progress | — |
+| 5b. The hard ceiling | [PLAN-scheduler-reservations-phase-05b-hard-ceiling.md](PLAN-scheduler-reservations-phase-05b-hard-ceiling.md) | Complete | — |
 | 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete | `597312d2a` (#3957), `b54f126e5` (#3971), `c37012c89` (#3972), `96c78fd63` (#4006) |
 | 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete | `30a02a918` (#4052) |
 | 7a. An operator-readable capacity surface | [PLAN-scheduler-reservations-phase-07a-capacity-surface.md](PLAN-scheduler-reservations-phase-07a-capacity-surface.md) | Complete | `e8585a874` (#4654), `3695f168a` (#4687) |
