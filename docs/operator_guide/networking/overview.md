@@ -695,6 +695,59 @@ namespace loopback interface up` when it does. If the loopback cannot
 be brought up, that is reported like any other probe which could not
 run.
 
+## What a maintenance pass costs
+
+The maintenance pass runs every 30 seconds, and the work it does grows
+with the number of networks the node is on. On a hypervisor that is the
+networks it has instances for; on the network node it is every active
+network in the cluster, whether or not anything is using it.
+
+Most of that cost is the per-network health checks, and on the network
+node the most expensive of those is the DHCP readiness probe described
+above: it starts an interpreter through `sf-privexec` inside the
+network's namespace and waits for an answer, with `DHCP_PROBE_TIMEOUT`
+(2 seconds by default) as its worst case. A healthy network answers in
+well under that. A wedged `dnsmasq`, or a namespace the probe cannot
+reach, costs the full timeout. The probes run one network at a time.
+
+So the pass has two cost regimes, and the difference between them is
+large: a node whose networks are all healthy pays roughly an
+interpreter start each, while a node in the middle of an incident
+affecting many `dnsmasq` processes at once pays the timeout for each
+affected network. A few hundred networks in the second state is more
+than the 30 second cadence allows for.
+
+Every pass therefore logs what it cost:
+
+```
+Maintenance pass complete; health_check_seconds=1.84; networks=112; pass_seconds=2.31
+```
+
+* `networks` is how many networks the pass health checked.
+* `health_check_seconds` is the wall time inside those checks, summed.
+  This is the term which grows with network count.
+* `pass_seconds` is the whole pass. The difference between it and
+  `health_check_seconds` is the pass's fixed cost plus any
+  reconciliations it enqueued.
+
+These are log lines rather than events deliberately: a pass runs twice
+a minute for the life of the node, and an event row at that rate would
+say nothing the first one said. Reconstruct pass duration against
+network count from the log stream.
+
+The one case which *is* an event is a pass slower than its own
+interval, recorded against the node:
+
+```
+maintain pass took 47.2 seconds, longer than its 30 second interval
+```
+
+That is worth acting on, because the pass's own sleep cannot claw the
+time back: every repair the next pass would have made is late by the
+overrun. If you see it, the log line's `health_check_seconds` says
+whether the cost is in the health checks (and so in the probes, and so
+most likely in how many networks are unwell) or elsewhere.
+
 ## Stray vxlan reaping
 
 Which networks a node should be carrying is a closed question: a network

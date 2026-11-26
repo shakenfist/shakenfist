@@ -15,6 +15,35 @@ from shakenfist.tests import base
 from shakenfist.util import network as real_util_network
 
 
+def _info_messages(active):
+    """The ``LOG.with_fields(...).info()`` messages one pass emitted, less
+    the pass-cost line.
+
+    Every pass reports what it cost (issue 4971), so a test which cares
+    about one particular line has to name that line rather than assert
+    the pass logged exactly once. Excluding the cost line here keeps
+    each such test asserting the thing it is actually about.
+    """
+    return [
+        call.args[0]
+        for call in active['log'].with_fields.return_value.info.call_args_list
+        if call.args and call.args[0] != 'Maintenance pass complete']
+
+
+def _pass_cost_fields(active):
+    """The fields the pass-cost log line carried, or None if it was absent.
+
+    Found by looking for the ``pass_seconds`` key rather than by
+    position, because the pass logs through ``with_fields`` in several
+    other places and ``with_fields`` hands back the same mock each time.
+    """
+    for call in active['log'].with_fields.call_args_list:
+        if (call.args and isinstance(call.args[0], dict)
+                and 'pass_seconds' in call.args[0]):
+            return call.args[0]
+    return None
+
+
 def _build_mock_network(uuid='net-uuid-001', vxid=42, state='created',
                         is_okay=False, is_mesh_okay=True, interfaces=None):
     n = mock.MagicMock()
@@ -101,7 +130,8 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
                            find_network_vxids_error=None,
                            namespace_routes=None,
                            root_routes=None,
-                           namespace_routes_error=None):
+                           namespace_routes_error=None,
+                           clock_step=0.0):
         """Drive Job.execute() through exactly one pass of the outer loop
         and return a dict of the mocks that callers will most likely
         want to assert on.
@@ -166,7 +196,21 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
             md.clear_abort_path.return_value = None
 
             mt = active['time']
-            mt.time.return_value = 10_000.0
+            if clock_step:
+                # Each time.time() call advances the clock by clock_step,
+                # so a pass can be given a measurable duration. Every
+                # interval the pass reads is bracketed by exactly two
+                # calls, which makes the durations it computes
+                # predictable rather than merely non-zero.
+                clock = {'now': 10_000.0}
+
+                def _advancing_clock():
+                    clock['now'] += clock_step
+                    return clock['now']
+
+                mt.time.side_effect = _advancing_clock
+            else:
+                mt.time.return_value = 10_000.0
             mt.sleep.return_value = None
 
             active['util_network'].discover_interfaces.return_value = (
@@ -292,6 +336,85 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         finally:
             for p in patches.values():
                 p.stop()
+
+    def test_pass_cost_is_logged_every_pass(self):
+        """Every pass reports what it cost: how many networks it
+        considered, how long it took, and how much of that was health
+        checks. Nothing measured any of this, so there was no way to
+        say whether a pass still fits inside its own cadence (issue
+        4971).
+        """
+        nets = [_build_mock_network(uuid='net-a', vxid=1,
+                                    is_okay=True, is_mesh_okay=True),
+                _build_mock_network(uuid='net-b', vxid=2,
+                                    is_okay=True, is_mesh_okay=True)]
+        active = self._run_one_iteration(network_node=True, networks=nets)
+
+        fields = _pass_cost_fields(active)
+        self.assertIsNotNone(fields)
+        self.assertEqual(2, fields['networks'])
+        self.assertIn('health_check_seconds', fields)
+        self.assertIn('Maintenance pass complete',
+                      [c.args[0] for c
+                       in active['log'].with_fields.return_value
+                       .info.call_args_list if c.args])
+
+    def test_health_check_time_is_attributed_to_the_pass(self):
+        """``health_check_seconds`` is wall time spent inside the
+        per-network health checks, not a constant. Each network's checks
+        are bracketed by exactly two clock reads, so with a clock which
+        advances a known amount per read the figure is the number of
+        networks times that amount -- which a constant, or a bracket
+        around the wrong call, cannot produce.
+        """
+        nets = [_build_mock_network(uuid='net-a', vxid=1,
+                                    is_okay=True, is_mesh_okay=True),
+                _build_mock_network(uuid='net-b', vxid=2,
+                                    is_okay=True, is_mesh_okay=True),
+                _build_mock_network(uuid='net-c', vxid=3,
+                                    is_okay=True, is_mesh_okay=True)]
+        active = self._run_one_iteration(
+            network_node=True, networks=nets, clock_step=0.25)
+
+        fields = _pass_cost_fields(active)
+        self.assertIsNotNone(fields)
+        self.assertEqual(3, fields['networks'])
+        self.assertEqual(0.75, fields['health_check_seconds'])
+
+    def test_a_pass_which_outgrows_its_interval_is_reported_on_the_node(self):
+        """A pass slower than its own interval delays every repair the
+        next pass would have made, and the loop's sleep cannot claw the
+        time back. That is the condition an operator can act on, so it
+        is an event on the node -- which no faster pass writes, because
+        one row every thirty seconds for the life of a healthy node says
+        nothing the first did not.
+        """
+        from shakenfist.daemons.network import maintain
+
+        nets = [_build_mock_network(uuid='net-a', vxid=1,
+                                    is_okay=True, is_mesh_okay=True)]
+        active = self._run_one_iteration(
+            network_node=True, networks=nets,
+            clock_step=maintain.PASS_INTERVAL_SECONDS)
+
+        node = active['node'].from_db.return_value
+        node.add_event.assert_called_once()
+        message = node.add_event.call_args.args[1]
+        self.assertIn('longer than its %d second interval'
+                      % maintain.PASS_INTERVAL_SECONDS, message)
+        self.assertEqual(
+            1, node.add_event.call_args.kwargs['extra']['networks'])
+
+    def test_a_pass_inside_its_interval_writes_no_node_event(self):
+        """The companion to the test above: the overrun event must be the
+        exception rather than the steady state, and a pass which does not
+        overrun must not read the node row at all.
+        """
+        nets = [_build_mock_network(uuid='net-a', vxid=1,
+                                    is_okay=True, is_mesh_okay=True)]
+        active = self._run_one_iteration(network_node=True, networks=nets)
+
+        active['node'].from_db.assert_not_called()
 
     def test_queue_depth_guard_skips_pass(self):
         """When summed queue depth exceeds the threshold the per-network
@@ -1005,9 +1128,9 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
 
         active['util_concurrency'].execute.assert_not_called()
         active['log'].with_fields.return_value.warning.assert_not_called()
-        active['log'].with_fields.return_value.info.assert_called_once()
-        message = active['log'].with_fields.return_value.info.call_args.args[0]
-        self.assertNotIn('Extra vxlan present', message)
+        messages = _info_messages(active)
+        self.assertEqual(1, len(messages), messages)
+        self.assertNotIn('Extra vxlan present', messages[0])
         self.assertIn(0x123, maintain.EXTRA_VLANS_WARNED)
         # Note-only is the steady state for a stray we never touch, and
         # it has nothing to record, so it must not read the node row on
@@ -1022,7 +1145,7 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         )
         active['util_concurrency'].execute.assert_not_called()
         active['log'].with_fields.return_value.warning.assert_not_called()
-        active['log'].with_fields.return_value.info.assert_not_called()
+        self.assertEqual([], _info_messages(active))
 
     def test_stray_vxlan_disappearance_resets_tracking(self):
         """When a stray vxlan disappears from the host its history and
@@ -1243,9 +1366,9 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         active['util_concurrency'].execute.assert_not_called()
         active['nn_create_and_enqueue'].assert_not_called()
         active['log'].with_fields.return_value.warning.assert_not_called()
-        active['log'].with_fields.return_value.info.assert_called_once()
-        message = active['log'].with_fields.return_value.info.call_args.args[0]
-        self.assertNotIn('Extra vxlan present', message)
+        messages = _info_messages(active)
+        self.assertEqual(1, len(messages), messages)
+        self.assertNotIn('Extra vxlan present', messages[0])
         self.assertIn(0x123, maintain.EXTRA_VLANS_HISTORY)
 
     def test_delete_wait_error_instance_protects_its_vxlan(self):
@@ -1354,10 +1477,9 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
 
         active['util_concurrency'].execute.assert_any_call(
             'ip link delete vxlan-000123')
-        active['log'].with_fields.return_value.info.assert_called_once()
-        self.assertIn(
-            'reaped stray vxlan',
-            active['log'].with_fields.return_value.info.call_args.args[0])
+        messages = _info_messages(active)
+        self.assertEqual(1, len(messages), messages)
+        self.assertIn('reaped stray vxlan', messages[0])
         self.assertNotIn(0x123, maintain.EXTRA_VLANS_HISTORY)
 
     def test_unclaimed_stray_reaped_even_with_local_instances(self):
@@ -1570,7 +1692,7 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
             db_network_vxids=[0x123],
             attached_vxids=[0x123],
         )
-        active['log'].with_fields.return_value.info.assert_called_once()
+        self.assertEqual(1, len(_info_messages(active)))
         active['log'].with_fields.return_value.warning.assert_not_called()
 
         # The same stray, but now this node's row cannot be read, so the

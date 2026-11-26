@@ -56,6 +56,13 @@ EXTRA_VLANS_WARNED: dict[int, set[str]] = {}
 QUIESCE_REPORTED: set[str] = set()
 STRAY_VXLAN_HANDLING_FAILING: bool = False
 
+# How often a maintenance pass is meant to run. The loop below sleeps
+# towards this interval, and it is also what a pass is judged to have
+# outgrown: a pass which takes longer than its own cadence delays every
+# repair the next one would have made, and the loop's sleep cannot claw
+# that time back (issue 4971).
+PASS_INTERVAL_SECONDS = 30
+
 
 def forget_unvisited_quiesces(visited_networks):
     """Drop once-per-episode report entries for networks a pass did not visit.
@@ -670,17 +677,79 @@ class Job(util_concurrency.Job):
         QUIESCE_REPORTED.discard(str(n.uuid))
         return False
 
+    def _report_pass_cost(self, pass_started, networks_considered,
+                          health_seconds):
+        """Report what one maintenance pass cost.
+
+        The log line is emitted every pass. It is deliberately the
+        cheap half of this: a report can reconstruct pass duration
+        against network count from the log stream without the pass
+        writing a database row every thirty seconds, which is how the
+        queue waits are already reported (``tools/queue-wait-report.py``).
+
+        The event is emitted only when the pass outgrew
+        ``PASS_INTERVAL_SECONDS``, because that is the condition an
+        operator can act on. One event per pass for the life of a
+        healthy node would say nothing the first did not -- the same
+        rule the per-network status events in ``network.py`` follow,
+        and the reason they are once per episode rather than once per
+        pass.
+
+        ``health_seconds`` is wall time inside ``is_okay()`` and
+        ``is_mesh_okay()`` summed over the networks this pass
+        considered. On the network node that is dominated by the DHCP
+        readiness probe, so it is the term which grows with network
+        count; the difference between it and ``pass_seconds`` is the
+        fixed cost of the pass plus the reconciliations it enqueued.
+        """
+        pass_seconds = time.time() - pass_started
+        fields = {
+            'networks': networks_considered,
+            'pass_seconds': round(pass_seconds, 3),
+            'health_check_seconds': round(health_seconds, 3),
+        }
+        LOG.with_fields(fields).info('Maintenance pass complete')
+
+        if pass_seconds < PASS_INTERVAL_SECONDS:
+            return
+
+        # A pass this slow is reported against the node rather than any
+        # one network, because no single network is at fault -- the cost
+        # is the sum over all of them.
+        n = Node.from_db(config.NODE_NAME, suppress_failure_audit=True)
+        if not n:
+            return
+        n.add_event(
+            EVENT_TYPE_AUDIT,
+            'maintain pass took %.1f seconds, longer than its %d second '
+            'interval' % (pass_seconds, PASS_INTERVAL_SECONDS),
+            extra=fields)
+
     def execute(self):
         LOG.info('Starting network maintenance')
         last_loop = 0
 
         while daemon.check_abort_path(self.abort_path):
-            if time.time() - last_loop < 30:
+            if time.time() - last_loop < PASS_INTERVAL_SECONDS:
                 time.sleep(1)
                 continue
 
             last_loop = time.time()
             LOG.info('Maintaining existing networks')
+
+            # What this pass cost, reported at the end of it. The pass
+            # does work proportional to the number of networks this node
+            # is on, and on the network node the most expensive part of
+            # that is the DHCP readiness probe inside
+            # ``Network.is_okay()`` -- an interpreter start through
+            # privexec into the network's namespace, whose worst case is
+            # ``DHCP_PROBE_TIMEOUT``, once per DHCP network per pass.
+            # Nothing measured any of it, so there was no way to say
+            # whether a pass on a node with many networks still fits
+            # inside its own cadence (issue 4971).
+            pass_started = time.time()
+            health_seconds = 0.0
+            networks_considered = 0
 
             # Queue-depth safety guard. If the network queue family is
             # already backed up, piling more reconciliation requests on
@@ -784,8 +853,11 @@ class Job(util_concurrency.Job):
                     # Network state changed in the last minute, punt for now
                     continue
 
+                networks_considered += 1
+                health_started = time.time()
                 network_okay = n.is_okay()
                 mesh_okay = n.is_mesh_okay() if network_okay else False
+                health_seconds += time.time() - health_started
 
                 # Routed addresses are the third thing which can drift:
                 # either of the two routes for one can be missing on a
@@ -936,6 +1008,9 @@ class Job(util_concurrency.Job):
                     family='network')
 
             forget_unvisited_quiesces(host_networks)
+
+            self._report_pass_cost(
+                pass_started, networks_considered, health_seconds)
 
             # Determine if there are any extra vxids
             extra_vxids = set(vxid_to_mac.keys()) - set(seen_vxids)
