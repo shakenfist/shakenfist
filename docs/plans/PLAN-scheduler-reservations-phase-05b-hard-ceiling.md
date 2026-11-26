@@ -604,3 +604,254 @@ Phase 5a's reading of 2026-11-13 and phase 4c's baseline are the
 comparison figures, and live in each of those plans' own *Observations*
 sections. Step 1 writes its reading here beside them, in the same
 units.
+
+### Step 1 -- the reading, 2026-11-26
+
+**The window reads Flip. All six of D1's rows pass, and the residue
+the advisory release was watching for is not merely smaller than the
+threshold -- it is absent.** Zero over-limit admissions, in a window
+holding 3,913 claims and 3,738 collected runs.
+
+**The window, to the second.** 2026-11-15 06:48:13 AEDT to
+2026-11-22 06:48:13 AEDT, which is `2026-11-14T19:48:13Z` to
+`2026-11-21T19:48:13Z`: **exactly 7.0 days**, computed rather than
+asserted, and the window D2 names, anchored on
+shakenfist/kerbside#727's merge at 2026-11-14 19:48 UTC. The
+epoch bounds used in every query below are 1794685693 and 1795290493,
+and the upper bound is exclusive throughout.
+
+**Sources, and which produced each number.** The conductor's
+`claim_events` and `workflow_costs`, read from a 2026-11-26 17:52
+AEDT copy of `/srv/shakenfist/private-ci/conductor.db` taken with
+`~/.ssh/id_ansible_ed25519`; the live file was never opened, and the
+copy passed `PRAGMA quick_check`. No `-wal` or `-shm` sidecar existed
+at the moment of the copy, so the snapshot is not missing checkpointed
+transactions. private-ci's `tools/measure-oversized-instances.py
+--start 2026-11-14T19:48:13Z --end 2026-11-21T19:48:13Z`, run from the
+`claim-coverage-and-sizing-phase-03g-reading` worktree because R6's
+`--start`/`--end` support is on private-ci#322 and not yet on
+`master`. `tools/measure-claim-accuracy.py` for the ledger. Loki, for
+the sfcbr nodes' own warnings and the conductor's stream, every query
+excluding `caller=metrics.go` and `caller=engine.go`. `sf-client
+namespace claim list --all` for the live census.
+
+#### D1, row by row
+
+| Measure | 4c baseline | 5a window | Flip requires | This window | |
+|---|---|---|---|---|---|
+| Over-limit admissions per day | 33.4/day | 0.71/day | <= 3.3/day | **0.00/day** (0 in 7 days) | pass |
+| Namespaces with any over-limit admission | 101 | 5 | <= 10 | **0** | pass |
+| Namespaces where one instance exceeded the whole claim | 24 | 5 | 0 | **0** | pass |
+| Over-limit admissions on an *exact* dimension | not measured | 0.71/day | <= 1/day | **0.00/day** (0 in 7 days) | pass |
+| `conductor_claims_failed_total`, claim logic only | 0 | 0 | 0 | **0** | pass |
+| Claims created (readability floor) | 2038 | 3770 | >= 500 | **3913** | pass |
+
+The floor was read first, as R5 requires, so no other row was read off
+an unvalidated denominator: 3,913 created against a floor of 500 is
+7.8x the minimum and the largest of the three windows. Rows 1, 2 and 4
+come from the aggregate comparison -- each namespace's
+`peak_allocated_*` against the `limit_*` of the one `created`
+`claim_events` row it was charged to -- and read 0 run and 0 namespace
+over, in any dimension. Row 3 comes from
+`measure-oversized-instances.py`, which reports **"No run went
+over"**. Row 5 is 0 because `claim_events` holds no `failed` row
+inside the window; the only three in the table's entire 163,000-row
+history are the sf-api reachability errors 5a found
+(2026-09-21 21:09, 2026-10-21 19:11 and 2026-10-24 20:43 UTC: an
+nginx 502, a refused connection and a second 502), and all three
+predate the window, so D1's amendment excluded nothing and changed no
+number -- as 5a expected it would not.
+
+**Row 4's zero is a consequence rather than a measurement.** It counts
+a subset of row 1, and row 1 is empty, so it is 0 whatever
+`exact_dimensions` says. Worth recording because the first pass at it
+was wrong: `exact_dimensions` stores a `+`-joined string
+(`cpus+memory_mb+disk_gb`), not JSON, so a `json.loads` parse failed
+to an empty list and would have reported 0 for the wrong reason. The
+script was corrected to split on `+` and re-run to the same 0. On the
+window's created claims the column reads `cpus+memory_mb+disk_gb` on
+3,444 of 3,913 (88.0%), `cpus+memory_mb` on 386, and empty on 83.
+
+#### Why the zero is believed
+
+A zero is also what a broken measurement looks like, so each way it
+could be false was closed.
+
+**The columns are populated.** Across the window's 3,863 cost rows
+there are **no** NULLs in `peak_allocated_cpus`, `peak_allocated_ram_mb`,
+`peak_allocated_disk_gb` or `peak_shapes`; 2,546 rows record a nonzero
+vCPU peak, the largest being 36 vCPU and 9 concurrent instances. The
+zero is a comparison that found nothing, not a column that held
+nothing.
+
+**The join is sound.** `measure-oversized-instances.py`'s own checks
+report 0 runs whose claim was attempted but not created, 0 runs with
+no `claim_events` row at all, and 0 namespaces with more than one
+`created` row, over 3,738 joined runs. F8 of 3g's plan holds on this
+window as it did on fourteen days of earlier data.
+
+**Two independent readings agree.** private-ci 3g read the same seven
+days from the same tables and reported zero over-limit runs across
+3,738 joined runs (F15). This phase's reading, taken from a database
+copy four days later and run with explicit `--start`/`--end` bounds,
+reports zero across 3,738 joined runs. The run counts are identical
+and **there is no disagreement to report** -- which is what D1 item 3
+asks for either way.
+
+**The SF side agrees, as far as it can be made to.** Loki returns
+**no** `Placement admitted over the namespace capacity claim` line in
+the last twelve days, and no line matching `namespace capacity` at
+all, with Loki's own query log excluded. All six sfcbr nodes (`sf-1`
+to `sf-6`) have live `{job="syslog"}` streams. The stronger check is
+the conductor stream against the database it writes: on every day the
+helper's 5,000-line cap covers completely, the two agree **exactly** --
+417 `Claimed` lines against 417 `created` rows on 2026-11-19, 439
+against 439 on 2026-11-20, and 893 against 893 on 2026-11-21, the
+contention day and the window's busiest. This is a weaker completeness
+statement than 5a's, and the limit is worth naming rather than
+glossing: `loki-query` takes `--since` but no absolute end, and an
+unfiltered host stream saturates 2,000 lines in about twenty minutes,
+so 2026-11-15 to 2026-11-18 could not be counted this way. The
+authoritative record for rows 1 to 4 is the conductor database, which
+is complete over the whole window; Loki corroborates it on the three
+days it can reach, including the one most likely to have produced an
+exceedance.
+
+#### Claims, refusals and the ledger
+
+| | This window | 5a window | 4c window |
+|---|---|---|---|
+| created (`claim_events`) | 3913 | 3770 | 1934 |
+| refused on capacity | 3707 | 8032 | 303 |
+| failed | 0 | 0 | 0 |
+
+Per AEDT day, created then refused: 488/640 (2026-11-15, from
+06:48), 292/139, 698/55, 666/619, 417/132, 439/232, 893/1890, and
+20/0 on 2026-11-22 to 06:48.
+
+**The contention episode is in the window and reads exactly as D2
+predicted it would.** 2026-11-21 carries 1,890 of the window's 3,707
+capacity refusals -- and also its highest claim creation count, 893.
+Both halves of D2's argument are visible in that one row: the episode
+raises the readability floor, and it put more claims and more
+placements through the guard than any other day in the window, so if
+contention could manufacture an over-limit admission this is the day
+it would have. It produced none. Keeping the window cost nothing and
+proved more than excluding it would have.
+
+**No claim leaked, and the ledger does not drift.**
+`measure-claim-accuracy.py`'s item 7 finds the ledger's mark and the
+conductor's reconstruction agreeing to a median of **1.000** on all
+three dimensions over **4,267** runs, with **zero** runs outside a 5%
+tolerance and none to explain. The live census agrees from the other
+end: `sf-client namespace claim list --all` returns 15 claims, every
+one `created` and `active`, one per namespace, with usage at or below
+limit in every row and no holder whose namespace has gone. As in 5a
+and 4c this is the answer to the definition of done's
+`cluster_capacity.claimed_*` drift question, which cannot be read as
+worded -- `claimed_*` goes to a Prometheus gauge and no Prometheus is
+reachable from the development host. One caveat on the accuracy
+figures specifically: that tool takes `--since` and no `--end`, so its
+4,267-run population is the window **plus** the four days after it,
+not the window. It is quoted here for the ledger agreement, which is
+what it is for; none of D1's six rows depends on it.
+
+#### What the flip costs, and the one thing to watch
+
+**On this window's traffic, the flip refuses nothing.** Zero of 3,738
+runs exceeded the claim they were charged to in any dimension, so
+enforcement applied to the measured week would have changed no
+outcome. That is the direct answer to the question 5a could not
+answer, where the cost was a 13.5% chance per `sf-e2e` run.
+
+**The headroom, however, is exactly zero.** The maximum
+peak-over-limit ratio in the window is **1.0000** in all three
+dimensions, and 2,315 of 3,738 runs (61.9%) sit at a vCPU ratio of
+exactly 1.000 -- the claim is the peak, not the peak plus margin,
+which is F15's "exact in all three dimensions with no `CLAIM_HEADROOM`"
+showing up fleet-wide rather than only on the three bound jobs. The
+sizer has earned that: 4,132 of 4,268 runs are sized exactly and an
+exact claim lands within 2% of what the run uses. But it means the
+cost of this flip is borne entirely by *future* footprint growth
+rather than by present traffic. A job whose footprint grows -- one
+more VM in a test, a bigger image -- has no slack to grow into, and
+under enforcement its first run after the change is refused where
+today it is admitted with a warning. That is R4's territory and it is
+why R4's canary matters; the close-out records it, and it is named on
+private-ci#311 so the people who own the sizing know that a
+regression now refuses jobs rather than mis-sizing claims.
+
+**The three flagged pools are worst-case pairings that did not
+occur.** `measure-oversized-instances.py`'s forward-looking report
+flags `debian-13/l`, `debian-13/m` and `debian-13/s` as RESIDUE: in
+each, the smallest claim the pool produced is smaller than the largest
+single instance some job in it holds. Two are the false positive the
+tool's own docstring predicts -- the largest instance belongs to
+`kerbside/oVirt 4.5 on Rocky 8` and to `kerbside/OpenStack via
+Kolla-Ansible master on Debian 13`, both **bound** by #727, and a bind
+token lives in the combination key which `claim_events` does not
+record, so binding is invisible in this schema. The third was checked
+rather than assumed, because its holder is not one of the three bound
+jobs: in `debian-13/s` the `kerbside-patches` jobs holding a
+12/16384/400 instance were charged claims of **14/20480/560** (38
+runs) and **17/24576/672** (5 runs), while the pool's smallest claim
+of 2/4096/160 went to 49 runs whose peak was 2 vCPU. The small claim
+and the large instance never met. Recorded because the exposure is
+structural even where it is unrealised: the mis-assignment class was
+removed for the three jobs that were bound, not for the pool
+mechanism, and an unbound job sharing a combination pool can still in
+principle be charged a claim sized for a smaller lane.
+
+**Already-refused creates, for context.** The window's cost rows
+record 464 refused creates across 53 runs and 1,781 unplaced
+instances across 1,370 runs. None of these is a claim refusal --
+the ceiling is advisory throughout the window -- they are the
+cluster-capacity surface 5a flagged and `PLAN-placeable-capacity.md`
+owns. They are noted so a later reader does not mistake them for the
+flip's cost, and so the first merge run after the flip is read against
+a baseline that already contains them.
+
+#### Verdict
+
+**Flip.** Every row of D1 is satisfied, the floor was validated before
+any other row was read, the two readings of row 3 agree, and the
+window is the one D2 pinned with the contention episode kept in.
+Steps 2, 3 and 4 are therefore ungated and run.
+
+## Execution notes
+
+**Back brief answered 2026-11-26 (AEDT), before step 1 read
+anything.** Both of the plan's gates were put to Michael together
+with the two permissions the skill requires, and all four were
+answered in one pass:
+
+- **D2's window: confirmed as written.** The binding-anchored
+  2026-11-15 06:48:13 to 2026-11-22 06:48:13 AEDT, declining the
+  episode-free week that opens 2026-11-29 and declining plan-blocker
+  n26's own suggestion of it. The reasoning is D2's and was agreed
+  before the data was on screen, which is the only time it could be
+  agreed. The reading has since vindicated it: see the 2026-11-21 row
+  of the per-day table, which is both the episode and the window's
+  busiest claim day, and produced no exceedance.
+- **D7's release-notes rewrite: confirmed.** v0.8 is unreleased
+  (newest tag `v0.8.0-rc4`), so the file describes the release being
+  prepared and the line would be false on release day. Step 4 rewrites
+  it and leaves the claim-creation status-code list alone.
+- **Live read: approved**, read-only. The conductor database was
+  copied and the copy queried; the live file was not opened. Nothing
+  on `maui` or `sfcbr` was written, deployed or restarted.
+- **Push and pull request: approved for this phase**, so the step 5
+  question the skill would otherwise ask is not asked again.
+
+**Step 1 ran in the management session**, as its row specifies, rather
+than in a sub-agent; steps 2 to 4 are sub-agents per the execution
+model. Two departures from the step 1 brief, both recorded at the
+point they arose in *Observations*: `measure-oversized-instances.py`
+was run from the private-ci 3g worktree because its `--start`/`--end`
+arguments are still only on private-ci#322 (R6, as the brief
+anticipated), and `measure-claim-accuracy.py` was run without
+`python3 -I` because `-I` suppresses the user site-packages that hold
+the editable `shakenfist_client` the tool imports -- the data rule's
+`-I` is for untrusted downloaded data, and this is the repository's own
+tool reading a database passed to it by path from outside its
+directory.
