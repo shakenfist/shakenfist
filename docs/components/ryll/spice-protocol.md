@@ -681,6 +681,93 @@ session. The `--pedantic` mode and always-visible
 `Gaps: N` status-bar counter surface these the moment
 they happen. See the pedantic-mode entry below.
 
+### What the draw ops deliberately do not do
+
+The reference clients differ on how much of a draw op to honour:
+spice-html5 warns and ignores any non-`SPICE_ROPD_OP_PUT` ROP and
+any non-null mask (and does not implement `DRAW_TRANSPARENT` or
+`DRAW_ALPHA_BLEND` at all), while spice-gtk implements the ROPs and
+masks through Cairo and pixman. ryll sits closer to spice-html5 on
+those two sub-features and past it on opcode coverage. The rule that
+decides each case is what the ignored feature would have changed:
+
+- **A feature that changes which pixels are touched is ignored and the
+  draw still paints.** A non-null `SpiceQMask` on `DRAW_FILL`,
+  `DRAW_BLACKNESS`, `DRAW_WHITENESS` and `DRAW_INVERS` is warned about
+  once and the rectangle is painted unmasked. Firmware and the
+  framebuffer drivers use these ops to clear whole regions, where the
+  mask is null, so painting something is better than leaving the
+  previous stage's pixels on screen. Non-zero `alpha_flags` on
+  `DRAW_ALPHA_BLEND` is warned about once and painted anyway: the
+  straight-alpha path already respects a source's per-pixel alpha, and
+  the surface is always opaque, so the destination-has-alpha flag
+  changes nothing.
+- **A feature that changes what colour lands is skipped.** A
+  non-`OP_PUT` ROP or a non-solid brush on `DRAW_FILL`, and a
+  non-`OP_PUT` ROP on `DRAW_BLEND` and `DRAW_OPAQUE`, skip the draw
+  after one warning, because painting the source unmodified would put
+  wrong pixels on screen where leaving the old ones is merely stale.
+  The brush on `DRAW_OPAQUE` is ignored on `OP_PUT` without a warning,
+  since spice-gtk's `canvas_draw_opaque` reads it only when the ROP
+  names the pattern source.
+- **`DRAW_COPY` is the exception: it paints whatever its ROP says,** and
+  ignores its mask without a warning. It was handled before any of this
+  and is by far the commonest op, so changing what it does for a
+  non-`OP_PUT` ROP is a behaviour change to the hot path that nothing
+  has asked for. `DRAW_BLEND` skips where `DRAW_COPY` paints because
+  the ROP is the whole point of the op.
+
+`DRAW_ROP3`, `DRAW_STROKE`, `DRAW_TEXT` and `DRAW_COMPOSITE` are not
+rendered. Linux guests under QXL rarely emit the first three, and each
+is a subsystem of its own: ROP3 needs a 256-entry ternary truth-table
+evaluator (spice-gtk's `rop3.c`), stroke a line rasteriser with dash
+patterns, text a glyph unpacker and compositor. They fire a `warn_once!`
+and a one-time hex dump of the payload, so a guest that does use one
+shows up in the session's gap list and in a `--pedantic` report with
+bytes to implement against. `DRAW_COMPOSITE` is different in that ryll
+advertises the `COMPOSITE` capability; see
+[design decision 7](/components/ryll/design-decisions/) for why the capability is
+sent.
+
+The ones that are implemented, each checked against spice-common:
+
+- **Colour and alpha.** `DRAW_TRANSPARENT` compares only the lower 24
+  bits of the colour against the source (`pixman_utils.c`'s
+  `(0xffffff & val) != transparent_color`), so the alpha byte of either
+  side is ignored; its deprecated `true_color` field is ignored without
+  a warning because spice-gtk ignores it on 32-bpp surfaces and it
+  would warn on every op. `DRAW_ALPHA_BLEND` with `alpha == 0` returns
+  before decoding the image, as `canvas_draw_alpha_blend` does. Blending
+  is straight (non-premultiplied) alpha, which is what egui's
+  `ColorImage::from_rgba_unmultiplied` takes, so no conversion is needed
+  at render time; each channel is rounded with `(s*a + 127) / 255`, which
+  is within one of the exact value, and the written alpha is always 255.
+  `JPEG_ALPHA` sources are not decoded (the separate alpha plane is not
+  implemented), so a `DRAW_ALPHA_BLEND` whose image is one is dropped
+  after a warning.
+- **`COPY_BITS` reads before it writes.** The source rectangle is
+  copied to a scratch buffer, then written to the destination, which is
+  what spice-html5's `getImageData`/`putImageData` does and is simpler
+  to get right than a direction-aware in-place copy. The scratch is
+  bounded by the wire rectangle, typically a console line. The wire
+  `src_pos` is a signed `int32` (as is `SpiceQMask.pos`), kept signed in
+  the parser; `COPY_BITS` clamps negative source coordinates to zero
+  instead of rejecting the draw, which a conforming QXL never sends.
+- **A fresh surface is opaque black, not grey.** The surface used to
+  start at `(50, 50, 50)` so that a missing draw op was obvious; the
+  grey showed between the glyph rows of the BIOS and boot console,
+  where nothing drew over it, and spice-gtk's canvas starts black.
+  Fixing it was kept separate from the draw ops themselves so it could
+  be reverted alone.
+- **The BIOS and boot-console stripes had two causes, and fill and
+  copy fixed only one.** Adding `DRAW_FILL`, `DRAW_BLACKNESS`,
+  `DRAW_WHITENESS` and `COPY_BITS` fixed the missing clears and
+  scrolls. A "static" artefact remained after them, and was a
+  separate GLZ cross-frame decode bug, not a missing op (see Q6 in
+  [open questions](/components/ryll/plans/OPEN-QUESTIONS/)): a capture of the
+  affected window had no `DRAW_FILL` or `COPY_BITS` at all and was about
+  99% GLZ-family images.
+
 ### Clip rectangles
 
 A draw's `RECTS` clip is a list of rectangles whose union is
@@ -757,6 +844,44 @@ panel polls `warn_once_count()` each frame; clicking opens
 a floating window listing every fired key. The counter
 works without `--pedantic` — `--pedantic` only adds the
 bug-report-per-gap automation on top.
+
+The design choices behind that, so they are not reopened:
+
+- **The registry takes a callback, not a channel.** That keeps it free
+  of any tokio dependency; each observer picks its own concurrency
+  model, and the pedantic one spawns a task per gap so the thread that
+  hit the gap, usually a channel task, never waits on disk I/O or the
+  one-second metrics sample.
+- **Late observers are replayed** every key already present, so a gap
+  that fired during connection set-up is not lost because the observer
+  registered a moment later. The race that results (a key firing between
+  the observer being added and the registry snapshot, so the observer
+  sees it twice) is accepted: observers must be idempotent per key, the
+  window is microseconds, and the pedantic observer does not de-duplicate
+  because the worst case is one extra zip.
+- **Reports are local files only,** capped at 50 a session by a
+  hard-coded constant (`PEDANTIC_REPORT_CAP`) rather than a flag, so a
+  dedupe key that explodes cannot fill a disk. Nothing is uploaded and
+  nothing persists across sessions: the registry is per-process, and
+  the user decides what to file. `--pedantic` and `--capture` are
+  independent.
+- **The keys are flat and their second segment is always the gap
+  category** (`unimpl`, an op name for an ignored sub-feature,
+  `decode_failure`, `hexdump`), so a consumer can split on `:`. A
+  decode-failure key is `display:decode_failure:<op>:<failure>` with
+  `<op>` from the call site, which is why op-parameterised keys go
+  through `intern_key`: it leaks one string per distinct key, bounded
+  by channel times opcode (tens), and must never be given per-message
+  data. A key must not vary by instance count or payload.
+- **The observer is registered where the live handles exist**
+  (`RyllApp::new` and `run_headless`), not in `main.rs`, because the
+  traffic capture is what makes a report debuggable: the key says
+  which decoder failed and the capture says on which message. Headless
+  has live traffic and channel snapshots but no app-level snapshot,
+  which only the GUI loop fills (see
+  [multi-mode-parity.md](/components/ryll/multi-mode-parity/)). Disabling `--pedantic`
+  in headless was rejected, since unattended runs are where it is most
+  useful.
 
 ## Keyboard Scancodes
 

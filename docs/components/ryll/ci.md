@@ -171,8 +171,37 @@ breakage, which is what actually breaks in practice, but not
 aarch64-specific. The msvc triple cannot be checked from Linux
 without an MSVC toolchain, because `cargo check` still runs
 build scripts and `aws-lc-sys` compiles vendored BoringSSL C for
-the target. See
-[PLAN-two-stage-ci.md](/components/ryll/plans/PLAN-two-stage-ci/).
+the target. Making it work would need `xwin`-fetched Windows SDK
+and CRT headers plus `clang-cl`, which is materially heavier
+tooling and a licensing question for a check that still cannot
+link, so it was rejected (spike run 2026-08-09). The gnu triple
+works once `mingw-w64` is in the devcontainer image, and the
+`x86_64-pc-windows-gnu` target is baked into the image rather than
+added per run, because `RUSTUP_HOME` is not volume-mounted and an
+ad-hoc `rustup target add` does not persist.
+
+The check is worth more than it looks because `--no-default-features`
+does not make the graph slim: only `gui` is feature-gated in
+`ryll/Cargo.toml`, and `shakenfist-spice-webrtc`, an unconditional
+dependency, depends on `opus` directly, so the check also
+cross-compiles the cmake-driven vendored libopus build along with
+`ring`, `aws-lc-sys`, `zstd-sys` and `mozjpeg-sys`. A warm local
+run takes about 24 seconds.
+
+It is its own job rather than a step in `Build (Linux x86_64)`
+because folding it in was measured and was wrong: on PR #256 that
+job went from 8m56s to 12m3s, since an ephemeral runner compiles the
+whole graph cold for the Windows target. As a separate job it runs
+concurrently, so smoke-tier wall clock is unchanged; the cost moves
+from latency to capacity, a second devcontainer image build on
+another `l` runner. If capacity turns out to be the binding
+constraint, folding it back is a two-line change, and if the gnu
+target ever diverges enough from msvc to produce false failures the
+job is one line to delete. Whether it earns its keep at all rests on
+renovate lockfile churn breaking `windows-sys`, which is frequent in
+this repository but has not been measured against merge-queue
+ejection rates. The spike's full text is in the
+[retired two-stage CI plan](https://github.com/shakenfist/ryll/blob/87f50f87483a5f93dc9e18d484b3cc00efd6cf39/docs/plans/PLAN-two-stage-ci.md).
 
 ## The nightly fuzz lane
 
@@ -766,7 +795,23 @@ The queue is configured with ALLGREEN grouping and
 speculative stacking: one entry builds at a time. For a
 single-developer project on a loaded CI cluster that trades peak
 throughput for never wasting a run on a speculative build that
-gets ejected and rebuilt.
+gets ejected and rebuilt. With concurrency above one, a second
+entry builds stacked on the first and any failure ahead of it
+ejects that work and rebuilds the group on a new SHA; shakenfist's
+merge-tier failures are mostly CI-cluster load, and stacked builds
+were observed rebuilding one entry five times in a day while adding
+the very load that causes the failures.
+
+The remaining parameters are `merge_method: MERGE`,
+`max_entries_to_merge: 5`, `min_entries_to_merge: 1`,
+`min_entries_to_merge_wait_minutes: 5` and
+`check_response_timeout_minutes: 360`, copied from shakenfist's
+ruleset. With a minimum of 1 the wait timer never engages (it is
+the timeout for reaching the minimum group size, which one entry
+already satisfies), so each entry merges as soon as its own merge
+group is green. Batching with `min_entries_to_merge >= 2` would add
+latency and save nothing, because the queue builds one merge group
+and runs one CI run per entry regardless.
 
 ## Reading a merge queue ejection
 
@@ -892,7 +937,29 @@ script are byte-for-byte copies of shakenfist/development's
 template, not the copy.
 
 Ruleset changes are captured under `.github/exported-config/`
-by `export-repo-config.yml`, which runs daily and on demand.
+by `export-repo-config.yml`, which runs daily and on demand. The
+export currently shows `"bypass_actors": []` although the live
+ruleset has two, so the audit trail does not record who can bypass.
+
+Two properties of the ruleset bite when editing it. `PUT
+/rulesets/{id}` replaces the `rules` array and `bypass_actors`
+wholesale, so a change must restate `deletion`, `non_fast_forward`
+and the bypass list or they are silently dropped. And the three
+required contexts (`Can see status`, `Can enqueue`, `Can merge`,
+with GitHub Actions' integration id 15368) must match the gate
+jobs' `name:` fields exactly: a misspelling blocks every pull
+request on a check that never reports. Recovery is to `PUT` a
+corrected array, or to set `enforcement` to `evaluate` while doing
+so. The ruleset was extended from the existing history-protection
+one rather than added beside it, so two rulesets never disagree
+about the same branch.
+
+Enabling it was ordered so the bot's push was proven first: the
+`pull_request` rule forbids the direct push `prune-reviews` makes,
+so the bypass credential had to work on a real post-merge run
+before the ruleset started blocking `GITHUB_TOKEN` pushes, or ryll's
+own automation would have been locked out of the branch it
+maintains.
 
 ## Reproducing CI locally
 

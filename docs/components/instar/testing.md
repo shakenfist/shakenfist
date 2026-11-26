@@ -161,6 +161,41 @@ writes to a given temporary file is a property of the test that can
 change in an edit the `with` statement never sees.
 `tests/helpers/scratch.py` itself is the one exemption.
 
+**Never build a path into the repository outside `tests/`.** The suite's
+tree is relocatable: `tools/test-package-functional.sh` copies `tests/`
+alone to `/tmp/instar-tests` and runs it there against an installed
+package, with no repository around it. A test that reaches out of
+`tests/` resolves its path against `/tmp` and raises
+`FileNotFoundError`. The PR gate cannot see it, because it runs the
+suite from the checkout where the path exists; only the seven
+`package-matrix` legs can, and two tests reading
+`src/crates/vmdk/src/lib.rs` ejected
+[#968](https://github.com/shakenfist/instar/pull/968) from the queue
+after a green pull request. The `instar-testdata` clone is a sibling of
+the repository rather than part of it, and is addressed through
+`INSTAR_TESTDATA_PATH`, so it is not covered by this rule.
+
+A check that must read the repository's own source belongs in
+`tools/ci` instead, where the whole tree is present and it runs on every
+pull request. `tools/ci/check-vmdk-split-pins.py` is the one moved out
+for this reason: it compares the split VMDK descriptor literals in the
+vmdk crate with `tests/golden/qemu-create-pins.json`, which Rust cannot
+read for want of a JSON parser. Its `--no-fixture` form needs only the
+checkout and runs in `ci-tooling` and as a pre-commit hook; the full
+form also compares the hand-copied 33 GiB descriptor with the committed
+fixture, needs a testdata clone, and runs in `integration-core`. A
+missing clone fails that check rather than passing it quietly, because
+the fixture is the only committed witness past sixteen extents and past
+65535 cylinders.
+
+`tools/ci/check-tests-relocatable.sh` enforces the rule, as a
+pre-commit hook and in the `ci-tooling` job. It matches the pathlib
+join form against the repository's own top-level directories, read from
+git so a new one is covered the day it appears. `tests/base.py` is the
+one exemption: `get_instar_binary` falls back to the build tree at
+`src/target/release/instar`, and only when `INSTAR_BINARY_PATH` is
+unset, which the packaged harness sets to `/usr/bin/instar`.
+
 ## Test Categories
 
 ### Safe Images (`test_info_safe.py`)
@@ -2754,7 +2789,33 @@ guards. See the VHD and VHDX notes in
 [chain-config.md](/components/instar/chain-config/#format-specific-notes) for the
 composing path being guarded.
 
-There are **172 cases**, in sixteen groups.
+There are **179 cases**, in seventeen groups. The prose below
+describes each group, with sub-totals nested inside the larger ones; this
+table is the flat version, so the sum can be checked in one pass. The
+headline, `EXPECTED_CASES` and the case count the script itself reports
+are checked against each other by `--check-patterns`; the group counts
+here are not, so they are the thing to re-derive if the two disagree.
+
+| Group | Cases |
+|-------|------:|
+| writer | 47 |
+| fixed VHDX measure | 3 |
+| reader | 47 |
+| `compare` with two chains | 5 |
+| `bench` and `rebase` | 6 |
+| `commit` | 1 |
+| `map`, `measure` and `check` | 15 |
+| device count | 2 |
+| subcluster | 3 |
+| data device | 12 |
+| descriptor attachment | 7 |
+| split descriptor | 7 |
+| data-file entry | 8 |
+| host-offset refusal | 2 |
+| VHDX metadata | 6 |
+| VHD footer copy | 4 |
+| partial last block | 4 |
+| **total** | **179** |
 
 Forty-seven cover the writer. Twenty-four mutate a library crate
 (`create`, `vhd`, `vhdx`) and are caught by a Rust unit or round-trip
@@ -3066,6 +3127,43 @@ descriptor declares, so a FIFO, a block device or a character device
 among the extents would contribute its whole span as zero padding and
 the read would succeed -- a wrong answer reported as a success, where
 qemu-img cannot get the node's length and errors out.
+
+Then **7 split-descriptor cases**, on the emitter that writes a
+`twoGbMaxExtentSparse` or `twoGbMaxExtentFlat` descriptor. The
+descriptor is compared byte for byte against what every pinned qemu-img
+build writes, so most of these are caught by that comparison; what the
+group is really checking is that a narrow test notices each one too,
+because a single broad golden comparison tells you something broke
+without saying what. They are described here in the order the script
+runs them, so the group can be checked against `rust_case` entries
+without matching prose to code by hand.
+
+The first drops the `ddb.toolsVersion` line qemu has written since
+6.2.0. The second gives a sparse layout the flat `-f` name infix, so
+every extent line names a file that was never written. The third
+formats the extent index to a floor of two digits instead of three,
+turning `image-s001.vmdk` into `image-s01.vmdk`. The fourth stops
+clamping the final extent to the remainder, so a 5 GiB image claims
+three full 2 GiB extents and over-reports its own size; it is caught in
+the layout rather than the descriptor, because that is where the clamp
+lives. The fifth removes the blank line between `#DDB` and the first
+`ddb.` line, which is the one piece of whitespace the three
+single-extent emitters do not have and so the easiest to copy wrongly.
+The sixth drops the ` 0` start offset from a flat extent line, the only
+one of the four differences between the two subformats that had no
+narrow test of its own until that case was added. The last makes a
+`put` that does not fit copy the bytes that do, instead of skipping the
+write whole, which is the buffer contract every descriptor builder in
+the crate shares and the one thing a short-buffer test can check that a
+full-buffer test cannot.
+
+The third case is why the group exists in this form. The test named for
+the padding rule asserted only that `image-s999.vmdk` and
+`image-s1000.vmdk` appear, which checks that three digits is not a
+*cap* -- both print in full at any width -- and never that it is a
+*floor*. The mutant survived it, and only the broad golden comparison
+failed. The test now also asserts `image-s001.vmdk` and
+`image-s099.vmdk`, and kills it.
 
 Then **8 data-file entry cases**, guarding the fix for
 issue #803. qemu applies two rules to the L2 entries of an image with

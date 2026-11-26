@@ -83,8 +83,7 @@ clean session against the same target rather than a
   `std::thread::spawn`, with its own repaint-bridge task.
 - A new `Arc<Notify>` for repaint wake-ups, a new
   `ByteCounter`, new `TrafficBuffers`, new
-  `ChannelSnapshots`, a new `BandwidthTracker`, and a new
-  `VolumeControl`.
+  `ChannelSnapshots` and a new `BandwidthTracker`.
 
 Per-session UI state is reset in place: surfaces, cursor
 position / visibility / image / texture, the cached
@@ -109,6 +108,15 @@ this list first. The reconnect path **does not** touch:
   `RyllApp::reconnect_virtual_disks` and
   `reconnect_share_dir` at construction so they survive
   the reset.
+- The audio volume slider and mute state. The
+  `Arc<VolumeControl>` is handed to the new connection rather
+  than recreated: volume is the host's output gain, not session
+  state, and the SPICE protocol has no client-to-server volume
+  message, so nothing about it is renegotiated. Recreating it
+  reset the slider to 80% and unmuted on every reconnect. It
+  lives for the process only, because ryll has no user-settings
+  file; the other session-level toggles below are in the same
+  position, so persisting one of them alone would be lopsided.
 - The paste-as-keystrokes toggle and inter-character
   delay.
 - The "Obey guest size hints" toggle. It is a
@@ -316,6 +324,27 @@ doomed; the GUI maps that onto the matching `ModalVariant`.
 The state-machine
 transition consults it first, so a single-use ticket
 disconnects directly to Modal without burning the budget.
+
+Two choices in that policy are deliberate. `delete-this-file=1`
+stands in for "single-use ticket" because every producer that
+issues one-shot tickets (Kerbside, oVirt) also sets it, the file
+being useless after the first link, so existing producers behave
+correctly with no change and no new key or flag was invented for a
+case nobody has. And `ticket-valid-until` lands in `TicketExpired`
+only when the wall clock says the ticket has expired. ryll cannot
+tell from a disconnect alone that the server rejected a ticket, so
+labelling every disconnect on a ticketed session "ticket expired"
+would mislabel real network failures. With the expiry still in the
+future after the retries are used up the modal is `Generic`, and a
+`warn!` says the expiry was still ahead, as the hook for a
+server-side revocation or clock skew.
+
+What auto-reconnect does not do, on purpose: retry a single
+channel (under one-shot tickets a dropped channel cannot be
+re-linked, so only the whole session is worth retrying), ask the
+issuer for a fresh ticket (there is no path for that in the `.vv`
+flow), or retry a first attempt (the user is at the screen then,
+and `Modal(ConnectFailed)` answers it).
 
 The GUI tick also re-checks the policy at every `Pending`
 fire — a long Pending window can outlive

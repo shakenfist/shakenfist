@@ -672,8 +672,8 @@ changed while you were typing the description.
 When a Display bug report is submitted because video appears to
 stutter or fall behind, these fields in `channel-state.json` tell
 you which part of the pipeline was slow without re-running the
-session. They come from the master plan
-[`PLAN-video-keeping-up.md`](/components/ryll/plans/PLAN-video-keeping-up/).
+session. Why they are these fields is in
+[diagnostics.md](/components/ryll/diagnostics/#diagnosing-video-not-keeping-up-how-the-instrumentation-is-shaped).
 
 - `decode_total_count`, `decode_failed_count`,
   `decode_from_cache_count` — cumulative decode counters since

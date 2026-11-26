@@ -1,6 +1,6 @@
 # Multi-extent VMDK phase 2: fixtures and baselines
 
-## Status: Not started
+## Status: Complete
 
 Master plan: `PLAN-multi-extent-vmdk.md`.
 

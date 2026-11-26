@@ -233,7 +233,7 @@ against `develop`, not the last phase's diff alone, so it
 sees what the repaint, logging, latency and metrics changes
 did to each other.  Findings land as their own PR against
 `develop`, recorded here under an *Items deferred from the
-push audit* heading — the shape `PLAN-web-frontend.md` uses
+push audit* heading — the shape [`PLAN-web-frontend.md`](https://github.com/shakenfist/ryll/blob/d21844d8392d178d7d39c35a0107ed9319674740/docs/plans/PLAN-web-frontend.md) uses
 for its *Items deferred from the post-Phase-N pre-push audit*
 sections, minus the phase number, because this phase audits
 the whole plan rather than a range of it.  This plan is not
@@ -421,7 +421,7 @@ and triage status, is in
   runtime on the UI thread to spawn onto.  The pattern for
   this side is a named `std::thread::Builder` writing into
   a slot the UI polls, which
-  `PLAN-bugreport-trigger-snapshot-phase-02-snapshot.md:422`
+  [`PLAN-bugreport-trigger-snapshot-phase-02-snapshot.md:422`](https://github.com/shakenfist/ryll/blob/71ef2db6446f69fd18d43d73bf09434aaf5964ed/docs/plans/PLAN-bugreport-trigger-snapshot-phase-02-snapshot.md#L422)
   already spells out — "not `tokio::spawn_blocking`".
 
   Two things the finding did not mention turned up in the

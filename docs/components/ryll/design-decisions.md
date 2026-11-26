@@ -20,7 +20,8 @@ produced.
    stack without GUI overhead. Headless is also the first evidence of the
    project's broader **multi-modal client** stance: the SPICE stack is
    frontend-agnostic, and additional frontends (`--web` browser mode shipped
-   end-to-end via the [web frontend plan](/components/ryll/plans/PLAN-web-frontend/)) are
+   end-to-end; [why it is a WebRTC transcoder](/components/ryll/web-mode-internals/#why-a-webrtc-transcoder-rather-than-a-browser-spice-client)
+   is in its internals guide) are
    first-class peers of the GUI rather than retrofits. When you add or modify a feature, ask which
    modes it should be reachable from; if a mode physically cannot host the
    feature, say so in the docs rather than leaving the gap unstated.
@@ -54,9 +55,9 @@ produced.
    seconds for both threads to exit, so the MP4 is complete after a clean
    exit even though a detached GUI connection thread may still hold a
    reference to the session; a wedged writer costs the MP4 rather than
-   hanging exit. See
-   [`PLAN-video-keeping-up.md`](/components/ryll/plans/PLAN-video-keeping-up/) for the
-   trade-off.
+   hanging exit. The reasoning behind the drop-on-overflow policy, queue
+   sizes and timestamps is in
+   [diagnostics.md](/components/ryll/diagnostics/#diagnosing-video-not-keeping-up-how-the-instrumentation-is-shaped).
 
 7. **Display channel capabilities** - Ryll advertises COMPOSITE,
    MONITORS_CONFIG, SIZED_STREAM, A8_SURFACE, plus STREAM_REPORT (4),
@@ -243,8 +244,9 @@ produced.
 
 22. **Notifications go through the unified store, not direct UI
     calls** - The notification store at `ryll/src/notifications.rs`
-    is the single producer boundary. Channel handlers, the bug-report
-    writer, the screenshot dialog, and the gap observer all push
+    is the single producer boundary. Channel handlers emit
+    `ChannelEvent::Notification` for the host's event drain to push; the
+    bug-report writer, the screenshot dialog, and the gap observer push
     `NotificationEntry` values via `Arc<Mutex<NotificationStore>>`; the
     GUI side panel and the status-bar bell read from the same store.
     Adding a new notification producer means: build a
@@ -371,3 +373,55 @@ produced.
     artefact. The choice is reversible rather than permanent: if a
     crate ever needs its own repository, `git filter-repo` can lift it
     out with its history.
+
+28. **Packaging: one native artifact per platform, with the choices that
+    shape them** - The distributable formats and the reasons behind each
+    choice, so a change to one is deliberate. Where a decision was
+    reversed since the packaging plan, the page says so rather than
+    repeating the plan.
+
+    - `Cargo.lock` is committed, because ryll is a binary and CI, release
+      and developer builds must resolve the same dependencies; the
+      release workflow checks that the lockfile agrees with the tag.
+    - `ctrlc` handles Ctrl+C instead of a raw `libc::signal`, because
+      the latter does not compile on Windows and `ctrlc` also covers
+      the Unix signal.
+    - macOS binaries are Apple Silicon only, built with
+      `MACOSX_DEPLOYMENT_TARGET=14.0` (Sonoma) in `ci.yml`,
+      `release.yml` and `manual-build.yml`. That floor was chosen when
+      14 was the oldest macOS Apple still supported, and it is far above
+      eframe's own minimum; Intel is not built because Apple is ending
+      security updates for every Intel Mac in 2026 and nobody
+      supported would run it. Revisit both if someone asks.
+    - Distribution on macOS is a Homebrew tap (`shakenfist/homebrew-tap`),
+      not homebrew-core, which requires popularity and review. The
+      `update-homebrew` job in `release.yml` edits the tap's formula in
+      place with a token for that repository, because `GITHUB_TOKEN`
+      cannot push to another one, and is `continue-on-error` so a missing
+      or expired token leaves the release itself complete.
+    - RPMs come from `cargo-generate-rpm`, with no spec file or
+      `rpmbuild`: it builds from Cargo metadata on any Linux runner, and
+      its `ldd`-based auto-requires record SONAMEs, which every RPM
+      distribution resolves itself. Move to a spec file only on hitting a
+      limitation it cannot express. The `.deb` is likewise `cargo-deb`
+      with `$auto` dependencies.
+    - Windows is a `.zip` holding `ryll.exe`, not an MSI, which would
+      need the WiX toolset for Start Menu shortcuts that a test client
+      does not need. Windows builds drop only the `capture` feature,
+      because its dependencies (`pcap-file`, `etherparse`, `mp4`) do not
+      build there per the comment in `release.yml`; see
+      [Binary portability](/components/ryll/portability/).
+    - None of the macOS or Windows binaries are code-signed, so the first
+      run of a downloaded one meets Gatekeeper or SmartScreen; see
+      [Installation](/components/ryll/installation/).
+    - `release.yml` carries its own copy of the build matrix rather than
+      calling `ci.yml`, so a change that suits pull-request feedback
+      (which jobs run, what they are capped at) cannot silently change
+      what a release builds, and the reverse.
+    - The Docker devcontainer stays the primary local build for Linux,
+      because the developer works across several Rust toolchain
+      versions and the container selects the right one without touching
+      the host; the packaging jobs take their binary from that build.
+
+    The text the decision came out of is in the
+    [retired packaging plan](https://github.com/shakenfist/ryll/blob/8634fe4e378c7b2b33aca59b3ae907f8a97d2798/docs/plans/PLAN-packaging.md).

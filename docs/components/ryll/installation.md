@@ -64,6 +64,11 @@ tar xzf ryll-0.1.0-aarch64-apple-darwin.tar.gz
 cp ryll /usr/local/bin/
 ```
 
+The macOS binary is not code-signed. A tarball downloaded through a
+browser carries the quarantine attribute, so Gatekeeper refuses to open
+it with a "developer cannot be verified" warning; right-click and Open,
+or clear the attribute with `xattr -d com.apple.quarantine ryll`.
+
 ## Windows
 
 Download the `.zip` archive for your architecture from
@@ -80,6 +85,10 @@ To make it available system-wide, move `ryll.exe` to a directory
 on your `PATH`.
 
 Note that `--capture` mode is not available on Windows builds.
+
+The Windows binaries are not code-signed, so SmartScreen may show an
+"unrecognized app" warning on first run; choose "More info", then "Run
+anyway".
 
 ## pip (Python, Linux only)
 
