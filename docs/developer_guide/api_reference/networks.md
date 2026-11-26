@@ -183,7 +183,7 @@ event system.
             "fqdn": "sf-1",
             "message": "usage",
             "timestamp": 1685229103.9690208,
-            "type": "usage"
+            "event_type": "usage"
         },
         ...
     ]

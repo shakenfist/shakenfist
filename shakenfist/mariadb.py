@@ -600,7 +600,20 @@ BLOB_ATTRIBUTES_VERSION = 1
 NODES_VERSION = 2
 NODE_ATTRIBUTES_VERSION = 4
 NAMESPACES_VERSION = 2
-NAMESPACE_ATTRIBUTES_VERSION = 2
+# v1: schema creation. v2: etcd data-import marker (historical).
+# v3: drops the legacy keys JSON column. Namespace keys have been
+# objects of their own in namespace_keys / namespace_key_attributes
+# since the namespace_keys v2 migration, and nothing has read this
+# column since -- so what it held was a second copy of live bcrypt
+# hashes and nonces, at rest, with no reader (issue 5016). That v2
+# migration is the one thing which reads it, so ensure_schema() runs
+# namespace_keys before this table.
+NAMESPACE_ATTRIBUTES_VERSION = 3
+# The version at which the keys column stopped existing. The
+# namespace_keys migration asks the table whether the column is there
+# rather than reading this, because a table can exist with no version
+# it can report and still have it.
+NAMESPACE_ATTRIBUTES_KEYS_DROPPED_VERSION = 3
 # v1: schema creation. v2: data migration out of the
 # namespace_attributes.keys JSON column. namespace_key_attributes rows
 # are written by that same migration, but it is gated on this table's
@@ -4829,12 +4842,17 @@ def ensure_schema() -> list[dict[str, Any]]:
     results.append(_ensure_nodes_schema(engine))
     results.append(_ensure_node_attributes_schema(engine))
     results.append(_ensure_namespaces_schema(engine))
-    results.append(_ensure_namespace_attributes_schema(engine))
     # namespace_key_attributes is ensured before namespace_keys because
     # the namespace_keys v1->v2 data migration writes rows into it, and
     # on an upgrading cluster both tables are created by this same call.
     results.append(_ensure_namespace_key_attributes_schema(engine))
     results.append(_ensure_namespace_keys_schema(engine))
+    # namespace_attributes is ensured after namespace_keys because its
+    # v2->v3 step drops the legacy keys column which that same v1->v2
+    # data migration reads. The other way round, an upgrading cluster
+    # would have the column taken away before its keys were copied out
+    # of it (issue 5016).
+    results.append(_ensure_namespace_attributes_schema(engine))
     results.append(_ensure_trusted_issuer_attributes_schema(engine))
     results.append(_ensure_trusted_issuers_schema(engine))
     results.append(_ensure_mapping_rule_attributes_schema(engine))
@@ -13901,7 +13919,9 @@ def _get_namespace_attributes_table() -> sa.Table:
                 sa.Column(
                     'name', sa.String(255), primary_key=True
                 ),
-                sa.Column('keys', sa.JSON(), nullable=True),
+                # The legacy keys JSON column is gone from here as of
+                # table version 3; namespace keys are objects of their
+                # own (issue 5016).
                 sa.Column('trust', sa.JSON(), nullable=True),
             )
     return _namespace_attributes_table
@@ -13950,9 +13970,21 @@ def _ensure_namespace_attributes_schema(engine: sa.Engine) -> dict[str, Any]:
 
     # Version 0 or -1 means table doesn't exist yet - create it at the
     # current schema version. The historical v1->v2 step was the etcd
-    # data-import marker; with etcd purged, fresh installs are at the
-    # target version by construction.
-    if current_ver <= 0:
+    # data-import marker and v3 drops a column this table definition no
+    # longer has, so fresh installs are at the target version by
+    # construction. A table which is already there but has no version
+    # it can report -- never stamped, or a version read which failed --
+    # may still carry the legacy column, so it goes through the drop
+    # step below rather than being stamped as though it had been made
+    # without one. Its version is left as the one recorded, so that a
+    # drop which is refused or fails reports the version an operator
+    # will find in schema_versions rather than one assumed here.
+    if current_ver <= 0 and sa.inspect(engine).has_table(table_name):
+        LOG.warning(
+            f'{table_name} exists but reports version {current_ver}; '
+            f'checking it for the legacy keys column rather than '
+            f'stamping it')
+    elif current_ver <= 0:
         LOG.info(f'Creating {table_name} table (version {NAMESPACE_ATTRIBUTES_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
 
@@ -13965,6 +13997,83 @@ def _ensure_namespace_attributes_schema(engine: sa.Engine) -> dict[str, Any]:
 
         current_ver = NAMESPACE_ATTRIBUTES_VERSION
         _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < NAMESPACE_ATTRIBUTES_KEYS_DROPPED_VERSION:
+        # Drop the legacy keys JSON column (issue 5016). Namespace keys
+        # live in namespace_keys / namespace_key_attributes, and nothing
+        # has read or written this column since that migration, so what
+        # it holds is a second copy of live key material at rest.
+        #
+        # The namespace_keys v1->v2 fan out is its one reader, and
+        # ensure_schema() runs that table before this one so the copy
+        # has happened by the time the column goes; see the ordering
+        # comment there. DROP COLUMN IF EXISTS is idempotent, so a
+        # re-run is a no-op. `keys` is a MariaDB reserved word and has
+        # to stay quoted.
+        #
+        # A failure is deliberately not swallowed into a version bump:
+        # the point of the step is that the key material stops being at
+        # rest, so recording it as done while the column is still there
+        # would be a claim no operator can see through. The table stays
+        # at version 2, which is the shape the release they are
+        # upgrading from ran on, sf-ctl ensure-mariadb-schema names it
+        # as short of version 3 and exits non-zero, and a re-run
+        # finishes it.
+        #
+        # The drop cannot be undone, so it goes ahead only once
+        # namespace_keys has reached version 2, which that table stamps
+        # only after proving every well-formed legacy key has a row (see
+        # _ensure_namespace_keys_schema). It deliberately does not copy
+        # again here. From that version on a legacy key with no row has
+        # either been removed -- and Namespace.remove_key() is a hard
+        # delete, so a revoked key leaves no trace but its absence -- or
+        # has failed to authenticate ever since, because authentication
+        # reads namespace_keys. Copying it back could only make a
+        # revoked credential valid again. A column which is already gone
+        # (a drop whose version stamp failed) has nothing left to lose.
+        may_drop = False
+        try:
+            keys_ver = _get_table_version(engine, 'namespace_keys')
+            if not _legacy_keys_column_present(engine):
+                may_drop = True
+            elif keys_ver >= 2:
+                may_drop = True
+            else:
+                LOG.warning(
+                    f'Not dropping {table_name}.keys: namespace_keys is '
+                    f'at version {keys_ver}, so the copy out of it has '
+                    f'not been proven. The table stays at version '
+                    f'{current_ver}; a re-run retries the copy.')
+        except Exception as e:
+            LOG.warning(
+                f'Could not confirm the legacy namespace keys were '
+                f'copied, so not dropping {table_name}.keys and leaving '
+                f'the table at version {current_ver}: {e}')
+        if not may_drop:
+            return {
+                'table': table_name,
+                'start_version': start_ver,
+                'end_version': current_ver,
+                'target_version': NAMESPACE_ATTRIBUTES_VERSION,
+                'migrated': start_ver != current_ver
+            }
+        # Only now, so a refused drop never reads as an upgrade.
+        LOG.info(
+            f'Upgrading {table_name} table to version '
+            f'{NAMESPACE_ATTRIBUTES_KEYS_DROPPED_VERSION} '
+            f'(drop legacy keys column)')
+        try:
+            with engine.connect() as conn:
+                conn.execute(sa.text(
+                    'ALTER TABLE namespace_attributes '
+                    'DROP COLUMN IF EXISTS `keys`'))
+                conn.commit()
+            current_ver = NAMESPACE_ATTRIBUTES_KEYS_DROPPED_VERSION
+            _set_table_version(engine, table_name, current_ver)
+        except (IntegrityError, OperationalError) as e:
+            LOG.warning(
+                f'Failed to drop the legacy {table_name}.keys column, '
+                f'leaving the table at version {current_ver}: {e}')
 
     return {
         'table': table_name,
@@ -14060,7 +14169,7 @@ def _direct_create_namespace_attributes(data: NamespaceAttributesData) -> bool:
 
     try:
         with engine.connect() as conn:
-            stmt = sa.insert(table).values(name=data.name, keys=data.keys, trust=data.trust)
+            stmt = sa.insert(table).values(name=data.name, trust=data.trust)
             conn.execute(stmt)
             conn.commit()
             return True
@@ -14086,7 +14195,6 @@ def _direct_get_namespace_attributes(name: str) -> Optional[NamespaceAttributesD
 
             return NamespaceAttributesData(
                 name=result.name,
-                keys=result.keys if result.keys else {'nonced_keys': {}},
                 trust=result.trust if result.trust else ['system'],
             )
     except OperationalError as e:
@@ -14107,11 +14215,14 @@ def _namespace_attributes_column_values(
     fields limits the result to the named model fields; None or an
     empty list means every column. Writers setting a single attribute
     must name it so concurrent writers of other attributes on the same
-    row (keys against trust, which hold different attribute locks)
-    cannot lose their updates to this writer's read-modify-write.
+    row cannot lose their updates to this writer's read-modify-write.
+
+    Since the legacy keys column was retired (issue 5016) trust is the
+    only attribute left here, so there is nothing for a masked write to
+    protect today. The mask stays because the next attribute added to
+    this row would otherwise arrive with the race already built in.
     """
     all_values: Dict[str, Any] = {
-        'keys': data.keys,
         'trust': data.trust,
     }
     if not fields:
@@ -14226,7 +14337,6 @@ def _grpc_create_namespace_attributes(data: NamespaceAttributesData) -> bool:
         request = database_pb2.CreateNamespaceAttributesRequest(
             data=database_pb2.NamespaceAttributesProto(
                 name=data.name,
-                keys_json=_json_dumps(data.keys),
                 trust_json=_json_dumps(data.trust)))
         reply = _grpc_call(stub.CreateNamespaceAttributes, request)
         return bool(reply.success)
@@ -14245,7 +14355,6 @@ def _grpc_get_namespace_attributes(name: str) -> Optional[NamespaceAttributesDat
             return None
         return NamespaceAttributesData(
             name=reply.data.name,
-            keys=json.loads(reply.data.keys_json) if reply.data.keys_json else {'nonced_keys': {}},
             trust=json.loads(reply.data.trust_json) if reply.data.trust_json else ['system'],
         )
     except grpc.RpcError as e:
@@ -14274,7 +14383,6 @@ def _grpc_update_namespace_attributes(
         request = database_pb2.UpdateNamespaceAttributesRequest(
             data=database_pb2.NamespaceAttributesProto(
                 name=data.name,
-                keys_json=_json_dumps(data.keys),
                 trust_json=_json_dumps(data.trust)),
             fields=fields or [])
         reply = _grpc_call(stub.UpdateNamespaceAttributes, request)
@@ -14404,10 +14512,10 @@ def update_namespace_attributes(
         fields: The model field names to write. This argument is
             deliberately required: callers must name exactly the
             fields they changed so concurrent writers of other
-            attributes on the same row (keys against trust) cannot
-            lose their committed column to this writer's
-            read-modify-write. Passing None writes every column and
-            is reserved for row creation and upgrade persistence.
+            attributes on the same row cannot lose their committed
+            column to this writer's read-modify-write. Passing None
+            writes every column and is reserved for row creation and
+            upgrade persistence.
 
     Returns:
         True if updated successfully, False otherwise.
@@ -14538,12 +14646,16 @@ def _migrate_keys_from_namespace_attributes(
     both clobber a key rotated since the migration ran and orphan an
     attributes row under the losing uuid.
 
-    The JSON column is left in place; it is dropped in a later schema
-    bump once nothing reads it.
+    This is the only reader the legacy JSON column has, which is why
+    the namespace_attributes v2->v3 migration can drop it. That drop is
+    also why the column is read by name in raw SQL here rather than
+    through the table definition, which no longer declares it: this
+    function runs against a namespace_attributes table which still has
+    the column, and its caller is responsible for only calling it then.
+    ``keys`` is a MariaDB reserved word, so it stays quoted.
 
     Returns ``(migrated, errors)``.
     """
-    src = _get_namespace_attributes_table()
     dst = _get_namespace_keys_table()
     attrs_dst = _get_namespace_key_attributes_table()
     states = _get_object_states_table()
@@ -14551,10 +14663,10 @@ def _migrate_keys_from_namespace_attributes(
     errors = 0
 
     with engine.connect() as conn:
-        # Note the subscript: ColumnCollection has a keys() method, so
-        # src.c.keys is that method rather than the JSON column.
         rows = conn.execute(
-            sa.select(src.c.name, src.c['keys'])
+            sa.text(
+                'SELECT name, `keys` AS keys_json FROM '
+                'namespace_attributes')
         ).fetchall()
 
         # The (namespace, name) pairs which already have a key row.
@@ -14565,7 +14677,23 @@ def _migrate_keys_from_namespace_attributes(
         }
 
         for row in rows:
-            keys = row.keys or {}
+            # A raw text select hands back whatever the driver read, so
+            # a MariaDB JSON column arrives as the string it is stored
+            # as rather than deserialised by a column type. Decoding
+            # here, rather than relying on a table definition which no
+            # longer declares the column, is what keeps a string from
+            # being mistaken for malformed content and the namespace's
+            # keys from being dropped on the floor.
+            keys = row.keys_json or {}
+            if isinstance(keys, (str, bytes)):
+                try:
+                    keys = json.loads(keys)
+                except ValueError:
+                    LOG.warning(
+                        f'Namespace {row.name} has an undecodable keys '
+                        f'column, skipped')
+                    errors += 1
+                    continue
             if not isinstance(keys, dict):
                 LOG.warning(
                     f'Namespace {row.name} has a malformed keys column, '
@@ -14649,6 +14777,68 @@ def _migrate_keys_from_namespace_attributes(
     return migrated, errors
 
 
+def _legacy_keys_column_present(engine: sa.Engine) -> bool:
+    """Whether namespace_attributes still has the legacy keys JSON column.
+
+    Asked of the table rather than inferred from its version, because a
+    table which exists with no version it can report may still have the
+    column, and a version stamp which failed after the drop leaves a
+    table at version 2 without it. Raises on a failed inspection rather
+    than answering, so a caller cannot mistake it for "no column".
+    """
+    inspector = sa.inspect(engine)
+    if not inspector.has_table('namespace_attributes'):
+        return False
+    return 'keys' in {
+        c['name'] for c in inspector.get_columns('namespace_attributes')}
+
+
+def _unmigrated_legacy_keys(engine: sa.Engine) -> list[str]:
+    """Name every well-formed legacy key which has no namespace_keys row.
+
+    The namespace_keys v1->v2 step asks this immediately after its fan
+    out, and stamps version 2 only on an empty answer: that version is
+    what the namespace_attributes v2->v3 drop trusts before it ends the
+    only other copy. Only keys
+    the fan out could have copied count: an entry without both a hash
+    and a nonce cannot authenticate anything, so losing it loses nothing,
+    and counting it would block the drop forever. Raises rather than
+    answering on a failed read, so that a caller cannot mistake a read
+    it could not make for an empty answer.
+    """
+    with engine.connect() as conn:
+        rows = conn.execute(sa.text(
+            'SELECT name, `keys` AS keys_json FROM namespace_attributes'
+        )).fetchall()
+        dst = _get_namespace_keys_table()
+        existing = {
+            (r.namespace, r.name)
+            for r in conn.execute(
+                sa.select(dst.c.namespace, dst.c.name)).fetchall()
+        }
+
+    missing = []
+    for row in rows:
+        keys = row.keys_json or {}
+        if isinstance(keys, (str, bytes)):
+            try:
+                keys = json.loads(keys)
+            except ValueError:
+                continue
+        if not isinstance(keys, dict):
+            continue
+        nonced_keys = keys.get('nonced_keys')
+        if not isinstance(nonced_keys, dict):
+            continue
+        for key_name, payload in nonced_keys.items():
+            if (not isinstance(payload, dict)
+                    or 'key' not in payload or 'nonce' not in payload):
+                continue
+            if (row.name, key_name) not in existing:
+                missing.append(f'{row.name}:{key_name}')
+    return missing
+
+
 def _ensure_namespace_keys_schema(engine: sa.Engine) -> dict[str, Any]:
     """Ensure the namespace_keys table schema is up to date."""
     table_name = 'namespace_keys'
@@ -14680,18 +14870,61 @@ def _ensure_namespace_keys_schema(engine: sa.Engine) -> dict[str, Any]:
 
     if current_ver < 2:
         # Fan any pre-existing namespace_attributes.keys JSON content out
-        # into this table and namespace_key_attributes. Skipped
-        # automatically on a fresh cluster because there is nothing to
-        # read. Note that this writes namespace_key_attributes rows, so
-        # ensure_schema() must have created that table already.
-        LOG.info(
-            f'Migrating namespace keys JSON into {table_name} (version 2)')
-        migrated, errors = _migrate_keys_from_namespace_attributes(engine)
-        LOG.info(
-            f'{table_name} migration: {migrated} key(s) copied, '
-            f'{errors} error(s)')
-        current_ver = 2
-        _set_table_version(engine, table_name, current_ver)
+        # into this table and namespace_key_attributes. Note that this
+        # writes namespace_key_attributes rows, so ensure_schema() must
+        # have created that table already.
+        #
+        # Whether there is anything to copy is asked of the column
+        # itself rather than of namespace_attributes' version: a fresh
+        # cluster has not created that table yet when this runs, from
+        # version 3 the column is gone (issue 5016), and a table which
+        # exists with no version it can report may still have it.
+        #
+        # Version 2 is stamped only once every well-formed legacy key is
+        # proven to have a row here. This is the one point at which a
+        # legacy key without a row can only mean a copy which failed:
+        # sf-database will not start until this table reaches version 2,
+        # so nothing has authenticated against, or removed, a key in it
+        # yet. From version 2 on a missing row is indistinguishable from
+        # a key which was revoked since, which is why the namespace_attributes
+        # v2->v3 drop trusts this version rather than copying again. A
+        # copy which fails leaves this table at version 1, sf-ctl
+        # ensure-mariadb-schema exits non-zero, and a re-run retries it.
+        copy_proven = False
+        try:
+            if _legacy_keys_column_present(engine):
+                LOG.info(
+                    f'Migrating namespace keys JSON into {table_name} '
+                    f'(version 2)')
+                migrated, errors = _migrate_keys_from_namespace_attributes(
+                    engine)
+                LOG.info(
+                    f'{table_name} migration: {migrated} key(s) copied, '
+                    f'{errors} error(s)')
+                uncopied = _unmigrated_legacy_keys(engine)
+                if uncopied:
+                    LOG.warning(
+                        f'{len(uncopied)} legacy namespace key(s) have '
+                        f'no {table_name} row '
+                        f'({", ".join(uncopied[:10])}). {table_name} '
+                        f'stays at version {current_ver}; a re-run '
+                        f'retries the copy.')
+                else:
+                    copy_proven = True
+            else:
+                LOG.info(
+                    f'No legacy namespace keys column to migrate into '
+                    f'{table_name}')
+                copy_proven = True
+        except Exception as e:
+            LOG.warning(
+                f'Could not confirm every legacy namespace key was '
+                f'copied into {table_name}, leaving it at version '
+                f'{current_ver}: {e}')
+
+        if copy_proven:
+            current_ver = 2
+            _set_table_version(engine, table_name, current_ver)
 
     return {
         'table': table_name,
@@ -23833,6 +24066,16 @@ def _direct_delete_cluster_operation(uuid: UUID) -> bool:
         return False
 
 
+# What a placement, claim, hold or enqueue result's ``error`` says when
+# the database failed. Never the exception: a SQLAlchemy error renders as the
+# statement and its bound parameters, an RpcError carries the database
+# node's address, and these results reach add_event()'s extra on the
+# instance or claim, which a tenant can read through the API (#5027).
+# Every site logs the exception itself, where it happened.
+_RESULT_ERROR_DATABASE = 'MariaDB error; the cause is logged where it ran'
+_RESULT_ERROR_UNAVAILABLE = 'database unavailable; the cause is logged'
+
+
 def _direct_create_and_enqueue_cluster_operation(
         op_uuid: UUID,
         operation_type: str,
@@ -23999,13 +24242,13 @@ def _direct_create_and_enqueue_cluster_operation(
             return True, ''
         LOG.warning(
             f'MariaDB atomic create+enqueue refused duplicate '
-            f'cluster_operation {op_uuid}')
-        return False, f'duplicate cluster_operation uuid: {e}'
+            f'cluster_operation {op_uuid}: {e}')
+        return False, f'duplicate cluster_operation uuid {op_uuid}'
     except OperationalError as e:
         LOG.warning(
             f'MariaDB atomic create+enqueue failed for '
             f'cluster_operation {op_uuid}: {e}')
-        return False, f'MariaDB error: {e}'
+        return False, _RESULT_ERROR_DATABASE
 
 
 def _direct_set_cluster_operation_error(
@@ -24376,7 +24619,7 @@ def _grpc_create_and_enqueue_cluster_operation(
         LOG.warning(
             f'gRPC CreateAndEnqueueClusterOperation failed for '
             f'{op_uuid}: {e}')
-        return False, f'gRPC error: {e}'
+        return False, _RESULT_ERROR_UNAVAILABLE
 
 
 def _grpc_set_cluster_operation_error(
@@ -30664,7 +30907,7 @@ def _direct_admit_instance_placement(
             f'MariaDB admit_instance_placement failed for '
             f'{instance_uuid}: {e}')
         result['success'] = False
-        result['error'] = f'MariaDB error: {e}'
+        result['error'] = _RESULT_ERROR_DATABASE
         return result
 
 
@@ -30801,7 +31044,7 @@ def _direct_release_instance_placement(
             f'MariaDB release_instance_placement failed for '
             f'{instance_uuid}: {e}')
         result['success'] = False
-        result['error'] = f'MariaDB error: {e}'
+        result['error'] = _RESULT_ERROR_DATABASE
         return result
 
 
@@ -30948,9 +31191,9 @@ def _grpc_admit_instance_placement(
             # upgraded. Name the cause so the resulting 500 does.
             result['error'] = (
                 'database service predates AdmitInstancePlacement; '
-                f'upgrade sf-database before sf-api: {e}')
+                'upgrade sf-database before sf-api')
         else:
-            result['error'] = f'database unavailable: {e}'
+            result['error'] = _RESULT_ERROR_UNAVAILABLE
         return result
 
 
@@ -30994,7 +31237,7 @@ def _grpc_release_instance_placement(
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.error(f'gRPC ReleaseInstancePlacement failed: {e}')
         result['success'] = False
-        result['error'] = f'database unavailable: {e}'
+        result['error'] = _RESULT_ERROR_UNAVAILABLE
         return result
 
 
@@ -31892,7 +32135,7 @@ def _direct_create_namespace_claim(
         LOG.warning(
             f'MariaDB create_namespace_claim failed for {claim_uuid}: {e}')
         result['success'] = False
-        result['error'] = f'MariaDB error: {e}'
+        result['error'] = _RESULT_ERROR_DATABASE
         return result
 
 
@@ -32235,7 +32478,7 @@ def _direct_update_namespace_claim(
                 f'MariaDB update_namespace_claim failed for '
                 f'{claim_uuid}: {e}')
             result['success'] = False
-            result['error'] = f'MariaDB error: {e}'
+            result['error'] = _RESULT_ERROR_DATABASE
             return result
 
     LOG.warning(
@@ -32877,7 +33120,7 @@ def _direct_book_claim_holds(
         LOG.warning(
             f'MariaDB book_claim_holds failed for {claim_uuid}: {e}')
         result['success'] = False
-        result['error'] = f'MariaDB error: {e}'
+        result['error'] = _RESULT_ERROR_DATABASE
         return result
 
 
@@ -33116,7 +33359,7 @@ def _direct_release_claim_holds(
             LOG.warning(
                 f'MariaDB release_claim_holds failed for {claim_uuid}: {e}')
             result['success'] = False
-            result['error'] = f'MariaDB error: {e}'
+            result['error'] = _RESULT_ERROR_DATABASE
             return result
 
     LOG.warning(
@@ -33282,7 +33525,7 @@ def _direct_delete_namespace_claim(
                 f'MariaDB delete_namespace_claim failed for '
                 f'{claim_uuid}: {e}')
             result['success'] = False
-            result['error'] = f'MariaDB error: {e}'
+            result['error'] = _RESULT_ERROR_DATABASE
             return result
 
     LOG.warning(
@@ -33444,7 +33687,7 @@ def _grpc_create_namespace_claim(
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.error(f'gRPC CreateNamespaceClaim failed: {e}')
         result['success'] = False
-        result['error'] = f'database unavailable: {e}'
+        result['error'] = _RESULT_ERROR_UNAVAILABLE
         return result
 
 
@@ -33478,7 +33721,7 @@ def _grpc_update_namespace_claim(
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.error(f'gRPC UpdateNamespaceClaim failed: {e}')
         result['success'] = False
-        result['error'] = f'database unavailable: {e}'
+        result['error'] = _RESULT_ERROR_UNAVAILABLE
         return result
 
 
@@ -33503,7 +33746,7 @@ def _grpc_delete_namespace_claim(
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.error(f'gRPC DeleteNamespaceClaim failed: {e}')
         result['success'] = False
-        result['error'] = f'database unavailable: {e}'
+        result['error'] = _RESULT_ERROR_UNAVAILABLE
         return result
 
 
@@ -33597,7 +33840,7 @@ def _grpc_book_claim_holds(
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.error(f'gRPC BookNamespaceClaimHolds failed: {e}')
         result['success'] = False
-        result['error'] = f'database unavailable: {e}'
+        result['error'] = _RESULT_ERROR_UNAVAILABLE
         return result
 
 
@@ -33653,7 +33896,7 @@ def _grpc_release_claim_holds(
     except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
         LOG.error(f'gRPC ReleaseNamespaceClaimHolds failed: {e}')
         result['success'] = False
-        result['error'] = f'database unavailable: {e}'
+        result['error'] = _RESULT_ERROR_UNAVAILABLE
         return result
 
 

@@ -477,7 +477,6 @@
   },
   "namespace_attributes": {
     "columns": {
-      "keys": "JSON NULL",
       "name": "VARCHAR(255) NOT NULL",
       "trust": "JSON NULL"
     },
@@ -485,7 +484,7 @@
     "primary_key": [
       "name"
     ],
-    "version": 2
+    "version": 3
   },
   "namespace_claim_holds": {
     "columns": {

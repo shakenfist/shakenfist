@@ -36,13 +36,13 @@ class NamespaceKeyExpiryTestCase(base.ShakenFistTestCase):
         ns.add_key('expkey', 'secret', expiry=2000)
 
         # The expiry is persisted verbatim in the nonced_keys entry.
-        stored = self.mock_mariadb.namespace_attributes['banana'].keys
+        stored = self.mock_mariadb.legacy_namespace_keys_view('banana')
         self.assertEqual(2000, stored['nonced_keys']['expkey']['expiry'])
 
     def test_add_key_without_expiry_has_no_expiry(self):
         ns = Namespace.from_db('banana')
         ns.add_key('noexp', 'secret')
-        stored = self.mock_mariadb.namespace_attributes['banana'].keys
+        stored = self.mock_mariadb.legacy_namespace_keys_view('banana')
         self.assertNotIn('expiry', stored['nonced_keys']['noexp'])
 
     def test_keys_accessor_filters_expired_entry(self):
@@ -63,7 +63,7 @@ class NamespaceKeyExpiryTestCase(base.ShakenFistTestCase):
             self.assertIn('key1', visible)
 
         # The filter is read-time only: the entry is still in storage.
-        stored = self.mock_mariadb.namespace_attributes['banana'].keys
+        stored = self.mock_mariadb.legacy_namespace_keys_view('banana')
         self.assertIn('expkey', stored['nonced_keys'])
 
 
@@ -93,7 +93,7 @@ class GetApiTokenTestCase(base.ShakenFistTestCase):
         self.addCleanup(self.hashpw.stop)
 
     def _service_keys(self):
-        keys = self.mock_mariadb.namespace_attributes['system'].keys['nonced_keys']
+        keys = self.mock_mariadb.legacy_namespace_keys_view('system')['nonced_keys']
         return [k for k in keys if k.startswith('_service_key_')]
 
     def test_creates_service_key_and_caches_token(self):
@@ -109,7 +109,7 @@ class GetApiTokenTestCase(base.ShakenFistTestCase):
         self.assertEqual(1, len(service_keys))
 
         # Its expiry is ~300s in the future.
-        keys = self.mock_mariadb.namespace_attributes['system'].keys['nonced_keys']
+        keys = self.mock_mariadb.legacy_namespace_keys_view('system')['nonced_keys']
         expiry = keys[service_keys[0]]['expiry']
         self.assertGreaterEqual(expiry, before + 300)
         self.assertLessEqual(expiry, after + 300)
@@ -156,7 +156,7 @@ class NamespaceExternalViewTestCase(base.ShakenFistTestCase):
         # through unchanged, so these needles must be unwrapped -- a
         # SecretStr is never a substring of a string, and the assertion
         # would otherwise pass however much of the key the view leaked.
-        stored = self.mock_mariadb.namespace_attributes['banana'].keys['nonced_keys']
+        stored = self.mock_mariadb.legacy_namespace_keys_view('banana')['nonced_keys']
         serialised = json.dumps(view)
         for keyname, entry in stored.items():
             self.assertNotIn(entry['key'].get_secret_value(), serialised)

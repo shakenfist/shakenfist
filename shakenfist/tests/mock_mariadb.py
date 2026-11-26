@@ -56,37 +56,6 @@ from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
 
 
-class _NamespaceAttributesStore(dict):
-    """The namespace attributes store, with a legacy `keys` view.
-
-    Namespace keys used to live in the namespace_attributes.keys JSON
-    column. They now live in the namespace_keys tables, and production
-    code neither reads nor writes that column -- it is vestigial until a
-    later schema version drops it.
-
-    The behaviour preservation tests written before that cutover
-    (shakenfist/tests/test_namespace_keys.py) assert against this store
-    using the old shape. They are the bit compatibility proof for the
-    move and must pass unmodified, so reads through this mapping render the
-    key tables back into the legacy shape. The assertions stay
-    meaningful -- they still describe the key material which was
-    actually stored, just read out of the table which now stores it.
-
-    Only __getitem__ is overridden. The mocked mariadb accessors use
-    get() and __setitem__, so the production read path still sees the
-    empty column it now writes.
-    """
-
-    def __init__(self, mock_mariadb):
-        super().__init__()
-        self._mock_mariadb = mock_mariadb
-
-    def __getitem__(self, name):
-        data = super().__getitem__(name)
-        data.keys = self._mock_mariadb.legacy_namespace_keys_view(name)
-        return data
-
-
 class MockMariaDB():
     """Mock the MariaDB store with simple dictionaries
 
@@ -101,9 +70,7 @@ class MockMariaDB():
         self.ipam_reservations = {}  # Mock MariaDB IPAM reservations storage
         self.dnsmasq_objects = {}  # Mock MariaDB DnsMasq object storage
         self.namespace_objects = {}  # Mock MariaDB namespace storage
-        # Mock MariaDB namespace attributes. See
-        # _NamespaceAttributesStore for why this is not a plain dict.
-        self.namespace_attributes = _NamespaceAttributesStore(self)
+        self.namespace_attributes = {}  # Mock MariaDB namespace attributes
         self.namespace_key_objects = {}  # Mock MariaDB namespace key storage
         self.namespace_key_attributes = {}  # Mock MariaDB namespace key attrs
         self.trusted_issuers = {}  # Mock MariaDB trusted issuer storage
@@ -1968,9 +1935,17 @@ class MockMariaDB():
     def legacy_namespace_keys_view(self, namespace):
         """Render one namespace's keys in the legacy namespace_attributes JSON shape.
 
-        See _NamespaceAttributesStore. Expired keys are included, as
-        they always were in storage -- the expiry filter was and is
-        applied at read time by the accessors, not here.
+        The behaviour preservation tests written before keys became
+        objects of their own (shakenfist/tests/test_namespace_keys.py)
+        assert on the old shape, and are the bit compatibility proof
+        for that move, so this renders the key tables back into it.
+        The assertions stay meaningful: they describe the key material
+        which was actually stored, read out of the tables which now
+        store it. The legacy column itself is gone (issue 5016).
+
+        Expired keys are included, as they always were in storage --
+        the expiry filter was and is applied at read time by the
+        accessors, not here.
         """
         nonced_keys = {}
         for data in self.namespace_key_objects.values():
@@ -3932,7 +3907,7 @@ class MockMariaDB():
             self._trace(
                 f'MockMariaDB.create_and_enqueue_cluster_operation'
                 f'({key}): duplicate')
-            return False, f'duplicate cluster_operation uuid: {key}'
+            return False, f'duplicate cluster_operation uuid {key}'
 
         row = dict(metadata)
         row['uuid'] = key

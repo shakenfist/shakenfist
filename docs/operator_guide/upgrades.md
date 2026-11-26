@@ -548,6 +548,63 @@ upgraded gateway and may log a failed `CreateClusterOperationTarget` call.
 This is expected and harmless: the row was already written by the enqueue,
 and the caller ignores the result.
 
+#### namespace_attributes v2 to v3
+
+The v3 migration drops the legacy `keys` JSON column. Namespace keys have
+been objects of their own in `namespace_keys` and
+`namespace_key_attributes` since the `namespace_keys` v2 migration, and
+nothing has read the column since — so what it held was a second copy of
+live bcrypt hashes and nonces at rest, which is an exposure with no
+benefit. The `ALTER TABLE` is a metadata-only drop on a table with one row
+per namespace, so it is quick, and `DROP COLUMN IF EXISTS` makes it safe to
+re-run.
+
+`sf-ctl ensure-mariadb-schema` applies the `namespace_keys` v1 to v2
+fan-out **before** this drop within the same run, so a cluster upgrading
+from a release that predates first-class keys copies its keys into the new
+tables before the column goes, no matter how many releases it skips. The
+fan-out proves its own copy: it records `namespace_keys` at version 2 only
+once every key in the column with both a hash and a nonce has a row in
+`namespace_keys`. If any does not, `namespace_keys` stays at version 1, the
+warning names the keys concerned, the drop refuses to run, the column and
+its keys stay in place, and a re-run retries the copy.
+
+The drop trusts that version rather than copying again, on purpose. Once
+`namespace_keys` is at version 2 the cluster authenticates from it, so a key
+still in the column with no row there has either been removed since —
+removing a key is a hard delete, so a revoked key leaves nothing behind but
+its absence — or has not authenticated since the fan-out. Copying it back
+could only make a revoked credential valid again. A cluster which tracked
+development builds between the two migrations may therefore lose a key
+whose copy failed back then; that key has not worked since, and its owner
+needs a new one either way.
+
+If the drop itself fails — a lock wait against a serving cluster, say — the
+table stays at version 2, the command names it as short of version 3 and
+exits non-zero, and `sf-database` refuses to start until a re-run succeeds:
+restarting it in between leaves the database tier down rather than bringing
+it back. That is deliberate: a step whose point is that key material stops
+being at rest must not report itself done while the column is still there.
+
+Restart `sf-database` on every database node promptly after the command
+succeeds. A `sf-database` from the previous release still names the column
+in its queries, so until it is restarted onto this release every namespace
+attribute read and write it serves fails with an unknown column error. That
+covers more than namespace mutations: `GET` on a namespace, and the trust
+check that decides whether one namespace may use another's artifacts, fail
+too. Authentication is unaffected, because it reads `namespace_keys`, and
+keys are not lost in that window.
+
+!!! warning "Rolling back across this migration is a credential event"
+    While the column existed, rolling back to a release that predates
+    first-class keys revived it, and every key that predated the earlier
+    migration kept working. After v3 there is no column to revive, so
+    such a release sees no keys for any namespace and `POST /auth`
+    refuses every credential until keys are created again on the older
+    release. If your rollback plan crosses this upgrade, take a database
+    backup first, or plan to re-create namespace keys as part of it.
+    Nothing is lost going forwards: this affects a downgrade only.
+
 #### object_states v2 to v3
 
 The v3 migration adds a standalone index `idx_object_states_uuid` on

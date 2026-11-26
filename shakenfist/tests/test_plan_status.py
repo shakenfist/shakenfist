@@ -275,6 +275,15 @@ class PlanStatusFixtureTestCase(base.ShakenFistTestCase):
         checker.REPO_ROOT = self.tmp
         self.addCleanup(setattr, checker, 'REPO_ROOT', self.original_root)
 
+        # The exemption sets name real plans, which this tree does not have,
+        # and the checker now reports an exemption whose plan is absent. So
+        # they start empty here and each test which wants one substitutes it
+        # with _exempt(), which is the same split the rest of this class
+        # already uses: the fixture tests the mechanism, and the whole-tree
+        # regression test at the end tests the membership.
+        self._exempt('HAND_COUNTED', set())
+        self._exempt('PROVISIONAL', set())
+
     def _write(self, name, content, root=False):
         path = os.path.join(self.tmp if root else self.plans, name)
         with open(path, 'w') as f:
@@ -371,7 +380,7 @@ class PlanStatusFixtureTestCase(base.ShakenFistTestCase):
         """Point one of the checker's exemption sets at the fixture plan.
 
         Substituting the set tests the mechanism rather than the membership.
-        Whether the six real names are still the right six is what the
+        Whether the five real names are still the right five is what the
         whole-tree regression test below answers.
         """
         original = getattr(checker, attribute)
@@ -401,6 +410,33 @@ class PlanStatusFixtureTestCase(base.ShakenFistTestCase):
         # decomposing. It is neither a phase nor a status claim, so it
         # changes neither number.
         self._write('FIXTURE-plan.md', MASTER + '| ... | ... | ... |\n')
+        self.assertEqual([], checker.problems())
+
+    def test_a_stale_exemption_fails(self):
+        # Retirement deletes a plan's files and leaves its index row as a
+        # permalink, which registers no local plan. A name left behind in
+        # HAND_COUNTED or PROVISIONAL then exempts nothing, silently, and
+        # would re-arm against a later plan which reused the name.
+        self._exempt('HAND_COUNTED', {'FIXTURE-retired.md'})
+        self.assertProblem(
+            "HAND_COUNTED exempts 'FIXTURE-retired.md', which is not a "
+            'master plan')
+
+    def test_a_stale_provisional_exemption_fails(self):
+        # Both sets are checked. PROVISIONAL is the easier one to leave
+        # behind: its members are plans whose tables are placeholders, so
+        # they are the plans most likely to be abandoned rather than
+        # finished, and an abandoned plan retires on the same clock.
+        self._exempt('PROVISIONAL', {'FIXTURE-retired.md'})
+        self.assertProblem(
+            "PROVISIONAL exempts 'FIXTURE-retired.md', which is not a "
+            'master plan')
+
+    def test_a_live_exemption_passes(self):
+        # The check is staleness, not membership: a name which is a master
+        # plan in the tree is exactly what an exemption is for.
+        self._exempt('HAND_COUNTED', {'FIXTURE-plan.md'})
+        self._write('index.md', INDEX.replace('1 of 2', '99 of 99'))
         self.assertEqual([], checker.problems())
 
     def test_a_stale_index_row_fails(self):

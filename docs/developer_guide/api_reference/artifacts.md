@@ -159,7 +159,7 @@ both narrow and owner-only.
             "fqdn": "sf-3",
             "message": "artifact fetch complete",
             "timestamp": 1684718452.2673004,
-            "type": "audit"
+            "event_type": "audit"
         },
         ...
     ]

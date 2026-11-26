@@ -687,7 +687,7 @@ event system.
             "fqdn": "sf-2",
             "message": "usage",
             "timestamp": 1685229509.9592097,
-            "type": "usage"
+            "event_type": "usage"
         },
         ...
     ]

@@ -58,6 +58,7 @@ metrics. The headlines:
 - A sample taken before the work is not a decision.
 - Fail closed on a field, not on a formatting accident.
 - Credential-carrying routes are not logged, not redacted.
+- A failed RPC names itself, and says nothing else.
 - Cluster CI tests only run in the merge queue.
 - A signal handler only sets flags.
 - A backfill cannot finish while the old writers are still running.
