@@ -932,11 +932,12 @@ class BaseTestCase(testtools.TestCase):
     def _require_node_sudo(self, node):
         """Skip the test loudly if node cannot run a command as root.
 
-        The companion to ``_require_node_exec()`` above, for an assertion
-        which reads state only root can see: libvirt's domains, or a
-        configuration directory read as root rather than on the strength
-        of its mode, so that a deploy which tightens that mode makes this
-        skip rather than report a directory it cannot see as removed.
+        The counterpart of ``_require_node_exec()`` for an assertion
+        which reads root-only host state -- a configuration directory
+        under STORAGE_PATH, an instance's disks, a libvirt domain. Those
+        are read as root rather than relying on their modes, so that a
+        deploy which tightens a mode makes the test skip rather than
+        report state it cannot see as absent.
         """
         try:
             self._node_exec(node, ['true'], sudo=True)
@@ -944,6 +945,29 @@ class BaseTestCase(testtools.TestCase):
             self.skipTest(
                 'Cannot exec as root on node %s (%s): %s'
                 % (node.get('name'), node.get('ip'), e))
+
+    def _node_path_present(self, node, path, test='-e'):
+        """Whether path exists on node, read as root.
+
+        test is the shell file test to apply, so a caller which means a
+        directory can say so. Returns a boolean, and fails the test if
+        the node answered something other than the two words it was
+        asked for: a command which could not run at all would otherwise
+        read as an absent path, which is the answer a teardown assertion
+        most wants to be wrong about.
+        """
+        out, _ = self._node_exec(
+            node,
+            ['sh', '-c',
+             'if [ %s %s ]; then echo present; else echo absent; fi'
+             % (test, shlex.quote(path))],
+            sudo=True)
+        answer = out.strip()
+        self.assertIn(
+            answer, ['present', 'absent'],
+            'Could not tell whether %s exists on node %s: %r'
+            % (path, node.get('name'), out))
+        return answer == 'present'
 
     def _node_link_names(self, node):
         """The names of the network links in node's root namespace."""
@@ -1123,6 +1147,64 @@ class BaseTestCase(testtools.TestCase):
                 % (instance_uuid, node.get('name'), out))
 
         return disks
+
+    def _domain_nvram_path(self, node, instance_uuid):
+        """The path of instance_uuid's UEFI nvram on node, its hypervisor.
+
+        Read out of the domain with ``virsh dumpxml`` rather than derived
+        from STORAGE_PATH, because the nvram file is libvirt's rather
+        than Shaken Fist's: libvirt.tmpl asks for it inside the
+        instance's own directory, so a check of that directory alone
+        would stop seeing it the day libvirt or the template put it
+        somewhere else.
+
+        Fails the test, with the command's output attached, if the domain
+        declares no ``<nvram>``. Every UEFI domain does, and a caller
+        asserting the file is gone must not be handed a path of None to
+        assert nothing about.
+        """
+        out, _ = self._node_exec(
+            node, ['virsh', 'dumpxml', 'sf:%s' % instance_uuid], sudo=True)
+        try:
+            domain = ElementTree.fromstring(out)
+        except ElementTree.ParseError as e:
+            # self.fail() raises, so nothing below runs on this path.
+            self.fail(
+                'virsh dumpxml for instance %s on node %s is not XML (%s). '
+                'Full dumpxml output:\n%s'
+                % (instance_uuid, node.get('name'), e, out))
+
+        nvram = (domain.findtext('./os/nvram') or '').strip()
+        if not nvram:
+            self.fail(
+                'The libvirt domain for instance %s on node %s declares no '
+                'UEFI nvram. Full dumpxml output:\n%s'
+                % (instance_uuid, node.get('name'), out))
+        return nvram
+
+    def _domain_is_defined(self, node, instance_uuid):
+        """Whether libvirt on node still has a domain for instance_uuid.
+
+        ``virsh domstate`` exits non-zero for a domain libvirt does not
+        know, so the exit code is the answer -- turned into a word by the
+        shell, because ``_node_exec()`` returns output rather than a
+        status. Any other reason the command could fail also reads as
+        undefined, so use this only where the domain has been observed to
+        exist first.
+        """
+        out, _ = self._node_exec(
+            node,
+            ['sh', '-c',
+             'if virsh domstate %s >/dev/null 2>&1; then echo defined; '
+             'else echo undefined; fi'
+             % shlex.quote('sf:%s' % instance_uuid)],
+            sudo=True)
+        answer = out.strip()
+        self.assertIn(
+            answer, ['defined', 'undefined'],
+            'Could not tell whether instance %s has a libvirt domain on node '
+            '%s: %r' % (instance_uuid, node.get('name'), out))
+        return answer == 'defined'
 
     def _await_power_off(self, instance_uuid, after=None):
         return self._await_instance_event(
