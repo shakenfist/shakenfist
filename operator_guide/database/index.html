@@ -18807,7 +18807,7 @@ dedicated attribute tables:</p>
 <tr>
 <td><code>namespace_attributes</code></td>
 <td>Namespace</td>
-<td>name, keys (JSON), trust (JSON). Keys live in <code>namespace_keys</code> / <code>namespace_key_attributes</code> since the v2 <code>namespace_keys</code> migration; the legacy <code>keys</code> JSON column is left in place until a later schema bump drops it</td>
+<td>name, trust (JSON). Keys live in <code>namespace_keys</code> / <code>namespace_key_attributes</code> since the v2 <code>namespace_keys</code> migration; the legacy <code>keys</code> JSON column was dropped by this table's v3 migration</td>
 </tr>
 <tr>
 <td><code>namespace_key_attributes</code></td>
@@ -18858,8 +18858,9 @@ dedicated attribute tables:</p>
 </table>
 <p>Node attributes consolidate observed state, roles, daemons and versions
 into a single row.</p>
-<p>Namespace attributes consolidate keys (authentication) and trust
-(namespace trust relationships) into a single row.</p>
+<p>Namespace attributes hold trust (namespace trust relationships).
+Authentication keys were on this row too until the v3 migration dropped
+the column; they are their own objects.</p>
 <p>Because these tables pack several logically independent attributes into
 one row, every updater passes a field mask naming exactly the columns it
 changed (see <code>update_*_attributes</code> in <code>shakenfist/mariadb.py</code>). Full-row
@@ -18965,15 +18966,36 @@ state <code>created</code>. Hashes, nonces and expiries are copied verbatim, so
 tokens issued before the upgrade keep working; scopes and provenance
 are NULL. Expired keys are migrated too and removed by the reaper on
 its next pass. The migration is idempotent — keys which already have a
-row are skipped — so it is safe to re-run.</p>
-<p>The legacy JSON column is deliberately left untouched by the
-migration, exactly as the <code>node_daemon_states</code> migration left
-<code>node_attributes.daemon_states</code> in place. One consequence is worth
-knowing before an upgrade: <strong>rolling back to a pre-upgrade release
-revives the JSON column</strong>, which still holds every key that existed
-before the migration, but keys created or rotated after the migration
-exist only in the new tables and will be invisible to the rolled-back
-code.</p>
+row are skipped — so it is safe to re-run. It records version 2 only
+once it has checked its own work: if any key with a hash and a nonce
+still has no <code>namespace_keys</code> row, the table stays at version 1 and
+the next run copies it.</p>
+<p>Version 3 of <code>namespace_attributes</code> then drops that JSON column. It
+had no reader but the migration above, and what it held was a second
+copy of live bcrypt hashes and nonces sitting at rest — so the two
+could disagree, and anybody reading the schema had to work out which
+was authoritative. <code>sf-ctl ensure-mariadb-schema</code> runs the
+<code>namespace_keys</code> fan-out before this drop, in that order, so a cluster
+upgrading from before first-class keys copies them out of the column
+before it goes. The drop trusts the <code>namespace_keys</code> version stamp
+rather than the order: it refuses while that table is below version 2,
+and it does not repeat the fan-out. Once keys are served from the new
+tables, a key left only in the column has been revoked since, and
+copying it back would revive a revoked credential. A drop which fails
+leaves the table at version 2 and
+the command exits non-zero rather than reporting a column gone which
+is still there; re-run it.</p>
+<p>The consequence to know before upgrading is about rolling <em>back</em>.
+While the column survived, a rollback to a pre-first-class-keys
+release revived it, so keys which predated that migration kept
+working and only keys created or rotated since were lost. Once
+version 3 has run there is no column to revive: a rollback to a
+release that reads it finds <strong>no keys at all</strong> for every namespace,
+and <code>POST /auth</code> refuses every credential until a key is created
+again on the rolled-back release. Rolling back across this migration
+is therefore a credential event, not an inconvenience. The blast
+radius is the same shape as the <code>node_daemon_states</code> precedent, one
+step further on.</p>
 <h4 id="federation-abuse-resistance-tables">Federation Abuse Resistance Tables<a class="headerlink" href="#federation-abuse-resistance-tables" title="Permanent link">&para;</a></h4>
 <p>Two tables in the federated exchange path hold no objects at all. They
 exist to make an unauthenticated endpoint safe to expose, so they are

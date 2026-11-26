@@ -15449,6 +15449,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Merge lanes and weekly lanes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-node-lifecycle-lane-is-where-cluster-disturbing-checks-live" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The node lifecycle lane is where cluster-disturbing checks live
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -15698,7 +15715,7 @@ decides when a lane runs:</p>
 it does not select anything: it names the bundle artifact and forms part of
 the concurrency group, and nothing else reads it. A lane's suite is its
 <code>stestr_config</code> alone. <code>debian-13-localhost</code> passes <code>tier: smoke</code> and runs
-the whole of <code>cluster-ci.conf</code>, the same 163 tests as the multi-node lanes,
+the whole of <code>cluster-ci.conf</code>, the same suite as the multi-node lanes,
 which is why its <code>test_timeout_minutes</code> is the largest of any lane rather
 than the smallest -- one node at concurrency 3 needs about 48 minutes for
 the suite the three-node lane finishes in 34 at concurrency 5. Making that
@@ -15723,6 +15740,35 @@ not call <code>smoke-cluster.yml</code>. It shares only the deploy (the
 teardown powers nodes off and the reusable workflow's does not. It has no
 <code>concurrency_key</code> to pass, so its own <code>concurrency.group</code> carries the lane
 name, and the seam test reads it from there.</p>
+<h3 id="the-node-lifecycle-lane-is-where-cluster-disturbing-checks-live">The node lifecycle lane is where cluster-disturbing checks live<a class="headerlink" href="#the-node-lifecycle-lane-is-where-cluster-disturbing-checks-live" title="Permanent link">&para;</a></h3>
+<p><code>nodelifecycletests.sh</code> runs alone against its own <code>slim-primary</code> cluster
+and breaks that cluster on purpose, so it is the home for any check whose
+side effects would fail unrelated tests if it ran inside a stestr suite.
+It carries three such exercises, two of them beyond the node kills it is
+named for:</p>
+<ul>
+<li>the documented <code>API_VALIDATION_MODE</code> rollback, which flips a
+  cluster-wide config value and restarts sf-api
+  (<code>apivalidationrollbacktests.py</code>);</li>
+<li>node resource health, which makes a hypervisor's storage really fail —
+  a read-only bind mount over <code>STORAGE_PATH/uploads</code> — and asserts the
+  node reaches <code>error</code> with a diagnosis naming the path, leaves the
+  scheduler's candidate set, publishes <code>node_resource_health</code> 0, and
+  comes back only when <code>sf-ctl clear-node-error</code> is run
+  (<code>noderesourcehealthtests.py</code>);</li>
+<li>the node kills themselves, and the maintainer failover they force.</li>
+</ul>
+<p>The constraint that puts the second one here is worth stating, because it
+applies to anything that would error a node. <code>slim-tier</code>'s three nodes are
+all hypervisors and sum to exactly the cluster ledger floor
+<code>cluster_ci_tests/test_nodes.py</code> asserts, and the two non-network
+hypervisors <code>test_network_lifecycle.py</code> pins instances onto are the only
+two a fault could pick from — so erroring one inside <code>cluster-ci.conf</code>
+would fail tests that have nothing to do with the fault. What the cluster
+suite keeps is the half that is read-only:
+<code>cluster_ci_tests/test_node_health.py</code> asserts every node publishes a
+healthy gauge and a write heartbeat in each path its roles declare, which
+catches a probe thread that never started on the merge that broke it.</p>
 <p>Two of its steps reach the cluster's nodes over ssh: the cached-image
 upload, which deliberately targets a hypervisor rather than the primary,
 and <code>tools/ci-restart-cluster-nodes.sh</code>, which power cycles the nodes

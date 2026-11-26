@@ -16783,9 +16783,21 @@ the authentication path.</p>
 table. Existing keys are migrated into the new tables by
 <code>sf-ctl ensure-mariadb-schema</code> during upgrade, preserving each key's hash,
 nonce and expiry exactly, so tokens minted before the upgrade continue to
-validate. The old column is left in place but is no longer read or written.
-Note that this means downgrading after the migration loses any key created
-afterwards; keys that predate the upgrade are unaffected.</p>
+validate. That column has since been dropped, by the <code>namespace_attributes</code>
+v3 migration, because it had no reader but the fan-out itself and holding a
+second copy of live key material at rest bought nothing. The two steps run
+in that order in <code>ensure_schema()</code>, but the drop does not rely on the order
+alone. The fan-out proves its own copy: it stamps <code>namespace_keys</code> at version
+2 only when <code>_unmigrated_legacy_keys()</code> finds no usable key in the column
+without a <code>namespace_keys</code> row, so a failed copy leaves it at version 1 and a
+re-run finishes the job. The v3 drop then trusts that version stamp (and asks
+<code>_legacy_keys_column_present()</code> whether there is a column to drop), refuses
+below version 2, and deliberately does not copy again: from version 2 on, a
+key left only in the column is indistinguishable from one revoked since, and
+copying it back would revive a revoked credential.
+Note that a downgrade across either migration loses keys — across the first
+one, any key created since it ran; across the drop, all of them, because the
+column a pre-first-class-keys release reads is no longer there.</p>
 <h2 id="secrets-and-the-event-log">Secrets and the event log<a class="headerlink" href="#secrets-and-the-event-log" title="Permanent link">&para;</a></h2>
 <p>Credentials never appear in events. This matters more than it might sound,
 because events are written to syslog and shipped to Loki, so a credential in an

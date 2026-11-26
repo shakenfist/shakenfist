@@ -15606,6 +15606,47 @@ so identity tokens were logged verbatim at INFO and shipped to the log
 aggregator.</p>
 <p>Every route which takes a credential lives under <code>/auth/</code>. Keep it that way,
 or extend the predicate — never the redaction lists.</p>
+<h2 id="a-failed-rpc-names-itself-and-says-nothing-else">A failed RPC names itself, and says nothing else<a class="headerlink" href="#a-failed-rpc-names-itself-and-says-nothing-else" title="Permanent link">&para;</a></h2>
+<p>The database servicer in <code>shakenfist/daemons/database/main.py</code> has two ways
+to report a failure, and both of them leave the database tier: the gRPC status
+detail, which reaches the client inside <code>str(grpc.RpcError)</code>, and a reply's
+<code>error</code> field, which the <code>mariadb.py</code> wrappers read back by name. Neither may
+carry the exception.</p>
+<p><code>str(e)</code> on a SQLAlchemy error is the statement which failed followed by its
+bound parameters, and <code>DatabaseUnavailable</code> wraps that rendering into its own
+message, so a reader which fails closed carries the SQL too. The client folds
+what it received into its own exception message and log lines, and the
+placement and claim wrappers put a reply's <code>error</code> straight into
+<code>add_event()</code>'s extra -- a tenant-readable record. That is how a <code>SELECT</code> and
+the uuid bound into it got from the database tier to an instance's event log.</p>
+<p>So a handler calls <code>_rpc_error('&lt;RpcName&gt;')</code>, which is the whole of what a
+client is told, and records the exception here with <code>ignore_exception()</code> --
+on the node which can act on it, next to the failing query. A handler with
+something specific and safe to say is free to say it, as long as it wrote the
+message rather than derived it from the exception:
+<code>GetNamespaceClaims</code>'s <code>INVALID_ARGUMENT</code> arm names the argument the caller
+got wrong.</p>
+<p>The reply's <code>error</code> field has a second source which never passes through a
+servicer handler's exception: the placement, claim, hold and enqueue
+handlers copy it out of a <code>mariadb._direct_*()</code> result
+(<code>error=result['error']</code>). So the same rule binds those functions, and the
+gRPC wrappers which build the same shape on the client side: a result's
+<code>error</code>, or the reason in a returned <code>(success, error)</code> tuple, never carries
+a database or transport exception. They use <code>_RESULT_ERROR_DATABASE</code> or
+<code>_RESULT_ERROR_UNAVAILABLE</code> and log the exception where it happened. A
+validation message the code wrote itself -- a malformed uuid, an unbookable
+hold shape -- is still returned, because the caller needs it.</p>
+<p>The habit came back one handler at a time as the service grew -- 194 sites by
+the time anyone counted -- so
+<code>shakenfist/tests/test_database_servicer_error_details.py</code> holds it closed
+structurally: inside an <code>except ... as e</code> handler in that file, the name the
+handler bound -- or any name assigned from it, such as <code>msg = str(e)</code> -- may
+not appear in a <code>set_details()</code> or <code>abort()</code> argument or an <code>error=</code> keyword.
+<code>str(e)</code>, <code>repr(e)</code> and <code>f'...{e}'</code> all fail it, because what matters is the
+exception reaching the client rather than how it was stringified. The same
+test scans <code>mariadb.py</code>: in a handler for a SQLAlchemy, gRPC or catch-all
+exception, the bound name may not reach <code>result['error']</code>, an <code>error=</code>
+keyword or the reason of a returned tuple.</p>
 <h2 id="a-check-that-runs-after-the-parse-is-not-a-check">A check that runs after the parse is not a check<a class="headerlink" href="#a-check-that-runs-after-the-parse-is-not-a-check" title="Permanent link">&para;</a></h2>
 <p>The endpoint-method decorators are not the outermost thing in a request.
 <code>log_request</code> calls <code>get_json(force=True)</code> before any method body runs, so a

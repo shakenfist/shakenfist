@@ -13840,6 +13840,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-legacy-namespace-key-column-is-gone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The legacy namespace key column is gone
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#affinity-constraints-and-the-deprecation-of-weights" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13938,6 +13949,17 @@
     <span class="md-ellipsis">
       
         Agent operations can wait for each other
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-failed-database-rpc-no-longer-reports-the-sql-to-its-caller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A failed database RPC no longer reports the SQL to its caller
       
     </span>
   </a>
@@ -16174,6 +16196,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-legacy-namespace-key-column-is-gone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The legacy namespace key column is gone
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#affinity-constraints-and-the-deprecation-of-weights" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16272,6 +16305,17 @@
     <span class="md-ellipsis">
       
         Agent operations can wait for each other
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-failed-database-rpc-no-longer-reports-the-sql-to-its-caller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A failed database RPC no longer reports the SQL to its caller
       
     </span>
   </a>
@@ -18068,6 +18112,37 @@ not, so the command works against either.</p>
 <a href="/operator_guide/authentication/#reading-a-keys-expiry-and-scopes">reading a key's expiry and scopes</a>
 and the developer guide's
 <a href="/developer_guide/api_reference/authentication/">authentication API reference</a>.</p>
+<h2 id="the-legacy-namespace-key-column-is-gone">The legacy namespace key column is gone<a class="headerlink" href="#the-legacy-namespace-key-column-is-gone" title="Permanent link">&para;</a></h2>
+<p>Namespace keys became objects of their own, in <code>namespace_keys</code> and
+<code>namespace_key_attributes</code>, earlier in this release. The <code>keys</code> JSON
+column they used to live in on <code>namespace_attributes</code> stayed behind,
+read by nothing: a second copy of every namespace's live bcrypt hashes
+and nonces, sitting at rest, which the cluster could not use and
+could disagree with the tables that served it. The
+<code>namespace_attributes</code> v3 migration drops it.</p>
+<p>Run <code>sf-ctl ensure-mariadb-schema</code> before rolling the daemons, as
+usual, and restart <code>sf-database</code> promptly afterwards: an old
+<code>sf-database</code> still names the column, so its namespace attribute reads
+and writes -- namespace <code>GET</code>s and cross-namespace trust checks
+included, though not authentication -- fail until it is restarted. The
+keys themselves, their expiries and the tokens minted from them are
+untouched. The command applies the key fan-out before the drop within
+one run, so a cluster upgrading from before first-class keys is
+migrated and then cleaned up in the right order however many releases
+it skips. The fan-out proves its copy before recording itself done, so
+a usable key whose copy failed keeps the column (and the
+<code>namespace_keys</code> table at version 1) until a re-run copies it. The
+drop does not copy again: once keys are served from the new tables, a
+key left only in the column has been revoked or has not worked since,
+and restoring it could only revive a revoked credential.</p>
+<p>The one thing to plan for is a rollback. While the column existed, a
+downgrade to a release that predates first-class keys revived it and
+every key which predated that migration kept working. After this
+migration there is no column to revive, so such a release sees no keys
+at all and refuses every credential until keys are created again on it.
+Take a database backup before upgrading if your rollback plan crosses
+this release. See
+<a href="/operator_guide/upgrades/#namespace_attributes-v2-to-v3">Known migration notes</a>.</p>
 <h2 id="affinity-constraints-and-the-deprecation-of-weights">Affinity constraints, and the deprecation of weights<a class="headerlink" href="#affinity-constraints-and-the-deprecation-of-weights" title="Permanent link">&para;</a></h2>
 <p>The <code>affinity</code> metadata entry accepts a second value shape, using four
 reserved names that each take a JSON list of tags:</p>
@@ -18538,6 +18613,22 @@ for the trade-off.</p>
 <a href="../../developer_guide/agent_operations/">agent operations</a>. The parameters,
 refusals and objects are in
 <a href="../../developer_guide/api_reference/instances/#declaring-dependencies-between-agent-operations">declaring dependencies between agent operations</a>.</p>
+<h2 id="a-failed-database-rpc-no-longer-reports-the-sql-to-its-caller">A failed database RPC no longer reports the SQL to its caller<a class="headerlink" href="#a-failed-database-rpc-no-longer-reports-the-sql-to-its-caller" title="Permanent link">&para;</a></h2>
+<p>The database tier answers a failed RPC with the name of the RPC which failed,
+and nothing more. Previously it passed the exception's rendering back, either
+as the gRPC status detail or in the reply's <code>error</code> field, and for a SQLAlchemy
+error -- or a <code>DatabaseUnavailable</code> wrapping one -- that rendering is the
+statement which failed followed by its bound parameters.</p>
+<p>This matters to an operator in two places. A client-side log line which used
+to end in a <code>SELECT</code> and a uuid now ends in, for example,
+<code>database GetNamespaceKeyAttributes failed</code>; the failing statement is in
+<code>sf-database</code>'s own log on the database node, where it always also was. And an
+event on an instance or namespace no longer repeats the statement: the
+placement and claim paths put a failed reply's <code>error</code> text into the event
+they write, and those events are readable by the namespace which owns the
+object. Those paths now record a fixed reason (<code>MariaDB error; the cause is
+logged where it ran</code>, or <code>database unavailable; the cause is logged</code>), with
+the cause in the log of whichever node hit it.</p>
 
 
 
