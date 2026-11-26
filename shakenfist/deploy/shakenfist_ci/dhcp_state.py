@@ -114,18 +114,10 @@ class DhcpStateTestsMixin:
         return '%s/%s' % (DHCP_CONFIG_ROOT, self.net['uuid'])
 
     def _dhcp_config_present(self):
-        path = self._dhcp_config_directory()
-        out, _ = self._node_exec(
-            self.network_node,
-            ['sh', '-c',
-             'if [ -d %s ]; then echo present; else echo absent; fi' % path],
-            sudo=True)
-        answer = out.strip()
-        self.assertIn(
-            answer, ['present', 'absent'],
-            'Could not tell whether %s exists on node %s: %r'
-            % (path, self.network_node.get('name'), out))
-        return answer == 'present'
+        # -d rather than the helper's default -e: this is a directory,
+        # and a file left at that path is not the state being asserted.
+        return self._node_path_present(
+            self.network_node, self._dhcp_config_directory(), test='-d')
 
     def test_delete_removes_the_dhcp_config_directory(self):
         # A ready DHCP network has its configuration on the network node.

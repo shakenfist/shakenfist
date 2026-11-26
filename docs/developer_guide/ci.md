@@ -488,6 +488,42 @@ which imports nothing from the rest of the suite, for the reason
 by path and exercises it on every pull request, where the test which
 calls it runs only in the merge queue.
 
+### Teardown is asserted on the node, not only through the API
+
+An object's delete is reported done by the API as soon as the
+cluster-wide bookkeeping is finished, which says nothing about the files
+and daemons the hosting node still holds. Residue of that kind is
+invisible until the node runs short of disk, so two mixins under
+`deploy/shakenfist_ci/` assert the host side of a delete instead, and
+both are subclassed from the smoke and cluster suites so a break shows
+up on the pull request rather than in the merge queue:
+
+- `dhcp_state.py` -- a deleted network's dnsmasq configuration
+  directory, and so its `leases` file, is gone from the network node.
+- `instance_state.py` -- a deleted instance's directory under
+  `STORAGE_PATH`, the nvram file libvirt boots a UEFI instance from, and
+  its libvirt domain are all gone from the hypervisor it was pinned to.
+
+Three things both do deliberately. They **read the state before the
+delete**, because state which was never there is also state which was
+removed, and an assertion which cannot tell those apart passes on a
+cluster where nothing works. They **poll for absence**, because teardown
+is asynchronous and queued behind whatever else that node's workers are
+doing. And they **read as root and skip loudly if they cannot**
+(`_require_node_sudo()`), so a deploy which tightens a mode makes the
+test skip with the node named rather than report state it cannot see as
+removed.
+
+The instance mixin asks libvirt for the nvram path with `virsh dumpxml`
+rather than deriving it from `STORAGE_PATH`. The nvram is libvirt's file
+rather than Shaken Fist's, and the two steps are coupled: libvirt
+refuses to undefine a domain which still has nvram unless it is asked to
+remove the nvram too, so a failed unlink leaves the domain defined and
+the domain then holds its disks. That is the shape of the defect the
+cleaner's several `virsh undefine --nvram` paths exist for, and naming
+all three kinds of residue in one failure message is what tells them
+apart.
+
 ### Credentials go through the environment, not argv
 
 `_exec()` in the command-line tests writes every command it runs to stderr,
@@ -814,12 +850,6 @@ type, target bus, driver format and cache mode. The reader is
 `virsh domblklist` helpers. An nvme disk is invisible to it, because
 libvirt has no `<disk>` element for one and Shaken Fist renders it as
 `qemu:commandline` arguments instead.
-
-One question in the same family is still unasked: whether deleting an
-instance removes its directory and nvram from the hypervisor, the
-instance-side counterpart of the dnsmasq-directory check in
-`dhcp_state.py`, tracked as
-[#5072](https://github.com/shakenfist/shakenfist/issues/5072).
 
 ### Upgrade data verification
 
