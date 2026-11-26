@@ -16,8 +16,6 @@ import time
 
 from testtools import content
 
-from shakenfist_ci import process
-
 
 # shakenfist.config.STORAGE_PATH, which the deployer does not move, and
 # ObjectType.DHCP's string value.
@@ -111,20 +109,6 @@ class DhcpStateTestsMixin:
             'net',
             content.text_content(json.dumps(self.net, indent=4, sort_keys=True)))
         self._await_networks_ready([self.net['uuid']])
-
-    def _require_node_sudo(self, node):
-        """Skip the test loudly if node cannot run a command as root.
-
-        The configuration directory is read as root rather than relying
-        on its mode, so that a deploy which tightens that mode makes this
-        skip rather than report a directory it cannot see as removed.
-        """
-        try:
-            self._node_exec(node, ['true'], sudo=True)
-        except process.ProcessExecutionError as e:
-            self.skipTest(
-                'Cannot exec as root on node %s (%s): %s'
-                % (node.get('name'), node.get('ip'), e))
 
     def _dhcp_config_directory(self):
         return '%s/%s' % (DHCP_CONFIG_ROOT, self.net['uuid'])

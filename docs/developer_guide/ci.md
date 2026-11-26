@@ -429,6 +429,34 @@ which are *not* the network node is what makes it sharp, since after
 teardown the network must vanish from both while remaining on the
 network node.
 
+### Reconciling a node's accounting with libvirt
+
+`cluster_ci_tests/test_nodes.py`'s
+`test_node_accounting_agrees_with_libvirt` is the one assertion which
+holds Shaken Fist's per-node accounting against the hypervisor rather
+than against another part of Shaken Fist. Three figures in an
+`/admin/resources` `per_node` entry are measurements of libvirt and not
+ledger entries -- `instances_active`, `cpu_measured` and `ram_measured`,
+all built in one pass over `get_active_sf_domains()` by `sf-resources`
+-- and both CPU and memory admission measure a node against them, so a
+node whose measurement has drifted from what it is running refuses or
+admits work on a number which is not true.
+
+The sample is one `sh -c` per node (`BaseTestCase._node_sf_domains()`),
+which prints the node's clock and then a `virsh dominfo` per active
+domain: one ssh round trip, because a reading is only worth comparing if
+nothing changed while it was taken. `/admin/resources` is read between
+two samples, and a node is judged only when those two agree. A node
+whose domains moved across the read is resampled, and a publish is
+allowed to catch up, so only a node which disagreed in every comparable
+reading fails.
+
+The parsing and the arithmetic live in `shakenfist_ci/accounting.py`,
+which imports nothing from the rest of the suite, for the reason
+`sizing.py` does: `shakenfist/tests/test_ci_node_accounting.py` loads it
+by path and exercises it on every pull request, where the test which
+calls it runs only in the merge queue.
+
 ### Credentials go through the environment, not argv
 
 `_exec()` in the command-line tests writes every command it runs to stderr,

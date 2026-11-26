@@ -956,6 +956,29 @@ class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
             self.assertFalse(per_node['cpu_reservation_clamped'])
             self.assertFalse(per_node['memory_reservation_clamped'])
 
+    def test_summarize_resources_publishes_ram_measured(self):
+        # The measured half of the memory decision, the analogue of
+        # cpu_measured: memory_total_instance_actual passed through
+        # untouched, so that it can be compared with what the hypervisor
+        # is actually running (cluster CI does exactly that). A node
+        # whose metrics lack it publishes zero rather than omitting the
+        # field, as the other measured figures do.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.update_node_metrics('node3', {
+            'memory_total_instance_actual': 3072})
+
+        resources = scheduler.Scheduler().summarize_resources()
+
+        node3 = resources['per_node'][self._node_uuid('node3')]
+        self.assertEqual(3072, node3['ram_measured'])
+        # Published beside, and independent of, the ledger figure for the
+        # same dimension: a reader comparing the two is the point.
+        self.assertEqual(0, node3['ram_committed'])
+        for n, per_node in resources['per_node'].items():
+            if n == self._node_uuid('node3'):
+                continue
+            self.assertEqual(0, per_node['ram_measured'])
+
     def test_summarize_resources_publishes_domains_enumerated_at(self):
         # The node's own timestamp for the enumeration behind cpu_measured
         # (issue 4214) is passed through untouched, and a node whose metrics

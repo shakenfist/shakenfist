@@ -129,6 +129,7 @@ admin_resources_get_example = """{
             "memory_reserved_mb": 8192,
             "ram_max_per_instance": 81920,
             "ram_max": 393216.0,
+            "ram_measured": 24576,
             "ram_committed": 40960,
             "ram_held_mb": 0,
             "ram_available": 344064,
