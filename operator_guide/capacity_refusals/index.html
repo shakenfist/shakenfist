@@ -15054,6 +15054,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-403-for-a-namespace-over-its-claim" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The 403 for a namespace over its claim
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-refusal-on-the-instance" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15694,6 +15705,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-403-for-a-namespace-over-its-claim" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The 403 for a namespace over its claim
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-refusal-on-the-instance" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15806,7 +15828,10 @@
 <h1 id="capacity-refusals">Capacity refusals<a class="headerlink" href="#capacity-refusals" title="Permanent link">&para;</a></h1>
 <p>When the scheduler cannot place an instance because the cluster is full, the
 <code>POST /instances</code> request fails with an HTTP <code>507 Insufficient Storage</code> status.
-This document describes the response format and what it means.</p>
+A namespace which has used all of the capacity its own
+<a href="../scheduler/#namespace-capacity-claims">claim</a> declared is refused with an
+HTTP <code>403</code> instead, described <a href="#the-403-for-a-namespace-over-its-claim">below</a>.
+This document describes both responses and what they mean.</p>
 <h2 id="which-refusals-are-transient">Which refusals are transient<a class="headerlink" href="#which-refusals-are-transient" title="Permanent link">&para;</a></h2>
 <p>Not every <code>507</code> is worth retrying, and not even every <em>scheduling</em> <code>507</code> is.
 The server says which is which, so a client does not have to guess from the
@@ -15861,6 +15886,11 @@ fifteen seconds, in an hour, or after every instance on it had been deleted:</p>
   the request is not in the active node list.</p>
 </li>
 </ul>
+<p><strong>A refusal by the namespace's own claim</strong> (<code>capacity_claim</code>) is a third kind,
+described <a href="#the-403-for-a-namespace-over-its-claim">below</a>. It is not
+transient, because no wait returns capacity the namespace is itself holding.
+It is not permanent in the sense of the list above either, because deleting
+the namespace's instances or growing its claim does clear it.</p>
 <h2 id="is-the-refusal-queued-server-side">Is the refusal queued server-side?<a class="headerlink" href="#is-the-refusal-queued-server-side" title="Permanent link">&para;</a></h2>
 <p>No. When the scheduler cannot place an instance, the server refuses the
 request; it does not hold the create until capacity appears. A client that
@@ -15905,7 +15935,9 @@ a node fares worse than an unpinned one. Every refused create the suite issues
 is pinned, so there is no unpinned comparison arm, and that stays untested
 rather than settled.</p>
 <h2 id="the-response-body">The response body<a class="headerlink" href="#the-response-body" title="Permanent link">&para;</a></h2>
-<p>A scheduling <code>507</code> returns a JSON body with four fields:</p>
+<p>A scheduling <code>507</code> returns a JSON body with four fields. (The <code>403</code> for a
+namespace over its claim carries two more, described
+<a href="#the-403-for-a-namespace-over-its-claim">below</a>.)</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="s2">"message describing what was refused"</span><span class="p">,</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="mi">507</span><span class="p">,</span>
@@ -15931,6 +15963,12 @@ rather than settled.</p>
   answer; see <a href="../scheduler/">the placement query</a>.</p>
 </li>
 <li>
+<p><strong><code>capacity_claim</code></strong> -- the namespace has used the capacity its own claim
+  declared, and every candidate in the scheduler's walk was refused for that
+  reason. This is the one stage published with a <code>403</code> rather than a <code>507</code>; see
+  <a href="#the-403-for-a-namespace-over-its-claim">below</a>.</p>
+</li>
+<li>
 <p><strong><code>unknown</code></strong> -- the refusal reached the API carrying no stage. This is a
   defensive value that should never appear in normal operation; if you see it,
   report it. It is never marked transient.</p>
@@ -15944,18 +15982,74 @@ the <code>stage</code> name: the classification lives in one place in the server
 (<code>TRANSIENT_CAPACITY_STAGES</code> in <code>shakenfist/constants.py</code>, re-exported by
 <code>shakenfist/external_api/base.py</code>), and a client that reproduces the list will
 drift from it.</p>
+<h2 id="the-403-for-a-namespace-over-its-claim">The 403 for a namespace over its claim<a class="headerlink" href="#the-403-for-a-namespace-over-its-claim" title="Permanent link">&para;</a></h2>
+<p>A <a href="../scheduler/#namespace-capacity-claims">namespace capacity claim</a> is a
+ceiling the namespace declared for itself, and it is enforced: an instance
+which would take the namespace past it is refused. Every other capacity refusal
+is a <code>507</code> because the cluster cannot serve the request. This one is an HTTP
+<code>403 Forbidden</code>, because the cluster could have served it: what refused is the
+namespace's own ceiling, so the remedy belongs to whoever owns the claim rather
+than to whoever runs the cluster, and a client which read a <code>507</code> here would
+wait for capacity that is already free.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="s2">"namespace capacity claim &lt;uuid&gt; cannot admit this instance: it is over on cpus by 4. Grow the claim or delete instances in this namespace."</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="mi">403</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">"stage"</span><span class="p">:</span><span class="w"> </span><span class="s2">"capacity_claim"</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">"transient"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">"claim"</span><span class="p">:</span><span class="w"> </span><span class="s2">"uuid of the claim which refused"</span><span class="p">,</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="nt">"dimensions"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="p">{</span><span class="nt">"dimension"</span><span class="p">:</span><span class="w"> </span><span class="s2">"cpus"</span><span class="p">,</span><span class="w"> </span><span class="nt">"limit"</span><span class="p">:</span><span class="w"> </span><span class="mf">16.0</span><span class="p">,</span><span class="w"> </span><span class="nt">"used"</span><span class="p">:</span><span class="w"> </span><span class="mf">14.0</span><span class="p">,</span><span class="w"> </span><span class="nt">"shortfall"</span><span class="p">:</span><span class="w"> </span><span class="mf">4.0</span><span class="p">}</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="p">]</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="p">}</span>
+</code></pre></div>
+<p><code>error</code>, <code>status</code>, <code>stage</code> and <code>transient</code> mean what they mean in a <code>507</code>.
+<code>stage</code> is always <code>capacity_claim</code> and <code>transient</code> is always <code>false</code>. The
+response carries <strong>no <code>Retry-After</code> header at all</strong>, because there is no wait to
+recommend: the capacity is not scarce on the cluster, it is held by the
+namespace's own instances.</p>
+<ul>
+<li><strong><code>claim</code></strong> is the uuid of the claim which refused.</li>
+<li><strong><code>dimensions</code></strong> lists <em>only</em> the dimensions which are actually over, each as
+  <code>dimension</code> plus, where the refusal could report them, <code>limit</code>, <code>used</code> and
+  <code>shortfall</code>. <code>shortfall</code> is defined in
+  <a href="../../developer_guide/subsystem_internals/#scheduler-and-node-capacity-metrics">the subsystem internals</a>.</li>
+</ul>
+<p><strong><code>dimensions</code> can be empty, and that is meaningful.</strong> The claim's
+uuid is taken from the row the refusing transaction named, but the figures are
+read after that transaction rolled back. If the claim was deleted or replaced in
+between, the response still says which claim refused but has no figures, and its
+message deliberately recommends nothing: telling an operator to grow a claim by
+four vCPUs is worse than saying nothing when the claim is already gone. Read
+<code>dimensions</code> as detail if there is any, never as a required field.</p>
+<p>What to do about one:</p>
+<ul>
+<li><strong>Grow the claim</strong> by the <code>shortfall</code> the body reports, per dimension, or</li>
+<li><strong>delete instances</strong> in the namespace, which returns what they were using.</li>
+</ul>
+<p>A <code>403</code> is published only when <em>every</em> candidate in the scheduler's walk was
+refused at the claim stage. That is all of them or none, because the claim's
+limits are namespace-denominated and do not depend on which node is asked. Any
+other mixture of refusing stages keeps its <code>507</code>. As with the <code>507</code>, read
+<code>transient</code> rather than the status code: <code>capacity_refusal_is_transient()</code>
+(<code>shakenfist/external_api/base.py</code>) answers <code>false</code> for <code>capacity_claim</code>, and
+the stage is in neither <code>TRANSIENT_CAPACITY_STAGES</code> nor the permanent set in
+<code>shakenfist/constants.py</code>.</p>
+<p>Only an admission which counts against the claim can be refused this way. A
+placement recorded for an instance which is already running on a node is not
+refusable, so a claim can still be found over its limits; the
+<code>placement admitted over namespace capacity claim</code> event records that.</p>
 <h2 id="the-refusal-on-the-instance">The refusal on the instance<a class="headerlink" href="#the-refusal-on-the-instance" title="Permanent link">&para;</a></h2>
 <p>Not every refusal is a <code>507</code>. A create which the scheduler accepted can still
 be refused later, when the chosen node runs preflight and finds it no longer
 has room: there is no request left to answer by then, so the server errors the
 instance and queues its delete instead. The instance carries the same two
 fields in that case, beside the message:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">"state"</span><span class="p">:</span><span class="w"> </span><span class="s2">"error"</span><span class="p">,</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">"error_message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Unable to find suitable node"</span><span class="p">,</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">"error_stage"</span><span class="p">:</span><span class="w"> </span><span class="s2">"capacity_guard"</span><span class="p">,</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">"error_transient"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">"state"</span><span class="p">:</span><span class="w"> </span><span class="s2">"error"</span><span class="p">,</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">"error_message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Unable to find suitable node"</span><span class="p">,</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">"error_stage"</span><span class="p">:</span><span class="w"> </span><span class="s2">"capacity_guard"</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="nt">"error_transient"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="p">}</span>
 </code></pre></div>
 <p><code>error_stage</code> and <code>error_transient</code> mean exactly what <code>stage</code> and <code>transient</code>
 mean in a <code>507</code> body, and are computed by the same helper, so the two cannot
@@ -15972,7 +16066,7 @@ falls back to matching the two historical abort messages only against a server
 which does not publish the field.</p>
 <h2 id="retry-after-header">Retry-After header<a class="headerlink" href="#retry-after-header" title="Permanent link">&para;</a></h2>
 <p>A transient <code>507</code> includes an HTTP <code>Retry-After</code> header:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Retry-After: 15
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Retry-After: 15
 </code></pre></div>
 <p>The value is <strong>always 15 seconds</strong> for all transient capacity refusals. It is not
 computed per-refusal.</p>
@@ -16017,9 +16111,9 @@ transient refusals. It is <strong>off by default</strong>.</p>
 <h3 id="enabling-the-retry">Enabling the retry<a class="headerlink" href="#enabling-the-retry" title="Permanent link">&para;</a></h3>
 <p>To enable automatic retry on transient refusals, pass the <code>retry_transient_capacity=True</code>
 flag when constructing a <code>Client</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">Client</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">client</span> <span class="o">=</span> <span class="n">Client</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">retry_transient_capacity</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">Client</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">client</span> <span class="o">=</span> <span class="n">Client</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">retry_transient_capacity</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="retry-behavior">Retry behavior<a class="headerlink" href="#retry-behavior" title="Permanent link">&para;</a></h3>
 <p>When enabled, the client will:</p>

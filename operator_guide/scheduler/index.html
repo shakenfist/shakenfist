@@ -15508,10 +15508,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#advisory-this-release-exceedances-are-recorded-not-refused" class="md-nav__link">
+  <a href="#the-ceiling-is-enforced" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Advisory this release: exceedances are recorded, not refused
+        The ceiling is enforced
       
     </span>
   </a>
@@ -15906,10 +15906,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#advisory-this-release-exceedances-are-recorded-not-refused" class="md-nav__link">
+  <a href="#the-ceiling-is-enforced" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Advisory this release: exceedances are recorded, not refused
+        The ceiling is enforced
       
     </span>
   </a>
@@ -16595,18 +16595,23 @@ claims are admin-only. Scripts can use the REST API at
 response bodies are published in the
 <a href="https://openapi.shakenfist.com">OpenAPI specification</a>. A namespace
 holds at most one active claim.</p>
-<h3 id="advisory-this-release-exceedances-are-recorded-not-refused">Advisory this release: exceedances are recorded, not refused<a class="headerlink" href="#advisory-this-release-exceedances-are-recorded-not-refused" title="Permanent link">&para;</a></h3>
-<p><strong>Creating a claim does not stop anybody -- including the claiming
-namespace -- from exceeding it.</strong> In this release claim ceilings are
-<em>advisory</em>: a placement that would push a namespace past the limits it
-claimed is <strong>admitted</strong>, and the fact that it went over is recorded. The
-refusal arrives in a later release, once operators have had a release in
-which to see real exceedances and calibrate their claims against them.</p>
+<h3 id="the-ceiling-is-enforced">The ceiling is enforced<a class="headerlink" href="#the-ceiling-is-enforced" title="Permanent link">&para;</a></h3>
+<p><strong>A claim is a ceiling the namespace set for itself, and it binds.</strong> A
+placement that would push a namespace past the limits it claimed is
+<strong>refused</strong>, with an HTTP 403 rather than the 507 every other capacity
+refusal carries: the cluster could have served the request, and it is the
+namespace's own ceiling which said no. The response names the claim and
+each dimension that is over, and carries no <code>Retry-After</code>, because no
+wait returns capacity the namespace is itself holding. Grow the claim or
+delete instances in the namespace; the response format is described in
+<a href="../capacity_refusals/#the-403-for-a-namespace-over-its-claim">capacity refusals</a>.</p>
 <p>Two consequences worth being explicit about, because both surprise
 people:</p>
 <ul>
-<li>A claim does <strong>not</strong> cap the claiming namespace. <code>used_*</code> on a claim
-  can and will exceed <code>limit_*</code>.</li>
+<li>A claim caps the claiming namespace only through that refusal. A
+  placement which is not refusable -- one recorded for an instance
+  already running on a node -- is still charged to the claim, so <code>used_*</code>
+  on a claim can exceed <code>limit_*</code>, and the event below records it.</li>
 <li>What a claim <em>does</em> do immediately is reserve capacity <strong>from everybody
   else</strong>. The claim's limits are added to
   <code>cluster_capacity.claimed_*</code>, and the guard that admits instances in
@@ -16619,8 +16624,8 @@ people:</p>
   <em>best-effort</em>, and competes for what the active claims have not
   spoken for.</li>
 </ul>
-<p>The record of an exceedance is an audit event on the <em>instance</em> whose
-placement crossed the line:</p>
+<p>The record of an exceedance which was admitted anyway is an audit event
+on the <em>instance</em> whose placement crossed the line:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>placement admitted over namespace capacity claim
 </code></pre></div>
 <p>It is emitted at warning level and carries <code>node</code>, <code>namespace</code>, <code>claim</code>
@@ -16653,8 +16658,9 @@ would vanish the moment an operator deletes and recreates it, which
 is exactly how many operators grow a claim today.</p>
 <p>Because a create that exceeds a claim looks exactly like a create in a
 namespace with no claim at all, the event is the only observable
-difference between advisory mode working and advisory mode being absent.
-If you are testing a claim, assert the event.</p>
+difference between a claim which was exceeded by an unrefusable placement
+and no claim at all. If you are testing a claim's ceiling, assert the 403
+instead; the event is the record of what the ceiling could not stop.</p>
 <h3 id="what-creating-a-claim-does-to-existing-usage">What creating a claim does to existing usage<a class="headerlink" href="#what-creating-a-claim-does-to-existing-usage" title="Permanent link">&para;</a></h3>
 <p>A namespace usually already has instances when its claim is created, and
 that usage is already counted -- on the cluster's <em>unclaimed</em> side. So

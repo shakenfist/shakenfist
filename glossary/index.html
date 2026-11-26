@@ -15510,9 +15510,10 @@ confused with an authorization term: capabilities do not grant or restrict
 access in Shaken Fist. The authorization noun is <a href="#scope">scope</a>.</p>
 <p><strong id="capacity-claim">capacity claim</strong> -- A namespace's reservation of aggregate
 cluster vCPU, memory and disk, created by an administrator, with at most one
-active claim per namespace. The ceiling is advisory this release: a placement
-that exceeds it is admitted and the exceedance recorded, while the claim's
-limits are still reserved against namespaces without a claim. Defined in
+active claim per namespace. The ceiling is enforced: a placement that exceeds
+it is refused (see <a href="../operator_guide/capacity_refusals/">capacity refusals</a>),
+and the claim's limits are also reserved against namespaces without a claim.
+Defined in
 <code>docs/operator_guide/scheduler.md#namespace-capacity-claims</code>. Not to be
 confused with the bound claims of a <a href="#mapping-rule">mapping rule</a>, which are
 fields of an OIDC <a href="#identity-token">identity token</a>.</p>

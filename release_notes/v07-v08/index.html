@@ -18002,16 +18002,18 @@ namespace's existing usage onto it. Expiry is a duration in seconds,
 applied against the cluster's clock; an expired claim stops covering
 placements but keeps its row until it is deleted, and must be replaced
 rather than grown back.</p>
-<p><strong>Claim ceilings are advisory this release.</strong> A placement that takes a
-namespace past its claim is admitted, not refused, and is recorded as a
+<p><strong>Claim ceilings are enforced.</strong> A placement that would take a
+namespace past its claim is refused with an HTTP 403, not the 507 of a
+full cluster, because the namespace's own ceiling is what said no; see
+the capacity refusals page of the operator guide. A claim does not cap
+its own namespace by any other mechanism, and it reserves capacity from
+everybody else at once: namespaces without a claim are admitted only
+into what active claims have not spoken for, so an oversized claim
+starves them. A placement which cannot be refused, because it records
+an instance already running, is still admitted and recorded as a
 warning-level <code>placement admitted over namespace capacity claim</code> event
-on the instance and on the namespace. A claim does not cap its own
-namespace, but it does reserve capacity from everybody else at once:
-namespaces without a claim are admitted only into what active claims
-have not spoken for, so an oversized claim starves them today. Refusal
-arrives in a later release. Until then the events are what to calibrate
-a claim against, and the namespace's are the ones to read, because a
-claim's own events are removed with the claim.</p>
+on the instance and on the namespace, and the namespace's are the ones
+to read, because a claim's own events are removed with the claim.</p>
 <p>Creating or growing a claim is an admission decision of its own, and
 the status code says which kind of refusal it was:</p>
 <ul>

@@ -16082,8 +16082,8 @@ table entirely (decision D8).</p>
 </tr>
 <tr>
 <td>5b. The hard ceiling</td>
-<td>PLAN-scheduler-reservations-phase-05b-hard-ceiling.md</td>
-<td>Blocked</td>
+<td><a href="../PLAN-scheduler-reservations-phase-05b-hard-ceiling/">PLAN-scheduler-reservations-phase-05b-hard-ceiling.md</a></td>
+<td>Complete</td>
 <td>—</td>
 </tr>
 <tr>
@@ -16350,15 +16350,22 @@ is here.</p>
 <li><strong>Phase 5b</strong> carries phase 5a's steps 4, 5 and 6 -- the
   <code>CLAIM_ENFORCEMENT_HARD</code> flip, the cluster CI assertion inversion
   and the eight documentation lines -- which did not start because
-  the gate did not open. It has no plan file yet and needs no new
-  survey of the enforcement contract: those three step briefs are
-  written in phase 5a, as are D5's discriminator and D6's
-  classification, both confirmed by Michael on 2026-11-07. What it
+  the gate did not open. It had no plan file when this was written,
+  and needs no new survey of the enforcement contract: those three
+  step briefs are written in phase 5a, as are D5's discriminator and
+  D6's classification, both confirmed by Michael on 2026-11-07. What it
   does need is a <strong>fresh</strong> seven-day window read against D2
   unchanged, which cannot begin until private-ci's per-job binding
   phase has landed and deployed on <code>maui</code>. Recorded as plan-blocker
   b21; nothing in this repository can clear it, and the flip is not
-  to be read again against the window phase 5a already spent.</li>
+  to be read again against the window phase 5a already spent.
+  (<em>Corrected 2026-11-26 by phase 5b's own survey:</em> "needs no new
+  survey" held for the contract and not for the map to it. Every file
+  reference in those three briefs has moved, <code>mariadb.py</code>'s by 1,342
+  lines, and their scope was short by
+  <code>docs/operator_guide/capacity_refusals.md</code>, the create endpoint's
+  OpenAPI 403 declaration, and a release-notes line which is not the
+  history it looked like. See phase 5b's F1 and F7 to F9.)</li>
 </ul>
 <p><strong>That binding has now landed</strong>, traced on 2026-11-18 so a later
   session need not re-derive the chain. private-ci's phase 3g
@@ -16375,6 +16382,26 @@ is here.</p>
   5b's first step. Phase 5b may not be planned before 3g has handed
   over, because a Hold there changes 5b's shape rather than merely
   delaying it.</p>
+<p><strong>3g handed over on 2026-11-25 and the reading is clean</strong>, so the
+  gate is open and phase 5b is planned
+  (<a href="../PLAN-scheduler-reservations-phase-05b-hard-ceiling/">PLAN-scheduler-reservations-phase-05b-hard-ceiling.md</a>).
+  Over 2026-11-14T19:48:13Z to 2026-11-21T19:48:13Z the
+  mis-assignment class is gone: <strong>zero</strong> runs held an instance larger
+  than the claim it was charged to, across 3,738 joined runs, against
+  five in the seven days before, and all 118 claims for the three
+  bound jobs record "max over 1 pending job". A pass rather than a
+  Hold is what this bullet's own condition asked for, so 5b's shape
+  is unchanged and 5a's step briefs are still what it carries.
+  Recorded as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/322" title="GitHub Issue: shakenfist/private-ci #322">private-ci#322</a> and on <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/311" title="GitHub Issue: shakenfist/private-ci #311">private-ci#311</a>. Two facts 5b
+  inherits with it. The live claims are <strong>exact in all three
+  dimensions with no <code>CLAIM_HEADROOM</code></strong> -- sf-e2e 18/28672/520, oVirt
+  18/28672/760, Kolla 16/24576/660 -- and not the headroom-multiplied
+  figures 3g's own step 2 recorded, so a reading which looks for
+  those will not find them. And the window contains a fleet-wide
+  contention episode on 2026-11-21, which 5b's D2 keeps rather than
+  stepping around: those were claim-<em>creation</em> refusals, which
+  appear in no D2 row, and contention can only raise the rows it
+  touches, so the episode biases against the flip.</p>
 <ul>
 <li><strong>Phase 6</strong> was executed out of order, ahead of phases 4c and 5,
   and completed on 2026-09-01. It merged as #3972 (the validator
