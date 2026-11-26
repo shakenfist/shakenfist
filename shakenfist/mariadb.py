@@ -115,7 +115,9 @@ from shakenfist.schema.sqlalchemy import TABLE_CREATION_LOCK
 from shakenfist.schema.sqlalchemy import uuid_column_type
 from shakenfist.schema.upload import UploadData
 from shakenfist.util import callstack as util_callstack
+from shakenfist.util.caller_identity import CALL_REF_METADATA_KEY
 from shakenfist.util.caller_identity import get_caller_daemon
+from shakenfist.util.caller_identity import new_call_ref
 
 
 LOG, _ = logs.setup(__name__)
@@ -1032,6 +1034,16 @@ def _grpc_call(
     timing_scope = _RPC_TIMING_SCOPE.get()
     started = time.monotonic() if timing_scope is not None else 0.0
 
+    # One reference for the whole logical call, not one per attempt: a
+    # retried call's attempts are the same call, and an operator chasing a
+    # deadline wants to see every server-side line that call produced.
+    # sf-database names it on everything it logs while serving the call, and
+    # every failure reported below names it too, so a client-side error --
+    # including one copied into an event -- can be joined to the exception
+    # which caused it (issue 5077).
+    call_ref = new_call_ref()
+    call_metadata = ((CALL_REF_METADATA_KEY, call_ref),)
+
     # The try/finally wraps the whole retry loop and the final raise so that
     # a failed call is observed as well as a successful one: a call which
     # exhausts its retries is exactly the expensive case being measured.
@@ -1051,7 +1063,8 @@ def _grpc_call(
                 if attempt > 0 and method_name:
                     stub = _get_database_stub()
                     method = getattr(stub, method_name)
-                return method(request, timeout=timeout)
+                return method(request, timeout=timeout,
+                              metadata=call_metadata)
             except grpc.RpcError as e:
                 last_error = e
                 if e.code() not in retryable_codes:
@@ -1069,8 +1082,8 @@ def _grpc_call(
                     # message limit would otherwise read as an empty
                     # list.
                     failed = (
-                        f'gRPC {method_name or "call"} failed: '
-                        f'{_describe_rpc_error(e)}')
+                        f'gRPC {method_name or "call"} failed (ref '
+                        f'{call_ref}): {_describe_rpc_error(e)}')
                     LOG.error(failed)
                     raise exceptions.DatabaseCallFailed(
                         failed, code=e.code()) from e
@@ -1138,8 +1151,8 @@ def _grpc_call(
         # (issue 3607). Both facts are cheap to state, so state them.
         summary = (
             f'gRPC {method_name or "call"} failed after {attempts_made} '
-            f'attempts (deadline {timeout}s, slow attempt budget '
-            f'{max_slow_failures}): {_describe_rpc_error(last_error)}')
+            f'attempts (ref {call_ref}, deadline {timeout}s, slow attempt '
+            f'budget {max_slow_failures}): {_describe_rpc_error(last_error)}')
         LOG.error(summary)
         # Raise a non-RpcError so the client wrappers below, which translate
         # RpcError into "object not found" return values, let an exhausted
