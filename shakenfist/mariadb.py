@@ -9501,9 +9501,12 @@ def _direct_record_relationship(
         True if created or updated, False on error.
 
     Raises:
-        ValueError: If relationship_value is too long for the column. This
-            is the raise site for a value which arrived over gRPC, where
-            the servicer turns it into a failed StatusReply.
+        exceptions.RelationshipValueTooLong: If relationship_value is too
+            long for the column. This is the raise site for a value which
+            arrived over gRPC, where the servicer turns it into a failed
+            StatusReply. A ValueError subclass, so that the servicer can
+            tell it from a ValueError raised anywhere else in the same
+            handler (issue 5074).
     """
     validate_relationship_value(relationship_value)
 
@@ -10741,9 +10744,10 @@ def record_relationship(
         True if created (or already existed), False on error.
 
     Raises:
-        ValueError: If relationship_value is too long for the column.
-            Checked before dispatch so that the gRPC path refuses it the
-            same way the direct path does.
+        exceptions.RelationshipValueTooLong: If relationship_value is too
+            long for the column. Checked before dispatch so that the gRPC
+            path refuses it the same way the direct path does. A
+            ValueError subclass.
     """
     validate_relationship_value(relationship_value)
 
@@ -33320,7 +33324,7 @@ def _direct_release_claim_holds(
     leave booked room that nothing could account for.
     """
     if not hold_uuids and not all_holds:
-        raise ValueError(
+        raise exceptions.NoHoldsNamed(
             'release_claim_holds needs hold_uuids or all_holds')
 
     result = _empty_release_holds_result()
@@ -33601,9 +33605,16 @@ CLAIM_COVERAGE_STATES = (CLAIM_STATE_ACTIVE, CLAIM_STATE_EXPIRED)
 
 
 def _validate_claim_coverage_state(coverage_state: str) -> None:
-    """Raise ValueError unless this is a coverage state a listing can filter on."""
+    """Refuse a coverage state a claim listing cannot filter on.
+
+    ``InvalidClaimState`` is a ValueError subclass, so a caller which
+    catches ValueError here still does. It is a dedicated type because
+    the servicer's GetNamespaceClaims reports this one fault as the
+    caller's mistake, and must not say that about every ValueError its
+    body can raise (issue 5074).
+    """
     if coverage_state and coverage_state not in CLAIM_COVERAGE_STATES:
-        raise ValueError(
+        raise exceptions.InvalidClaimState(
             f'coverage_state must be empty, "active" or "expired", not '
             f'{coverage_state!r}')
 
@@ -33908,7 +33919,7 @@ def _grpc_release_claim_holds(
     database error.
     """
     if not hold_uuids and not all_holds:
-        raise ValueError(
+        raise exceptions.NoHoldsNamed(
             'release_claim_holds needs hold_uuids or all_holds')
 
     result = _empty_release_holds_result()
@@ -34122,7 +34133,7 @@ def release_claim_holds(
     """
     names = hold_uuids or []
     if not names and not all_holds:
-        raise ValueError(
+        raise exceptions.NoHoldsNamed(
             'release_claim_holds needs hold_uuids or all_holds')
     if _use_database_service():
         return _grpc_release_claim_holds(claim_uuid, names, all_holds)

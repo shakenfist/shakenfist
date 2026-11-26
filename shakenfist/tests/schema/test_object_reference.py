@@ -11,6 +11,7 @@ from uuid import uuid4
 from pydantic import ValidationError
 import sqlalchemy as sa
 
+from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.schema.object_reference import ObjectReference
 from shakenfist.schema.object_reference import RELATIONSHIP_VALUE_MAX_LENGTH
@@ -553,6 +554,21 @@ class ValidateRelationshipValueTestCase(base.ShakenFistTestCase):
         self.assertRaises(
             ValueError, validate_relationship_value,
             'a' * (RELATIONSHIP_VALUE_MAX_LENGTH + 1))
+
+    def test_refusal_is_its_own_exception_type(self):
+        # A dedicated type, so the database servicer's
+        # RecordRelationship can report this one fault as the caller's
+        # argument mistake without saying that about every ValueError
+        # its body can raise (issue 5074).
+        self.assertRaises(
+            exceptions.RelationshipValueTooLong, validate_relationship_value,
+            'a' * (RELATIONSHIP_VALUE_MAX_LENGTH + 1))
+
+    def test_refusal_is_still_a_value_error(self):
+        # The negative control on the type above: every existing caller
+        # catching ValueError must be unaffected by the narrowing.
+        self.assertTrue(
+            issubclass(exceptions.RelationshipValueTooLong, ValueError))
 
     def test_refusal_names_both_lengths(self):
         # The caller is a developer reading a traceback, so the message

@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 
+from shakenfist import exceptions
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.util.access_tokens import request_namespace
@@ -39,15 +40,21 @@ def validate_relationship_value(relationship_value: Optional[str]) -> None:
     record_relationship() and the direct writer call this, so a value
     arriving over gRPC is refused at the write as well as before dispatch.
 
+    The exception is a dedicated ValueError subclass so that a caller
+    which reports this as the caller's own mistake -- the database
+    servicer's RecordRelationship -- can catch this fault alone rather
+    than every ValueError its body can raise (issue 5074).
+
     Args:
         relationship_value: The value to check. None is always valid.
 
     Raises:
-        ValueError: If the value is longer than the column can store.
+        exceptions.RelationshipValueTooLong: If the value is longer than
+            the column can store. A ValueError subclass.
     """
     if relationship_value is not None and (
             len(relationship_value) > RELATIONSHIP_VALUE_MAX_LENGTH):
-        raise ValueError(
+        raise exceptions.RelationshipValueTooLong(
             f'relationship_value is {len(relationship_value)} characters, '
             f'the maximum is {RELATIONSHIP_VALUE_MAX_LENGTH}')
 
