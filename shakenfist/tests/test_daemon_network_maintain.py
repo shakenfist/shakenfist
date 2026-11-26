@@ -133,7 +133,8 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
                            root_routes=None,
                            namespace_routes_error=None,
                            clock_step=0.0,
-                           health_check_budget=10.0):
+                           health_check_budget=10.0,
+                           busy_networks=None):
         """Drive Job.execute() through exactly one pass of the outer loop
         and return a dict of the mocks that callers will most likely
         want to assert on.
@@ -298,6 +299,11 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
             mar.has_pending_cluster_operation_target.return_value = pending_op
             mar.get_recent_terminal_op_states_for_target.return_value = (
                 recent_history)
+            # Which networks have an interface attached, read once per
+            # pass to order the health checks.
+            mar.find_network_interfaces.return_value = [
+                mock.MagicMock(network_uuid=uuid)
+                for uuid in (busy_networks or [])]
             # find_network_vxids returns the claiming network's uuid as
             # well, because the reaper routes teardown of a network
             # which still exists through a cluster operation targeting
@@ -526,6 +532,67 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         self.assertTrue(
             any('deferred 1 networks to a later pass' in m
                 for m in messages), messages)
+
+    def test_busy_networks_are_health_checked_before_empty_ones(self):
+        """When the budget is scarce it is spent on the networks which
+        have guests on them. An empty network has nothing which can fail
+        to get a DHCP lease, so it yields to a busy one even when the
+        busy one was checked more recently -- which is what makes many
+        unused networks close to free for the network node.
+        """
+        nets = [_build_mock_network(uuid='net-empty', vxid=1, is_okay=True),
+                _build_mock_network(uuid='net-busy', vxid=2, is_okay=True)]
+
+        # A budget which affords exactly one check, and an empty network
+        # whose uuid would otherwise sort first.
+        active = self._run_one_iteration(
+            network_node=True, networks=nets,
+            clock_step=6.0, health_check_budget=5.0,
+            busy_networks=['net-busy'])
+
+        self.assertTrue(nets[1].is_okay.called)
+        self.assertFalse(nets[0].is_okay.called)
+        self.assertEqual(
+            'net-busy',
+            active['network'].Network.from_db.call_args_list[0].args[0])
+
+    def test_a_busy_network_beats_an_empty_one_checked_longer_ago(self):
+        """Having an interface outranks having waited longer. Without
+        that the rotation would hand the scarce budget back to empty
+        networks as soon as they were the oldest, which is the state
+        they are in most of the time.
+        """
+        from shakenfist.daemons.network import maintain
+
+        nets = [_build_mock_network(uuid='net-empty', vxid=1, is_okay=True),
+                _build_mock_network(uuid='net-busy', vxid=2, is_okay=True)]
+
+        # The empty network has waited far longer than the busy one.
+        maintain.HEALTH_CHECK_LAST['net-empty'] = 1.0
+        maintain.HEALTH_CHECK_LAST['net-busy'] = 9_000.0
+
+        self._run_one_iteration(
+            network_node=True, networks=nets,
+            clock_step=6.0, health_check_budget=5.0,
+            busy_networks=['net-busy'])
+
+        self.assertTrue(nets[1].is_okay.called)
+        self.assertFalse(nets[0].is_okay.called)
+
+    def test_the_interface_read_is_one_query_per_pass(self):
+        """The busy set is one read of the table, not one per network.
+        The per-network form would be a networks-per-thirty-seconds
+        database sweep, which is the shape this pass has had to have
+        removed from it before.
+        """
+        nets = [_build_mock_network(uuid='net-a', vxid=1, is_okay=True),
+                _build_mock_network(uuid='net-b', vxid=2, is_okay=True),
+                _build_mock_network(uuid='net-c', vxid=3, is_okay=True)]
+        active = self._run_one_iteration(
+            network_node=True, networks=nets, busy_networks=['net-a'])
+
+        self.assertEqual(
+            1, active['mariadb'].find_network_interfaces.call_count)
 
     def test_queue_depth_guard_skips_pass(self):
         """When summed queue depth exceeds the threshold the per-network

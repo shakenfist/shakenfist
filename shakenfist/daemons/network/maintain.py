@@ -10,12 +10,14 @@ from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist import instance
+from shakenfist.network import interface
 from shakenfist import mariadb
 from shakenfist.network import network
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import get_all_network_queues
 from shakenfist.operations.baseoperation import get_node_network_queues
 from shakenfist.schema.ipam_reservation import ReservationType
+from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
@@ -90,17 +92,45 @@ def forget_unvisited_quiesces(visited_networks):
         del HEALTH_CHECK_LAST[uuid]
 
 
-def health_check_order(network_uuids):
-    """The networks a pass should health check, longest-waiting first.
+def networks_with_interfaces():
+    """The uuids of networks which currently have an interface attached.
 
-    A network never checked by this process sorts first, then the one
-    checked longest ago. The uuid breaks ties so the order is stable
-    for a set of networks checked in the same pass, which keeps the
-    rotation deterministic rather than dependent on dictionary order.
+    One read of the whole table rather than one per network: this runs
+    every maintenance pass, and the per-network form would be a
+    networks-per-thirty-seconds sweep. The (FindNetworkInterfaces, net)
+    pair this charges to is already budgeted for interface enumeration
+    during network maintenance, and one call per pass is a rounding
+    error against its level.
+    """
+    criteria = ObjectFilterCriteria(
+        states=list(interface.NetworkInterface.ACTIVE_STATES))
+    return {
+        str(ni.network_uuid)
+        for ni in mariadb.find_network_interfaces(criteria)}
+
+
+def health_check_order(network_uuids, busy_networks=frozenset()):
+    """The networks a pass should health check, in the order to do it.
+
+    Networks with an interface attached come first, then the network
+    which has waited longest for a check, then the uuid to break ties
+    so the order is stable and the rotation deterministic rather than
+    dependent on dictionary order.
+
+    The order only decides anything when a pass runs out of health
+    check budget, which on a well cluster never happens -- every check
+    costs milliseconds and every network is reached. It matters during
+    degradation, when the budget is scarce, and there the networks with
+    guests on them are the ones worth spending it on: an empty network
+    has nothing which can fail to get a DHCP lease. That is also what
+    makes many unused networks close to free for the network node,
+    which is what issue 925 asked for (#925).
     """
     return sorted(
         network_uuids,
-        key=lambda u: (HEALTH_CHECK_LAST.get(str(u), 0.0), str(u)))
+        key=lambda u: (str(u) not in busy_networks,
+                       HEALTH_CHECK_LAST.get(str(u), 0.0),
+                       str(u)))
 
 
 # Instance states in which a domain on this node may still be attached
@@ -862,7 +892,8 @@ class Job(util_concurrency.Job):
             # first. With a health check budget the tail of this list
             # may not be checked this pass, and the order is what makes
             # that tail the next pass's first business.
-            for network_uuid in health_check_order(host_networks):
+            for network_uuid in health_check_order(
+                    host_networks, networks_with_interfaces()):
                 n = network.Network.from_db(
                     network_uuid, suppress_failure_audit=True)
                 if not n:

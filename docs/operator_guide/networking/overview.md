@@ -761,11 +761,19 @@ nothing until something is actually wrong. What it stops is the
 degraded case, where enough unreachable `dnsmasq` processes to spend
 2 seconds each would otherwise take the pass past its own cadence.
 
-Networks are checked longest-waiting first, so the bound defers work
-rather than starving it: the networks a pass did not reach are the ones
-the next pass starts with. A network deferred this way is still counted
-as one this node is on, so it is not mistaken for a stray and reaped
-while it waits.
+Networks with an interface attached are checked first, then the
+longest-waiting, so the bound defers work rather than starving it: the
+networks a pass did not reach are the ones the next pass starts with. A
+network deferred this way is still counted as one this node is on, so
+it is not mistaken for a stray and reaped while it waits.
+
+Preferring networks which have guests on them is what makes a large
+number of unused networks close to free for the network node. It only
+decides anything when the budget is scarce -- on a well cluster every
+network is checked every pass whatever the count -- and when it is
+scarce, an empty network has nothing which can fail to get a DHCP
+lease, so it is the right thing to go without. Which networks have
+interfaces is one read of the table per pass, not one per network.
 
 When a pass does defer, it says so against the node:
 
