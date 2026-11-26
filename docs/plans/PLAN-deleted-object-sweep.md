@@ -1019,7 +1019,7 @@ copy lives in shakenfist/development at
     the worked example in the `plan-file-conventions` block
     above leaves it), `TBD` or `n/a`.
 
-    A few of this repository's older roadmaps write their
+    Two of this repository's older roadmaps write their
     phases as prose sections rather than as a table:
     `blob-storage-roadmap.md` and
     `api-query-batching-roadmap.md`, which are the two named
