@@ -14,9 +14,15 @@ deploy profile's redeploy check is what found it.
 deploy/ no longer ships in the wheel, but a dirty tree still gives every
 version built from it the .dYYYYMMDD suffix, so these tests still guard the
 version a deploy installs.
+
+The script also installs what it built and checks the result (issue
+#4613), so the fake ansible-galaxy below answers both subcommands and
+lays down a plausible installed tree. A fake which only answered "build"
+would make every assertion about the verification pass against nothing.
 """
 
 import importlib.util
+import json
 import os
 import pathlib
 import tempfile
@@ -50,6 +56,19 @@ class BuildCollectionTestCase(base.ShakenFistTestCase):
         self.addCleanup(os.chdir, cwd)
 
         self.built = {}
+        self.installed = {}
+
+        # What the installed copy will claim about itself, and which of
+        # the required paths will be there. Tests which are about the
+        # verification override these before calling main().
+        self.manifest = {
+            'collection_info': {
+                'namespace': 'shakenfist',
+                'name': 'shakenfist',
+                'version': '1.2.3-rc4',
+            },
+        }
+        self.install_paths = list(script.REQUIRED_INSTALLED_PATHS)
 
         def fake_build(argv):
             # What ansible-galaxy would have read, captured before the
@@ -58,13 +77,40 @@ class BuildCollectionTestCase(base.ShakenFistTestCase):
             self.built['source'] = source
             self.built['galaxy'] = (source / 'galaxy.yml').read_text()
             self.built['output'] = argv[argv.index('--output-path') + 1]
+            # The real build writes a tarball, and the verification step
+            # names it rather than globbing for it, so the name has to
+            # exist for the stand-in install below to be reached at all.
+            output = pathlib.Path(self.built['output'])
+            output.mkdir(parents=True, exist_ok=True)
+            (output / 'shakenfist-shakenfist-1.2.3-rc4.tar.gz').write_text('')
+
+        def fake_install(argv, env=None):
+            self.installed['tarball'] = argv[3]
+            self.installed['env'] = env
+            self.installed['dest'] = argv[argv.index('--collections-path') + 1]
+            dest = pathlib.Path(self.installed['dest'])
+            root = dest / 'ansible_collections' / 'shakenfist' / 'shakenfist'
+            for relative in self.install_paths:
+                target = root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text('')
+            manifest = root / 'MANIFEST.json'
+            if manifest.exists():
+                manifest.write_text(json.dumps(self.manifest))
+
+        def fake_galaxy(argv, env=None):
+            if argv[1:3] == ['collection', 'build']:
+                return fake_build(argv)
+            if argv[1:3] == ['collection', 'install']:
+                return fake_install(argv, env=env)
+            raise AssertionError('unexpected ansible-galaxy call: %s' % argv)
 
         for patcher in [
                 mock.patch.object(
                     script, 'collection_version',
                     return_value=('1.2.3rc4', '1.2.3-rc4')),
                 mock.patch.object(
-                    script.subprocess, 'check_call', side_effect=fake_build)]:
+                    script.subprocess, 'check_call', side_effect=fake_galaxy)]:
             patcher.start()
             self.addCleanup(patcher.stop)
 
@@ -89,3 +135,73 @@ class BuildCollectionTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             (self.root / script.OUTPUT_DIR).resolve(),
             pathlib.Path(self.built['output']).resolve())
+
+    def test_the_built_tarball_is_installed_and_checked(self):
+        """The artifact half of the untested publish job.
+
+        publish-collection has never run, so until a tag is pushed the
+        only evidence about the tarball is that it installs -- which is
+        why the script checks, and why this asserts it checked the file
+        it just built rather than whatever else is in the output
+        directory.
+        """
+        script.main()
+        self.assertEqual(
+            'dist-collection/shakenfist-shakenfist-1.2.3-rc4.tar.gz',
+            self.installed['tarball'])
+        # The environment override is cosmetic -- it suppresses a
+        # "not part of the configured collections paths" warning which is
+        # true and intended -- but it has to name the same directory the
+        # install was pointed at, or it suppresses nothing.
+        self.assertEqual(
+            self.installed['dest'],
+            self.installed['env'].get('ANSIBLE_COLLECTIONS_PATH'))
+
+    def test_a_leftover_tarball_is_not_what_gets_verified(self):
+        """The verification names the tarball rather than globbing.
+
+        dist-collection/ is not cleaned between builds, and a glob would
+        pick whichever name sorts first -- so a build whose version
+        rewrite had stopped working could be "verified" against an
+        earlier tarball that was fine.
+        """
+        stale = self.root / script.OUTPUT_DIR
+        stale.mkdir(parents=True, exist_ok=True)
+        (stale / 'shakenfist-shakenfist-0.0.0.tar.gz').write_text('')
+
+        script.main()
+        self.assertEqual(
+            'dist-collection/shakenfist-shakenfist-1.2.3-rc4.tar.gz',
+            self.installed['tarball'])
+
+    def test_an_installed_copy_missing_a_role_fails_the_build(self):
+        self.install_paths = [
+            path for path in script.REQUIRED_INSTALLED_PATHS
+            if 'roles' not in str(path)]
+        error = self.assertRaises(SystemExit, script.main)
+        self.assertIn('roles/node/tasks/main.yml', str(error))
+
+    def test_an_installed_copy_missing_a_module_fails_the_build(self):
+        self.install_paths = [
+            path for path in script.REQUIRED_INSTALLED_PATHS
+            if 'plugins' not in str(path)]
+        error = self.assertRaises(SystemExit, script.main)
+        self.assertIn('plugins/modules/sf_instance.py', str(error))
+
+    def test_a_version_which_did_not_reach_the_artifact_fails(self):
+        """The failure the version rewrite is there to prevent.
+
+        If the staged galaxy.yml edit stops working, the build still
+        succeeds and ships a collection calling itself 0.0.0. Nothing
+        downstream would notice: the tarball installs, and the
+        placeholder is a valid semver.
+        """
+        self.manifest['collection_info']['version'] = '0.0.0'
+        error = self.assertRaises(SystemExit, script.main)
+        self.assertIn('0.0.0', str(error))
+        self.assertIn('1.2.3-rc4', str(error))
+
+    def test_a_collection_installed_under_another_name_fails(self):
+        self.manifest['collection_info']['name'] = 'somethingelse'
+        error = self.assertRaises(SystemExit, script.main)
+        self.assertIn('somethingelse', str(error))
