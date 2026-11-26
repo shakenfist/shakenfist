@@ -2,11 +2,28 @@
 
 """Tests for renovate.json.
 
-Renovate's pre-commit manager ships disabled, so unless the config opts
-in, the hook revisions in .pre-commit-config.yaml are the one dependency
-file nobody is watching and they drift silently (issue 3757). Pin the
-opt-in here, accepting any of the three forms Renovate documents, so a
-future config cleanup cannot quietly turn the manager back off.
+Renovate runs centrally, from the fleet runner in
+shakenfist/development, and the policy it applies lives once in the
+fleet preset local>shakenfist/development:renovate-fleet. This
+repository carries only what is particular to it.
+
+Two properties of that arrangement fail silently, so they are pinned
+here rather than left to the consistency audit, which only reports a
+day later (issue 5079):
+
+* The extends entry naming the preset. Without it the configuration
+  still validates and Renovate still runs, on its own defaults rather
+  than the fleet's -- no weekly window, and no pre-commit manager, so
+  the hook revisions in .pre-commit-config.yaml become the one
+  dependency file nobody is watching (issue 3757).
+* The absence of a top-level key the preset also sets. A repository's
+  own value replaces the preset's outright, so the fleet's policy
+  quietly stops applying here while the configuration goes on looking
+  correct.
+
+A repository-local Renovate workflow is the third: the fleet runner
+manages this repository, and a second Renovate instance over it races
+the first on branch creation.
 """
 
 import json
@@ -15,6 +32,29 @@ import re
 import tomllib
 
 from shakenfist.tests import base
+
+
+# The fleet preset that carries the whole Renovate policy. It lives in
+# shakenfist/development as renovate-fleet.json, and Renovate reads it
+# from that repository's default branch.
+FLEET_PRESET = 'local>shakenfist/development:renovate-fleet'
+
+# The preset's own top-level keys, less the three a repository may
+# legitimately set alongside it. Keys the preset does not set --
+# constraints, lockFileMaintenance, customManagers, a manager's own
+# block such as github-actions -- are this repository's to use.
+PRESET_OWNED_TOP_LEVEL_KEYS = frozenset([
+    'assignees',
+    'dependencyDashboard',
+    'gitAuthor',
+    'minimumReleaseAge',
+    'pre-commit',
+    'prConcurrentLimit',
+    'prHourlyLimit',
+    'rollbackPrs',
+    'schedule',
+    'timezone',
+])
 
 
 def _root():
@@ -55,18 +95,54 @@ class RenovateConfigTestCase(base.ShakenFistTestCase):
         with open(_renovate_path()) as f:
             self.config = json.load(f)
 
-    def test_pre_commit_manager_is_enabled(self):
-        enabled = (
-            self.config.get('pre-commit', {}).get('enabled') is True or
-            'pre-commit' in self.config.get('enabledManagers', []) or
-            ':enablePreCommit' in self.config.get('extends', []))
-        self.assertTrue(
-            enabled,
-            'renovate.json no longer enables the pre-commit manager, so '
-            'the hook revisions in .pre-commit-config.yaml are unmanaged. '
-            'Re-enable it with one of: {"pre-commit": {"enabled": true}}, '
-            '"pre-commit" in enabledManagers, or ":enablePreCommit" in '
-            'extends.')
+    def test_fleet_preset_is_extended(self):
+        self.assertIn(
+            FLEET_PRESET, self.config.get('extends', []),
+            'renovate.json no longer extends %s, which carries the fleet '
+            'Renovate policy: the cadence, the author and assignee, '
+            'minimumReleaseAge, and the pre-commit manager that keeps the '
+            'hook revisions in .pre-commit-config.yaml watched. Without it '
+            'this configuration still validates and Renovate still runs, '
+            'on its own defaults.' % FLEET_PRESET)
+
+    def test_no_top_level_key_overrides_the_fleet_preset(self):
+        # Renovate resolves a repository's own configuration after the
+        # presets it extends, so a top-level key set here replaces the
+        # preset's value rather than adding to it. $schema, extends and
+        # packageRules are the three exceptions: the first two are how a
+        # repository reaches the preset at all, and Renovate appends a
+        # repository's packageRules to the preset's.
+        #
+        # The audit in shakenfist/development reads this set from the
+        # preset itself and is authoritative; this list is a local copy
+        # so the failure arrives with the commit rather than a day
+        # later. A key added to the preset lands here when the audit
+        # next reports it.
+        overridden = sorted(
+            set(self.config) & PRESET_OWNED_TOP_LEVEL_KEYS)
+        self.assertEqual(
+            [], overridden,
+            'renovate.json sets top-level %s, which %s also sets. A '
+            'repository\'s own value wins, so the fleet policy stops '
+            'applying here while the configuration goes on looking '
+            'correct. Delete the key, and if this repository genuinely '
+            'needs something different put it in a packageRules entry '
+            'scoped to what it is about.' % (
+                ', '.join(overridden), FLEET_PRESET))
+
+    def test_no_repository_local_renovate_workflow(self):
+        # The fleet runner manages this repository. A copy of the old
+        # per-repository workflow, enabled again, races it: two Renovate
+        # instances over one repository race on branch creation and
+        # produce duplicate or half-written pull requests. A disabled
+        # copy is one click from running, so the file must not be here
+        # at all.
+        path = os.path.join(_root(), '.github', 'workflows', 'renovate.yml')
+        self.assertFalse(
+            os.path.exists(path),
+            '.github/workflows/renovate.yml is back. Renovate runs from '
+            'the fleet runner in shakenfist/development, and a copy here '
+            'races it on branch creation.')
 
     def test_oslo_packages_are_grouped_in_lockstep(self):
         # The OpenStack oslo libraries are released in lockstep and share
