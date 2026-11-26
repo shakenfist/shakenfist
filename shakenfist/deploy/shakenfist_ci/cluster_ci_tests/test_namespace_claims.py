@@ -4,10 +4,12 @@
 A claim is a namespace's promise of aggregate capacity: creating one is
 itself a guarded admission decision against the cluster, an instance
 create in a claimed namespace draws the claim down instead of the
-cluster's unclaimed sums, and -- for this release -- exceeding a claim
-is *recorded* rather than refused (an advisory period before it becomes
-a hard refusal). None of that is exercised by a test which mocks the
-database away, so it is exercised here.
+cluster's unclaimed sums, and a create which would take the namespace
+past what it claimed is refused -- with an HTTP 403 naming the claim and
+what it is short by, which is a different answer from the 507 a full
+cluster gives, because the cluster has the room and it is the ceiling
+the namespace asked for that refused. None of that is exercised by a
+test which mocks the database away, so it is exercised here.
 
 What this file defends
 ----------------------
@@ -95,12 +97,16 @@ from shakenfist_ci import retries
 from shakenfist_client import apiclient
 
 
-# The advisory audit event Instance._event_claim_over_limit() writes when
-# a placement pushes a namespace past what it claimed. Matched exactly:
-# it is deliberately distinct from the over-limit event ("placement
-# recorded despite exceeding capacity guard"), which is a ground-truth write
-# exceeding a *node* guard, and a test which matched loosely would not
-# be able to tell the two apart.
+# The audit event Instance._event_claim_over_limit() writes when a
+# placement pushes a namespace past what it claimed. A guarded create
+# which would do that is refused instead, so the only placements that
+# can still reach this event are the unguarded ones -- a ground-truth
+# writer recording where a libvirt domain already is, which no guard can
+# refuse. This file therefore looks for the event's *absence*, and
+# matches exactly: it is deliberately distinct from the over-limit event
+# ("placement recorded despite exceeding capacity guard"), which is a
+# ground-truth write exceeding a *node* guard, and a test which matched
+# loosely would not be able to tell the two apart.
 CLAIM_OVER_LIMIT_MESSAGE = 'placement admitted over namespace capacity claim'
 
 # Long enough that no test here races its own claim expiring, short
@@ -411,29 +417,30 @@ class ClaimAPIMixin:
                 disk_gb += int(size)
         return (inst['cpus'], inst['memory'], disk_gb)
 
-    def _claim_over_limit_events(self, instance_uuid, wait=0):
-        """The advisory audit events on an instance, optionally awaited.
+    def _claim_over_limit_events(self, instance_uuid):
+        """The claim over-limit audit events on an instance.
 
         Read at the API's maximum limit rather than its default of 100.
-        The events come back newest first, and the advisory event is
-        written at placement -- which is the *oldest* thing that happens
-        to an instance -- so a busy instance could push it off the end
-        of a default read and turn a working feature into an absence.
+        The events come back newest first, and this one is written at
+        placement -- which is the *oldest* thing that happens to an
+        instance -- so a busy instance could push it off the end of a
+        default read. That matters precisely because what is asserted
+        here is that there is *no* such event: a truncated read would
+        report an absence it never established.
+
+        One read and no polling, deliberately. A poll cannot make an
+        absence more certain -- it can only make it slower to report --
+        and what makes a single read safe is that the placement being
+        checked finished before it.
         """
-        deadline = time.time() + wait
-        while True:
-            events = self.system_client.get_instance_events(
-                instance_uuid, limit=1000)
-            matched = [
-                e for e in events
+        events = self.system_client.get_instance_events(
+            instance_uuid, limit=1000)
+        self.addDetail(
+            'events for instance %s' % instance_uuid,
+            content.text_content(json.dumps(
+                events, indent=4, sort_keys=True, default=str)))
+        return [e for e in events
                 if str(e.get('message', '')) == CLAIM_OVER_LIMIT_MESSAGE]
-            if matched or time.time() > deadline:
-                self.addDetail(
-                    'events for instance %s' % instance_uuid,
-                    content.text_content(json.dumps(
-                        events, indent=4, sort_keys=True, default=str)))
-                return matched
-            time.sleep(2)
 
 
 class TestNamespaceClaimLifecycle(ClaimAPIMixin, base.BaseNamespacedTestCase):
@@ -729,7 +736,7 @@ class TestNamespaceClaimAccounting(ClaimAPIMixin,
             inst, indent=4, sort_keys=True, default=str)))
         return inst
 
-    def test_placements_draw_down_the_claim_and_report_exceedance(self):
+    def test_placements_draw_down_the_claim_and_the_ceiling_refuses(self):
         # A claim sized for exactly one of these instances. Two are then
         # created: the first fits, the second does not.
         claim = self._create_claim(
@@ -764,73 +771,135 @@ class TestNamespaceClaimAccounting(ClaimAPIMixin,
             claim['uuid'], footprint,
             'one placement in a namespace holding an active claim')
 
-        exceeds = self._create_instance('claim-exceeds')
-        self._await_claim_used(
-            claim['uuid'], tuple(2 * n for n in footprint),
-            'a second placement in a namespace holding an active claim')
-
-        # The create succeeded, which is what advisory means -- but a
-        # create succeeding is also what happens with no claim at all,
-        # so the assertion that matters is the audit event.
+        # The second instance would double a claim sized for one, so the
+        # namespace has already promised away the capacity it is asking
+        # for and the create is refused. Not by the wrapper's retry
+        # either: it waits out a 507 it is told is transient, and this
+        # refusal is neither, so the exception arrives on the first
+        # attempt rather than CLUSTER_HEADROOM_WAIT seconds later.
+        #
+        # The client maps 403 onto UnauthorizedException for every
+        # endpoint it has, so the class says only "forbidden" -- the
+        # status code and the body are what say which refusal this is,
+        # and they are asserted rather than the class.
+        exceeds = self.assertRaises(
+            apiclient.UnauthorizedException,
+            self._create_instance, 'claim-exceeds')
         self.assertEqual(
-            'created', exceeds['state'],
-            'An instance create which exceeds its namespace\'s claim must '
-            'still succeed while claim ceilings are advisory, but instance '
-            '%s is in state %s' % (exceeds['uuid'], exceeds['state']))
+            403, exceeds.status_code,
+            'A create which would take namespace %s past a claim of %s it '
+            'has already drawn down to %s should be refused 403 -- the '
+            'cluster has the room, and the namespace\'s own ceiling is '
+            'what refused. The API answered HTTP %s with body %r'
+            % (self.namespace, self._claim_limits(claim), footprint,
+               exceeds.status_code, exceeds.text))
 
-        matched = self._claim_over_limit_events(exceeds['uuid'], wait=60)
-        self.assertNotEqual(
-            [], matched,
-            'Instance %s drew its namespace past a claim of %s to a usage '
-            'of %s, and no "%s" audit event was recorded for it within 60 '
-            'seconds. Advisory mode which records nothing is '
-            'indistinguishable from no claim at all.'
-            % (exceeds['uuid'], self._claim_limits(claim),
-               tuple(2 * n for n in footprint), CLAIM_OVER_LIMIT_MESSAGE))
+        try:
+            body = json.loads(exceeds.text)
+        except (TypeError, ValueError):
+            body = None
+        self.addDetail(
+            'claim refusal body',
+            content.text_content(str(exceeds.text)))
+        self.assertIsInstance(
+            body, dict,
+            'The refusal carried no JSON object, so nothing a client can '
+            'parse says which claim refused: %r' % exceeds.text)
 
-        extra = matched[0].get('extra') or {}
+        # A claim refusal is its own kind, and both fields say so: the
+        # stage is the claim's rather than the guard's, and no wait
+        # returns capacity the namespace is itself holding.
         self.assertEqual(
-            self.namespace, extra.get('namespace'),
-            'The advisory event names namespace %s rather than %s: %s'
-            % (extra.get('namespace'), self.namespace,
-               json.dumps(matched[0], sort_keys=True, default=str)))
+            'capacity_claim', body.get('stage'),
+            'The refusal does not name the claim stage, so a client and '
+            'the instance\'s own record disagree about what refused: %s'
+            % json.dumps(body, sort_keys=True, default=str))
+        self.assertIs(
+            False, body.get('transient'),
+            'The refusal is marked worth retrying. No wait returns '
+            'capacity this namespace is itself holding, so a client which '
+            'believed it would retry until its deadline: %s'
+            % json.dumps(body, sort_keys=True, default=str))
+        # Conditional for the same reason base.assertRefusedAtStage()'s
+        # Retry-After assertion is: the header is only visible through
+        # APIException.headers, which not every released client carries.
+        headers = getattr(exceeds, 'headers', None)
+        if headers:
+            self.assertNotIn(
+                'Retry-After', headers,
+                'The refusal recommends a wait, which contradicts the '
+                'transient field beside it: %r' % dict(headers))
 
-        dimensions = extra.get('claim_dimensions') or []
-        exceeded = sorted(d.get('dimension') for d in dimensions
-                          if d.get('exceeded'))
+        # Which claim, in the body and in the sentence a human reads.
+        # The namespace name alone cannot answer it once an operator has
+        # grown a claim by delete-and-create, and the claim is the thing
+        # they have to grow.
         self.assertEqual(
-            ['cpus', 'disk_gb', 'memory_mb'], exceeded,
+            claim['uuid'], body.get('claim'),
+            'The refusal names claim %s rather than %s, which is the one '
+            'the namespace holds: %s'
+            % (body.get('claim'), claim['uuid'],
+               json.dumps(body, sort_keys=True, default=str)))
+        self.assertIn(
+            claim['uuid'], str(body.get('error', '')),
+            'The refusal message does not name the claim an operator has '
+            'to grow: %s' % json.dumps(body, sort_keys=True, default=str))
+
+        dimensions = body.get('dimensions') or []
+        self.assertEqual(
+            ['cpus', 'disk_gb', 'memory_mb'],
+            sorted(d.get('dimension') for d in dimensions),
             'The second instance doubles a claim sized for one, so every '
-            'dimension should be reported as exceeded. The event reported '
-            '%s. The event reads %s'
-            % (exceeded, json.dumps(matched[0], sort_keys=True, default=str)))
+            'dimension is over and every one should be reported. The '
+            'refusal reported %s'
+            % json.dumps(dimensions, sort_keys=True, default=str))
 
         # And the detail describes this instance's request, not some
         # other quantity: a per-dimension report an operator cannot size
-        # a claim from is not worth emitting.
+        # a claim from is not worth emitting. The claim holds exactly one
+        # instance and is sized for exactly one, so the shortfall in each
+        # dimension is this instance's whole request.
         requested = dict(zip(('cpus', 'memory_mb', 'disk_gb'), footprint))
         for detail in dimensions:
+            self.assertIn(
+                'shortfall', detail,
+                'The refusal\'s %s detail says the dimension is over but '
+                'not by how much, so an operator cannot size the claim '
+                'from it: %s'
+                % (detail['dimension'],
+                   json.dumps(detail, sort_keys=True, default=str)))
             self.assertEqual(
                 float(requested[detail['dimension']]),
-                float(detail['requested']),
-                'The advisory event\'s %s detail does not describe this '
-                'instance\'s request of %s: %s'
+                float(detail['shortfall']),
+                'The refusal\'s %s detail does not say the claim is short '
+                'by this instance\'s whole request of %s: %s'
                 % (detail['dimension'], requested[detail['dimension']],
                    json.dumps(detail, sort_keys=True, default=str)))
 
-        # The event fires because the claim was exceeded, not because a
-        # claim exists. The first instance fitted exactly inside the
-        # claim and must carry no advisory event. Checked only now, once
-        # the second instance's event has been seen: the event pipeline
-        # is demonstrably flowing, and the first placement happened
-        # strictly before the second one did, so an empty list here is
-        # absence rather than latency.
+        # And nothing was charged. The refusal rolls its transaction
+        # back, so the claim still holds exactly the placement that
+        # fitted -- a ceiling which refused the create and charged it
+        # anyway would starve the namespace of capacity it never got.
+        refused = self._get_claim(claim['uuid'])
+        self.assertEqual(
+            footprint, self._claim_used(refused),
+            'A refused create moved the claim\'s drawdown from %s to %s. '
+            'The claim reads %s'
+            % (footprint, self._claim_used(refused),
+               json.dumps(refused, sort_keys=True, default=str)))
+
+        # The guard refused the create, so no placement was admitted
+        # over this claim and there is no over-limit event anywhere --
+        # including on the instance which fitted exactly inside the
+        # claim, which is the discriminating case: an event which fired
+        # on every create in a claimed namespace would report nothing
+        # useful. Safe to read as absence rather than latency, because
+        # this placement happened strictly before the refusal above.
         self.assertEqual(
             [], self._claim_over_limit_events(within['uuid']),
             'Instance %s fitted exactly inside the claim, so it should '
-            'carry no "%s" audit event. Advisory accounting which fires on '
-            'every create in a claimed namespace would report nothing '
-            'useful.' % (within['uuid'], CLAIM_OVER_LIMIT_MESSAGE))
+            'carry no "%s" audit event.'
+            % (within['uuid'], CLAIM_OVER_LIMIT_MESSAGE))
 
     def test_claim_creation_migrates_existing_drawdown(self):
         # The namespace holds an instance *before* it holds a claim.

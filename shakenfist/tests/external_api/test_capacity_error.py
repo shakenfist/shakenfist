@@ -33,6 +33,7 @@ import os
 from shakenfist_utilities import api as sf_api
 
 from shakenfist import constants
+from shakenfist.constants import CAPACITY_CLAIM_STAGE
 from shakenfist.constants import CAPACITY_GUARD_STAGE
 from shakenfist.external_api import base as api_base
 from shakenfist.operations.baseoperation import BaseClusterOperation
@@ -103,9 +104,12 @@ class CapacityErrorTestCase(base.ShakenFistTestCase):
 
     def test_capacity_guard_stage(self):
         # The admission-guard branch has no single filter stage to
-        # report, and publishes the constant per D30. It is transient
-        # today because a claim cannot refuse a placement while
-        # mariadb.CLAIM_ENFORCEMENT_HARD is False.
+        # report, so it publishes the constant rather than inventing a
+        # per-candidate summary. It is transient because what reaches it
+        # is cluster or node capacity, which a concurrent delete or a
+        # reconciler pass moves: a walk refused by the namespace's own
+        # claim at every candidate is published under the claim stage
+        # instead, and that one is not transient.
         resp = api_base.capacity_error(
             'schedule failed, every candidate refused by capacity guard',
             CAPACITY_GUARD_STAGE)
@@ -121,6 +125,96 @@ class CapacityErrorTestCase(base.ShakenFistTestCase):
                 'transient': True,
             },
             json.loads(resp.get_data(as_text=True)))
+
+    def test_a_claim_refusal_is_a_403_naming_the_claim(self):
+        # A namespace which has used the capacity it claimed is not a
+        # full cluster: the room exists, and the ceiling the namespace
+        # declared for itself is what refused. So this is the one
+        # capacity refusal that is not a 507, and the one a client must
+        # not wait out -- no wait returns quota the namespace is itself
+        # holding, so there is nothing to sleep on and no Retry-After
+        # to sleep for.
+        resp = api_base.claim_capacity_error(
+            '9c9d6c96-1dc7-4f53-9f50-7b9e3a1c6a21',
+            [{'dimension': 'cpus', 'limit': 16.0, 'used': 15.0,
+              'requested': 3.0, 'exceeded': True, 'shortfall': 2.0},
+             {'dimension': 'memory_mb', 'limit': 65536.0, 'used': 1024.0,
+              'requested': 1024.0, 'exceeded': False, 'shortfall': 0.0}])
+
+        self.assertEqual(403, resp.status_code)
+        self.assertNotIn('Retry-After', resp.headers)
+
+        # Whole-body equality, not per-key membership: see the module
+        # docstring. The dimension which did not refuse is absent, and
+        # the ones which did carry only the three fields an operator
+        # acts on -- not the guard's working, which is what the denial
+        # detail the handler was handed also contains.
+        self.assertEqual(
+            {
+                'error':
+                    'namespace capacity claim '
+                    '9c9d6c96-1dc7-4f53-9f50-7b9e3a1c6a21 cannot admit this '
+                    'instance: it is over on cpus by 2. Grow the claim or '
+                    'delete instances in this namespace.',
+                'status': 403,
+                'stage': 'capacity_claim',
+                'transient': False,
+                'claim': '9c9d6c96-1dc7-4f53-9f50-7b9e3a1c6a21',
+                'dimensions': [
+                    {'dimension': 'cpus', 'limit': 16.0, 'used': 15.0,
+                     'shortfall': 2.0},
+                ],
+            },
+            json.loads(resp.get_data(as_text=True)))
+
+    def test_a_claim_refusal_without_detail_recommends_nothing(self):
+        # The claim's uuid comes from the row the guarded UPDATE named,
+        # and the per-dimension figures from a read taken after that
+        # transaction rolled back. A claim deleted between the two
+        # leaves a refusal which can say which claim refused and
+        # nothing else -- and a body telling an operator to grow a
+        # claim by two vCPUs is worse than one that says nothing, when
+        # the claim is already gone. The empty list is how a client
+        # tells "no detail" from "nothing was over".
+        resp = api_base.claim_capacity_error(
+            '9c9d6c96-1dc7-4f53-9f50-7b9e3a1c6a21', [])
+
+        self.assertEqual(403, resp.status_code)
+        self.assertNotIn('Retry-After', resp.headers)
+        body = json.loads(resp.get_data(as_text=True))
+        self.assertEqual(
+            {
+                'error':
+                    'namespace capacity claim '
+                    '9c9d6c96-1dc7-4f53-9f50-7b9e3a1c6a21 refused this '
+                    'instance. The claim could not be read back after the '
+                    'refusal, so what it is over by is not reported.',
+                'status': 403,
+                'stage': 'capacity_claim',
+                'transient': False,
+                'claim': '9c9d6c96-1dc7-4f53-9f50-7b9e3a1c6a21',
+                'dimensions': [],
+            },
+            body)
+        # Said as a property rather than only as a literal, because the
+        # literal above is what a reword changes and this is what must
+        # survive one.
+        self.assertIn('9c9d6c96-1dc7-4f53-9f50-7b9e3a1c6a21', body['error'])
+        self.assertNotIn('Grow', body['error'])
+
+    def test_the_claim_stage_is_classified_as_neither_kind(self):
+        # A claim refusal is a third kind of refusal and is in neither
+        # set on purpose: not transient, because no wait returns quota
+        # the namespace is holding, and not permanent in the sense that
+        # set documents, because deleting the namespace's own instances
+        # or growing its claim does clear it. False is the answer the
+        # absence produces, and the answer it wants.
+        self.assertFalse(
+            constants.capacity_refusal_is_transient(CAPACITY_CLAIM_STAGE))
+        self.assertNotIn(
+            CAPACITY_CLAIM_STAGE, constants.TRANSIENT_CAPACITY_STAGES)
+        self.assertNotIn(
+            CAPACITY_CLAIM_STAGE, constants.PERMANENT_CAPACITY_STAGES)
 
     def test_retry_after_constant(self):
         # D31: 15 seconds, fixed.
@@ -236,7 +330,12 @@ class CapacityErrorTestCase(base.ShakenFistTestCase):
             'worth retrying, which may be wrong')
 
         # The guard stage is not a scheduler stage, so it is the only
-        # classified name that may be absent from the source walk.
+        # classified name that may be absent from the source walk. The
+        # claim stage is not a scheduler stage either, but it is not
+        # classified -- it is in neither set, which is what says "no
+        # wait clears this" -- so it is correctly absent from both
+        # sides of this comparison rather than being an exception to
+        # it.
         self.assertEqual(
             {CAPACITY_GUARD_STAGE}, classified - stages,
             'A classified stage name no longer matches any raise site in '

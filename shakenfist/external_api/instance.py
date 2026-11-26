@@ -278,6 +278,42 @@ instance_post_507_example = """{
 }"""
 
 
+# The refusal that is not about the cluster being full: the namespace
+# has used the capacity its own claim declared. `claim` names the claim
+# to grow and `dimensions` says by how much, and both are what make the
+# response actionable by the person who owns the namespace rather than
+# the person who owns the cluster. `dimensions` is sometimes empty --
+# the claim can be deleted between the refusal and the read-back which
+# produces these figures -- so a client reads it as "detail, if any"
+# rather than as a required field. There is no `Retry-After` on this
+# response at all, which is the point of `transient` being false here:
+# no wait returns quota the namespace is itself holding.
+#
+# The error line is spliced rather than written out whole because a real
+# one does not fit in a source line: it names a uuid and then says what
+# to do about it.
+instance_post_403_example = (
+    '{\n'
+    '    "error": "namespace capacity claim '
+    '9c9d6c96-1dc7-4f53-9f50-7b9e3a1c6a21 cannot admit this instance: it '
+    'is over on cpus by 2. Grow the claim or delete instances in this '
+    'namespace.",'
+    """
+    "status": 403,
+    "stage": "capacity_claim",
+    "transient": false,
+    "claim": "9c9d6c96-1dc7-4f53-9f50-7b9e3a1c6a21",
+    "dimensions": [
+        {
+            "dimension": "cpus",
+            "limit": 16.0,
+            "used": 15.0,
+            "shortfall": 2.0
+        }
+    ]
+}""")
+
+
 class InstanceEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Get instance information.',
@@ -686,6 +722,39 @@ instances_get_example = """[
 VALID_SIDE_CHANNELS = ['sf-agent', 'sf-agent2']
 
 
+def _claim_only_denial(denials):
+    """The one denial to publish when a claim refused the whole walk.
+
+    ``place_on_candidates()`` returns a refusal per candidate, and a
+    walk can mix stages: one node full, another refused by the cluster's
+    unclaimed room. Those are capacity shortages and stay a 507. A walk
+    in which *every* candidate was refused at the claim stage is a
+    different fact -- the namespace has spent the capacity it declared,
+    and no node in the cluster could have taken the instance -- and is
+    answered 403. Returns that denial, or None if the walk was anything
+    else.
+
+    "Every candidate, or none" is not a coincidence: the claim guard is
+    namespace-denominated and node-independent, so it gives the same
+    answer at every candidate, and a mixed dict therefore means some
+    candidate was refused for a reason a client should treat
+    differently. Deciding on the mixture rather than on the presence of
+    a claim denial is what keeps a cluster that is genuinely full from
+    being reported as a namespace which is over its quota.
+
+    One denial is returned rather than a merged summary because each
+    denial's claim uuid and per-dimension figures are read either side
+    of its own rollback, so only the pair from a single candidate is
+    known to describe a single claim.
+    """
+    if not denials:
+        return None
+    walk = list(denials.values())
+    if any(denial['failing_stage'] != 'claim' for denial in walk):
+        return None
+    return walk[0]
+
+
 class InstancesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'instances', 'Get all instances visible to the currently '
@@ -787,6 +856,18 @@ class InstancesEndpoint(api_base.Resource):
             (200, 'Information about a single instance.', instance_get_example),
             (400, 'Instance configuration error such as invalid name of boot '
                 'configuration.', None),
+            (403, 'The namespace has used the capacity its own claim '
+                'declared, and every candidate node refused the instance '
+                'for that reason -- the cluster is not full. The body '
+                'carries `stage` (`capacity_claim`), `transient` (always '
+                'false: no wait returns capacity a namespace is itself '
+                'holding, so there is no `Retry-After` on this response), '
+                '`claim` (the claim to grow) and `dimensions` (what it is '
+                'short by, per dimension). `dimensions` is empty when the '
+                'claim could not be read back after refusing, so a client '
+                'treats it as detail rather than as a required field. Grow '
+                'the claim, or delete instances in the namespace.',
+                instance_post_403_example),
             (404, 'Namespace, network, node, blob, snapshot, or label not found.', None),
             (406, 'Network not ready.', None),
             (409, 'Network address or MAC address in use, or no node '
@@ -1423,14 +1504,26 @@ class InstancesEndpoint(api_base.Resource):
                 EVENT_TYPE_AUDIT,
                 'schedule failed, every candidate refused by capacity guard',
                 extra={'candidates': candidates, 'denials': denials})
+
+            # A walk refused at the claim stage everywhere is the
+            # namespace's own ceiling, not a full cluster, so it is
+            # answered 403 and recorded under its own stage -- the
+            # refusal the instance carries and the refusal the client
+            # reads have to be the same fact (issue 4568).
+            claim_denial = _claim_only_denial(denials)
+            if claim_denial is not None:
+                inst.enqueue_delete_due_error(
+                    'scheduling failed',
+                    stage=api_base.CAPACITY_CLAIM_STAGE)
+                return api_base.claim_capacity_error(
+                    claim_denial['claim'], claim_denial['dimensions'])
+
             inst.enqueue_delete_due_error(
                 'scheduling failed', stage=api_base.CAPACITY_GUARD_STAGE)
-            # There is no single stage here -- denials may span
-            # 'cluster', 'claim' and 'node' across different candidates
-            # (D30) -- so the guard branch publishes the constant
-            # rather than inventing a per-candidate summary. That
-            # constant is classified transient only while claims are
-            # advisory; see TRANSIENT_CAPACITY_STAGES.
+            # There is no single stage left here -- the surviving
+            # denials may span 'cluster', 'claim' and 'node' across
+            # different candidates -- so the guard branch publishes the
+            # constant rather than inventing a per-candidate summary.
             return api_base.capacity_error(
                 'no node had capacity for this instance, %d candidates '
                 'refused it' % len(denials),

@@ -360,7 +360,7 @@ table entirely (decision D8).
 | 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | Complete | `c273627a2` (#3952), `948055063` (#4008), `8fc8ba961` (#4139), `2b767a9b1` (#4154) |
 | 5. Caller migration and hard ceiling | [PLAN-scheduler-reservations-phase-05-callers.md](PLAN-scheduler-reservations-phase-05-callers.md) | Complete | `660d4f65e7` (#4800) |
 | 5a. The calibration re-run | [PLAN-scheduler-reservations-phase-05a-hard-ceiling.md](PLAN-scheduler-reservations-phase-05a-hard-ceiling.md) | Complete | `3797716023` (#4917) |
-| 5b. The hard ceiling | PLAN-scheduler-reservations-phase-05b-hard-ceiling.md | Blocked | — |
+| 5b. The hard ceiling | [PLAN-scheduler-reservations-phase-05b-hard-ceiling.md](PLAN-scheduler-reservations-phase-05b-hard-ceiling.md) | Complete | — |
 | 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete | `597312d2a` (#3957), `b54f126e5` (#3971), `c37012c89` (#3972), `96c78fd63` (#4006) |
 | 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete | `30a02a918` (#4052) |
 | 7a. An operator-readable capacity surface | [PLAN-scheduler-reservations-phase-07a-capacity-surface.md](PLAN-scheduler-reservations-phase-07a-capacity-surface.md) | Complete | `e8585a874` (#4654), `3695f168a` (#4687) |
@@ -597,15 +597,22 @@ is here.
 - **Phase 5b** carries phase 5a's steps 4, 5 and 6 -- the
   `CLAIM_ENFORCEMENT_HARD` flip, the cluster CI assertion inversion
   and the eight documentation lines -- which did not start because
-  the gate did not open. It has no plan file yet and needs no new
-  survey of the enforcement contract: those three step briefs are
-  written in phase 5a, as are D5's discriminator and D6's
-  classification, both confirmed by Michael on 2026-11-07. What it
+  the gate did not open. It had no plan file when this was written,
+  and needs no new survey of the enforcement contract: those three
+  step briefs are written in phase 5a, as are D5's discriminator and
+  D6's classification, both confirmed by Michael on 2026-11-07. What it
   does need is a **fresh** seven-day window read against D2
   unchanged, which cannot begin until private-ci's per-job binding
   phase has landed and deployed on `maui`. Recorded as plan-blocker
   b21; nothing in this repository can clear it, and the flip is not
   to be read again against the window phase 5a already spent.
+  (*Corrected 2026-11-26 by phase 5b's own survey:* "needs no new
+  survey" held for the contract and not for the map to it. Every file
+  reference in those three briefs has moved, `mariadb.py`'s by 1,342
+  lines, and their scope was short by
+  `docs/operator_guide/capacity_refusals.md`, the create endpoint's
+  OpenAPI 403 declaration, and a release-notes line which is not the
+  history it looked like. See phase 5b's F1 and F7 to F9.)
 
   **That binding has now landed**, traced on 2026-11-18 so a later
   session need not re-derive the chain. private-ci's phase 3g
@@ -622,6 +629,27 @@ is here.
   5b's first step. Phase 5b may not be planned before 3g has handed
   over, because a Hold there changes 5b's shape rather than merely
   delaying it.
+
+  **3g handed over on 2026-11-25 and the reading is clean**, so the
+  gate is open and phase 5b is planned
+  ([PLAN-scheduler-reservations-phase-05b-hard-ceiling.md](PLAN-scheduler-reservations-phase-05b-hard-ceiling.md)).
+  Over 2026-11-14T19:48:13Z to 2026-11-21T19:48:13Z the
+  mis-assignment class is gone: **zero** runs held an instance larger
+  than the claim it was charged to, across 3,738 joined runs, against
+  five in the seven days before, and all 118 claims for the three
+  bound jobs record "max over 1 pending job". A pass rather than a
+  Hold is what this bullet's own condition asked for, so 5b's shape
+  is unchanged and 5a's step briefs are still what it carries.
+  Recorded as private-ci#322 and on private-ci#311. Two facts 5b
+  inherits with it. The live claims are **exact in all three
+  dimensions with no `CLAIM_HEADROOM`** -- sf-e2e 18/28672/520, oVirt
+  18/28672/760, Kolla 16/24576/660 -- and not the headroom-multiplied
+  figures 3g's own step 2 recorded, so a reading which looks for
+  those will not find them. And the window contains a fleet-wide
+  contention episode on 2026-11-21, which 5b's D2 keeps rather than
+  stepping around: those were claim-*creation* refusals, which
+  appear in no D2 row, and contention can only raise the rows it
+  touches, so the episode biases against the flip.
 
 - **Phase 6** was executed out of order, ahead of phases 4c and 5,
   and completed on 2026-09-01. It merged as #3972 (the validator

@@ -1302,7 +1302,7 @@ class Instance(dbowo):
             if result['success']:
                 self._event_admission_over_limit(location, denial)
 
-        # D16's advisory claim accounting, deliberately read from
+        # The claim over-limit accounting, deliberately read from
         # ``result`` *after* the rebinding above so it comes from
         # whichever reply actually recorded the placement -- which is the
         # same reasoning the over-limit event's placement documents.
@@ -1310,10 +1310,12 @@ class Instance(dbowo):
         # transaction back, so it charged no claim and can carry no
         # exceedance; eventing from it would announce a claim drawdown
         # that was undone. And ``admitted`` gates both replies, because a
-        # placement which was not recorded consumed nothing. This is not
-        # conditional on ``enforce``: a ground-truth write into an
-        # over-claim namespace is exactly as interesting as a scheduled
-        # one, and both reach here.
+        # placement which was not recorded consumed nothing. Not
+        # conditional on ``enforce`` either, even though an enforced
+        # create which would take a namespace over its claim is now
+        # refused rather than reaching here: the reply says whether a
+        # claim went over, and asking it is both weaker and more durable
+        # than enumerating which callers can still produce one.
         if result['admitted'] and result['claim_over_limit']:
             self._event_claim_over_limit(location, result)
 
@@ -1336,7 +1338,7 @@ class Instance(dbowo):
             })
 
     def _event_claim_over_limit(self, location, result):
-        """Record that a placement drew a namespace past its claim (D16).
+        """Record that a placement drew a namespace past its claim.
 
         Distinct from _event_admission_over_limit() in every respect that
         matters to a reader: that one says a *ground-truth* write was
@@ -1346,14 +1348,19 @@ class Instance(dbowo):
         ``extra`` keys differ so a log consumer never has to guess which
         happened.
 
-        Deliberately not ``log_as_error``: advisory mode did exactly what
-        the operator asked for when this fires. CLAIM_ENFORCEMENT_HARD is
-        False for one release precisely so exceedances are *observed*
-        before they are refused, so this is a warning -- loud enough to
-        find, and to calibrate a claim against, but not a failure. Once
-        that constant is flipped the same condition refuses the create
-        instead, and will be an error because then the create does not
-        happen.
+        Deliberately not ``log_as_error``, and that stays true now that
+        a claim ceiling is enforced. Enforcement refuses the create
+        which would take a namespace over, so the one placement still
+        able to reach here is an *unguarded* one: a ground-truth writer
+        -- the cleaner, or startup reconciliation -- recording where a
+        libvirt domain already is, which clears every guard because a
+        guard cannot refuse reality and leaving the ledger wrong would
+        be strictly worse. (A move reaches neither this event nor the
+        guard: it changes node and never namespace, so it charges
+        nothing on the namespace side and there is no read-back for it
+        to report.) So this is still the right shape for the fact it
+        records -- a warning, loud enough to find and to size a claim
+        against, about a placement nobody asked permission for.
 
         This instance's own event above is left exactly as it was (G2).
         In addition, the same facts are recorded against the
@@ -1495,12 +1502,20 @@ class Instance(dbowo):
                 return
 
             if not result['admitted']:
+                # The claim rides along for the same reason the
+                # over-limit events above carry it: a namespace grown by
+                # delete-and-create rather than by update leaves a trail
+                # spanning several claims, and "which claim refused
+                # this" is not answerable from the namespace name alone.
+                # Empty on a node or cluster denial, which has no claim
+                # to name, so a reader tests for the name.
                 self.add_event(
                     EVENT_TYPE_AUDIT, 'instance placement denied',
                     extra={
                         'node': location,
                         'failing_stage': result['failing_stage'],
                         'dimensions': result['dimensions'],
+                        'claim': result['claim_uuid'],
                         'enforce': enforce
                     })
                 if not enforce:
@@ -1516,7 +1531,8 @@ class Instance(dbowo):
                     # the next cleaner pass retries.
                     return
                 raise exceptions.CapacityAdmissionDenied(
-                    result['failing_stage'], result['dimensions'])
+                    result['failing_stage'], result['dimensions'],
+                    result['claim_uuid'])
 
             # The RPC wrote the placement column behind this object's
             # back, so do what _db_set_attribute() would have done
@@ -1601,11 +1617,11 @@ class Instance(dbowo):
         Returns ``(chosen, denials)``: the admitting node uuid (or
         ``None`` when every candidate was refused), and a fresh dict of
         the per-candidate refusals ``{node: {failing_stage, dimensions,
-        demand_only}}``. The caller reads ``denials`` for its own
-        exhaustion handling -- the per-candidate stages and the refused
-        count -- so it is built here and returned rather than passed in,
-        which keeps the demand re-walk below keyed on this call's own
-        denials alone.
+        claim, demand_only}}``. The caller reads ``denials`` for its own
+        exhaustion handling -- the per-candidate stages, the claim which
+        refused and the refused count -- so it is built here and
+        returned rather than passed in, which keeps the demand re-walk
+        below keyed on this call's own denials alone.
 
         Each refusal is evented against ``log_targets`` with
         ``refusal_message`` -- the one audit message that differs between
@@ -1646,6 +1662,13 @@ class Instance(dbowo):
                     denials[candidate] = {
                         'failing_stage': e.failing_stage,
                         'dimensions': e.dimensions,
+                        # Paired with this candidate's dimensions, never
+                        # merged across candidates: the uuid comes from
+                        # the row the guarded UPDATE named and the
+                        # numbers from a read taken after that
+                        # transaction rolled back, so only the pair from
+                        # one denial is known to describe one claim.
+                        'claim': e.claim_uuid,
                         'demand_only': e.demand_only,
                     }
                     add_event_multi(

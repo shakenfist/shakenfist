@@ -1221,6 +1221,131 @@ class ExternalApiTransientRefusalContractTestCase(
         self.assertNotIn('transient', resp.get_json())
 
 
+class ExternalApiClaimCeilingTestCase(ExternalApiCreateAdmissionWalkTestCase):
+    """``POST /instances`` answers 403 when a namespace is over its claim.
+
+    Every other capacity refusal from this endpoint is a 507: the
+    cluster cannot serve the request, and whether a wait would help is
+    what ``transient`` says. A namespace which has used the capacity its
+    own claim declared is a different fact -- the cluster has the room,
+    and the ceiling the namespace asked for is what refused -- so it is
+    a 403, it is never transient, and the body names the claim to grow.
+
+    The discriminator is the *whole walk*: 403 only when every candidate
+    was refused at the claim stage, 507 for any mixture. That is not a
+    detail, and the pair of tests below is what pins it rather than
+    either one alone. Reporting a full cluster as a namespace over quota
+    would send an operator to grow a claim that was never the problem,
+    and reporting a namespace over quota as a full cluster would tell a
+    client to wait for capacity that is already free.
+    """
+
+    CLAIM = 'd2c4e5a6-0f1b-4c3d-9e8f-7a6b5c4d3e2f'
+
+    def _claim(self, **limits):
+        return self.mock_mariadb.set_namespace_claim(
+            'system', claim_uuid=self.CLAIM, **limits)
+
+    def _denial(self, stage, claim_uuid=''):
+        return exceptions.CapacityAdmissionDenied(
+            stage,
+            [{'dimension': 'cpus', 'limit': 2.0, 'used': 1.0,
+              'requested': 4.0, 'exceeded': True, 'shortfall': 3.0}],
+            claim_uuid)
+
+    def test_a_claim_refusal_on_every_candidate_is_a_403(self):
+        # The claim guard is namespace-denominated and node-independent,
+        # so a namespace which is over refuses at every candidate rather
+        # than at some -- both nodes here have ample room, and neither
+        # of them is what refused.
+        claim = self._claim(
+            limit_cpus=2, limit_memory_mb=65536, limit_disk_gb=500)
+        self._roomy(self.NODE_A)
+        self._roomy(self.NODE_B)
+
+        with self._candidates(self.NODE_A, self.NODE_B):
+            resp = self._post('over-its-claim', cpus=4)
+
+        self.assertEqual(403, resp.status_code, resp.get_json())
+        # No wait returns quota the namespace is itself holding.
+        self.assertNotIn('Retry-After', resp.headers)
+        body = resp.get_json()
+        self.assertEqual('capacity_claim', body['stage'])
+        self.assertIs(False, body['transient'])
+        # Which claim, and by how much: the two things an operator needs
+        # to act, and the reason this is a 403 the namespace's owner can
+        # do something about rather than a 507 only the cluster's owner
+        # can.
+        self.assertEqual(claim['uuid'], body['claim'])
+        self.assertIn(claim['uuid'], body['error'])
+        self.assertEqual(
+            ['cpus'], [d['dimension'] for d in body['dimensions']])
+        # Four vCPUs asked of a claim limited to two, with none of it
+        # used: two short, which is what an operator grows the claim by.
+        self.assertEqual(2.0, body['dimensions'][0]['shortfall'])
+        # Nothing was charged anywhere: a denial rolls its transaction
+        # back, and neither roomy node took the instance on the way to
+        # the refusal.
+        self.assertEqual(2, claim['limit_cpus'])
+        self.assertEqual(0, claim['used_cpus'])
+        self.assertEqual(
+            0, self.mock_mariadb.node_capacity[self.NODE_A]['used_cpus'])
+
+    def test_a_mixed_claim_and_node_refusal_is_still_a_507(self):
+        # One candidate refused by the claim, the next by its own
+        # capacity. The walk as a whole is then a cluster with no room
+        # for this instance, which is a 507 a delete elsewhere can
+        # clear -- so the presence of a claim denial is not what decides
+        # the status code. Built by raising the denials directly because
+        # the admission primitive cannot produce this mixture: the claim
+        # stage gives the same answer at every candidate, which is
+        # exactly why "every candidate" is the right discriminator.
+        with mock.patch(
+                'shakenfist.instance.Instance.place_instance',
+                side_effect=[self._denial('claim', self.CLAIM),
+                             self._denial('node')]):
+            with self._candidates(self.NODE_A, self.NODE_B):
+                resp = self._post('mixed-refusal')
+
+        self.assertEqual(507, resp.status_code, resp.get_json())
+        body = resp.get_json()
+        self.assertEqual('capacity_guard', body['stage'])
+        self.assertNotIn('claim', body)
+
+    def test_the_instance_records_the_claim_stage_it_was_refused_at(self):
+        # The refusal a client reads and the refusal left on the
+        # instance have to be the same fact (issue 4568), so the stage
+        # recorded before the error-delete is the claim stage and not
+        # the guard stage a mixed refusal would record.
+        self._claim(limit_cpus=2, limit_memory_mb=65536, limit_disk_gb=500)
+        self._roomy(self.NODE_A)
+
+        with mock.patch('shakenfist.instance.Instance.'
+                        'enqueue_delete_due_error') as delete:
+            with self._candidates(self.NODE_A):
+                resp = self._post('records-the-stage', cpus=4)
+
+        self.assertEqual(403, resp.status_code, resp.get_json())
+        delete.assert_called_once_with(
+            'scheduling failed', stage='capacity_claim')
+
+    def test_a_claim_with_room_still_admits(self):
+        # The other half of enforcement: a claim is a ceiling and not a
+        # gate, so a placement which fits inside one is admitted and
+        # charged against it. Without this, a guard which refused every
+        # claimed namespace would pass the tests above.
+        claim = self._claim(
+            limit_cpus=8, limit_memory_mb=65536, limit_disk_gb=500)
+        self._roomy(self.NODE_A)
+
+        with self._candidates(self.NODE_A):
+            resp = self._post('inside-its-claim', cpus=4)
+
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertEqual(self.NODE_A, resp.get_json()['node'])
+        self.assertEqual(4, claim['used_cpus'])
+
+
 class ExternalApiExceptionRecordingTestCase(ExternalApiTestCase):
     """Test that exceptions during JSON serialization are recorded."""
 

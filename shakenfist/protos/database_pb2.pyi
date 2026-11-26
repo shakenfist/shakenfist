@@ -9968,15 +9968,17 @@ class AdmitInstancePlacementReply(_message.Message):
     node_used_disk_gb: _builtins.int
     node_expected_demand: _builtins.float
     claim_over_limit: _builtins.bool
-    """Advisory claim accounting. The admission was charged to a
+    """Claim over-limit accounting. The admission was charged to a
     namespace claim and, read back inside the same transaction, that
     claim's used_* now stands above its limit_*. The placement was
-    *admitted* -- claim ceilings are advisory for one release -- so this
-    is deliberately not reported through failing_stage or dimensions,
-    which both mean "this was refused". claim_dimensions carries only
-    the dimensions actually over, in the same shape dimensions uses:
-    used is what the claim held before this admission, requested is this
-    admission's allocation, limit is the claim's ceiling.
+    *admitted* -- which, now that a claim ceiling refuses, means an
+    unguarded write recording where a libvirt domain already is, since
+    a guard cannot refuse reality -- so this is deliberately not
+    reported through failing_stage or dimensions, which both mean
+    "this was refused". claim_dimensions carries only the dimensions
+    actually over, in the same shape dimensions uses: used is what the
+    claim held before this admission, requested is this admission's
+    allocation, limit is the claim's ceiling.
     """
     claim_uuid: _builtins.str
     """Which claim this placement was weighed against, so an audit event

@@ -929,18 +929,21 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         # charge went over.
         self.assertEqual(str(claim_uuid), result['claim_uuid'])
 
-    def test_a_claim_that_would_overflow_is_admitted_and_reported(self):
-        # Claim ceilings are advisory while CLAIM_ENFORCEMENT_HARD is
-        # False. The over-limit admission has to *land* -- counters above
-        # the limit and all -- and say so, because the pending hard
-        # ceiling flips that constant and turns this into the refusal.
+    def test_an_unguarded_overflow_lands_and_is_reported(self):
+        # A guarded placement which would take this namespace past its
+        # claim is refused -- that is the guard test below. An unguarded
+        # ground-truth write cannot be: it records where a libvirt
+        # domain already is, and a guard cannot refuse reality. So this
+        # admission has to *land*, counters above the limit and all, and
+        # say so: nothing else in the system watches for a claim which
+        # has come to sit over its limits with no create refused.
         claim_uuid = self._add_claim(
             limit_cpus=8, used_cpus=6, limit_memory_mb=65536,
             used_memory_mb=0, limit_disk_gb=1000, used_disk_gb=0)
-        result = self._admit(self.node_b, cpus=4)
+        result = self._admit(self.node_b, cpus=4, enforce=False)
 
         self.assertTrue(result['admitted'], result['error'])
-        # Advisory, so nothing about this reads as a refusal.
+        # The placement landed, so nothing about this reads as a refusal.
         self.assertEqual('', result['failing_stage'])
         self.assertEqual([], result['dimensions'])
 
@@ -960,8 +963,9 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         self.assertTrue(detail['cpus']['exceeded'])
 
         # And the row really is over its limit afterwards. This is the
-        # assertion that separates "advisory mode works" from "advisory
-        # mode does nothing", which look identical from the create.
+        # assertion that separates "the write landed and was recorded"
+        # from "the write landed and nothing noticed", which look
+        # identical from the caller.
         claim = self._claim(claim_uuid)
         self.assertEqual(10, claim.used_cpus)
         self.assertGreater(claim.used_cpus, claim.limit_cpus)
@@ -969,10 +973,13 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         self.assertEqual(4, self._capacity(self.node_b).used_cpus)
 
     def test_every_over_claim_dimension_is_reported(self):
+        # Unguarded for the same reason as the test above: only a
+        # ground-truth write can be admitted over a claim at all.
         self._add_claim(limit_cpus=8, used_cpus=6, limit_memory_mb=4096,
                         used_memory_mb=4096, limit_disk_gb=1000,
                         used_disk_gb=0)
-        result = self._admit(self.node_b, cpus=4, memory_mb=4096, disk_gb=40)
+        result = self._admit(self.node_b, cpus=4, memory_mb=4096, disk_gb=40,
+                             enforce=False)
 
         self.assertTrue(result['admitted'], result['error'])
         self.assertTrue(result['claim_over_limit'])
@@ -993,11 +1000,14 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         # A move consumes nothing new on the namespace side (it never
         # changes namespace), so it must neither touch the claim
         # counters nor re-report a claim that some earlier admission
-        # left over its limits.
+        # left over its limits. That earlier admission is unguarded,
+        # because only a ground-truth write can leave a claim over its
+        # limits now.
         claim_uuid = self._add_claim(limit_cpus=8, used_cpus=6,
                                      limit_memory_mb=65536, used_memory_mb=0,
                                      limit_disk_gb=1000, used_disk_gb=0)
-        self.assertTrue(self._admit(self.node_a)['claim_over_limit'])
+        self.assertTrue(
+            self._admit(self.node_a, enforce=False)['claim_over_limit'])
         before = self._claim(claim_uuid)
 
         result = self._admit(self.node_b, old_node=str(self.node_a))
@@ -1021,16 +1031,15 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         # empty string is what says so -- never a zero uuid.
         self.assertEqual('', result['claim_uuid'])
 
-    def test_the_claim_guard_binds_when_enforcement_is_turned_on(self):
-        # The hard ceiling's flip of CLAIM_ENFORCEMENT_HARD, exercised
-        # against a real server so its guard is known to bind before the
-        # constant moves. Also the live half of the claim guard being
-        # independent of the node guard: the node here has a capacity
-        # row, so this says nothing about the fail-open -- the unit
-        # suite covers that half.
+    def test_the_claim_guard_binds_against_a_real_server(self):
+        # The ceiling refuses, proven against a real server rather than
+        # a mocked engine: the SQL guard's own comparison is what has to
+        # match no row, and only MariaDB can say whether it does. Also
+        # the live half of the claim guard being independent of the node
+        # guard: the node here has a capacity row, so this says nothing
+        # about the fail-open -- the unit suite covers that half.
         claim_uuid = self._add_claim(limit_cpus=8, used_cpus=6)
-        with mock.patch.object(mariadb, 'CLAIM_ENFORCEMENT_HARD', True):
-            result = self._admit(self.node_b, cpus=4)
+        result = self._admit(self.node_b, cpus=4)
 
         self.assertFalse(result['admitted'])
         self.assertEqual('claim', result['failing_stage'])

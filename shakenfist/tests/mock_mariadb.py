@@ -2929,11 +2929,11 @@ class MockMariaDB():
 
         Whether the claim's limits can *refuse* a placement is not a
         property of the row: mariadb.CLAIM_ENFORCEMENT_HARD decides that
-        for the whole cluster, and it is False for D16's advisory
-        release. With it False, seeding a claim smaller than what is
-        placed produces claim_over_limit and the offending dimensions on
-        an admitted placement; with it True the same seed produces
-        failing_stage='claim'.
+        for the whole cluster, and it is True. So seeding a claim smaller
+        than what is placed produces failing_stage='claim' on a guarded
+        placement, and claim_over_limit with the offending dimensions on
+        an unguarded one -- the constant is read at call time, so a test
+        which patches it gets the other answer from the same seed.
 
         The ``peak_used_*`` high-water mark defaults to the matching
         ``used_*``, which is where a claim that has only ever grown

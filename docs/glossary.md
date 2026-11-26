@@ -61,9 +61,10 @@ access in Shaken Fist. The authorization noun is [scope](#scope).
 
 **capacity claim**{#capacity-claim} -- A namespace's reservation of aggregate
 cluster vCPU, memory and disk, created by an administrator, with at most one
-active claim per namespace. The ceiling is advisory this release: a placement
-that exceeds it is admitted and the exceedance recorded, while the claim's
-limits are still reserved against namespaces without a claim. Defined in
+active claim per namespace. The ceiling is enforced: a placement that exceeds
+it is refused (see [capacity refusals](operator_guide/capacity_refusals.md)),
+and the claim's limits are also reserved against namespaces without a claim.
+Defined in
 `docs/operator_guide/scheduler.md#namespace-capacity-claims`. Not to be
 confused with the bound claims of a [mapping rule](#mapping-rule), which are
 fields of an OIDC [identity token](#identity-token).

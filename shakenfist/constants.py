@@ -316,6 +316,24 @@ def final_object_states(
 # capacity_refusal_is_transient() below.
 CAPACITY_GUARD_STAGE = 'capacity_guard'
 
+# The refusal stage published when every candidate was refused because
+# the namespace has already used the capacity its own claim declared,
+# rather than because the cluster or a node is full. Also a published
+# API token -- it appears in the "stage" field of the 403 the create
+# path answers for this case, which is a different status code from the
+# 507 every other capacity refusal gets, because the request is not
+# asking for capacity the cluster lacks.
+#
+# Deliberately classified in neither set below. A claim refusal is a
+# third kind: not transient, because no wait returns quota the
+# namespace itself is holding, and not permanent in the sense
+# PERMANENT_CAPACITY_STAGES documents, because deleting the namespace's
+# own instances or growing its claim does clear it.
+# capacity_refusal_is_transient() answers False for an unclassified
+# stage, which is the answer this stage wants, so the absence is the
+# classification rather than an omission.
+CAPACITY_CLAIM_STAGE = 'capacity_claim'
+
 
 # Which refusal stages a retry can actually clear, and which it cannot.
 #
@@ -344,13 +362,14 @@ TRANSIENT_CAPACITY_STAGES = frozenset([
 
     # The guard is an accounting refusal against the capacity counters,
     # which a concurrent delete or a reconciler pass moves on the same
-    # horizon. This holds only while mariadb.CLAIM_ENFORCEMENT_HARD is
-    # False: today a namespace claim cannot refuse a placement at all,
-    # so every guard denial is cluster or node capacity. Once that
-    # constant is flipped (see PLAN-scheduler-reservations.md) a claim
-    # denial becomes namespace quota exhaustion, which no wait clears,
-    # and claim denials must be split out of this set at that point
-    # rather than silently inheriting it.
+    # horizon. This stage now means cluster or node capacity, or a
+    # mixture of stages which included one of them: a refusal in which
+    # *every* candidate was refused by the namespace's own claim is
+    # published as CAPACITY_CLAIM_STAGE instead, and is unclassified,
+    # because namespace quota exhaustion is not something a wait
+    # clears. Keeping the two apart is what keeps this entry honest: a
+    # claim refusal which inherited it would promise a retry that can
+    # never succeed.
     CAPACITY_GUARD_STAGE,
 ])
 
@@ -379,5 +398,9 @@ def capacity_refusal_is_transient(stage: str) -> bool:
     one and the 'unknown' fallback for a refusal which arrived carrying
     no stage at all, is not transient: refusing to promise
     retry-worthiness is the safe direction to be wrong in.
+
+    CAPACITY_CLAIM_STAGE is unclassified on purpose rather than by
+    omission, and False is the answer it wants: see its own comment
+    above.
     """
     return stage in TRANSIENT_CAPACITY_STAGES

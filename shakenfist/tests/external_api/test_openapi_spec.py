@@ -785,6 +785,42 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
             {'error', 'status', 'stage', 'transient'}, set(decoded))
         self.assertIs(True, decoded['transient'])
 
+    def test_post_instances_403_describes_the_claim_refusal(self):
+        # The one capacity refusal that is not a 507, and the one a
+        # client must not retry. A response the server answers but the
+        # specification does not declare is invisible to every generated
+        # client, so this declaration is the published half of the
+        # refusal contract, asserted rather than trusted.
+        spec = self._fetch_spec()
+        response = spec['paths']['/instances']['post']['responses']['403']
+
+        description = response['description']
+        self.assertIn('capacity_claim', description)
+        self.assertIn('claim', description)
+        self.assertIn('dimensions', description)
+        # No Retry-After, structurally rather than only in the prose:
+        # there is no wait which returns quota the namespace is itself
+        # holding, which is the whole reason this refusal has a
+        # classification of its own.
+        self.assertNotIn('Retry-After', response.get('headers') or {})
+
+        example = response['examples']['application/json']
+        decoded = example if isinstance(example, dict) else json.loads(example)
+        self.assertEqual(
+            {'error', 'status', 'stage', 'transient', 'claim', 'dimensions'},
+            set(decoded))
+        self.assertEqual(403, decoded['status'])
+        self.assertEqual(api_base.CAPACITY_CLAIM_STAGE, decoded['stage'])
+        self.assertIs(False, decoded['transient'])
+        # The sample is a whole refusal rather than a shape: the claim
+        # an operator has to grow is named both in the body and in the
+        # sentence a human reads, and the dimension detail says by how
+        # much.
+        self.assertIn(decoded['claim'], decoded['error'])
+        self.assertEqual(
+            ['cpus'], [d['dimension'] for d in decoded['dimensions']])
+        self.assertIn('shortfall', decoded['dimensions'][0])
+
     def test_every_published_response_header_is_a_primitive(self):
         # A header object has no schema, so an object-valued one would
         # be an invalid specification. swagger_helper() refuses those at

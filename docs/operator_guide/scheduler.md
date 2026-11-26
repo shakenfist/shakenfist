@@ -599,20 +599,25 @@ response bodies are published in the
 [OpenAPI specification](https://openapi.shakenfist.com). A namespace
 holds at most one active claim.
 
-### Advisory this release: exceedances are recorded, not refused
+### The ceiling is enforced
 
-**Creating a claim does not stop anybody -- including the claiming
-namespace -- from exceeding it.** In this release claim ceilings are
-*advisory*: a placement that would push a namespace past the limits it
-claimed is **admitted**, and the fact that it went over is recorded. The
-refusal arrives in a later release, once operators have had a release in
-which to see real exceedances and calibrate their claims against them.
+**A claim is a ceiling the namespace set for itself, and it binds.** A
+placement that would push a namespace past the limits it claimed is
+**refused**, with an HTTP 403 rather than the 507 every other capacity
+refusal carries: the cluster could have served the request, and it is the
+namespace's own ceiling which said no. The response names the claim and
+each dimension that is over, and carries no `Retry-After`, because no
+wait returns capacity the namespace is itself holding. Grow the claim or
+delete instances in the namespace; the response format is described in
+[capacity refusals](capacity_refusals.md#the-403-for-a-namespace-over-its-claim).
 
 Two consequences worth being explicit about, because both surprise
 people:
 
-- A claim does **not** cap the claiming namespace. `used_*` on a claim
-  can and will exceed `limit_*`.
+- A claim caps the claiming namespace only through that refusal. A
+  placement which is not refusable -- one recorded for an instance
+  already running on a node -- is still charged to the claim, so `used_*`
+  on a claim can exceed `limit_*`, and the event below records it.
 - What a claim *does* do immediately is reserve capacity **from everybody
   else**. The claim's limits are added to
   `cluster_capacity.claimed_*`, and the guard that admits instances in
@@ -625,8 +630,8 @@ people:
   *best-effort*, and competes for what the active claims have not
   spoken for.
 
-The record of an exceedance is an audit event on the *instance* whose
-placement crossed the line:
+The record of an exceedance which was admitted anyway is an audit event
+on the *instance* whose placement crossed the line:
 
 ```
 placement admitted over namespace capacity claim
@@ -665,8 +670,9 @@ is exactly how many operators grow a claim today.
 
 Because a create that exceeds a claim looks exactly like a create in a
 namespace with no claim at all, the event is the only observable
-difference between advisory mode working and advisory mode being absent.
-If you are testing a claim, assert the event.
+difference between a claim which was exceeded by an unrefusable placement
+and no claim at all. If you are testing a claim's ceiling, assert the 403
+instead; the event is the record of what the ceiling could not stop.
 
 ### What creating a claim does to existing usage
 
