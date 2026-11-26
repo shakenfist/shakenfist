@@ -17,6 +17,7 @@ from testtools import content
 from prettytable import PrettyTable
 from shakenfist_client import apiclient
 
+from shakenfist_ci import accounting
 from shakenfist_ci import process
 from shakenfist_ci import retries
 
@@ -928,6 +929,22 @@ class BaseTestCase(testtools.TestCase):
                 'skip; see docs/developer_guide/ci.md.'
                 % (node.get('name'), node.get('ip'), e))
 
+    def _require_node_sudo(self, node):
+        """Skip the test loudly if node cannot run a command as root.
+
+        The companion to ``_require_node_exec()`` above, for an assertion
+        which reads state only root can see: libvirt's domains, or a
+        configuration directory read as root rather than on the strength
+        of its mode, so that a deploy which tightens that mode makes this
+        skip rather than report a directory it cannot see as removed.
+        """
+        try:
+            self._node_exec(node, ['true'], sudo=True)
+        except process.ProcessExecutionError as e:
+            self.skipTest(
+                'Cannot exec as root on node %s (%s): %s'
+                % (node.get('name'), node.get('ip'), e))
+
     def _node_link_names(self, node):
         """The names of the network links in node's root namespace."""
         out, _ = self._node_exec(node, ['ip', '-json', 'link', 'show'])
@@ -963,6 +980,38 @@ class BaseTestCase(testtools.TestCase):
             'No Autostart line in virsh dominfo for instance %s on node '
             '%s. Full dominfo output:\n%s'
             % (instance_uuid, node.get('name'), out))
+
+    def _node_sf_domains(self, node):
+        """Sample the Shaken Fist domains libvirt has active on node.
+
+        Returns what ``accounting.parse_domain_sample()`` returns: the
+        node's own clock before the enumeration, each active ``sf:``
+        domain's vCPU count and memory keyed by instance uuid, and the
+        domains which were listed but could not be read. One command per
+        node, and one ssh round trip, because a reading is only worth
+        comparing with a published measurement if nothing changed while
+        it was being taken.
+
+        Unlike ``_domain_autostart()`` and ``_domain_root_disk_path()``,
+        which read one named domain, this asks the node what it is
+        running -- so it answers for the instances this suite knows
+        nothing about as well, which is what makes it comparable with
+        ``/admin/resources``.
+
+        A failed ``dominfo`` is reported in ``unreadable`` rather than
+        raised, so check_exit_code is off: the loop's exit code is its
+        last command's, and a domain which stops mid-sample is a retry,
+        not a failure.
+        """
+        out, _ = self._node_exec(
+            node, ['sh', '-c', accounting.DOMAIN_SAMPLE_COMMAND],
+            sudo=True, check_exit_code=False)
+        try:
+            return accounting.parse_domain_sample(out)
+        except ValueError as e:
+            self.fail(
+                'Could not read the libvirt domains on node %s: %s. Full '
+                'output:\n%s' % (node.get('name'), e, out))
 
     def _domain_root_disk_path(self, node, instance_uuid):
         """The path of instance_uuid's root disk on node, its hypervisor.

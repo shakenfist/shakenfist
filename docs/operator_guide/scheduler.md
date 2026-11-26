@@ -1100,11 +1100,17 @@ capacity row's disk counters as `disk_limit_gb` and `disk_committed_gb`
 beside the headroom-only `disk_available` -- see [Admission is a
 guarded capacity claim](#admission-is-a-guarded-capacity-claim) for what
 `cpu_committed` and its `cpu_committed_row_present` companion actually
-mean.
+mean. The memory decision is broken out the same way, into `ram_max`,
+`ram_measured` and `ram_committed`. `ram_measured` is the measurement,
+the memory `sf-resources` last summed across the node's active libvirt
+domains, and is what the KSM overcommit check tests against `ram_max`;
+`ram_committed` is the ledger. A node refusing work while measuring
+idle, or the reverse, is the two disagreeing.
 
 Each node also reports `domains_enumerated_at`: when, on that node's
 own clock, `sf-resources` listed the libvirt domains behind
-`cpu_measured` (`null` from a node which predates the field). A node
+`cpu_measured`, `ram_measured` and `instances_active` -- one enumeration
+produces all three (`null` from a node which predates the field). A node
 publishes within a few seconds of any domain starting or stopping, so on
 a busy node `cpu_measured` moves for reasons unrelated to any one
 instance. To ask whether the published figure has caught up with a

@@ -3,6 +3,7 @@ import time
 
 from testtools import content
 
+from shakenfist_ci import accounting
 from shakenfist_ci import base
 from shakenfist_ci import retries
 from shakenfist_ci import sizing
@@ -47,6 +48,25 @@ CLUSTER_CAPACITY_ROW_WAIT = 300
 # exact strings, so a new one is an API change this test should notice.
 EXCLUSION_REASONS = frozenset({
     'queue too long', 'stale metrics', 'no metrics', 'metrics unreadable'})
+
+# How long a hypervisor's published measurement is given to agree with
+# the domains libvirt has on it, in test_node_accounting_agrees_with_libvirt.
+# sf-resources looks at the domain set every DOMAIN_POLL_INTERVAL_SECONDS
+# (5) and publishes on a change plus one follow-up poll, so a change is
+# published within about 10 seconds and the interval tick (60) is the
+# worst case for a publish which somehow missed the change. This is many
+# times that, because the wait is not only for the publish: the cluster is
+# shared, so a round is also spent whenever a sibling's instance starts or
+# stops on the node mid-sample. Short enough that a node which really has
+# drifted says so well inside the job timeout.
+LIBVIRT_RECONCILIATION_WAIT = 180
+LIBVIRT_RECONCILIATION_POLL = 5
+
+# The memory each instance that test asks for. Small, because what the
+# instances are for is to move the accounting rather than to run
+# anything, and two of them have to fit on one node beside whatever the
+# rest of the suite is doing.
+ACCOUNTING_INSTANCE_MEMORY_MB = 128
 
 CLUSTER_CAPACITY_COUNTERS = [
     '%s_%s' % (kind, dim)
@@ -668,3 +688,229 @@ class TestNodes(base.BaseNamespacedTestCase):
             'seconds, not within a minute.'
             % (node_uuid, change, self.CPU_MEASURED_DEADLINE_SECONDS,
                per_node['domains_enumerated_at'], per_node['cpu_measured']))
+
+    def _accounting_verdict(self, before, after, entry):
+        """Whether a node's domain sample and its per_node entry agree.
+
+        Returns ``comparable``, whether the two readings could be held
+        against each other at all; ``agreed``, whether they then did; and
+        a ``reason`` saying which.
+
+        Three things make a round incomparable, and none of them is a
+        finding. A node absent from ``per_node`` published no measurement
+        to compare -- which an active hypervisor is entitled to do, for
+        instance with a queue over the exclusion threshold. A domain
+        which was listed but could not be read was starting or stopping
+        while the sample was taken. And the two samples bracket the
+        ``/admin/resources`` read, so a node whose libvirt state moved
+        across that read is not judged either: the published figures
+        legitimately describe either side of the change. Only a stable
+        bracket around a published entry is a comparison, which is why
+        the caller counts them.
+        """
+        if entry is None:
+            return {'comparable': False, 'agreed': False,
+                    'reason': 'absent from per_node, so it published no '
+                              'measurement to compare'}
+        if before['unreadable'] or after['unreadable']:
+            return {'comparable': False, 'agreed': False,
+                    'reason': 'a listed domain could not be read, so the '
+                              'sample caught it starting or stopping'}
+        if before['domains'] != after['domains']:
+            return {'comparable': False, 'agreed': False,
+                    'reason': "libvirt's domains changed while the ledger "
+                              'was read'}
+
+        mismatches = accounting.accounting_mismatches(before['domains'], entry)
+        if mismatches:
+            return {'comparable': True, 'agreed': False,
+                    'mismatches': mismatches,
+                    'reason': 'the published measurement disagrees with '
+                              'libvirt: ' + '; '.join(
+                                  '%s libvirt %r published %r'
+                                  % (m['figure'], m['libvirt'],
+                                     m['published'])
+                                  for m in mismatches)}
+
+        return {'comparable': True, 'agreed': True, 'reason': None}
+
+    def test_node_accounting_agrees_with_libvirt(self):
+        """Each hypervisor's measured accounting matches what it is running.
+
+        Everything else in this file asserts on ``/admin/resources``
+        against Shaken Fist's own view of itself. This compares the three
+        figures in a ``per_node`` entry which are measurements of the
+        hypervisor rather than ledger entries -- ``instances_active``,
+        ``cpu_measured`` and ``ram_measured``, all three built in one
+        pass over ``get_active_sf_domains()`` by ``sf-resources`` -- with
+        what libvirt on that node reports for the same domains. Both CPU
+        and memory admission measure a node against those figures, so a
+        node whose measurement has drifted from its hypervisor decides
+        with a number which is not true. Issue 3772 is the umbrella for
+        creates refused 507 while the cluster has room, and the diagnosis
+        each time has been a node whose recorded usage did not match what
+        it was running -- found from the symptom, a refused create, which
+        means a drift which refuses nothing is invisible.
+
+        The comparison runs after a round of pinned creates and a delete,
+        so the ledger has had to move in both directions on the node this
+        test pins, and it runs over every hypervisor rather than that one
+        -- a sibling test's instances are as good a reason for the
+        figures to be wrong, and cost nothing extra to check.
+
+        What it cannot do is attribute a disagreement to this test's own
+        churn, because the cluster is shared: every other worker's
+        instances start and stop on these nodes throughout. So a
+        disagreement is not believed on sight. Each node is sampled with
+        ``/admin/resources`` read between two libvirt samples, and is
+        only judged when those two agree -- a node whose domains moved
+        across the read is resampled -- and the published figures are
+        then allowed to catch up, because a publish lags a change by a
+        poll plus a publish. A node fails only if it disagreed in every
+        one of the comparable readings taken over
+        LIBVIRT_RECONCILIATION_WAIT, which is many times that lag. A node
+        which produced no comparable reading at all fails nothing, since
+        an active hypervisor is entitled to be absent from ``per_node``
+        (an overlong queue, for one); if that is true of every node the
+        test says it proved nothing rather than reporting green.
+
+        The residue is that a node could agree by coincidence, a sibling
+        arriving to make a wrong figure right; that is the same trade
+        ``test_cluster_resources_measured_drops_after_delete`` makes
+        above, and the alternative -- insisting the publish was
+        enumerated inside the bracket -- waits up to a publish interval
+        on an idle node while demanding nothing change on it, which a
+        busy node cannot supply.
+        """
+        hypervisors = self._hypervisor_nodes()
+        for hypervisor in hypervisors:
+            self._require_node_exec(hypervisor)
+            self._require_node_sudo(hypervisor)
+
+        resources = self.system_client.get_cluster_resources()
+        self.addDetail('resources before', content.text_content(json.dumps(
+            resources, indent=4, sort_keys=True)))
+        candidates = [
+            n for n in hypervisors
+            if resources['per_node'].get(n['uuid'], {}).get(
+                'cpu_available', 0) >= 2
+            and resources['per_node'][n['uuid']].get(
+                'ram_available', 0) >= 2 * ACCOUNTING_INSTANCE_MEMORY_MB]
+        if not candidates:
+            self.skipTest(
+                'No hypervisor with room for two %d MB instances'
+                % ACCOUNTING_INSTANCE_MEMORY_MB)
+        node = max(
+            candidates,
+            key=lambda n: resources['per_node'][n['uuid']]['cpu_available'])
+
+        # Two one vCPU instances with an empty disk and no base image:
+        # nothing is downloaded, so this costs the cluster almost
+        # nothing. One is kept for the comparison -- so the pinned node
+        # has at least one domain of ours and an all-zeroes agreement
+        # cannot pass vacuously -- and one is deleted, so the node's
+        # accounting has had to release as well as charge before
+        # anything is compared.
+        kept = self.create_instance(
+            'accounting-kept', 1, ACCOUNTING_INSTANCE_MEMORY_MB, None,
+            [{'size': 1, 'type': 'disk'}], None, None,
+            force_placement=node['name'])
+        self.addCleanup(self._safe_delete_instance, kept['uuid'])
+        churned = self.create_instance(
+            'accounting-churned', 1, ACCOUNTING_INSTANCE_MEMORY_MB, None,
+            [{'size': 1, 'type': 'disk'}], None, None,
+            force_placement=node['name'])
+        self.addCleanup(self._safe_delete_instance, churned['uuid'])
+        for inst in (kept, churned):
+            self.addDetail('instance %s' % inst['name'], content.text_content(
+                json.dumps(inst, indent=4, sort_keys=True)))
+            self.assertEqual(node['uuid'], inst['node'])
+            self._await_instance_create(inst['uuid'])
+
+        self.system_client.delete_instance(churned['uuid'])
+        self._await_instance_deleted(churned['uuid'])
+
+        # Every hypervisor is owed an agreement, including the ones this
+        # test placed nothing on. A node drops out of pending the first
+        # time its two readings agree; comparisons counts the rounds in
+        # which they could be held against each other at all, which is
+        # what separates a node that disagrees from one that was never
+        # readable.
+        pending = {n['uuid']: n for n in hypervisors}
+        comparisons = {n['uuid']: 0 for n in hypervisors}
+        last = {}
+        deadline = time.time() + LIBVIRT_RECONCILIATION_WAIT
+        while True:
+            for node_uuid, hypervisor in sorted(pending.items()):
+                before = self._node_sf_domains(hypervisor)
+                entry = self.system_client.get_cluster_resources()[
+                    'per_node'].get(node_uuid)
+                after = self._node_sf_domains(hypervisor)
+
+                verdict = self._accounting_verdict(before, after, entry)
+                last[node_uuid] = {
+                    'node': hypervisor.get('name'),
+                    'libvirt before': before,
+                    'libvirt after': after,
+                    'per_node': entry,
+                    # How old the publish was when we looked, on the
+                    # node's own clock: a positive figure is a
+                    # measurement which predates this sample, which is
+                    # the innocent explanation for a disagreement.
+                    'publish age at sample': (
+                        before['sampled_at'] - entry['domains_enumerated_at']
+                        if entry and entry.get('domains_enumerated_at')
+                        else None),
+                    **verdict}
+                if verdict['comparable']:
+                    comparisons[node_uuid] += 1
+                if verdict['agreed']:
+                    del pending[node_uuid]
+
+            if not pending or time.time() > deadline:
+                break
+            time.sleep(LIBVIRT_RECONCILIATION_POLL)
+
+        self.addDetail('libvirt reconciliation', content.text_content(
+            json.dumps(last, indent=4, sort_keys=True, default=str)))
+        self.addDetail('libvirt comparisons', content.text_content(
+            json.dumps(comparisons, indent=4, sort_keys=True)))
+
+        # The pinned instance is still running, so libvirt must have
+        # listed a domain for it. Without this a node which reported no
+        # domains at all -- a virsh which did not run, for instance --
+        # would agree with a node measuring nothing and the comparison
+        # would prove nothing. Listed is all that is asked: a domain
+        # whose figures could not be read was listed too, and the
+        # comparison itself is what the figures are for.
+        sampled = last[node['uuid']]['libvirt before']
+        self.assertIn(
+            kept['uuid'],
+            set(sampled['domains']) | set(sampled['unreadable']),
+            'Instance %s is placed on node %s and has been created, but '
+            "libvirt there lists no domain for it, so this test's own "
+            'subject is missing from the sample' % (kept['uuid'], node['name']))
+
+        # A node which never produced a single comparable round is not a
+        # failure: it published no entry, or something was starting or
+        # stopping on it every time it was looked at. It is also not a
+        # pass, so if that is every node the test has proved nothing and
+        # says so rather than reporting green.
+        self.assertGreater(
+            sum(comparisons.values()), 0,
+            'No hypervisor could be compared with libvirt at all in %d '
+            'seconds, so nothing here was checked'
+            % LIBVIRT_RECONCILIATION_WAIT)
+
+        drifted = [n for n in sorted(pending) if comparisons[n]]
+        if drifted:
+            self.fail(
+                "These hypervisors' published accounting disagreed with the "
+                'domains libvirt is running on them in every one of the '
+                'comparable readings taken over %d seconds, after a pinned '
+                'create and delete: %s'
+                % (LIBVIRT_RECONCILIATION_WAIT,
+                   '; '.join(
+                       '%s after %d comparisons (%s)'
+                       % (last[n]['node'], comparisons[n], last[n]['reason'])
+                       for n in drifted)))

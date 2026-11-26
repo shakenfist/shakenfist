@@ -848,6 +848,21 @@ def _summarize_resources(metrics, metrics_unavailable):
         resources['per_node'][n]['ram_max'] = \
             metrics[n].get('memory_max', 0) * \
             config.RAM_OVERCOMMIT_RATIO
+        # The measured half of the memory decision, published for the
+        # same reason cpu_measured is: this is the figure
+        # _has_sufficient_ram()'s KSM overcommit check tests against
+        # ram_max, so "this node measures idle but refuses work" is only
+        # diagnosable in the memory dimension if it can be seen. It was
+        # recoverable as ram_max - ram_available, but only on a node
+        # where no capacity row bounds ram_available -- so a reader
+        # doing that arithmetic silently computes something else the
+        # moment the ledger is the binding term, which is why it is
+        # published outright. Like cpu_measured it is a measurement of
+        # the hypervisor (the memory sf-resources last summed over the
+        # active sf: domains), so the two can be compared with what
+        # libvirt is actually running; cluster CI does exactly that.
+        resources['per_node'][n]['ram_measured'] = metrics[n].get(
+            'memory_total_instance_actual', 0)
         committed_mb = row['used_memory_mb'] if row else 0
         resources['per_node'][n]['ram_committed'] = committed_mb
         held_mb = row['held_memory_mb'] if row else 0
