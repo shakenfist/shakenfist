@@ -15940,6 +15940,17 @@ mechanism.</p>
   defaults or config template, <code>examples/_shared/site.yml</code> (whose wiring of
   those entry points it checks structurally), or the script change. The sanity-checks
   workflow runs the same script
+- <code>test-cross-node-reductions</code> - Runs <code>examples/_shared/site.yml</code>'s
+  cluster-wide reductions (<code>network_node_ip</code>, <code>mariadb_gateway_hosts</code>,
+  <code>all_mesh_hosts</code> and <code>max_hypervisor_mtu</code>) against a dry six-node
+  inventory, without root and without connecting to anything, by running
+  <code>tools/ci-test-cross-node-reductions.sh</code>. The expressions are extracted
+  from <code>site.yml</code> rather than copied, and the cases include a hypervisor
+  and a database node absent from the reachability probe -- the shape of the
+  2026-07-20 deploy failure, where a reduction over a runtime-gathered fact
+  was taken over the whole inventory group. It needs only <code>ansible-core</code>,
+  and only runs when <code>site.yml</code>, the script or the shared library changes.
+  The sanity-checks workflow runs the same script
 - <code>test-kerbside-wiring</code> - Checks how <code>examples/_shared/site.yml</code> and the node
   role's <code>kerbside_source</code> entry point wire in the <code>kerbside</code> role of the
   <code>shakenfist.kerbside</code> collection (which is tested in the Kerbside repository),
@@ -15949,19 +15960,28 @@ mechanism.</p>
   <code>certtool</code> (the <code>gnutls-bin</code> package). It only runs when <code>site.yml</code>,
   <code>requirements.yml</code>, the <code>kerbside_source</code> entry point, the node role's
   <code>argument_specs</code> or defaults, the <code>internal_ca</code> role or the script change. The
-  sanity-checks workflow runs the same script
-- <code>flake8</code> - Style check via tox, on changed files
-- <code>py3</code> - Unit tests via tox
-- <code>check-from-db-by-ref-namespace</code> - Every <code>*_from_db_by_ref</code> call passes a
-  namespace, so an endpoint cannot fetch across tenants
-- <code>check-endpoint-authentication</code> - Endpoints inherit authentication from
+  sanity-checks workflow runs the same script</p>
+<p>The three rootless Ansible tests above share their sandbox --
+<code>fail</code>, <code>need</code>, the working directory, the collection symlink and the
+<code>ANSIBLE_*</code> environment which keeps a developer's own Ansible
+installation out of the run -- through <code>tools/ci-test-ansible-lib.sh</code>,
+which they source. Each keeps its own <code>run_play</code> and <code>assert_*</code> helpers,
+because each drives a different thing. <code>KEEP_WORK=1</code> leaves the working
+directory behind for any of them.</p>
+<ul>
+<li><code>flake8</code> - Style check via tox, on changed files</li>
+<li><code>py3</code> - Unit tests via tox</li>
+<li><code>check-from-db-by-ref-namespace</code> - Every <code>*_from_db_by_ref</code> call passes a
+  namespace, so an endpoint cannot fetch across tenants</li>
+<li><code>check-endpoint-authentication</code> - Endpoints inherit authentication from
   <code>api_base.Resource.method_decorators</code> rather than each carrying a
   decorator; this rejects resources that subclass <code>flask_restful.Resource</code>
   directly, and <code>@api_base.public</code> markers that are not the outermost
-  decorator
-- <code>check-api-parameter-locations</code> - Every <code>swagger_helper()</code> parameter is
-  declared at the location it actually arrives at
-- <code>mypy</code> - Type checking via tox (incremental rollout)</p>
+  decorator</li>
+<li><code>check-api-parameter-locations</code> - Every <code>swagger_helper()</code> parameter is
+  declared at the location it actually arrives at</li>
+<li><code>mypy</code> - Type checking via tox (incremental rollout)</li>
+</ul>
 <p>Note that no workflow runs pre-commit, so a hook only fires for
 contributors who have run <code>pre-commit install</code>. A check that must hold
 in CI needs a unit test as well — which is why the parameter-location

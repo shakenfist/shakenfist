@@ -14651,6 +14651,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="What gets released">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-ansible-galaxy-publish-has-never-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Ansible Galaxy publish has never run
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -14742,6 +14759,17 @@
     <span class="md-ellipsis">
       
         PyPI publish fails
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ansible-galaxy-publish-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ansible Galaxy publish fails
       
     </span>
   </a>
@@ -15823,6 +15851,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="What gets released">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-ansible-galaxy-publish-has-never-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Ansible Galaxy publish has never run
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -15914,6 +15959,17 @@
     <span class="md-ellipsis">
       
         PyPI publish fails
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ansible-galaxy-publish-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ansible Galaxy publish fails
       
     </span>
   </a>
@@ -16071,6 +16127,34 @@ publishing jobs, and only builds and checks the packages.</p>
 <li><strong>Ansible Galaxy</strong>: The <code>shakenfist.shakenfist</code> collection</li>
 <li><strong>GitHub Releases</strong>: The package files</li>
 </ul>
+<h3 id="the-ansible-galaxy-publish-has-never-run">The Ansible Galaxy publish has never run<a class="headerlink" href="#the-ansible-galaxy-publish-has-never-run" title="Permanent link">&para;</a></h3>
+<p><code>publish-collection</code> was added on 2026-06-26 and only runs on a <code>v*</code> tag
+push. No tag has been pushed since, so <code>shakenfist.shakenfist</code> has never
+been published and the job has never executed. Expect the next release to
+be the first time anyone sees it work. Issue
+<a href="https://github.com/shakenfist/shakenfist/issues/4613">#4613</a> tracks that.</p>
+<p>What <em>is</em> established, and what is not:</p>
+<ul>
+<li><strong>The token exists.</strong> <code>ANSIBLE_GALAXY_TOKEN</code> is a secret of the
+  <code>release</code> environment, not a repository secret and not an organisation
+  secret. Look for it under Settings &gt; Environments &gt; release, not under
+  Settings &gt; Secrets. The publish step refuses to run when it resolves
+  empty, so a token moved to the wrong level fails with that sentence
+  rather than with a 401 from Galaxy.</li>
+<li><strong>The namespace exists.</strong> The <code>shakenfist</code> Galaxy namespace is owned by
+  <code>mikalstill</code> and <code>shakenfist-bot</code>, and already carries
+  <code>shakenfist.k3s</code> and <code>shakenfist.kerbside</code>.</li>
+<li><strong>The artifact installs.</strong> <code>tools/build-collection.py</code> installs the
+  tarball it just built into a temporary collections path and checks that
+  the manifest names <code>shakenfist.shakenfist</code> at the built version and
+  that a role and a module both survived packaging. That runs on every
+  pull request, not only on a tag, so a collection which builds but is
+  not usable fails long before a release.</li>
+<li><strong>The publish itself is still unexercised.</strong> Nothing short of a tag
+  push sends the HTTP request, so the Galaxy end -- the token's
+  permissions on that namespace, and whether Galaxy accepts the
+  version string setuptools_scm produces -- is unverified.</li>
+</ul>
 <h2 id="verifying-a-release">Verifying a release<a class="headerlink" href="#verifying-a-release" title="Permanent link">&para;</a></h2>
 <h3 id="verify-the-signed-tag">Verify the signed tag<a class="headerlink" href="#verify-the-signed-tag" title="Permanent link">&para;</a></h3>
 <p>Anyone can verify the release tag signature using gitsign:</p>
@@ -16109,6 +16193,22 @@ section. You can also verify locally:</p>
 <ul>
 <li>Verify the Trusted Publisher is configured correctly in PyPI</li>
 <li>Ensure the workflow filename and environment name match exactly</li>
+</ul>
+<h3 id="ansible-galaxy-publish-fails">Ansible Galaxy publish fails<a class="headerlink" href="#ansible-galaxy-publish-fails" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>ANSIBLE_GALAXY_SERVER_GALAXY_TOKEN: ... is empty</code> means the secret did
+  not resolve. It is an <em>environment</em> secret on <code>release</code>; check it is
+  still there and that the job still declares <code>environment: release</code></li>
+<li>A 401 or 403 from Galaxy means the token resolved but is not accepted:
+  regenerate it from the Galaxy profile of an owner of the <code>shakenfist</code>
+  namespace, and check that owner still owns it</li>
+<li>A rejected version usually means the tag was not a plain <code>v0.X.Y</code>.
+  <code>tools/build-collection.py</code> converts the setuptools_scm version to
+  semver, and a local build (<code>python3 tools/build-collection.py</code>) prints
+  the collection version it would publish</li>
+<li>This job has never succeeded, so a first failure is as likely to be the
+  job as the release; see
+  <a href="#the-ansible-galaxy-publish-has-never-run">The Ansible Galaxy publish has never run</a></li>
 </ul>
 <h3 id="tag-signing-fails">Tag signing fails<a class="headerlink" href="#tag-signing-fails" title="Permanent link">&para;</a></h3>
 <ul>
