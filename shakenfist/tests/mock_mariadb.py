@@ -3982,8 +3982,11 @@ class MockMariaDB():
     def _mariadb_dequeue_work_items(self, queue_names, limit=10):
         """Mock implementation of mariadb.dequeue_work_items().
 
-        Returns up to ``limit`` ``(queue_name, job_name, payload)``
-        tuples for the highest-priority eligible rows. Priority is
+        Returns up to ``limit`` ``(queue_name, job_name, payload,
+        deliveries)`` tuples for the highest-priority eligible rows.
+        ``deliveries`` is the row's ``attempts`` after this claim
+        incremented it, so a first delivery is one, which is what the
+        real dequeue reports (issue 3974). Priority is
         the caller-supplied order of ``queue_names``: index 0 is
         top priority, matching the SQL ORDER BY
         FIELD(queue_name, ...). Within a single queue_name, ties are
@@ -4016,7 +4019,7 @@ class MockMariaDB():
             row['attempts'] = row.get('attempts', 0) + 1
             result.append(
                 (row['queue_name'], str(row['id']),
-                 dict(row['payload'] or {})))
+                 dict(row['payload'] or {}), row['attempts']))
         self._trace(
             f'MockMariaDB.dequeue_work_items('
             f'{queue_names}, limit={limit}): '

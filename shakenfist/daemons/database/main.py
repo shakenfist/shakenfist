@@ -146,6 +146,11 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         from a live peer's (issue 4652). A client older than this
         field sends nothing, and we fall back to our own node name as
         before, so a rolling upgrade is no worse than it was.
+
+        ``deliveries`` says how many times each item has now been handed
+        out, so a redelivery after a lost worker can be told from a
+        first delivery (issue 3974). A client too old to read the field
+        ignores it.
         """
         try:
             self.monitor.counters['dequeue'].inc()
@@ -159,8 +164,9 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                         queue_name=queue_name,
                         job_name=job_name,
                         work_item=util_json.json_dump(workitem),
+                        deliveries=deliveries,
                     )
-                    for queue_name, job_name, workitem in results
+                    for queue_name, job_name, workitem, deliveries in results
                 ]
             )
         except Exception as e:

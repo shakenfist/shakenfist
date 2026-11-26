@@ -891,12 +891,16 @@ events emitted by the operation itself). The enqueue-side dedup event
 is emitted by the enqueuing process, not by the dispatcher:
 
 * **`execution duration`** (`EVENT_TYPE_USAGE`). Emitted when the
-  dispatcher finishes running an op. Carries four fields in `extra`:
+  dispatcher finishes running an op. Carries these fields in `extra`:
     * `seconds` — wall-clock time spent inside `op.execute()`
       (state writes, coalescing fold, the `_apply_*` work, the
       terminal state write).
     * `wait_seconds` — time between when the op was first inserted
-      into `cluster_operations` and when the dispatcher claimed it.
+      into `cluster_operations` and when the dispatcher began
+      executing it. Note that this runs to the start of execution,
+      not to the claim: the two differ by however long the daemon
+      held the item after claiming it, which is what
+      `dispatch_seconds` below separates out.
       This is not queueing alone: it also counts deliberate
       deferral while an op waits on a dependency, and the seconds a
       `*_high_io` background op spends gated off while the local
@@ -916,6 +920,38 @@ is emitted by the enqueuing process, not by the dispatcher:
     * `queue_name` — the queue the op was claimed from. Useful for
       attributing wait time to a specific priority lane (e.g.
       `networknode-clusteroperation-user_facing_high_io`).
+    * `dequeued_at`, `queue_seconds` and `dispatch_seconds` — when
+      the dispatcher's claim returned this item, and the two halves
+      `wait_seconds` divides into: `queue_seconds` is time the row
+      sat in the database queue unclaimed, and `dispatch_seconds` is
+      time this daemon held it after claiming it. They sum to
+      `wait_seconds`.
+
+      This is the distinction that matters when a wait is long and
+      `defer_count` is zero, which is most of them: over nine in ten
+      of the waits of fifteen seconds or more never deferred once,
+      and an operation which never defers emits no intermediate
+      events, so its whole wait used to be a single bracket with
+      nothing inside it. A large `queue_seconds` means nobody asked
+      for that queue -- it sits low in the dispatcher's priority
+      order and higher lanes filled every batch. A large
+      `dispatch_seconds` means the daemon had the item and sat on
+      it, which on `sf-net` usually means one slow operation ahead
+      of it on the same partitioned worker, since ops for one target
+      are routed to one worker thread and run serially.
+
+      Absent on events from a build before this existed, and from a
+      dispatcher talking to an `sf-database` which does not report
+      the claim.
+    * `deliveries` — how many times this work item has been handed
+      to a worker, this delivery included, so a first delivery is
+      `1`. Anything higher means an earlier delivery did not resolve
+      the item: a worker which crashed or was lost holding it, which
+      the cluster's stuck-row reaper later gave back. `defer_count`
+      counts deliberate deferrals only, so without this a redelivery
+      reads exactly like a first attempt. Absent when the
+      `sf-database` answering the claim is too old to report it,
+      rather than reported as `1`.
 
   The combined event replaces an earlier split into separate
   `'started executing'` and `'execution duration'` events. The

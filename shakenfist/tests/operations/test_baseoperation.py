@@ -1534,6 +1534,79 @@ class ExecutionDurationExtraTestCase(base.ShakenFistTestCase):
         self.assertEqual(3, extra['defer_count'])
         self.assertEqual('a-queue', extra['queue_name'])
 
+    def test_the_wait_splits_into_queue_sit_and_dispatch_time(self):
+        """``wait_seconds`` conflated two different things: time the row
+        sat in the database queue unclaimed, and time this daemon held
+        it after claiming it. An operation which never deferred emits no
+        intermediate events at all, so its whole wait was one bracket
+        with nothing inside it and the two could not be told apart
+        (issue 3974).
+        """
+        op = self._make_op(created_at=100.0)
+
+        extra = op.execution_duration_extra(
+            160.0, 'a-queue', dequeued_at=145.0)
+
+        self.assertEqual(60.0, extra['wait_seconds'])
+        self.assertEqual(145.0, extra['dequeued_at'])
+        # Deliberately unequal: with both halves the same, a fix which
+        # swapped them would still sum correctly and no assertion here
+        # would notice.
+        self.assertEqual(45.0, extra['queue_seconds'])
+        self.assertEqual(15.0, extra['dispatch_seconds'])
+        self.assertEqual(
+            extra['wait_seconds'],
+            extra['queue_seconds'] + extra['dispatch_seconds'])
+
+    def test_the_split_is_omitted_without_a_dequeue_time(self):
+        """A caller which does not know when the claim returned reports
+        the wait as it always did, rather than a split which would be
+        wrong. Events from a build predating this carry neither field.
+        """
+        op = self._make_op(created_at=100.0)
+
+        extra = op.execution_duration_extra(160.0, 'a-queue')
+
+        self.assertEqual(60.0, extra['wait_seconds'])
+        self.assertNotIn('dequeued_at', extra)
+        self.assertNotIn('queue_seconds', extra)
+        self.assertNotIn('dispatch_seconds', extra)
+
+    def test_the_split_needs_an_enqueue_time_too(self):
+        """Without a ``created_at`` there is no wait to divide, so a
+        dequeue time on its own reports nothing.
+        """
+        extra = self._make_op().execution_duration_extra(
+            160.0, 'a-queue', dequeued_at=130.0)
+
+        self.assertNotIn('queue_seconds', extra)
+        self.assertNotIn('dispatch_seconds', extra)
+        self.assertNotIn('dequeued_at', extra)
+
+    def test_deliveries_reported_when_the_tier_knows_it(self):
+        """``defer_count`` counts deliberate deferrals only, so without
+        a delivery count a redelivery after a crashed or lost worker
+        reads exactly like a first delivery.
+        """
+        op = self._make_op(created_at=100.0)
+
+        extra = op.execution_duration_extra(
+            160.0, 'a-queue', deliveries=3)
+
+        self.assertEqual(3, extra['deliveries'])
+
+    def test_deliveries_omitted_when_the_tier_did_not_report_it(self):
+        """An sf-database too old to send the field leaves it zero, and
+        zero is not a delivery count -- reporting it as one would claim
+        a first delivery for an item which may well have had several.
+        """
+        op = self._make_op(created_at=100.0)
+
+        extra = op.execution_duration_extra(
+            160.0, 'a-queue', deliveries=0)
+
+        self.assertNotIn('deliveries', extra)
+
     def test_coalescing_fields_omitted_when_unset(self):
         # Events from a build predating the instrumentation carry none
         # of these, and the report tool has to be able to tell that

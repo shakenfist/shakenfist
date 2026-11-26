@@ -214,7 +214,9 @@ class BaseClusterOperation(BaseOperation):
     def execution_duration_extra(
             self,
             start_time: float,
-            queue_name: Optional[str]
+            queue_name: Optional[str],
+            dequeued_at: Optional[float] = None,
+            deliveries: Optional[int] = None
     ) -> dict[str, Any]:
         """Build the ``extra`` payload for the end-of-op event.
 
@@ -237,12 +239,37 @@ class BaseClusterOperation(BaseOperation):
         the op carries a ``created_at`` -- that is, when it was loaded
         from the cluster_operations table rather than constructed
         in-memory outside the dispatch path.
+
+        ``dequeued_at`` is when the dispatcher's claim returned this
+        item, which splits ``wait_seconds`` into the two things it used
+        to conflate: ``queue_seconds`` is time the row sat in the
+        database queue unclaimed, and ``dispatch_seconds`` is time this
+        daemon held it after claiming it. Without the split the only
+        intermediate events an operation emits are its deferrals, so an
+        operation which never deferred -- about nine in ten of the long
+        waits -- had its whole wait as a single bracket with nothing
+        inside it, and "nobody asked for this queue" could not be told
+        from "we had it and sat on it" (issue 3974).
+
+        ``deliveries`` is how many times the work item has been handed
+        out, this delivery included. ``defer_count`` counts deliberate
+        deferrals only, so without it a redelivery after a crashed or
+        lost worker is indistinguishable from a first delivery. Zero
+        means an sf-database too old to report it, and is left out
+        rather than reported as a first delivery.
         """
         extra: dict[str, Any] = {'seconds': time.time() - start_time}
         if self.created_at is not None:
             extra['wait_seconds'] = start_time - self.created_at
             extra['defer_count'] = self.current_defer_count
             extra['queue_name'] = queue_name
+            if dequeued_at is not None:
+                extra['dequeued_at'] = dequeued_at
+                extra['queue_seconds'] = dequeued_at - self.created_at
+                extra['dispatch_seconds'] = start_time - dequeued_at
+
+        if deliveries:
+            extra['deliveries'] = deliveries
 
         if self.coalesce_outcome is not None:
             extra['coalesce_outcome'] = self.coalesce_outcome

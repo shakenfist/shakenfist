@@ -81,6 +81,10 @@ class DependencyWaitDeferTest(base.ShakenFistTestCase):
 
         job = workitem.Job.__new__(workitem.Job)
         job.queue_name = QUEUE_NAME
+        # Set here because this Job skips __init__; the execution
+        # duration event reads both (issue 3974).
+        job.dequeued_at = None
+        job.deliveries = None
         job.batch_size = None
         job.log = mock.MagicMock()
         job.workitem = {
@@ -311,6 +315,10 @@ class DependencyWaitDeferTest(base.ShakenFistTestCase):
 
         job = workitem.Job.__new__(workitem.Job)
         job.queue_name = QUEUE_NAME
+        # Set here because this Job skips __init__; the execution
+        # duration event reads both (issue 3974).
+        job.dequeued_at = None
+        job.deliveries = None
         job.batch_size = None
         job.log = mock.MagicMock()
         job.workitem = {
@@ -369,6 +377,10 @@ class StateReadsPerDispatchTest(base.ShakenFistTestCase):
 
         job = workitem.Job.__new__(workitem.Job)
         job.queue_name = QUEUE_NAME
+        # Set here because this Job skips __init__; the execution
+        # duration event reads both (issue 3974).
+        job.dequeued_at = None
+        job.deliveries = None
         job.batch_size = None
         job.log = mock.MagicMock()
         job.workitem = {
@@ -451,6 +463,10 @@ class MissingOperationTest(base.ShakenFistTestCase):
 
         job = workitem.Job.__new__(workitem.Job)
         job.queue_name = QUEUE_NAME
+        # Set here because this Job skips __init__; the execution
+        # duration event reads both (issue 3974).
+        job.dequeued_at = None
+        job.deliveries = None
         job.jobname = 'test-job'
         job.batch_size = None
         job.log = mock.MagicMock()
@@ -519,6 +535,10 @@ class WorkItemResolutionTest(base.ShakenFistTestCase):
     def _run_job(self, side_effect):
         job = workitem.Job.__new__(workitem.Job)
         job.queue_name = QUEUE_NAME
+        # Set here because this Job skips __init__; the execution
+        # duration event reads both (issue 3974).
+        job.dequeued_at = None
+        job.deliveries = None
         job.jobname = 'test-job'
         job.log = mock.MagicMock()
         # Instance attribute shadows the method, as elsewhere in this

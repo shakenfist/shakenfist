@@ -896,11 +896,19 @@ class WorkerPoolDaemon(Daemon):
         if not items:
             return DequeueOutcome.NOTHING_ELIGIBLE
 
+        # When the claim returned, recorded once for the whole batch
+        # because that is when every item in it was claimed. Each
+        # worker reports it on its execution duration event, which is
+        # what separates queue sit from time held inside this daemon
+        # (issue 3974).
+        dequeued_at = time.time()
+
         # Pass the batch size to each spawned worker so its op's
         # ``execute()`` can skip the coalescing fold when the dispatcher
         # just saw an empty queue (see ``BaseClusterOperation.execute``).
         batch_size = len(items)
-        for queue_name, jobname, workitem in items:
-            args = [queue_name, jobname, workitem, batch_size]
+        for queue_name, jobname, workitem, deliveries in items:
+            args = [queue_name, jobname, workitem, batch_size,
+                    dequeued_at, deliveries]
             self.start_job(processing_class, args, jobname)
         return DequeueOutcome.STARTED

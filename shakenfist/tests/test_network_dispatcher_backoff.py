@@ -78,7 +78,7 @@ class NetworkDispatcherBackoffTestCase(base.ShakenFistTestCase):
 
     def _work_item(self):
         return [('queue', 'job', {'operation_type': 'network_create',
-                                  'operation_uuid': 'op-uuid'})]
+                                  'operation_uuid': 'op-uuid'}, 1)]
 
     def test_backs_off_when_idle(self):
         # An empty batch on every poll: the sleep grows geometrically to the
