@@ -690,6 +690,32 @@ What an operator sees during an outage:
 Recovery is automatic once an `sf-database` instance is reachable again;
 no daemon restarts are required.
 
+### Joining a failed call to the exception behind it
+
+The cause of a failed database RPC — the statement, its parameters, the
+exception — is logged on the database node, and the caller learns only that
+its call failed. To tie the two together, every client stamps a short
+reference on each call as gRPC metadata (`call-ref`), names it in whatever
+it reports, and `sf-database` names the same reference on everything it logs
+while serving that call. So a client-side error such as
+
+```
+gRPC GetNode failed (ref 1a2b3c4d): INTERNAL: ...
+```
+
+is answered by grepping the database node for that reference:
+
+```bash
+journalctl -u sf-database | grep 1a2b3c4d
+```
+
+which lands on the `[Exception]` line for that call, with its traceback and
+its `call_ref` log field for a query in centralised logging. The reference is
+minted randomly per call and names the call, not its content, so it carries
+no namespace, object or schema detail and is safe to repeat in an event or an
+API error. One reference covers a call's retries, so an exhausted call
+produces one token across every attempt it made.
+
 ### Rolling restarts of the database tier
 
 The deployer restarts database-tier nodes one at a time (`serial: 1`),

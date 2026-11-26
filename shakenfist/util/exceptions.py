@@ -10,12 +10,28 @@ from types import TracebackType
 
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist.util.caller_identity import get_call_ref
+
 
 LOG, _ = logs.setup(__name__)
 
 
 def ignore_exception(processname: str, e: BaseException) -> None:
     msg = f'[Exception] Ignored error in {processname}: {e}'
+
+    # An sf-database servicer thread serving an RPC knows the reference
+    # its caller minted for that call, and the caller's own error names
+    # the same reference. Naming it here is what gets an operator from
+    # "gRPC GetNode failed (ref 1a2b3c4d)" on one node to the
+    # statement and exception on another, rather than leaving them to
+    # match timestamps in a log of hundreds of calls a second (issue
+    # 5077). In the message as well as the fields because this is the
+    # line a human greps; empty, and therefore absent, everywhere
+    # except a database servicer thread.
+    ref = get_call_ref()
+    if ref:
+        msg += f' (ref {ref})'
+
     exc_type, exc_value, exc_tb = sys.exc_info()
     fields: dict[str, object] = {}
     if exc_tb:
@@ -32,6 +48,8 @@ def ignore_exception(processname: str, e: BaseException) -> None:
         # producer of recorded exceptions in the codebase.
         fields = record_exception(
             exc_type, exc_value, exc_tb, already_logged=True) or {}
+    if ref:
+        fields['call_ref'] = ref
     LOG.with_fields(fields).error(msg)
 
 

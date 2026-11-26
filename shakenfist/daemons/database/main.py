@@ -11,6 +11,7 @@ enable future migration to other database backends.
 from concurrent import futures
 from ipaddress import IPv4Address
 import json
+import re
 import time
 from typing import Any
 from typing import cast
@@ -69,6 +70,8 @@ from shakenfist.schema.node_data import NodeData
 from shakenfist.schema.upload import UploadData
 from shakenfist.util import exceptions as util_exceptions
 from shakenfist.util import json as util_json
+from shakenfist.util.caller_identity import CALL_REF_METADATA_KEY
+from shakenfist.util.caller_identity import call_ref
 from shakenfist.util.caller_identity import KNOWN_CALLERS
 from shakenfist.util.caller_identity import KNOWN_TASKS
 from shakenfist.util.caller_identity import set_caller_identity
@@ -6872,6 +6875,72 @@ def _task_from_metadata(metadata: Any) -> str:
     return ''
 
 
+# The shape new_call_ref() mints, and nothing else. The value arrives
+# over an unauthenticated port and is written into a log line, so a
+# forged one could otherwise inject a newline, a fake log field, or a
+# kilobyte of padding into every exception we record for that call. A
+# value which is not exactly a short lower case hex string is dropped
+# rather than trimmed to fit: a reference nobody minted is worse than no
+# reference, because an operator would chase it.
+_CALL_REF_RE = re.compile(r'[0-9a-f]{8}')
+
+
+def _ref_from_metadata(metadata: Any) -> str:
+    """Read call-ref from invocation metadata, defaulting to empty.
+
+    A client older than this metadata sends nothing, which is not an
+    error: its calls log as they always did. See the note on
+    CALL_REF_METADATA_KEY for what the reference is for.
+    """
+    for key, value in (metadata or ()):
+        if key == CALL_REF_METADATA_KEY:
+            ref = str(value)
+            return ref if _CALL_REF_RE.fullmatch(ref) else ''
+    return ''
+
+
+class _CallRefInterceptor(grpc.ServerInterceptor):  # type: ignore[type-arg]
+    """Name the caller's reference on everything a handler logs.
+
+    The handlers log the statement, parameters and exception behind a
+    failed call through ignore_exception(), which reads the reference
+    from thread-local state. That state has to be set in the thread
+    which runs the handler, and intercept_service runs on the server's
+    event-dispatch thread rather than a pool thread, so this wraps the
+    handler's behaviour instead of setting the reference here -- setting
+    it here would tag the wrong thread, and leak one call's reference
+    into the next.
+
+    Best-effort in the same way _CallerMetricsInterceptor is: a handler
+    which is not unary-unary (of DatabaseService, none; of the health
+    service, Watch) and a call with no reference are passed through
+    untouched, and any failure wrapping one serves the call anyway.
+    """
+
+    def intercept_service(self, continuation: Any,
+                          handler_call_details: Any) -> Any:
+        handler = continuation(handler_call_details)
+        try:
+            ref = _ref_from_metadata(
+                handler_call_details.invocation_metadata)
+            if (not ref or handler.request_streaming
+                    or handler.response_streaming
+                    or handler.unary_unary is None):
+                return handler
+            behaviour = handler.unary_unary
+
+            def _with_ref(request: Any, context: Any) -> Any:
+                with call_ref(ref):
+                    return behaviour(request, context)
+
+            return grpc.unary_unary_rpc_method_handler(
+                _with_ref,
+                request_deserializer=handler.request_deserializer,
+                response_serializer=handler.response_serializer)
+        except Exception:
+            return handler
+
+
 class _CallerMetricsInterceptor(grpc.ServerInterceptor):  # type: ignore[type-arg]  # noqa: E501
     """Count every RPC by operation, calling daemon and task.
 
@@ -7373,7 +7442,7 @@ def main() -> None:
     # costs only ~8 KiB of Python stack.
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=64),
-        interceptors=[_CallerMetricsInterceptor()],
+        interceptors=[_CallerMetricsInterceptor(), _CallRefInterceptor()],
         options=[
             ('grpc.http2.min_recv_ping_interval_without_data_ms', 5000),
             ('grpc.keepalive_permit_without_calls', 1),

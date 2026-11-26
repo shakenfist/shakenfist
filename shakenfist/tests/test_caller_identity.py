@@ -160,3 +160,57 @@ class KnownTasksTestCase(base.ShakenFistTestCase):
             self.assertIn(
                 "'%s'" % task, body,
                 'KNOWN_TASKS names a task no pass claims')
+
+
+class CallReferenceTestCase(base.ShakenFistTestCase):
+    """The per-call reference which joins the two halves of a failure."""
+
+    def test_a_reference_is_short_opaque_hex(self):
+        ref = caller_identity.new_call_ref()
+        self.assertEqual(8, len(ref))
+        self.assertRegex(ref, '^[0-9a-f]{8}$')
+
+    def test_references_are_minted_not_derived(self):
+        # Minted randomly, so two calls never share a reference by
+        # virtue of asking the same question: an operator greps for one
+        # reference and lands on one call.
+        refs = {caller_identity.new_call_ref() for _ in range(100)}
+        self.assertEqual(100, len(refs))
+
+    def test_default_is_empty(self):
+        self.assertEqual('', caller_identity.get_call_ref())
+
+    def test_set_inside_the_context_and_restored_after(self):
+        with caller_identity.call_ref('1a2b3c4d'):
+            self.assertEqual('1a2b3c4d', caller_identity.get_call_ref())
+        self.assertEqual('', caller_identity.get_call_ref())
+
+    def test_restored_when_the_handler_raises(self):
+        # The servicer handlers log and swallow; the reference must not
+        # outlive the call either way.
+        try:
+            with caller_identity.call_ref('1a2b3c4d'):
+                raise ValueError('a handler which failed')
+        except ValueError:
+            pass
+        self.assertEqual('', caller_identity.get_call_ref())
+
+    def test_nesting_restores_the_outer_reference(self):
+        with caller_identity.call_ref('1a2b3c4d'):
+            with caller_identity.call_ref('deadbeef'):
+                self.assertEqual('deadbeef', caller_identity.get_call_ref())
+            self.assertEqual('1a2b3c4d', caller_identity.get_call_ref())
+
+    def test_another_thread_does_not_inherit_the_reference(self):
+        # Thread local because the servicer runs each RPC on a pool
+        # thread: one call's reference must not name another's log line.
+        import threading
+
+        seen = []
+        with caller_identity.call_ref('1a2b3c4d'):
+            thread = threading.Thread(
+                target=lambda: seen.append(caller_identity.get_call_ref()))
+            thread.start()
+            thread.join()
+
+        self.assertEqual([''], seen)

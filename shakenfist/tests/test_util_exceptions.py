@@ -9,6 +9,7 @@ import threading
 from unittest import mock
 
 from shakenfist.tests import base
+from shakenfist.util import caller_identity
 from shakenfist.util import exceptions as util_exceptions
 
 
@@ -387,6 +388,60 @@ class IgnoreExceptionTestCase(base.ShakenFistTestCase):
 
         # Should not call record_exception when there's no traceback
         mock_record.assert_not_called()
+
+    @mock.patch('shakenfist.util.exceptions.record_exception',
+                return_value={'exception_hash': 'deadbeef',
+                              'exception_class': 'RuntimeError',
+                              'count': 7})
+    @mock.patch('shakenfist.util.exceptions.LOG')
+    def test_a_served_call_names_its_reference(self, mock_log, _mock_record):
+        """The whole point of the reference: the line an operator finds
+        on the database node names the same token as the error its
+        caller saw (issue 5077)."""
+        with caller_identity.call_ref('1a2b3c4d'):
+            try:
+                raise RuntimeError('a statement which failed')
+            except RuntimeError as e:
+                util_exceptions.ignore_exception('database GetNode', e)
+
+        log_ctx = mock_log.with_fields.return_value
+        log_msg = log_ctx.error.call_args[0][0]
+        self.assertIn('(ref 1a2b3c4d)', log_msg)
+        # And as a field, because the fields are what a log aggregator
+        # can be queried on.
+        fields = mock_log.with_fields.call_args[0][0]
+        self.assertEqual('1a2b3c4d', fields['call_ref'])
+        # Alongside, not instead of, the exception correlation fields.
+        self.assertEqual('deadbeef', fields['exception_hash'])
+
+    @mock.patch('shakenfist.util.exceptions.record_exception',
+                return_value=None)
+    @mock.patch('shakenfist.util.exceptions.LOG')
+    def test_the_reference_survives_an_unrecordable_exception(
+            self, mock_log, _mock_record):
+        # record_exception returning None replaces the fields dict, and
+        # the reference must not be lost with them.
+        with caller_identity.call_ref('1a2b3c4d'):
+            try:
+                raise RuntimeError('a statement which failed')
+            except RuntimeError as e:
+                util_exceptions.ignore_exception('database GetNode', e)
+
+        self.assertEqual(
+            {'call_ref': '1a2b3c4d'}, mock_log.with_fields.call_args[0][0])
+
+    @mock.patch('shakenfist.util.exceptions.record_exception')
+    @mock.patch('shakenfist.util.exceptions.LOG')
+    def test_nothing_is_named_outside_a_served_call(self, mock_log,
+                                                    _mock_record):
+        # ignore_exception is called from every daemon in the tree; only
+        # a thread serving a database RPC has a reference to name.
+        e = ValueError('not a database call')
+        util_exceptions.ignore_exception('test_process', e)
+
+        log_ctx = mock_log.with_fields.return_value
+        self.assertNotIn('(ref ', log_ctx.error.call_args[0][0])
+        self.assertNotIn('call_ref', mock_log.with_fields.call_args[0][0])
 
 
 class _CaptureHandler(logging.Handler):

@@ -24,6 +24,7 @@ error.
 """
 
 import contextlib
+import secrets
 import threading
 from typing import Iterator
 
@@ -104,3 +105,57 @@ def caller_task(name: str) -> Iterator[None]:
         yield
     finally:
         _caller_task.name = previous
+
+
+# The metadata key the client stamps a per-call reference under, and the
+# thread local the server parks it in while it serves that call.
+#
+# The cause of a failed database RPC -- the statement, its parameters,
+# the exception -- is logged on the database node, and the caller sees
+# only that its call failed. Nothing joined the two, so an operator
+# holding a client-side failure had to find the matching exception by
+# timestamp alone, which on a cluster serving hundreds of calls a second
+# is not a search that converges (issue 5077). A reference minted per
+# call, sent on the wire and named by both sides joins the two halves of
+# one failure back together, and is also the identifier a later
+# span-propagation pass would carry.
+#
+# Thread local for the same reason _caller_task is: on the server it is
+# a property of the pool thread running one RPC. Lower case because gRPC
+# requires that of metadata keys.
+CALL_REF_METADATA_KEY = 'call-ref'
+
+_call_ref = threading.local()
+
+
+def new_call_ref() -> str:
+    """Mint a short opaque reference for a single sf-database call.
+
+    Random rather than derived from the request: a reference names the
+    call, not its content, so it carries no namespace, object or schema
+    information and is safe to repeat in an event or an API error. Four
+    bytes is eight characters -- short enough for a human to carry
+    across two logs by eye, and unique enough that a grep for one lands
+    on the call that failed.
+    """
+    return secrets.token_hex(4)
+
+
+def get_call_ref() -> str:
+    """Return the call reference this thread is serving, or '' if none."""
+    return getattr(_call_ref, 'ref', '')
+
+
+@contextlib.contextmanager
+def call_ref(ref: str) -> Iterator[None]:
+    """Name ``ref`` on everything this thread logs inside the block.
+
+    Restores the previous value on exit, so a nested call does not
+    silently keep the reference of the one it was called from.
+    """
+    previous = get_call_ref()
+    _call_ref.ref = ref
+    try:
+        yield
+    finally:
+        _call_ref.ref = previous
