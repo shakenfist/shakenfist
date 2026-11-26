@@ -565,8 +565,12 @@ class TestNodes(base.BaseNamespacedTestCase):
         daemon = (preferred or sorted(running))[0]
 
         self.addCleanup(self._restore_running_daemon, node, daemon)
+        # sf-ctl is a venv entry point, on neither PATH nor sudo's
+        # secure_path, so it has to be named by its absolute path.
         self._node_exec(
-            node, ['sf-ctl', 'register-daemon', daemon], sudo=True)
+            node, ['/srv/shakenfist/venv/bin/sf-ctl', 'register-daemon',
+                   daemon],
+            sudo=True)
 
         after = self.system_client.get_node(node['name'])
         self.addDetail('node_after_reregister', content.text_content(
