@@ -1,6 +1,6 @@
 # Phase 3: read side, lift the extent ceiling
 
-## Status: In progress
+## Status: Complete
 
 Part of [PLAN-multi-extent-vmdk.md](/components/instar/plans/PLAN-multi-extent-vmdk/). Planned
 at high effort, as that plan's *Planning effort* section requires for

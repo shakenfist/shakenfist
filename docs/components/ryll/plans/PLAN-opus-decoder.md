@@ -249,12 +249,12 @@ Several items in the PR 23 follow-up plan are affected:
   resolved by this work. Replace the options list with a
   note that we migrated to `opus-decoder`.
 
-### Step 6: Update PLAN-packaging.md and phase-02-ci
+### Step 6: Update [PLAN-packaging.md](https://github.com/shakenfist/ryll/blob/8634fe4e378c7b2b33aca59b3ae907f8a97d2798/docs/plans/PLAN-packaging.md) and [phase-02-ci](https://github.com/shakenfist/ryll/blob/55c026d0562d36250e35ca46765d77ef622fad4b/docs/plans/PLAN-packaging-phase-02-ci.md)
 
-- Update the build dependency lists in PLAN-packaging.md
+- Update the build dependency lists in [PLAN-packaging.md](https://github.com/shakenfist/ryll/blob/8634fe4e378c7b2b33aca59b3ae907f8a97d2798/docs/plans/PLAN-packaging.md)
   to remove cmake if it's no longer needed, or update the
   comments explaining why it's present.
-- Update PLAN-packaging-phase-02-ci.md similarly.
+- Update [PLAN-packaging-phase-02-ci.md](https://github.com/shakenfist/ryll/blob/55c026d0562d36250e35ca46765d77ef622fad4b/docs/plans/PLAN-packaging-phase-02-ci.md) similarly.
 
 ### Step 7: Update documentation
 

@@ -231,7 +231,7 @@ they author it, extract that crate alone, with
 
 Both modes are load-bearing for ryll's own identity and testing:
 `--web` exists to dogfood ryll in place of Kasm plus Apache
-Guacamole (`PLAN-web-frontend.md`), and `--rdp` is a reachability
+Guacamole ([`PLAN-web-frontend.md`](https://github.com/shakenfist/ryll/blob/d21844d8392d178d7d39c35a0107ed9319674740/docs/plans/PLAN-web-frontend.md)), and `--rdp` is a reachability
 fallback for users who can install nothing (`PLAN-rdp-frontend.md`).
 Neither depends on Kerbside being in the path, and a developer
 debugging a transcode wants it in a single process with the
@@ -401,7 +401,7 @@ lane in CI today: add one to the merge tier of `ci.yml`, pinning
 --workspace --exclude shakenfist-spice-rdp`, plus a second check
 of `shakenfist-spice-rdp` alone at its own floor. The merge tier
 rather than the smoke tier because it is a second toolchain
-download; `PLAN-two-stage-ci.md` has the tiering rules. If a
+download; [`PLAN-two-stage-ci.md`](https://github.com/shakenfist/ryll/blob/87f50f87483a5f93dc9e18d484b3cc00efd6cf39/docs/plans/PLAN-two-stage-ci.md) (retired) has the tiering rules. If a
 member turns out not to build at 1.88, the finding is the result:
 record the true floor and declare that instead of raising the
 declaration quietly to whatever stable happens to be.

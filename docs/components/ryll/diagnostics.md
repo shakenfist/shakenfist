@@ -59,6 +59,62 @@ Ryll tracks:
 This instrumentation is the primary purpose of ryll -- measuring kerbside proxy
 performance.
 
+### Runtime metrics on macOS: why it is built this way
+
+The macOS sampler in `shakenfist-spice-renderer/src/metrics.rs` mirrors
+the Linux one (snapshot, sleep for the window, snapshot, delta), with the
+delta math factored into `macos_math` so it is unit-tested on every
+platform even though the Mach calls compile only on a Mac. The choices
+that are not obvious from the code:
+
+- **Process CPU comes from one `task_info(MACH_TASK_BASIC_INFO)` call**,
+  not from summing the per-thread `THREAD_BASIC_INFO` values. That is
+  one syscall per snapshot and parity with Linux's single
+  `/proc/self/stat` read. The cost is that `process.cpu_percent` does
+  not exactly equal the sum of `threads[].cpu_percent`, through
+  sampling skew; Linux behaves the same way.
+- **Threads are matched between the two snapshots by
+  `thread_identifier_info.thread_id`**, never by Mach port. The port
+  numbers `task_threads` returns for the same OS thread differ from one
+  call to the next, so matching on them would attribute CPU to the wrong
+  thread. This costs two `thread_info` calls per thread per snapshot,
+  which is negligible at a typical 20-40 threads.
+- **A thread that appears mid-window is reported at 0% CPU, and one
+  that vanishes mid-window is omitted**, which is what the Linux
+  sampler does; the Mach path also drops a thread whose `thread_info`
+  fails because it died between `task_threads` and the per-thread call.
+  Output is sorted by `tid` so the JSON is deterministic.
+- **`mach_port_deallocate` and `mach_task_self_` are declared in a local
+  `extern "C"` block** because the `libc` crate does not expose
+  the first on Apple targets and deprecates the `mach_task_self()`
+  wrapper in favour of the `mach2` crate. Both are stable Mach ABI; a
+  dependency for two items was judged the larger cost.
+- **`task_threads` hands back a port right per thread plus the array
+  itself**, and ignoring either leaks a reference per thread per sample.
+  `MachThreadList` releases both in `Drop`, and its only constructor is
+  the struct literal filled directly by the `task_threads` call, so no
+  fallible operation sits between allocation and ownership. The
+  `Drop` ignores the return codes of the two deallocations: a failure
+  there means a corrupt port table, which is outside this module.
+  A leak cannot be unit-tested, because observing the port table from
+  inside the process needs fragile `mach_port_kobject`-style
+  introspection; the soak in
+  [macos-metrics-verification.md](/components/ryll/macos-metrics-verification/) is the
+  empirical check.
+- **Uptime is baselined by `init_at_startup()`**, called first in
+  `main()`. The `LazyLock<Instant>` behind it otherwise initialises at
+  the first `sample()`, so a report filed shortly after startup would
+  read an uptime near zero. A `sample()` made before `init_at_startup()`
+  silently defeats the baseline, so keep it ahead of any sampling.
+- **A failing Mach call degrades to `Unavailable`** with the call
+  named in `reason`, so `sample()` never panics.
+- iOS is out of scope: its sandbox restrictions on the Mach APIs would
+  need their own design. Per-thread memory and GPU metrics are not
+  collected on either platform because neither OS exposes them cheaply.
+
+The plan that built this is retired; [the plans index](/components/ryll/plans/index/)
+links its final text.
+
 ## Traffic Ring Buffer
 
 Every SPICE message (sent and received) is recorded in a per-channel
@@ -97,8 +153,42 @@ shared via `Arc<TrafficBuffers>` between all channel handler tasks
 and the UI thread. This supports both bug-report export, the live
 traffic viewer, and the snapshot-on-notification path. (The webdav
 channel is intentionally absent — its handler does not call
-`traffic.record_*` today; tracked as a follow-up in the
-[dogfooding feedback plan](/components/ryll/plans/PLAN-session-001-feedback/).)
+`traffic.record_*` today; [#784](https://github.com/shakenfist/ryll/issues/784).)
+
+Three choices in the sizing are deliberate:
+
+- **Static weights, not memory-scaled.** The 50 MB total is fixed
+  rather than sized from system memory, and the weights are not
+  exposed as flags: the rebalance buys most of the retention without
+  the cost of growing and shrinking rings at run time, and a retune is
+  a one-line constant edit. The weights come from session-001's
+  display rate (2 MB/s typical, 6 MB/s peak). A bigger display ring
+  would also be wasted on reports, since the pcap in a report is held
+  to a 24 MB budget (see [Report size](#report-size)).
+- **usbredir cannot be rescued by size.** An active USB transfer can
+  reach 50 MB/s, so no realistic cap holds more than a fraction of a
+  second of one. Its 4 MB covers the idle and control traffic and the
+  start of a transfer, which is where the protocol state changes.
+- **A message over 64 KB stays one entry.** The extra segments hang
+  off the entry rather than becoming entries of their own, so the
+  traffic viewer still shows one row per SPICE message and byte-cap
+  eviction removes a message whole, never leaving the tail of a
+  half-evicted one in the ring. A message's segments share its
+  timestamp, as the live `--capture` writer's do. The limit that
+  forced segmentation is the IPv4 16-bit length field, not the
+  network MTU: before the fix `build_tcp_frame` refused such a
+  payload and the ring silently dropped the message from every
+  report. The first diagnosis, jumbo frames, was a coincidence.
+  `capture::segment_payload` is shared with the live writer so the two
+  cannot drift.
+
+`TrafficEntry::pcap_frame` and each additional segment are
+`Arc<[u8]>` rather than `Vec<u8>`; wrapping the whole `TrafficEntry`
+in an `Arc` instead would also make clones cheap but would force every
+consumer through the pointer and break the by-value APIs.
+`build_frame` still returns a plain `Vec<u8>` and the entry is sealed
+at the two `record_*` call sites, so a future caller that needs a
+mutable buffer is not made to copy out of an `Arc`.
 
 ## Channel State Snapshots
 
@@ -154,6 +244,95 @@ maintained separately by the `RyllApp` event loop.
 Updates hold the mutex only briefly (copying a handful of scalars
 and small collections), so contention with the UI thread is
 negligible.
+
+### Diagnosing "video not keeping up": how the instrumentation is shaped
+
+A report saying the video stream is not keeping up has to say which of
+server, network, decode, render or ryll's own capture I/O was the
+bottleneck without the session being re-run. How to read the fields is in
+[troubleshooting.md](/components/ryll/troubleshooting/#reading-display-channel-statejson-for-video-not-keeping-up);
+this records why they are the fields they are. The measurement came
+first, deliberately: the cheap signals say whether any threading change
+is worth making, and the capture writers moved off the hot paths only
+where inline I/O could stall the SPICE socket or the GUI.
+
+- **Decode time shares the `recent_decodes` ring.** Per-decode wall time
+  is kept as the last N entries plus min/max/mean computed at
+  snapshot-emit time, rather than as a histogram, which would cost state
+  for no extra diagnostic answer. Microseconds, not milliseconds, because
+  small LZ4 and pixmap decodes finish in well under 1 ms. Cache hits and
+  failures that never reach the decoder record zero and are excluded
+  from the aggregates.
+- **Socket pressure is a fill-rate proxy, not a buffer reading.** A read
+  that returns the full 256 KB chunk means the OS receive buffer had at
+  least that much waiting. Inspecting the buffer directly (`FIONREAD`)
+  was rejected: it needs the raw fd of a tokio stream and a per-platform
+  code path, and the proxy answers the question well enough.
+- **ACK cadence is a bounded ring of intervals** (the last 32), which at
+  a typical ACK window and busy display rates covers the last 10-30
+  seconds: enough to see whether ACKs paused, without bloating the
+  snapshot. A snapshot of `ack_window`/`last_ack` alone cannot tell a
+  healthy cadence from a long pause.
+- **Capture writers drop on overflow rather than block.** The pcap and
+  MP4 writers sit behind bounded queues, and a full queue drops the item
+  and counts it (`writer_dropped_count` per channel, `video_drop_count`
+  in `session.json`). Blocking would reintroduce the very back-pressure
+  the split exists to remove, at the price of gaps in a pcap or video
+  when the disk falls behind, which the counters make visible. Each
+  channel counts its own drops, but `webdav` and `playback` have no
+  pcap writer: their items are accepted by the queue and discarded by
+  the writer, so their counter measures queue pressure only and stays
+  zero in practice.
+- **Timestamps are taken at enqueue, not at dequeue.** A writer that
+  falls behind by hundreds of milliseconds would otherwise compress the
+  delayed packets into a burst at the moment it caught up, and the
+  timeline in the report would mislead. The same applies to MP4
+  presentation timestamps.
+- **The channel name in a queue item is a `&'static str`** matched
+  against the `CHANNELS` list in `capture.rs`, not an owned `String`
+  (an allocation per enqueue, defeating the hot-path gain) and not an
+  enum (couples the `CaptureSink` trait surface to the pcap layer).
+  A name not in the list is dropped before any queue work.
+- **Queue capacities are sized by item weight, not count.** The pcap
+  queue holds 1024 small items, but a display chunk can be 256 KB, so
+  the nominal worst case is hundreds of megabytes that a pathologically
+  slow disk would have to reach. The video queue holds 8 because each
+  item is a whole RGBA surface (about 8 MB at 1080p, 33 MB at 4K): at
+  the 4K worst case that is roughly 264 MB queued before drops begin,
+  which is acceptable for a diagnostic mode. Both are guesses to be
+  revisited only if real reports show high drop rates on a healthy disk.
+- **Only surface 0 is encoded, and the filter is in the encoder thread.**
+  Filtering in `frame()` would still copy the pixels into an `Arc`
+  just to discard them; checking on dequeue keeps the enqueue uniformly
+  cheap.
+- **Per-channel pcap files are independent**, so only within-channel
+  order is preserved (the queue is FIFO). A single unified pcap with
+  strict cross-channel ordering would need one multiplexed writer; nothing
+  has asked for it.
+- **Render-side latency is mpsc-queue lag.** `ImageReady*` and
+  `DisplayMark` carry `produced_at_secs`, stamped just before the send,
+  and the egui event drain subtracts it from the time it picks the event
+  up; both clocks are the one `traffic.elapsed()` epoch. "Inside the egui
+  paint" timing was rejected as disproportionate (it needs eframe or
+  compositor instrumentation), and end-to-end "pixels visible to the
+  user" is unmeasurable without external instrumentation. The diagnostic
+  pattern is high `image_ready_lag_*` while decode and socket-fill look
+  healthy, which points at the GUI thread being held by long synchronous
+  work in `App::update`. Events drained in one `process_events` call
+  share a `consumed_at`, so their samples are correlated: `max` is the
+  informative number and `mean` is biased by batch size. Negative
+  differences from clock granularity saturate at zero, and the first
+  samples after startup include startup lag until the 32-entry ring
+  rotates.
+- **MP4 finalisation is asynchronous, on purpose.** See decision 6 in
+  [design-decisions.md](/components/ryll/design-decisions/): synchronous finalisation
+  would put the caller back to blocking on the encoder draining, which is
+  the stall the encoder thread removes.
+
+Nothing is instrumented on the cursor, playback or main channels for this
+purpose; the data was only wanted for display. The plan that built these
+fields is retired; [the plans index](/components/ryll/plans/index/) links its final
+text.
 
 ## Bug Report Assembly
 
@@ -352,6 +531,15 @@ closes and the app enters **region selection mode**:
    region selection and says so in a notification.
 5. Pressing Escape skips selection and generates without a region.
 
+A region must have strictly positive area, so a deliberate one-pixel
+drag is accepted and no jitter threshold is applied, since no data
+shows jitter-made regions. The check is in the GUI (`validate_region`)
+rather than in `ReportRegion`, because the drag handler is its only
+producer, and `encode_region_png` still refuses a zero-area rectangle
+behind it. A zero-width region used to be written into `report.json`
+with no PNG to match, leaving a reader with a region of interest they
+could not find.
+
 The dialog says, while Display is selected, that Capture will ask
 for a region, and entering region selection also posts a
 notification, because a user who misses the banner otherwise sees
@@ -395,6 +583,87 @@ what becomes garbage.
 
 Keyboard and mouse input is not forwarded to the SPICE server
 during selection.  Coordinates are clamped to the surface bounds.
+
+### Why a report is built this way
+
+The choices behind the bug report path, kept so that a change to it
+does not re-propose something already weighed.
+
+- **One zip, not a directory of loose files.** A report exists to be
+  attached to an issue or an email, so it is a single file. Entries
+  are stored rather than deflated: the pcap payloads and the PNGs are
+  already compressed.
+- **The ring buffer is always on and has no flag.** A report taken
+  after the fact is only useful if the traffic was already being kept,
+  and 50 MB is small beside what the client otherwise uses, so
+  `--capture` is for recording a whole session and not a precondition
+  for reporting. Entries hold already-built pcap frames, built by the
+  `capture` module's frame code, so a report writes them out without
+  re-deriving anything. Each channel has its own buffer and mutex, so
+  a busy display channel cannot evict a quiet channel's history (the
+  split is weighted, above). A lock-free structure was judged
+  premature: a lock is held for one push, or for the traffic viewer's
+  250 ms refresh.
+- **Channels publish their snapshots; the UI never asks for them.** A
+  channel handler runs on a different thread from the UI, and a
+  request/response round trip through the event channel would need
+  cross-thread coordination. Each handler instead updates its
+  `Arc<Mutex<T>>` in place and the report reads the latest copy.
+- **The PNG is the whole surface and the region is metadata.** The
+  developer can crop locally. This is why the dialog warns that a
+  report contains screen contents. `screenshot-region.png` was added
+  later as a second image, not a replacement. The region is picked by
+  dragging a rectangle rather than clicking a point.
+- **F11 and F12 never reach the guest.** A guest rarely needs either,
+  and the report shortcut is worth more than the keystroke.
+
+The trigger-time snapshot has constraints of its own:
+
+- **Capture on open, whatever type is selected.** The artefact may be
+  gone by the time the user has chosen a type and typed a description;
+  that delay is the whole reason the snapshot exists. Do not guard
+  the capture on the selected type: a dialog opened as Input and
+  switched to Display would then have missed the moment. The PNG is
+  *included* only for a Display submission, so Input, Cursor and the
+  other types are no larger than before. The wasted encode on a
+  non-Display submission is accepted, since dialogs open rarely and
+  the encode is off the UI thread.
+- **A plain `std::thread`, not `tokio::task::spawn_blocking`.** PNG
+  encoding is CPU-bound with nothing async in it, and belongs outside
+  the tokio runtime that drives the SPICE channels.
+- **The surface is cloned, with no temporary file.** A 1024x768 RGBA
+  surface is about 3 MB and a 2560x1600 one about 16 MB, held only
+  from the trigger until the encode finishes (well under a second on a
+  modern CPU, while the user types), after which only the compressed
+  bytes remain. If profiling ever shows the clone matters, revisit it;
+  it was weighed with the operator on 2026-04-23 and judged not worth
+  a temp file.
+- **The submit path never blocks on the encoder.** `try_lock` with a
+  live-encode fallback means a user who clicks Capture before the
+  worker is done gets a slightly later image, not a frozen window. The
+  fallback also covers a failed thread spawn and a report triggered
+  before any surface existed (which then has no PNG either, but still
+  has its timestamps). Cancelling needs no primitive: dropping the
+  `Arc` leaves the worker to finish into garbage.
+- **`screenshot-region.png` crops the submit-time surface, never the
+  trigger-time PNG.** The region's coordinates are in the surface
+  space of the moment the user drew it, and the guest may have resized
+  in between, so re-cropping the trigger-time image would need a
+  decode, a coordinate mapping and a re-encode, and would be wrong
+  whenever the size changed. `region` in `metadata.json` therefore
+  indexes `screenshot-region.png` as a whole file, and indexes
+  `screenshot.png` only if the surface had the same geometry at both
+  moments. The crop is clamped to the surface (right and bottom are
+  exclusive), and a rectangle that is empty after clamping produces no
+  image rather than an error.
+- **The new metadata fields were added, not substituted.**
+  `session_uptime_secs` keeps meaning uptime at submit, and
+  `triggered_at` / `triggered_uptime_secs` sit beside it, so a reader
+  of an older report still finds the keys it knew. The two are always
+  present, never `null`: a report with no dialog behind it takes the
+  submit values, so tooling need not special-case them. `--pedantic`
+  reports are the example, since the observer firing is itself the
+  moment of interest and gets no trigger-time image or region.
 
 ## Live Traffic Viewer
 
@@ -521,6 +790,51 @@ within milliseconds of close may see an unfinalised MP4. The
 [troubleshooting guide](/components/ryll/troubleshooting/) records the
 trade-off rationale.
 
+### Why capture records what it does
+
+These choices were weighed when capture was written, and each
+rules out an obvious-looking alternative:
+
+- **Decrypted payloads, not TLS bytes.** The pcaps hold the SPICE
+  mini-header messages after TLS is removed. The encrypted stream
+  is no use for protocol debugging, and the channel handlers only
+  ever see decrypted data anyway.
+- **Fake TCP/IP framing, not a raw link type.** Wireshark's TCP
+  dissector, and with it stream reassembly and Follow TCP Stream,
+  only engage on TCP, and the headers are cheap to build. Each
+  channel is its own connection (a distinct client port, 10000 plus
+  the channel type, to server port 5900), sent and received packets
+  use the two directions, and sequence numbers advance by the
+  payload length.
+- **One pcap per channel,** so a reader debugging the display
+  channel opens one file rather than filtering a merged one.
+- **One video, of surface 0 only.** If the guest creates further
+  surfaces the capture skips them rather than compositing them or
+  writing a video each. A mid-session change of the primary
+  surface's dimensions stops recording with a warning: the H.264
+  encoder and the MP4 track are fixed at the first frame's size.
+- **A video frame per MARK, not per draw.** MARK is the display
+  channel's frame boundary, and it was confirmed to arrive from
+  both a local QEMU and real servers through kerbside, so a frame
+  is emitted when the picture is coherent and idle periods cost
+  nothing. Frames carry real timestamps, so playback runs at
+  session speed. A frame for every draw_copy, to show intermediate
+  tile states, was left out until something needs it.
+- **H.264 in MP4 via `openh264` and the `mp4` crate,** both of which
+  build inside the Docker devcontainer with no system dependency
+  (`openh264` bundles Cisco's library, `mp4` is pure Rust).
+  Rejected: `minimp4`, because its bindgen needs `libclang`, which
+  the devcontainer lacks; raw `y4m`, because the files are huge and
+  the frame rate fixed; and `rav1e`, because AV1 encoding is too
+  slow. `pcap-file` and `etherparse` are pure Rust too.
+- **The frame comes from the egui frame loop,** on `DisplayMark`,
+  because the composited surface lives in the app and not in the
+  display channel. That is why headless mode records no video.
+
+The retired
+[capture plan](https://github.com/shakenfist/ryll/blob/6626d4c560b8e672ae913f3e21a16e83fd7fa596/docs/plans/PLAN-capture.md)
+holds the original design text.
+
 
 ### Auto-snapshot on channel disconnect
 
@@ -606,6 +920,24 @@ When the user clicks the button:
   report uses the current `TrafficBuffers` and tags
   `PostEventOnly` / `postevent`. Useful, but without the
   run-up to the event.
+
+The button is always present, and filing from a stale notification
+still produces a report, because the ring buffer decides how much of
+the run-up survives. It is byte-capped, not time-capped, so at 2 to
+6 MB/s the display ring held only 1.5 to 4 s before it was
+rebalanced, while the low-rate channels keep the whole session. The
+dimmed button and the `PostEventOnly` marker tell the reader which
+case they have, so a missing run-up is never mistaken for a quiet
+one. A notification that folds into an existing one inside the 30 s
+dedup window returns the same id, and its snapshot is replaced with
+the newer one, matching the folded entry's refreshed timestamp. The
+5-entry, 60 s policy applies to every severity and source, is not
+configurable, and does not filter which notifications get a button. A
+notification report's channel state is the main channel's, as for any
+report that names no channel; the disconnect report's per-channel map
+is the richer form. The display surface is not snapshotted at fire
+time, because that would copy the whole RGBA surface on every
+notification.
 
 ### Auto-snapshot mode (`--auto-snapshot-interval`)
 

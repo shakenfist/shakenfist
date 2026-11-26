@@ -144,6 +144,37 @@ tears down cleanly.
 - Browser audio autoplay policy: click the volume button on
   the page to enable sound after the page loads.
 
+### Left out on purpose
+
+These were excluded from the MVP, each for a reason that still
+holds:
+
+- **Multi-monitor.** One video track is bound to one primary
+  surface. The back end keeps every surface, so the extension is one
+  track per surface ([#787](https://github.com/shakenfist/ryll/issues/787)).
+- **USB redirection.** The browser USB story is fragile and
+  Chrome-only; the alternative is a native companion helper.
+- **Folder sharing.** The WebDAV channel shares a *local* directory
+  with the guest, and "local" is ambiguous in a browser. A
+  drag-and-drop upload into a temporary share is the likely shape,
+  and bigger than it looks.
+- **Clipboard sync.** It needs the async clipboard API, which
+  requires a secure context; native TLS now provides one
+  ([#786](https://github.com/shakenfist/ryll/issues/786)).
+- **Pointer Lock.** Planned as a secure-context feature on Chrome,
+  and the fix for server-mode pointer drift
+  ([#790](https://github.com/shakenfist/ryll/issues/790)).
+- **PCM-only audio.** Only Opus is forwarded; a PCM-negotiating
+  server gives silence ([#788](https://github.com/shakenfist/ryll/issues/788)).
+- **Hardware encoding** (NVENC, QSV, VAAPI), **AV1**, and
+  **recording or capture from the web side.** No consumer yet; the
+  encoder is software openh264 only.
+- **Multi-user, login UI, OIDC and mTLS.** The per-launch URL token
+  is the only authentication; anything more pairs with multi-session
+  support, which is blocked on it.
+- **TURN deployment guidance** and **mobile UX** (touch gestures,
+  on-screen keyboard).
+
 ## Native TLS
 
 ryll supports HTTPS natively via two flags:
@@ -652,5 +683,5 @@ is Linux-only for the MVP; see [portability](/components/ryll/portability/)).
 
 The `--web` mode ships end-to-end: display, audio, inputs,
 cursor, reconnect, CI packaging, native TLS, and operator
-documentation. See [the web frontend plan](/components/ryll/plans/PLAN-web-frontend/)
-for the development history.
+documentation. [The plans index](/components/ryll/plans/index/) links the retired
+plan that records the development history.

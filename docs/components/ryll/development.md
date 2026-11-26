@@ -271,6 +271,64 @@ variables override the defaults, and the test sets
 `RYLL_K1_MAIN_ONLY=1` to run the main channel alone — cheaper,
 and the historical wedge fingerprint shows up there regardless.
 
+### What the K1 idle wedge was, and what it was not
+
+The wedge took three days of dogfooding to pin down, mostly because
+every visible symptom was downstream of the cause. What a later
+investigation should not have to rediscover:
+
+- **The cause was ryll's own session orchestrator.**
+  `shakenfist-spice-renderer/src/session.rs` drained an intermediate
+  `mpsc::channel(64)` only until `SessionInitialized` and
+  `ChannelsAvailable` arrived, then dropped the receiver while the
+  main channel kept emitting `ChannelEvent::Latency` on every PING.
+  After about 65 pings (the T+466 s fingerprint, seen on every
+  reproduction) the buffer filled and main blocked forever in
+  `event_tx.send().await`. With main's whole `select!` suspended no
+  PONGs went out. The fix replaced the temp channel with two
+  `oneshot`s for the session id and channel list, so main sends into
+  the real, drained `event_tx`. Every `event_tx.send()` in
+  `main_channel.rs` also runs under a 5 s timeout
+  (`MAIN_EVENT_SEND_TIMEOUT`), so a recurrence is a log line rather
+  than a silent hang.
+- **The server's 30 s "rcc has been unresponsive" log line is
+  downstream.** `CLIENT_CONNECTIVITY_TIMEOUT` in spice-server's
+  `main-channel-client.cpp` is genuinely 30 s and resets on any
+  inbound byte, so it fires 30 s after main goes quiet. The client
+  then notices the dead socket only when TCP keepalive gives up (30 s
+  idle plus three probes at 15 s, 75 s), which is why the failing
+  read turned up on an arbitrary channel, usually inputs, with
+  "peer closed connection without sending TLS close_notify". The
+  secondary channels' silence from T+300 s is the server pinging
+  them only every 300 s, not a fault.
+- **Ruled out, with the evidence.** A tokio, rustls, mio or kernel
+  bug: the "missing waker" was the permit-available waker of an mpsc
+  whose receiver was gone. macOS App Nap and screen lock: timing was
+  identical with ryll in the foreground, in the background and on
+  another virtual desktop, and a syslog search showed no lock events
+  around the failures. A client keepalive timeout: every capture had
+  `keepalive_timeout_fired: false`.
+- **The mitigations never touched it.** The mirror keepalive, the
+  inputs KEY_MODIFIERS keepalive and the spurious-PONG keepalive on
+  main all kept *other* channels busy while main sat deadlocked. The
+  KEY_MODIFIERS one was later removed outright, because it toggled
+  the guest's locks (see the
+  [channel diagnostics audit](/components/ryll/channel-diagnostics-audit/)).
+- **Designed and deliberately not built.** A client-initiated PING on
+  every channel that had been silent for 15 s, and a macOS App Nap
+  opt-out (`NSProcessInfo beginActivity`). Both answered hypotheses the
+  root cause disproved, and the opt-out was already unsupported by the
+  foreground and background timing parity above. ryll therefore sends
+  no application-level keepalive on any channel. If a long-idle
+  disconnect reappears with `keepalive_timeout_fired` false and the
+  main channel still answering PINGs, a per-channel PING is the
+  first thing to try, and the disconnect report's per-channel
+  `last_recv_ts_secs` is the evidence to read first.
+- **The mirror timeout is 90 s, not 30 s,** so that the server's own
+  30 s check fires first when the server is alive and leaves the more
+  informative log line and FIN or RST in the pcap. It is a backstop for a
+  server that vanished without either, not a liveness mechanism.
+
 ## Pre-commit hooks
 
 The project uses pre-commit hooks to enforce code quality:
@@ -531,8 +589,8 @@ protocol-level testing.
 
 `tools/web-soak.sh` samples a running `ryll --web` process while
 driving the guest, and prints a summary in the same shape as the
-0.17 baseline recorded in
-`docs/plans/PLAN-webrtc-0.20-upgrade-phase-01-prework.md`. Reach for
+0.17 baseline recorded in the "What `--web` costs, measured"
+section of [web-mode-internals.md](/components/ryll/web-mode-internals/). Reach for
 it when a change could plausibly affect memory or CPU over minutes
 rather than seconds — the WebRTC write path especially, where the
 integration tests only ever exercise a few seconds.

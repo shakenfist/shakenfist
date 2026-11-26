@@ -552,12 +552,18 @@ The phase order is chosen so that the cheap, user-visible delivery
 that rotation is proved on the read path (phase 3), where a mistake
 cannot corrupt an output, before the write path depends on it.
 
+A phase's row reaches `Complete` only once its merge commit is known,
+which is after the pull request lands, so a phase whose own plan file
+reads `Complete` sits here as `In progress` until then. The two are not
+in disagreement: the phase file records whether the work is finished,
+this table whether it is merged.
+
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 1. Pin and measure qemu's output | [PLAN-multi-extent-vmdk-phase-01-pin.md](/components/instar/plans/PLAN-multi-extent-vmdk-phase-01-pin/) | Complete | 34832d47 |
 | 2. Fixtures and baselines | [PLAN-multi-extent-vmdk-phase-02-fixtures.md](/components/instar/plans/PLAN-multi-extent-vmdk-phase-02-fixtures/) | Complete | 2e8a3022 |
-| 3. Read side: lift the extent ceiling | [PLAN-multi-extent-vmdk-phase-03-read-ceiling.md](/components/instar/plans/PLAN-multi-extent-vmdk-phase-03-read-ceiling/) | In progress | |
-| 4. Multi-extent descriptor emitter | PLAN-multi-extent-vmdk-phase-04-descriptor.md | Not started | |
+| 3. Read side: lift the extent ceiling | [PLAN-multi-extent-vmdk-phase-03-read-ceiling.md](/components/instar/plans/PLAN-multi-extent-vmdk-phase-03-read-ceiling/) | Complete | 64e6fbc6 |
+| 4. Multi-extent descriptor emitter | [PLAN-multi-extent-vmdk-phase-04-descriptor.md](/components/instar/plans/PLAN-multi-extent-vmdk-phase-04-descriptor/) | In progress | |
 | 5. Host-only flat create | PLAN-multi-extent-vmdk-phase-05-flat-create.md | Not started | |
 | 6. ABI: output rotation | PLAN-multi-extent-vmdk-phase-06-abi.md | Not started | |
 | 7. Core: rotation in the guest | PLAN-multi-extent-vmdk-phase-07-core.md | Not started | |
@@ -781,9 +787,11 @@ work directly in the main tree.
 The ABI and rotation phases (3, 6, 7, 8) turn on design decisions at
 the guest/host boundary and are planned at high effort. Phase 1 is
 high effort because everything downstream rests on its measurements.
-Phases 5, 10, 11 and 12 follow patterns already established by
+Phases 4, 5, 10, 11 and 12 follow patterns already established by
 `PLAN-bat-population.md` and `PLAN-create.md` and can be planned at
-medium. Phases 14, 15 and 17 are mechanical.
+medium -- phase 4 because phase 1 pinned every byte it emits and the
+crate already holds three emitters like it. Phases 14, 15 and 17 are
+mechanical.
 
 ### Verification that is not optional
 
@@ -837,9 +845,42 @@ Status line above.
 
 Filled in as the plan runs. Already known:
 
-* Retrofitting `ddb.*` onto `monolithicSparse`, `streamOptimized` and
+* [#964](https://github.com/shakenfist/instar/issues/964), retrofitting
+  `ddb.*` onto `monolithicSparse`, `streamOptimized` and
   `monolithicFlat` descriptors (open question 3), which churns every
   existing VMDK baseline and wants its own differential-fuzz exposure.
+  Filed by phase 4, which resolved open question 3 by writing the block
+  on the new subformats only. qemu writes it for `monolithicFlat` too,
+  so this is a live divergence rather than only an internal
+  inconsistency, and until it lands instar's VMDK subformats disagree
+  with each other.
+
+* [#965](https://github.com/shakenfist/instar/issues/965), five VMDK
+  descriptor builders across the `vmdk` and `create` crates, one of
+  them re-implementing another because the first hard-codes
+  `parentCID` and has no hook for a parent filename, and carrying a
+  second copy of the decimal formatter. The master plan's phase 4
+  intent assumed there was one; the survey found four, and phase 4
+  added the fifth rather than unifying them, which would have touched
+  every VMDK instar writes.
+
+* [#966](https://github.com/shakenfist/instar/issues/966), the
+  descriptor builders' `snprintf` interface -- return the length
+  needed, copy only what fits -- which is not idiomatic Rust and
+  leaves a caller that does not measure first writing a silently
+  truncated descriptor. Unreachable while every descriptor was a
+  fixed length; reachable from phase 4, because a split descriptor's
+  length grows with its extent count. Raised at phase 4's back brief,
+  where the operator kept the contract for now and asked for this
+  issue.
+
+* Extending phase 4's pin-literal guard,
+  `tools/ci/check-vmdk-split-pins.py`, to the VHDX literals in
+  `src/crates/create/tests/round_trip.rs`. Those are copied from the
+  same pin file by hand for the same reason -- the Rust workspace has
+  no JSON parser -- and nothing checks that copy either. The guard is
+  about thirty lines of Python per literal family and would have
+  caught a drifted VHDX expectation as readily as a VMDK one.
 * `twoGbMaxExtent*` as a backing file or in a backing chain, excluded
   from scope above.
 * `instar map` on flat sources, which is refused today for all flat
@@ -906,12 +947,13 @@ Filled in as the plan runs.
 * [#934](https://github.com/shakenfist/instar/issues/934), a VMDK with
   more extents than the 16 device slots cannot be read -- the read-side
   ceiling measured in the Situation, filed when phase 3 was planned.
-  Phase 3 fixes it by making a descriptor's extents cost one slot
-  between them instead of one each. The issue also records a trap for
-  whoever changes the slot count: the virtqueue-region assert at
-  `src/shared/src/lib.rs:664` hard-codes its own `16` rather than
-  deriving it from `MAX_CHAIN_DEVICES`, so raising the constant does not
-  trip it.
+  Phase 3 fixed it by making a descriptor's extents cost one slot
+  between them instead of one each. The issue also recorded a trap for
+  whoever changes the slot count: the virtqueue-region assert
+  hard-coded its own `16` rather than deriving it from
+  `MAX_CHAIN_DEVICES`, so raising the constant did not trip it. Phase 3
+  removed that trap as well -- the assert now derives the bound, and
+  setting `MAX_CHAIN_DEVICES` to 17 fails the build.
 
 * [#922](https://github.com/shakenfist/instar/issues/922), `info`
   reports the wrong allocation and child order for a multi-file VMDK.

@@ -15,7 +15,7 @@ guest rebooted several times (each display pcap shows 5–9
 This plan covers the two concrete bugs the artefacts pin down
 (clicks-not-working-after-VM-reboot, and the pedantic gap). The
 "static" bug needs a separate capture flow before we can
-meaningfully debug it — see `PLAN-bugreport-trigger-snapshot.md`.
+meaningfully debug it — see [`PLAN-bugreport-trigger-snapshot.md`](https://github.com/shakenfist/ryll/blob/d8bb55cab70839742956b474b1ea0615b34d6d2f/docs/plans/PLAN-bugreport-trigger-snapshot.md).
 
 ## Findings
 
@@ -99,7 +99,7 @@ submit time, not at the moment the user hit F12, so a
 transient artefact can be gone before the capture happens.
 Fixing that is a prerequisite to debugging the static
 properly and is covered by
-`PLAN-bugreport-trigger-snapshot.md`.
+[`PLAN-bugreport-trigger-snapshot.md`](https://github.com/shakenfist/ryll/blob/d8bb55cab70839742956b474b1ea0615b34d6d2f/docs/plans/PLAN-bugreport-trigger-snapshot.md).
 
 ## Fixes
 
@@ -181,7 +181,7 @@ for a PR.
 ## Future work
 
 * Bug-report trigger-time snapshot (own plan —
-  `PLAN-bugreport-trigger-snapshot.md`). Required before we
+  [`PLAN-bugreport-trigger-snapshot.md`](https://github.com/shakenfist/ryll/blob/d8bb55cab70839742956b474b1ea0615b34d6d2f/docs/plans/PLAN-bugreport-trigger-snapshot.md)). Required before we
   can usefully debug the static bug.
 * Store `multi_media_time` on the main-channel state and
   publish it to the playback channel when audio sync is

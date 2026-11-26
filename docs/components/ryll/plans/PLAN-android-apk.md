@@ -53,7 +53,7 @@ Ryll is a pure-Rust SPICE VDI test client built on eframe 0.29
 + egui, with a tokio async runtime, cpal audio, and a workspace
 of protocol / compression / usbredir sub-crates. It currently
 ships as packaged binaries for Linux x86_64, macOS aarch64, and
-Windows x86_64 (see `PLAN-packaging.md`).
+Windows x86_64 (see [`PLAN-packaging.md`](https://github.com/shakenfist/ryll/blob/8634fe4e378c7b2b33aca59b3ae907f8a97d2798/docs/plans/PLAN-packaging.md)).
 
 There is no Android build today. The primary motivation for
 adding one is to turn commodity Android TV hardware — in
@@ -143,7 +143,7 @@ Platform-specific bits that will need attention:
 - **`--capture` feature.** Pulls in `openh264`, `mp4`,
   `pcap-file`, `etherparse`. Not a user-facing feature and
   heavyweight to port. Disable via feature gate on Android
-  (same pattern as Windows in `PLAN-packaging.md`).
+  (same pattern as Windows in [`PLAN-packaging.md`](https://github.com/shakenfist/ryll/blob/8634fe4e378c7b2b33aca59b3ae907f8a97d2798/docs/plans/PLAN-packaging.md)).
 - **`--headless` mode.** Meaningless on Android. Disable
   via `#[cfg]` gates.
 
@@ -391,7 +391,7 @@ last phase's diff alone, because the `#[cfg]` gating from
 phase 2 is threaded through everything the later phases add.
 Findings land as their own PR against `develop`, recorded
 here under an *Items deferred from the push audit* heading —
-the shape `PLAN-web-frontend.md` uses for its *Items deferred
+the shape [`PLAN-web-frontend.md`](https://github.com/shakenfist/ryll/blob/d21844d8392d178d7d39c35a0107ed9319674740/docs/plans/PLAN-web-frontend.md) uses for its *Items deferred
 from the post-Phase-N pre-push audit* sections, minus the
 phase number, because this phase audits the whole plan rather
 than a range of it. This plan is not complete until each one

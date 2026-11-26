@@ -139,7 +139,7 @@ and phase 17 is cancelled rather than executed.
 ### Q5 — Why does the web stream never recover from sustained surface churn?
 
 **Linked plan:**
-[webrtc-0.20 phase 01 pre-work, "Found during execution"](/components/ryll/plans/PLAN-webrtc-0.20-upgrade-phase-01-prework/)
+[webrtc-0.20 phase 01 pre-work, "Found during execution"](https://github.com/shakenfist/ryll/blob/f986037370548a84f54d521719b639d444f10f81/docs/plans/PLAN-webrtc-0.20-upgrade-phase-01-prework.md)
 (where the symptom was recorded during the baseline soaks).
 
 **Symptom history:**
@@ -163,9 +163,8 @@ reproduces on demand: `make test-qemu`, `ryll --web`, and a QMP
 
 **Why parked:** real desktops rarely mode-set repeatedly, so
 this is a robustness gap rather than a dogfooding blocker, and
-the webrtc-0.20 port (phases 02–04) rewrites the adjacent code
-paths — diagnosis before the port would likely be throwaway
-work.
+the webrtc-0.20 port that was to rewrite the adjacent code paths
+has since landed; the wedge has not been re-run against it.
 
 ### Q6 — What corrupts GLZ cross-frame images during guest boot?
 

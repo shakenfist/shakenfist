@@ -505,8 +505,8 @@ ryll --direct localhost:5900 --usb-disk-ro test.raw
 
 ### USB Panel (GUI Mode)
 
-In GUI mode, click the **USB** button in the status bar to open the USB
-device management panel. The panel shows:
+In GUI mode, tick **USB** in the panel menu (☰) in the status bar to open
+the USB device management panel. The panel shows:
 
 - **Channel status** — whether a usbredir channel is available from the
   SPICE server.
@@ -539,7 +539,8 @@ host USB permissions.
 
 ### GUI Panel
 
-Click "Folders" in the status bar to open the Folders panel. It shows:
+Tick **Folders** in the panel menu (☰) in the status bar to open the
+Folders panel. It shows:
 
 - **Channel status** — whether the SPICE WebDAV channel is connected.
 - **Active share** — the shared directory path, read-only status, and

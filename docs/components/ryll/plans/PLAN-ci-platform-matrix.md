@@ -47,7 +47,7 @@ commit, master-plan table updated as work lands).
 ### Since this plan was written: the two-tier restructure
 
 The description above is CI as of 2026-05-08. On 2026-08-10
-[PLAN-two-stage-ci.md](/components/ryll/plans/PLAN-two-stage-ci/) split `ci.yml`
+[PLAN-two-stage-ci.md](https://github.com/shakenfist/ryll/blob/87f50f87483a5f93dc9e18d484b3cc00efd6cf39/docs/plans/PLAN-two-stage-ci.md) split `ci.yml`
 into a smoke tier on `pull_request` and a merge tier on
 `merge_group`, and put `develop` behind a merge queue. The job
 inventory is unchanged in substance, but where a job runs now
@@ -307,7 +307,7 @@ the workflow edits, the portability cleanup and the new smoke
 tests only make sense read together. Findings land as their
 own PR against `develop`, recorded here under an *Items
 deferred from the push audit* heading — the shape
-`PLAN-web-frontend.md` uses for its *Items deferred from the
+[`PLAN-web-frontend.md`](https://github.com/shakenfist/ryll/blob/d21844d8392d178d7d39c35a0107ed9319674740/docs/plans/PLAN-web-frontend.md) uses for its *Items deferred from the
 post-Phase-N pre-push audit* sections, minus the phase number,
 because this phase audits the whole plan rather than a range
 of it. This plan is not complete until each is fixed or

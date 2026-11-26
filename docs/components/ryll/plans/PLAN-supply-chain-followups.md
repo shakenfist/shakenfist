@@ -175,7 +175,7 @@ below. When an ignore is resolved, delete both the
      from `rtp` 0.17 onto `rtc::rtp`, which the webrtc 0.20
      port already pulls into the lockfile. That retires the
      first path along with a dead upstream line, and is
-     already recorded in PLAN-webrtc-0.20-upgrade.md's
+     already recorded in [PLAN-webrtc-0.20-upgrade.md](https://github.com/shakenfist/ryll/blob/7daf8a39f8759405b61be2cba10a1a2640fb7feb/docs/plans/PLAN-webrtc-0.20-upgrade.md)'s
      Future work.
   2. Track ironrdp / sspi for a release that drops
      `async-dnssd`. Re-check on each ironrdp bump; renovate
@@ -252,7 +252,7 @@ Recorded here so the acceptance lives with the scanning
 policy rather than only in the plan that caused it.
 
 The webrtc-rs 0.20 port
-(`docs/plans/PLAN-webrtc-0.20-upgrade-phase-02-bump.md`)
+([phase 02 plan](https://github.com/shakenfist/ryll/blob/5e261a025970c37192624777c9e274d65bcc887c/docs/plans/PLAN-webrtc-0.20-upgrade-phase-02-bump.md))
 replaced `dtls`, `webrtc-srtp`, `webrtc-sctp`, `stun`, `turn`
 and `webrtc-ice` 0.17.2 with the `rtc-*` 0.20.2 family plus
 `sansio` 1.0.1 — a sans-io reimplementation of the whole

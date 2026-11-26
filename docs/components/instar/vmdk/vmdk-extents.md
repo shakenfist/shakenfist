@@ -154,6 +154,49 @@ disk-s002.vmdk     sectors 4194304-8388607 (2GB)
 disk-s003.vmdk     sectors 8388608-12582911 (2GB)
 ```
 
+Every extent holds 4194304 sectors (2 GiB) except the last, which
+holds the remainder. A virtual size that is an exact multiple of 2 GiB
+produces a whole number of full extents and no zero-length trailing
+extent, so a 2 GiB disk is one extent and not two.
+
+#### Extent file names
+
+qemu derives each extent's name from the output path alone, never from
+any string in an input descriptor. It takes the basename after the last
+`/`, splits it at its last `.`, and writes
+`<prefix>-s<NNN><postfix>` for a sparse split image or
+`<prefix>-f<NNN><postfix>` for a flat one, in the output's own
+directory. The descriptor records the bare name, not a path. A name
+with no dot gets the suffix appended, and a leading dot is the split
+point, so `.hid` splits into an empty prefix and the postfix `.hid`
+and yields `-s001.hid`.
+
+`<NNN>` is the one-based extent number zero-padded to **at least**
+three digits. Three is a floor and not a cap: at a thousand extents
+qemu writes `RW 4194304 SPARSE "image-s1000.vmdk"` verbatim, and there
+is no ceiling on the count — probed at 1 PiB, qemu-img was still
+writing extents when a timeout stopped it at 70168 of 524288.
+
+#### Geometry the descriptor records
+
+The CHS triple in the `ddb.geometry.*` lines is a pure function of the
+virtual size:
+
+| Field | Value |
+|-------|-------|
+| `heads` | always 16 |
+| `sectors` | always 63 |
+| `cylinders` | `total_sectors / (16 * 63)`, truncated |
+
+`cylinders` is **not** clamped to the 65535 a 16-bit CHS geometry
+allows. A 33 GiB split image records 68656, and the corresponding
+fixture in the test corpus is qemu-written proof of it.
+
+Each extent of a split *sparse* image reserves 20 sectors for a
+descriptor of its own, at sector 1, and qemu leaves all of them zero.
+The standalone descriptor file is the only descriptor text a split
+image contains.
+
 ## Extent Permissions
 
 Extents have different child roles:
