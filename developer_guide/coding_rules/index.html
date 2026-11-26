@@ -15846,6 +15846,31 @@ longer, and the two share one definition of which devices are ours so they
 cannot drift apart. A host which cannot be asked counts as in use, because
 the two errors are not equal: a bridge left behind is reaped by a later
 maintain pass, while a bridge taken from a live domain is an outage.</p>
+<h2 id="an-arm-which-blames-the-caller-catches-the-callers-own-exception-type">An arm which blames the caller catches the caller's own exception type<a class="headerlink" href="#an-arm-which-blames-the-caller-catches-the-callers-own-exception-type" title="Permanent link">&para;</a></h2>
+<p>The database servicer's <code>GetNamespaceClaims</code> validates <code>coverage_state</code> and
+<code>ReleaseNamespaceClaimHolds</code> refuses a request which names no holds, and each
+answered that with <code>INVALID_ARGUMENT</code> out of an <code>except ValueError</code> arm around
+the handler's whole body. <code>ValueError</code> is not the fault, it is the <em>type of</em>
+the fault, and the body raises it from elsewhere too: a stored claim or hold
+row which will not fit its wire message raises <code>ValueError</code> out of
+<code>NamespaceClaim(**claim)</code>, and anything added to the body later brings its own.
+Those are the database tier's faults. Reported as <code>INVALID_ARGUMENT</code> with a
+message naming a parameter, they send a caller away to fix a request which was
+correct, with the one status code that says no retry will help (issue 5074).</p>
+<p>So the validator raises its own type -- <code>exceptions.InvalidClaimState</code>,
+<code>NoHoldsNamed</code>, <code>RelationshipValueTooLong</code>, each a <code>ValueError</code> subclass so
+that callers which already catch <code>ValueError</code> are unaffected -- and the arm
+catches that type. Everything else falls through to the generic arm, which
+records the exception on the node that can act on it and reports <code>INTERNAL</code>.</p>
+<p>This is the "<a href="#a-guard-has-to-sit-where-the-exception-is-raised">a guard has to sit where the exception is
+raised</a>" rule read from the
+other end: before writing a handler arm which blames the caller, list what
+else inside the <code>try</code> can raise that type. If the answer is "anything", the
+arm is a label, not a diagnosis. The width and the message compound: a
+<code>str(e)</code> reply at least described whatever had been raised, so narrowing the
+arm is a prerequisite for replacing it with written prose -- which is what
+the work on not returning SQL text to a caller (issue 5027) does to every
+one of these handlers.</p>
 
 
 
