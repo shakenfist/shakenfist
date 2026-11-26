@@ -16348,13 +16348,21 @@ symptom -- a create refused 507 while the cluster has room, which is
 drift which refuses nothing is invisible. The node-exec helpers make the
 assertion cheap to write; it is tracked as
 <a href="https://github.com/shakenfist/shakenfist/issues/5059">#5059</a>.</p>
-<p>The same helpers would answer two neighbouring questions nothing asks
-today: whether an instance's disks reach libvirt with the type, bus and
-cache mode requested (<code>test_disk_specs.py</code> only sees the guest's view),
-tracked as <a href="https://github.com/shakenfist/shakenfist/issues/5071">#5071</a>;
-and whether deleting an instance removes its directory and nvram from
-the hypervisor, the instance-side counterpart of the dnsmasq-directory
-check in <code>dhcp_state.py</code>, tracked as
+<p>The same helpers answer a neighbouring question for disks.
+<code>cluster_ci_tests/test_disk_specs.py</code>'s
+<code>test_requested_bus_and_type_reach_libvirt</code> builds an instance whose
+root disk is on a bus which is not the cluster default, with an extra
+disk on a third bus and a cdrom beside it, and asserts on the <code>&lt;disk&gt;</code>
+elements <code>virsh dumpxml</code> returns on that instance's hypervisor: device
+type, target bus, driver format and cache mode. The reader is
+<code>_domain_disks()</code> on <code>BaseTestCase</code>, beside the <code>virsh dominfo</code> and
+<code>virsh domblklist</code> helpers. An nvme disk is invisible to it, because
+libvirt has no <code>&lt;disk&gt;</code> element for one and Shaken Fist renders it as
+<code>qemu:commandline</code> arguments instead.</p>
+<p>One question in the same family is still unasked: whether deleting an
+instance removes its directory and nvram from the hypervisor, the
+instance-side counterpart of the dnsmasq-directory check in
+<code>dhcp_state.py</code>, tracked as
 <a href="https://github.com/shakenfist/shakenfist/issues/5072">#5072</a>.</p>
 <h3 id="upgrade-data-verification">Upgrade data verification<a class="headerlink" href="#upgrade-data-verification" title="Permanent link">&para;</a></h3>
 <p>Every functional job deploys a fresh cluster, so nothing in the suite
