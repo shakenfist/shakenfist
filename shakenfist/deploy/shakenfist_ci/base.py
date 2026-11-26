@@ -10,6 +10,7 @@ import shlex
 import string
 import sys
 import time
+from xml.etree import ElementTree
 
 import testtools
 from testtools import content
@@ -996,6 +997,83 @@ class BaseTestCase(testtools.TestCase):
         self.fail(
             'No disk in virsh domblklist for instance %s on node %s. Full '
             'domblklist output:\n%s' % (instance_uuid, node.get('name'), out))
+
+    def _domain_disks(self, node, instance_uuid):
+        """instance_uuid's libvirt disks on node, keyed by target device.
+
+        Reads the live domain definition with ``virsh dumpxml`` on node,
+        the hypervisor the domain is defined on, and returns one dict per
+        ``<disk>`` element: its ``device`` (libvirt's device type, so
+        'disk' or 'cdrom'), its target ``bus``, and its driver's
+        ``format`` and ``cache`` mode. That is the only view of what a
+        disk actually became: the API reports the disk spec back as it
+        was asked for, and the guest only ever sees the result, so a
+        spec which asked for one bus and got another boots and looks
+        healthy from both.
+
+        The domain, not the event-recorded XML, because this is the
+        definition the hypervisor will act on -- including a stale
+        libvirt.tmpl on the node -- and because it is readable whether
+        or not the domain is running.
+
+        Disks on the nvme bus are deliberately absent. libvirt has no
+        ``<disk>`` element for them, so ``_initialize_block_devices()``
+        renders them as ``qemu:commandline`` arguments and nothing here
+        can see them; a caller asserting on an nvme disk has to read the
+        domain's qemu arguments instead.
+
+        Fails the test, with the command's output attached, if the XML
+        does not parse, if the domain has no disks at all, or if a disk
+        has no target device name to key it by -- each of which a caller
+        would otherwise read as "the disk I asked for is missing". A
+        target device name claimed twice fails too rather than
+        collapsing into one entry here: the device names come from
+        ``instance._get_disk_device()``, and two disks which collide on
+        one is a defect in that naming a caller would otherwise see as a
+        disk having simply vanished.
+        """
+        out, _ = self._node_exec(
+            node, ['virsh', 'dumpxml', 'sf:%s' % instance_uuid], sudo=True)
+
+        try:
+            domain = ElementTree.fromstring(out)
+        except ElementTree.ParseError as e:
+            self.fail(
+                'virsh dumpxml for instance %s on node %s is not XML (%s). '
+                'Full dumpxml output:\n%s'
+                % (instance_uuid, node.get('name'), e, out))
+
+        disks = {}
+        for element in domain.findall('./devices/disk'):
+            target = element.find('./target')
+            if target is None or not target.get('dev'):
+                self.fail(
+                    'A disk of instance %s on node %s has no target device '
+                    'name. Full dumpxml output:\n%s'
+                    % (instance_uuid, node.get('name'), out))
+
+            if target.get('dev') in disks:
+                self.fail(
+                    'Two disks of instance %s on node %s both claim target '
+                    'device %s. Full dumpxml output:\n%s'
+                    % (instance_uuid, node.get('name'), target.get('dev'),
+                       out))
+
+            driver = element.find('./driver')
+            disks[target.get('dev')] = {
+                'device': element.get('device'),
+                'bus': target.get('bus'),
+                'format': None if driver is None else driver.get('type'),
+                'cache': None if driver is None else driver.get('cache'),
+            }
+
+        if not disks:
+            self.fail(
+                'No disks in virsh dumpxml for instance %s on node %s. Full '
+                'dumpxml output:\n%s'
+                % (instance_uuid, node.get('name'), out))
+
+        return disks
 
     def _await_power_off(self, instance_uuid, after=None):
         return self._await_instance_event(
