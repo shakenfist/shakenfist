@@ -18051,6 +18051,16 @@ at the price of a longer stall for everyone else using the blocked instance.
 See
 <a href="../../operator_guide/agent_operations/#what-to-tune-and-when">what to tune, and when</a>
 for the trade-off.</p>
+<p><strong>A <code>depends_on</code> edge is satisfied by a dependency which finished, not by
+one which succeeded</strong>, because a command which exits non-zero completes its
+operation: the exit code is a result rather than a failure, and
+<code>return-code</code> is read off a <code>complete</code> operation all over the place. An edge
+which means <code>&amp;&amp;</code> rather than <code>;</code> says so with <code>require_success</code>, which is a
+per-edge boolean on <code>depends_on</code> only and is gated behind its own
+<code>agentoperation-dependency-require-success</code> capability token. A dependent
+abandoned by one is aborted with a <code>dependency_failure</code> state of
+<code>nonzero-exit</code>, a third sentinel that field can carry beside <code>missing</code> and
+<code>unreadable</code>.</p>
 <p>The model, with worked examples, is in
 <a href="../../developer_guide/agent_operations/">agent operations</a>. The parameters,
 refusals and objects are in

@@ -14974,8 +14974,9 @@ which are executed in return, with results for each being gathered as they execu
 <p>An operation which declared a <code>depends_on</code> edge also carries <code>dependency_failure</code>,
 which is <code>null</code> unless that edge caused it to be aborted. It then holds
 <code>op_type</code>, <code>op_uuid</code> and <code>state</code> for the dependency responsible. <code>state</code> is
-usually one of the dependency's own states, but it is also where the two
-strings <code>missing</code> and <code>unreadable</code> appear, so a client which branches on it
+usually one of the dependency's own states, but it is also where the three
+strings <code>missing</code>, <code>unreadable</code> and <code>nonzero-exit</code> appear, so a client which
+branches on it
 must expect a value no operation can hold. See
 <a href="/developer_guide/api_reference/instances/#declaring-dependencies-between-agent-operations">declaring dependencies between agent operations</a>
 for what each of those means and when it is written, and

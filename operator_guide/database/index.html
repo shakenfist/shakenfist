@@ -18388,12 +18388,20 @@ surfaces for clients to branch on.</p>
 <code>runs_after</code> columns. Both are <code>LONGTEXT NOT NULL</code> with a server default of
 <code>'[]'</code>, so they are never NULL, and an operation which names nothing holds an
 empty list. An entry in either is stored as
-<code>{"op_type": "agentoperation", "op_uuid": "...", "settle_seconds": N}</code>. All
-three keys are present in anything the API writes, because it normalises
-every edge through its schema model before storing it, and <code>settle_seconds</code>
-is <code>null</code> when the caller asked for no settle delay. A reader should still
-treat an absent <code>settle_seconds</code> as <code>null</code>, since a row this API did not
-write -- a hand-edited one -- can lack the key. <code>dependency_failure</code> is NULL
+<code>{"op_type": "agentoperation", "op_uuid": "...", "settle_seconds": N,
+"require_success": true}</code>. All four keys are present in anything the API
+writes, because it normalises every edge through its schema model before
+storing it, and <code>settle_seconds</code> and <code>require_success</code> are <code>null</code> when the
+caller asked for neither a settle delay nor the dependency's commands to have
+succeeded. A reader should still treat either as <code>null</code> when absent, since a
+row this API did not write -- a hand-edited one, or one written before the
+key existed -- can lack it. The reverse does not hold: an edge is validated
+against its schema model when the row is read as well as when it is written,
+and that model refuses a key it does not know, so a node still running an
+older release cannot read an edge carrying a key added after it. Finish a
+rollout before a client starts sending a newly published edge field --
+<code>require_success</code> is the first one this has applied to.
+<code>dependency_failure</code> is NULL
 unless a <code>depends_on</code> dependency failed and caused this operation to be
 aborted, and it is the sidechannel dispatcher which writes it when the
 operation reaches the head of its instance's queue. <code>dependency_wait_started</code>

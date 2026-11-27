@@ -16106,7 +16106,10 @@ dispatched exactly as one without. Otherwise:</p>
   finishes. One whose state cannot be read at all -- a database outage rather
   than an answer -- holds the operation the same way, because a read which
   failed is not evidence that anything has happened. One which completed lets
-  the operation run, once any settle delay has elapsed. One which errored, was
+  the operation run, once any settle delay has elapsed -- whatever the
+  dependency's commands exited with, unless the edge asked for success with
+  <code>require_success</code>, in which case a non-zero exit aborts the dependent with a
+  <code>dependency_failure</code> state of <code>nonzero-exit</code>. One which errored, was
   aborted, expired, was deleted or no longer exists moves the operation to the
   <code>abort</code> state without running it, and the operation's <code>dependency_failure</code>
   field says which dependency, and in what state, caused that. The operation is
@@ -16137,12 +16140,13 @@ dispatched exactly as one without. Otherwise:</p>
 <code>depends_on</code> edge, and then holds a dictionary with three keys: <code>op_type</code>
 (always <code>agentoperation</code>), <code>op_uuid</code> (the dependency's UUID) and <code>state</code> (the
 dependency's state when it was given up on). <code>state</code> is one of the dependency's
-own states, or one of two strings which are deliberately not states any
+own states, or one of three strings which are deliberately not states any
 operation can hold: <code>missing</code> for a dependency which no longer exists, so that a
-dependency which failed can be told from one which is gone, and <code>unreadable</code> for
+dependency which failed can be told from one which is gone, <code>unreadable</code> for
 one whose state could not be read before the budget ran out, which is a report
 about the node's database connectivity rather than about the chain you
-submitted. An operation
+submitted, and <code>nonzero-exit</code> for a dependency which finished but whose command
+exited non-zero on an edge which asked for success. An operation
 aborted for outlasting the wait budget carries the dependency's state at that
 moment, which may be <code>queued</code> or <code>executing</code> -- or <code>complete</code>, which means the
 dependency succeeded and it was the settle delay after it which outlasted the
@@ -16201,6 +16205,25 @@ budget, so that second edge gives up as soon as it is reached -- and the
 <code>dependency_failure</code> names the second dependency rather than the settle.
 In practice a settle at or near the ceiling is only safe on an operation
 whose other dependencies have already finished.</p>
+</li>
+<li>
+<p>require_success (boolean): satisfy this edge only if the named operation's
+  commands succeeded, as well as it having finished. A command which exits
+  non-zero completes its operation normally -- the exit code is a result, not a
+  failure, and <code>return-code</code> is read off a <code>complete</code> operation by plenty of
+  callers -- so without this an edge runs its dependent after a dependency
+  whose command failed. With it, a dependency which completed but whose
+  commands did not all exit zero aborts the dependent, with a
+  <code>dependency_failure</code> state of <code>nonzero-exit</code>. A result which carries no
+  <code>return-code</code> at all, as a file transfer's does, is not counted as a failure:
+  reaching <code>complete</code> is the whole of what such a command has to report. Omit
+  it, or send false, for the historical behaviour. It is only meaningful in a
+  <code>depends_on</code> list, because a <code>runs_after</code> edge is satisfied by any finished
+  dependency and says nothing about its outcome; a <code>runs_after</code> edge which
+  carries it is refused with a 400 rather than ignored. A server advertises
+  that it understands the field with the
+  <code>agentoperation-dependency-require-success</code> capability token, separately from
+  <code>agentoperation-dependencies</code>, because the default is the other way round.</p>
 </li>
 </ul>
 <h3 id="fetching-information-about-an-instances-agent-operations">Fetching information about an Instance's Agent Operations<a class="headerlink" href="#fetching-information-about-an-instances-agent-operations" title="Permanent link">&para;</a></h3>

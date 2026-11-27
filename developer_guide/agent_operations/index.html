@@ -15295,15 +15295,31 @@ each other.</p>
 <p>All three creating calls take two optional lists of edges, each naming
 agent operations which already exist:</p>
 <ul>
-<li><strong><code>depends_on</code> is fate sharing.</strong> The new operation runs only if the
-  operation it names succeeded. If that operation errored, expired, was
+<li>
+<p><strong><code>depends_on</code> is fate sharing.</strong> The new operation runs only if the
+  operation it names finished. If that operation errored, expired, was
   aborted or has gone away, the dependent does not run at all: it is
   moved to the <code>abort</code> terminal state, and its <code>dependency_failure</code>
-  field says which dependency, and in what state, caused that.</li>
-<li><strong><code>runs_after</code> is ordering only.</strong> The new operation waits for the
+  field says which dependency, and in what state, caused that.</p>
+<p>Finishing is not the same as succeeding. A command which exits
+non-zero <em>completes</em> its operation -- the exit code is a result, not
+a failure, which is what lets a caller submit
+<code>something || true</code> deliberately and what <code>return-code</code> readers
+rely on -- so by default this edge is satisfied by a dependency
+whose command failed. Set
+<a href="../api_reference/instances/#agentdependency"><code>require_success</code></a> on
+the edge for the stronger reading, and the dependent aborts with a
+<code>dependency_failure</code> state of <code>nonzero-exit</code> instead of running
+against whatever the failed command left behind. The field needs a
+server advertising the
+<code>agentoperation-dependency-require-success</code> capability token and a
+client which knows the key, since an API client refuses an edge key
+it has not heard of rather than sending it on.
+* <strong><code>runs_after</code> is ordering only.</strong> The new operation waits for the
   named operation to finish and then runs, whatever that operation's
   outcome was. A <code>runs_after</code> edge never aborts anything and never sets
-  <code>dependency_failure</code>.</li>
+  <code>dependency_failure</code>.</p>
+</li>
 </ul>
 <p>An edge may name an operation on a <em>different</em> instance, which is what
 makes a chain able to span a fleet. Nothing about evaluation is
