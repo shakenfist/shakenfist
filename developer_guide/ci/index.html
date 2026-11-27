@@ -15013,11 +15013,6 @@ commands available on a PR.</p>
 <td>Daily schedule, PR self-test</td>
 </tr>
 <tr>
-<td><code>renovate.yml</code></td>
-<td>Self-hosted Renovate dependency updates</td>
-<td>Hourly schedule, manual</td>
-</tr>
-<tr>
 <td><code>ci-headroom-health.yml</code></td>
 <td>Harvest the ten newest merge runs' CI headroom bundles and assert the probe which wrote them is still working (runs <code>tools/ci_headroom_health.py</code>; see <a href="../ci_cloud_sizing/#is-the-instrument-still-alive">Is the instrument still alive?</a>). The one headroom check allowed to fail, because it is scheduled: it must never gain a PR or merge_group trigger</td>
 <td>Weekly schedule (Mondays 07:30 UTC), manual</td>
@@ -15089,6 +15084,19 @@ commands available on a PR.</p>
 </tr>
 </tbody>
 </table>
+<p>Dependency updates are not in that table, because Renovate does not run
+from this repository. It runs from the fleet runner,
+<code>.github/workflows/renovate-fleet.yml</code> in
+<a href="https://github.com/shakenfist/development">shakenfist/development</a>, which
+works over every managed repository in one pass. All this repository
+carries is <code>renovate.json</code>, which extends the fleet preset
+<code>local&gt;shakenfist/development:renovate-fleet</code> and adds only what is
+particular to Shaken Fist -- the package groups, and the custom manager for
+the Ansible tool pins in <code>functional-tests.yml</code>. A repository-local
+Renovate workflow is a consistency-audit failure rather than a belt and
+braces, because two Renovate instances over one repository race on branch
+creation; see the
+<a href="../../components/development/audits/renovate/">Renovate audit</a>.</p>
 <h2 id="merge-lanes-and-weekly-lanes">Merge lanes and weekly lanes<a class="headerlink" href="#merge-lanes-and-weekly-lanes" title="Permanent link">&para;</a></h2>
 <p>A <em>lane</em> is one functional cluster job: a topology deployed by the
 <code>shakenfist.shakenfist</code> collection, and a suite run against it. Most lanes
