@@ -67,6 +67,11 @@ DESCRIPTOR_NAME = '.sf-ci-idp.json'
 # the script and not here, or here and not there, fails: the descriptor is the
 # whole interface between a shell script on a runner and a test suite on a
 # cluster node, and neither can see the other.
+#
+# This set is one of three copies, and test_ci_oidc_login_guard.py holds it
+# against the one in cluster_ci_tests/test_oidc_login.py -- so this file says
+# what the script writes, that file says what the tests read, and the third
+# refuses to let the two drift.
 DESCRIPTOR_KEYS = {
     'issuer_url', 'client_id', 'oidc_scopes', 'username', 'password',
     'group_claim', 'group', 'image',
