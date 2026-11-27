@@ -218,8 +218,8 @@ with web mode).
 | 2. Module directory and pure state | [PLAN-app-split-phase-02-pure-state.md](/components/ryll/plans/PLAN-app-split-phase-02-pure-state/) | Complete | b245380 (#501) |
 | 3. Events and bug-report flow | [PLAN-app-split-phase-03-events.md](/components/ryll/plans/PLAN-app-split-phase-03-events/) | Complete | 79fc466 (#714), cdecf94 (#717) |
 | 4. Split `ui` into per-panel files | [PLAN-app-split-phase-04-panels.md](/components/ryll/plans/PLAN-app-split-phase-04-panels/) | Complete | ecf54b5 (#726) |
-| 5. Panel state sub-structs | PLAN-app-split-phase-05-substructs.md | Not started | |
-| 6. Function-length lint | shakenfist/development `PLAN-size-ratchet.md`, phase 3 | Complete | (#746) |
+| 5. Panel state sub-structs | [PLAN-app-split-phase-05-substructs.md](/components/ryll/plans/PLAN-app-split-phase-05-substructs/) | In progress | |
+| 6. Function-length lint | shakenfist/development `PLAN-size-ratchet.md`, phase 3 | Complete | debf8b1 (#746) |
 | 7. Push audit | This file, below | Not started | |
 
 Phase plans are written at the start of each phase (see the
@@ -332,12 +332,36 @@ calls them.
 One panel at a time, move its field cluster out of `RyllApp` into
 a struct owned by its `app/ui/*.rs` module, with a `show` method
 that takes `&mut self` plus the specific shared state it needs
-as separate arguments. Start with the most self-contained (the
-WebDAV and USB panels, whose fields are already prefixed) and
-remove the two-pass render-then-act workarounds where disjoint
-borrows make them unnecessary. This is the phase that changes
-code rather than moving it, so it may land as more than one pull
-request; the phase plan decides the grouping.
+as separate arguments. This is the phase that changes code rather
+than moving it, so it may land as more than one pull request; the
+phase plan decides the grouping.
+
+Three things this section got wrong before phase 5 was planned,
+all corrected here rather than only in the phase plan.
+
+It asked for the two-pass render-then-act workarounds to be
+removed "where disjoint borrows make them unnecessary". None of
+the five is caused by `RyllApp` being a god struct, so none is
+removed by splitting it up: two are cross-panel actions that
+become returned outcomes, one is a borrow of the very field being
+rendered, and two are egui's own closures. What the phase can
+deliver is that no deferred action crosses a module boundary as a
+`&mut` out-param; see survey finding 1 of the phase plan.
+
+It named "the WebDAV and USB panels, whose fields are already
+prefixed" as the most self-contained starting point. They are the
+least self-contained: `events.rs` and `connection.rs` write their
+fields 41 times between them, because channel events and not the
+panels drive that state. The traffic viewer, which this section
+did not mention, has no external writer at all and is the only
+pure field move of the three, so it goes first.
+
+Consequently the phase is larger than "move its field cluster"
+implies: those 41 field writes become a named
+`pub(in crate::app)` method per transition on the panel, which is
+the phase's real payoff. Moving the fields without the
+transitions would leave `events.rs` reaching into a sub-struct's
+privates, which is a rename rather than an encapsulation.
 
 ### Phase 6: Function-length lint
 

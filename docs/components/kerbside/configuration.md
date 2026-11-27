@@ -99,7 +99,7 @@ These settings configure the `KerbsideProxy` gRPC service the daemon hosts over 
 
 | Configuration Option | Type | Description |
 |---------------------|------|-------------|
-| API_SOCKET_PATH | String (default /run/kerbside/api.sock) | The unix domain socket the KerbsideProxy gRPC service listens on. The containing directory is created with 0700 permissions; access is guarded by filesystem permissions since the peer is a trusted local process. The proxy must be co-located with the daemon to share this socket. The REST API never connects to it; it reaches the daemon only through the database and may run on another host, given the same SOURCES_PATH and CACERT_PATH files. Keep the path short: AF_UNIX socket paths are limited to ~108 bytes (SUN_LEN), and an over-long path will fail to bind/connect; a path under /run is safe. |
+| API_SOCKET_PATH | String (default /run/kerbside/api.sock) | The unix domain socket the KerbsideProxy gRPC service listens on. The containing directory is created with 0700 permissions; access is guarded by filesystem permissions since the peer is a trusted local process. The proxy must be co-located with the daemon to share this socket. The REST API never connects to it; it reaches the daemon only through the database and may run on another host, given the same SOURCES_PATH and CACERT_PATH files. Keep the path short: AF_UNIX socket paths are limited to ~108 bytes (SUN_LEN), and an over-long path will fail to bind/connect; a path under /run is safe. Under the shipped systemd units only the default directory is writable, so a path outside `/run/kerbside` also needs `ReadWritePaths=` for its directory, as [Deploying Kerbside by hand](/components/kerbside/deployment/manual/#what-it-deploys) shows. |
 | API_GRPC_WORKERS | Integer (default 8) | The size of the thread pool serving KerbsideProxy gRPC requests. |
 
 ## SPICE firewall
@@ -165,7 +165,7 @@ Values tracked include:
 
 | Configuration Option | Type | Description |
 |---------------------|------|-------------|
-| LOG_OUTPUT_PATH | String (default empty) | Where to write logs to. If "stdout", then stdout is used. If blank, syslog is used. Daemon logs are always structured JSON, one object per line. |
+| LOG_OUTPUT_PATH | String (default empty) | Where to write logs to. If "stdout", then stdout is used. If blank, syslog is used. Daemon logs are always structured JSON, one object per line. Under the shipped systemd units a file also needs `ReadWritePaths=` for its directory, as [Deploying Kerbside by hand](/components/kerbside/deployment/manual/#what-it-deploys) shows. |
 | LOG_VERBOSE | Boolean (default False) | Whether to log verbose debugging information. |
 | PROMETHEUS_METRICS_PORT | Integer (default 13003) | The TCP port that the prometheus metrics HTTP server will listen on. |
 | PROMETHEUS_METRICS_ADDRESS | String (default 127.0.0.1) | The address the Rust proxy binds its `/metrics` server to. Defaults to loopback because the endpoint is unauthenticated and must not be exposed on the public VDI interface; set a management address (or 0.0.0.0 behind a firewall) to scrape it from another host. |
