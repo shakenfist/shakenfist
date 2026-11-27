@@ -1808,12 +1808,20 @@ An agent operation may name other agent operations in its `depends_on` and
 `runs_after` columns. Both are `LONGTEXT NOT NULL` with a server default of
 `'[]'`, so they are never NULL, and an operation which names nothing holds an
 empty list. An entry in either is stored as
-`{"op_type": "agentoperation", "op_uuid": "...", "settle_seconds": N}`. All
-three keys are present in anything the API writes, because it normalises
-every edge through its schema model before storing it, and `settle_seconds`
-is `null` when the caller asked for no settle delay. A reader should still
-treat an absent `settle_seconds` as `null`, since a row this API did not
-write -- a hand-edited one -- can lack the key. `dependency_failure` is NULL
+`{"op_type": "agentoperation", "op_uuid": "...", "settle_seconds": N,
+"require_success": true}`. All four keys are present in anything the API
+writes, because it normalises every edge through its schema model before
+storing it, and `settle_seconds` and `require_success` are `null` when the
+caller asked for neither a settle delay nor the dependency's commands to have
+succeeded. A reader should still treat either as `null` when absent, since a
+row this API did not write -- a hand-edited one, or one written before the
+key existed -- can lack it. The reverse does not hold: an edge is validated
+against its schema model when the row is read as well as when it is written,
+and that model refuses a key it does not know, so a node still running an
+older release cannot read an edge carrying a key added after it. Finish a
+rollout before a client starts sending a newly published edge field --
+`require_success` is the first one this has applied to.
+`dependency_failure` is NULL
 unless a `depends_on` dependency failed and caused this operation to be
 aborted, and it is the sidechannel dispatcher which writes it when the
 operation reaches the head of its instance's queue. `dependency_wait_started`

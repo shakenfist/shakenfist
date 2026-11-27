@@ -67,7 +67,8 @@ EXPECTED_CAPABILITIES = {
         'get-instance-namespace',
         'hot-plug-interface', 'include-queued-agent-operations',
         'instance-clusteroperations', 'agentoperation-deadlines',
-        'agentoperation-dependencies', 'placement-query'],
+        'agentoperation-dependencies',
+        'agentoperation-dependency-require-success', 'placement-query'],
     'networks': [
         'list-addresses', 'route-addresses', 'get-network-namespace',
         'provide-dns', 'extra-dns-entries', 'network-clusteroperations',

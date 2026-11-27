@@ -65,6 +65,19 @@ class agent_dependency(BaseModel):
     # whatever the dependency changed. None means satisfied immediately.
     settle_seconds: Optional[float] = None
 
+    # When true this edge is satisfied only if the named operation's
+    # commands also succeeded, rather than by it reaching complete at all.
+    # A command which exits non-zero is an ordinary result rather than a
+    # failure -- plenty of callers submit one deliberately -- so the
+    # default stays "complete is enough" and a caller who meant && rather
+    # than ; says so per edge (issue #5091). None means the same as false.
+    #
+    # Meaningless on a runs_after edge, which says "not before" and
+    # nothing about an outcome, and refused there by the API helper: one
+    # published object serves both lists, so this model is not told which
+    # one it is in and cannot make that refusal.
+    require_success: Optional[bool] = None
+
     @field_validator('op_type')
     @classmethod
     def validate_op_type(cls, v: ObjectType) -> ObjectType:

@@ -1026,7 +1026,10 @@ dispatched exactly as one without. Otherwise:
   finishes. One whose state cannot be read at all -- a database outage rather
   than an answer -- holds the operation the same way, because a read which
   failed is not evidence that anything has happened. One which completed lets
-  the operation run, once any settle delay has elapsed. One which errored, was
+  the operation run, once any settle delay has elapsed -- whatever the
+  dependency's commands exited with, unless the edge asked for success with
+  `require_success`, in which case a non-zero exit aborts the dependent with a
+  `dependency_failure` state of `nonzero-exit`. One which errored, was
   aborted, expired, was deleted or no longer exists moves the operation to the
   `abort` state without running it, and the operation's `dependency_failure`
   field says which dependency, and in what state, caused that. The operation is
@@ -1057,12 +1060,13 @@ dispatched exactly as one without. Otherwise:
 `depends_on` edge, and then holds a dictionary with three keys: `op_type`
 (always `agentoperation`), `op_uuid` (the dependency's UUID) and `state` (the
 dependency's state when it was given up on). `state` is one of the dependency's
-own states, or one of two strings which are deliberately not states any
+own states, or one of three strings which are deliberately not states any
 operation can hold: `missing` for a dependency which no longer exists, so that a
-dependency which failed can be told from one which is gone, and `unreadable` for
+dependency which failed can be told from one which is gone, `unreadable` for
 one whose state could not be read before the budget ran out, which is a report
 about the node's database connectivity rather than about the chain you
-submitted. An operation
+submitted, and `nonzero-exit` for a dependency which finished but whose command
+exited non-zero on an edge which asked for success. An operation
 aborted for outlasting the wait budget carries the dependency's state at that
 moment, which may be `queued` or `executing` -- or `complete`, which means the
 dependency succeeded and it was the settle delay after it which outlasted the
@@ -1126,6 +1130,24 @@ list. It is a JSON dictionary with the following fields:
     `dependency_failure` names the second dependency rather than the settle.
     In practice a settle at or near the ceiling is only safe on an operation
     whose other dependencies have already finished.
+
+* require_success (boolean): satisfy this edge only if the named operation's
+  commands succeeded, as well as it having finished. A command which exits
+  non-zero completes its operation normally -- the exit code is a result, not a
+  failure, and `return-code` is read off a `complete` operation by plenty of
+  callers -- so without this an edge runs its dependent after a dependency
+  whose command failed. With it, a dependency which completed but whose
+  commands did not all exit zero aborts the dependent, with a
+  `dependency_failure` state of `nonzero-exit`. A result which carries no
+  `return-code` at all, as a file transfer's does, is not counted as a failure:
+  reaching `complete` is the whole of what such a command has to report. Omit
+  it, or send false, for the historical behaviour. It is only meaningful in a
+  `depends_on` list, because a `runs_after` edge is satisfied by any finished
+  dependency and says nothing about its outcome; a `runs_after` edge which
+  carries it is refused with a 400 rather than ignored. A server advertises
+  that it understands the field with the
+  `agentoperation-dependency-require-success` capability token, separately from
+  `agentoperation-dependencies`, because the default is the other way round.
 
 ### Fetching information about an Instance's Agent Operations
 

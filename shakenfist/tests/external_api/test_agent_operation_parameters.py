@@ -407,7 +407,7 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             [{'op_type': 'agentoperation',
               'op_uuid': str(self.dependency.uuid),
-              'settle_seconds': None}],
+              'settle_seconds': None, 'require_success': None}],
             new.call_args.kwargs['depends_on'])
         self.assertEqual([], new.call_args.kwargs['runs_after'])
 
@@ -497,7 +497,7 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code, resp.get_json())
         self.assertEqual(
             [{'op_type': 'agentoperation', 'op_uuid': str(self.foreign.uuid),
-              'settle_seconds': None}],
+              'settle_seconds': None, 'require_success': None}],
             new.call_args.kwargs['depends_on'])
 
     def test_a_caller_may_not_publish_an_op_type(self):
@@ -561,6 +561,65 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
         self.assertEqual(400, resp.status_code, resp.get_json())
         self.assertIn(
             'AGENT_OPERATION_DEPENDENCY_WAIT', resp.get_json()['error'])
+        new.assert_not_called()
+
+    def test_require_success_reaches_the_object(self):
+        # The field a caller sets to mean && rather than ; (issue
+        # #5091). It is stored on the edge, because the dispatcher is
+        # what reads it at dispatch time.
+        resp, new = self._execute(
+            depends_on=[self._edge(self.dependency, require_success=True)])
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertEqual(
+            [{'op_type': 'agentoperation',
+              'op_uuid': str(self.dependency.uuid),
+              'settle_seconds': None, 'require_success': True}],
+            new.call_args.kwargs['depends_on'])
+
+    def test_require_success_is_refused_on_a_runs_after_edge(self):
+        # Refused rather than ignored. A runs_after edge is satisfied by
+        # any finished dependency and says nothing about the outcome, so
+        # there is no answer this field could have on one -- and a
+        # parameter which is silently dropped is the shape of the defect
+        # this field exists to close.
+        resp, new = self._execute(
+            runs_after=[self._edge(self.dependency, require_success=True)])
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        self.assertEqual(
+            {'error': 'runs_after[0]: require_success is only meaningful on '
+                      'a depends_on edge',
+             'status': 400},
+            resp.get_json())
+        new.assert_not_called()
+
+    def test_an_explicit_false_require_success_is_accepted_anywhere(self):
+        # False is what an omitted field already means, so sending it is
+        # not an ordering edge asking about an outcome and must not be
+        # refused as one.
+        resp, new = self._execute(
+            runs_after=[self._edge(self.dependency, require_success=False)])
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertEqual(
+            False, new.call_args.kwargs['runs_after'][0]['require_success'])
+
+    def test_a_non_boolean_require_success_is_refused(self):
+        resp, new = self._execute(
+            depends_on=[self._edge(self.dependency, require_success='maybe')])
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        self.assertIn('require_success', resp.get_json()['error'])
+        new.assert_not_called()
+
+    def test_require_success_is_refused_on_an_ordering_edge_in_warn_mode(self):
+        # The rollback path, as for the settle ceiling above: with
+        # validation warning rather than enforcing, the published schema
+        # is not what refuses anything, so the helper's own check has to
+        # be the thing which does.
+        self.set_validation_mode('warn')
+
+        resp, new = self._execute(
+            runs_after=[self._edge(self.dependency, require_success=True)])
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        self.assertIn('require_success', resp.get_json()['error'])
         new.assert_not_called()
 
     def test_a_list_at_the_edge_limit_is_accepted(self):
@@ -642,7 +701,7 @@ class AgentOperationParametersTestCase(base.ShakenFistTestCase):
                     self.assertEqual(
                         [{'op_type': 'agentoperation',
                           'op_uuid': str(self.dependency.uuid),
-                          'settle_seconds': None}],
+                          'settle_seconds': None, 'require_success': None}],
                         new.call_args.kwargs[parameter])
 
     def test_every_endpoint_refuses_a_bad_edge(self):

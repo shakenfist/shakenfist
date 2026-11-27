@@ -7,6 +7,7 @@ import os
 import socket
 import threading
 import time
+from uuid import UUID
 from uuid import uuid4
 
 from google.protobuf.message import DecodeError
@@ -191,6 +192,15 @@ DEPENDENCY_MISSING = 'missing'
 # client which finds unreadable in dependency_failure should look at the
 # node's database connectivity rather than at the chain it submitted.
 DEPENDENCY_UNREADABLE = 'unreadable'
+
+# The sentinel recorded when a dependency finished but a command it ran
+# exited non-zero, on an edge which asked for success rather than merely
+# for completion. Deliberately not a state any operation can hold, for the
+# reason the two above are not: the dependency really did reach complete,
+# so recording 'complete' would leave a client to fetch the dependency's
+# results and work out for itself what this says in one word (issue
+# #5091).
+DEPENDENCY_NONZERO_EXIT = 'nonzero-exit'
 
 # What a satisfied edge's settle delay has to say for itself. Three
 # answers rather than two, because the two walks treat the last of them
@@ -1721,6 +1731,11 @@ class Monitor(daemon.Daemon):
         # terminal states are ever stored here; see _dependency_state().
         self.terminal_dependency_cache = {}
 
+        # Whether a completed dependency's commands succeeded, by
+        # operation uuid, for require_success edges only; see
+        # _dependency_succeeded().
+        self.dependency_success_cache = {}
+
         # runs_after warnings already audited, keyed by (operation,
         # dependency, message); see _warn_runs_after(). A dict used as a
         # set, because the eviction policy both caches share needs
@@ -2170,6 +2185,49 @@ class Monitor(daemon.Daemon):
             self._cache_terminal_dependency(op_uuid, value)
         return True, value
 
+    def _dependency_succeeded(self, dep):
+        """Did a finished dependency's commands succeed?
+
+        Returns (readable, succeeded): (True, bool) when the
+        dependency's results were read, and (False, None) when the read
+        failed. That first element is load bearing for the reason
+        _dependency_state()'s is -- a read which failed is not evidence
+        that a command failed, and the depends_on walk acts irreversibly
+        on this answer.
+
+        Only an execute command reports an exit code. A file transfer
+        records a stat and a blob instead, and an operation which
+        reached complete has done what those asked for, so a result
+        carrying no return code is not evidence of failure and is not
+        counted as one.
+
+        The attributes row is read directly rather than by hydrating the
+        operation, which is still forbidden for the reason
+        _dependency_state() gives. The answer is cached for the life of
+        this dispatcher generation because the dependency is terminal by
+        the time it is asked, so its results cannot change again;
+        without that, an operation held by a second edge would re-read
+        this one on every pass.
+        """
+        op_uuid = str(dep['op_uuid'])
+
+        cached = self.dependency_success_cache.get(op_uuid)
+        if cached is not None:
+            return True, cached
+
+        attrs = mariadb.get_agent_operation_attributes(UUID(op_uuid))
+        if attrs is None:
+            return False, None
+
+        succeeded = all(
+            result.get('return-code', 0) == 0
+            for result in attrs.results.values()
+            if isinstance(result, dict))
+        self._remember_capped(
+            self.dependency_success_cache, op_uuid, succeeded,
+            TERMINAL_DEPENDENCY_CACHE_SIZE)
+        return True, succeeded
+
     def _remember_capped(self, cache, key, value, limit):
         """Add to one of the dispatcher's caches, evicting the oldest first.
 
@@ -2346,8 +2404,29 @@ class Monitor(daemon.Daemon):
                     return False, f'gave up waiting for an unknown {dep_state} dependency'
                 return False, f'waiting for an unknown {dep_state} dependency'
 
-            # Complete, which satisfies the edge -- once any settle
-            # delay has elapsed.
+            # Complete, which satisfies the edge -- unless this caller
+            # asked for the dependency's commands to have succeeded as
+            # well, and once any settle delay has elapsed. The outcome
+            # is checked before the settle: there is nothing to settle
+            # for when the thing which was supposed to happen did not.
+            if dep.get('require_success'):
+                readable, succeeded = self._dependency_succeeded(dep)
+
+                if not readable:
+                    # Held rather than judged, exactly as a failed state
+                    # read above is, and bounded the same way.
+                    if self._wait_budget_spent(agentop, budget):
+                        self._cascade_abort(
+                            agentop, dep, DEPENDENCY_UNREADABLE,
+                            event=CASCADE_EVENT_GAVE_UP)
+                        return False, 'gave up trying to read a dependency result'
+                    return False, 'dependency results could not be read'
+
+                if not succeeded:
+                    self._cascade_abort(
+                        agentop, dep, DEPENDENCY_NONZERO_EXIT)
+                    return False, 'dependency command exited non-zero'
+
             settle = self._settle_verdict(agentop, dep, dep_state, budget)
             if settle == SETTLE_EXHAUSTED:
                 self._cascade_abort(
@@ -2670,12 +2749,13 @@ class Monitor(daemon.Daemon):
         self.dispatcher_generation += 1
         generation = self.dispatcher_generation
 
-        # The terminal dependency cache and the runs_after warning
-        # record both live exactly as long as a dispatcher generation
-        # does, so a replacement thread starts cold. Fresh containers
-        # rather than clear(), so a superseded generation which has not
-        # noticed yet cannot be iterating one being emptied.
+        # The dependency caches and the runs_after warning record all
+        # live exactly as long as a dispatcher generation does, so a
+        # replacement thread starts cold. Fresh containers rather than
+        # clear(), so a superseded generation which has not noticed yet
+        # cannot be iterating one being emptied.
         self.terminal_dependency_cache = {}
+        self.dependency_success_cache = {}
         self.runs_after_warnings = {}
         self.dispatcher_last_pass = time.time()
         self.dispatcher_thread = threading.Thread(

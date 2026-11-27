@@ -87,11 +87,13 @@ class AgentOperationAttributesData(BaseModel):
     # nothing else, and surfaced on the external view, because a reason
     # which is not on the wire is a reason a client cannot act on (issue
     # #4075). The state it records is the dependency's own, except for
-    # two values no AgentOperation holds: 'missing' for a dependency
-    # which no longer exists at all, and 'unreadable' for one whose
-    # state could not be read before the wait budget ran out. Neither is
-    # an AgentOperation state value, and both are distinguishable from
-    # every real one on purpose.
+    # three values no AgentOperation holds: 'missing' for a dependency
+    # which no longer exists at all, 'unreadable' for one whose state
+    # could not be read before the wait budget ran out, and
+    # 'nonzero-exit' for one which completed but whose command failed on
+    # an edge which asked for success. None of them is an AgentOperation
+    # state value, and all are distinguishable from every real one on
+    # purpose.
     dependency_failure: Optional[dict] = None
 
     # Wall-clock time of the first dispatcher pass which found this

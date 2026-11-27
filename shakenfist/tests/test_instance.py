@@ -3008,7 +3008,8 @@ class AgentOperationDependencyTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             [{'op_type': 'agentoperation',
               'op_uuid': dep_uuid,
-              'settle_seconds': None}],
+              'settle_seconds': None,
+              'require_success': None}],
             reread.depends_on)
         self.assertEqual([], reread.runs_after)
         self.assertEqual(
@@ -3026,7 +3027,8 @@ class AgentOperationDependencyTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             [{'op_type': 'agentoperation',
               'op_uuid': dep_uuid,
-              'settle_seconds': None}],
+              'settle_seconds': None,
+              'require_success': None}],
             reread.runs_after)
         self.assertEqual([], self._view(reread)['depends_on'])
         self.assertEqual(
@@ -3040,6 +3042,26 @@ class AgentOperationDependencyTestCase(base.ShakenFistTestCase):
             self._edge(op_uuid=str(uuid.uuid4()), settle_seconds=30.0)])
         reread = AgentOperation.from_db(op.uuid)
         self.assertEqual(30.0, reread.depends_on[0]['settle_seconds'])
+
+    def test_require_success_survives_the_round_trip(self):
+        # The other part of an edge which is neither a constant nor a
+        # UUID, and the one a lossy encode would turn from "only if the
+        # command succeeded" into "whenever it finished" -- a weaker
+        # edge than the caller declared, which nothing else would
+        # notice.
+        op = self._make_agentop(depends_on=[
+            self._edge(op_uuid=str(uuid.uuid4()), require_success=True)])
+        reread = AgentOperation.from_db(op.uuid)
+        self.assertIs(True, reread.depends_on[0]['require_success'])
+
+    def test_a_non_boolean_require_success_is_refused(self):
+        # pydantic coerces the strings and integers which mean a boolean
+        # in JSON, and refuses anything which does not mean one at all,
+        # rather than storing a truthy string as a request for the
+        # stronger edge.
+        with testtools.ExpectedException(ValidationError):
+            self._make_agentop(depends_on=[
+                {'op_uuid': str(uuid.uuid4()), 'require_success': 'maybe'}])
 
     def test_an_edge_naming_another_object_type_is_refused(self):
         # An agent operation's edge may only name an agent operation.

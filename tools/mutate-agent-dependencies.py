@@ -389,6 +389,35 @@ MUTANTS = [
      "        except exceptions.InvalidStateException:",
      r'test_agent_operation_dependency_cascade',
      'test_a_cascade_writes_the_reason_before_the_state'),
+    # require_success, which is the only thing that makes a depends_on
+    # edge ask about the dependency's exit codes rather than only about
+    # its state. Every one of these mutants fails silently: the edge
+    # still orders, and the dependent still runs, which is exactly the
+    # behaviour the field was added to be able to refuse (issue #5091).
+    ('require_success ignored', SIDECHANNEL,
+     "            if dep.get('require_success'):",
+     "            if False:",
+     r'test_daemon_sidechannel_dependencies',
+     'test_a_nonzero_exit_cascades_on_a_require_success_edge'),
+    ('absent return code reads as a failure', SIDECHANNEL,
+     "            result.get('return-code', 0) == 0",
+     "            result.get('return-code') == 0",
+     r'test_daemon_sidechannel_dependencies',
+     'test_a_result_with_no_return_code_satisfies_require_success'),
+    ('unread results read as a failure', SIDECHANNEL,
+     "        attrs = mariadb.get_agent_operation_attributes(UUID(op_uuid))\n"
+     "        if attrs is None:\n"
+     "            return False, None",
+     "        attrs = mariadb.get_agent_operation_attributes(UUID(op_uuid))\n"
+     "        if attrs is None:\n"
+     "            return True, False",
+     r'test_daemon_sidechannel_dependencies',
+     'test_an_unreadable_result_blocks_rather_than_cascading'),
+    ('require_success accepted on an ordering edge', BASE,
+     "            if name == 'runs_after' and dependency.require_success:",
+     "            if False:",
+     r'external_api\.test_agent_operation_parameters',
+     'test_require_success_is_refused_on_a_runs_after_edge'),
 ]
 
 
