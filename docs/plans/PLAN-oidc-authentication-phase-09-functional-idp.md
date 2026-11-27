@@ -39,6 +39,10 @@ the scope and one of them is a correction to the master plan itself
 * A guard that fails, rather than skips, when the lane that is
   supposed to have a provider does not.
 
+The coverage is **weekly, not merge-gating**: see finding 6 and D2.
+Nothing in this phase blocks a merge, and the plan does not pretend
+otherwise.
+
 **Out of scope, deliberately:**
 
 * **Authentik in CI.** Finding 3 makes two providers unaffordable
@@ -178,6 +182,31 @@ A test that skips when its fixture is missing, and a fixture whose
 installer lives in a repository the test cannot see, is a combination
 that cannot be audited from either side. D4 does not repeat it.
 
+### Finding 6 — the lane with the memory is the weekly lane
+
+Found at the back brief rather than at planning time, which is where
+it should have been found. `slim-tier` is not a merge-gating lane.
+`.github/workflows/functional-tests.yml:598-608` runs `functional_lanes`
+only on `merge_group` or `workflow_dispatch`, and the list it passes is
+`["debian-13-slim-primary", "guests"]`. `debian-13-slim-tier` appears
+instead in `.github/workflows/scheduled-tests.yml:87`, among the weekly
+lanes, whose header says they "do not gate a merge, run weekly against
+develop" and whose failures are reported by
+`tools/ci_report_scheduled_failures.py` as a `ci-failure` issue per
+lane.
+
+Both merge-gating lanes use the `slim-primary` topology, so both have
+the 4096 MiB primary finding 3 rules out. There is therefore no
+merge-gating lane this phase can run in without the memory risk, and
+D2 now says so rather than implying otherwise.
+
+Two consequences follow. The coverage this phase adds is weekly, so a
+login regression reaches `develop` and is reported up to a week later
+by an issue — a large improvement on today's zero, and not a gate.
+And the guard in D4 cannot be demonstrated by either pull request,
+because the lane runs neither on `pull_request` nor in the merge
+queue; the definition of done says how it is demonstrated instead.
+
 ### What the survey found to be correct
 
 The phase's premise holds: there is no real provider in any lane, the
@@ -207,13 +236,29 @@ inherit.
    lane that falls over on memory tests nothing at all.
 
 2. **The provider runs on the primary, in the `debian-13-slim-tier`
-   lane only.** On the primary because that is where the suite runs
-   and the only host the cluster is proven to reach (finding 3); in
-   slim-tier because its primary has 12288 MiB against slim-primary's
-   4096 (finding 3), and because that lane already carries extra
-   processes — it is the Kerbside lane — and finishes in 34 of its 60
-   minutes, so it has both the memory and the clock. The other three
-   `cluster-ci.conf` lanes are unchanged and pay nothing.
+   lane only, and that lane is weekly.** On the primary because that
+   is where the suite runs and the only host the cluster is proven to
+   reach (finding 3); in slim-tier because its primary has 12288 MiB
+   against slim-primary's 4096 (finding 3), and because that lane
+   already carries extra processes — it is the Kerbside lane — and
+   finishes in 34 of its 60 minutes, so it has both the memory and
+   the clock. The other three `cluster-ci.conf` lanes are unchanged
+   and pay nothing.
+
+   Finding 6 is the cost of that, and it was put to Michael at the
+   back brief rather than decided here: slim-tier gates no merge, so
+   this phase's coverage runs once a week and a failure arrives as a
+   `ci-failure` issue. He kept it. The alternative was Keycloak in
+   4096 MiB beside sf-api, a venv and five stestr workers on every
+   merge, and a flaky merge gate on the fleet's smallest primary is
+   worse than honest weekly coverage. Raising that primary is a
+   change to another repository's capacity trade, in the middle of
+   its own 8 GiB sizing trial, and is not this phase's to make.
+
+   So this phase does not claim a gate. What it claims is that the
+   human login path is exercised against a real provider at all,
+   which it is not today, and phase 10 should record that the path
+   still has no merge-gating functional test.
 
 3. **The provider's certificate is signed by the CA
    `ci-jwks-ca.sh` already installed.** Finding 2 proves the cluster
@@ -275,7 +320,7 @@ inherit.
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
 | 9a | xhigh | opus | none | Write `tools/ci-idp-keycloak.sh`, which stands a Keycloak up on the primary and configures it for a human login. Model it on `tools/ci-jwks-ca.sh` — read that script first: same `set -eu` reasoning, same "requires the node address variables and the `nodes` list from `ci-environment.sh`, which the caller must have sourced" contract, same positional ssh-user argument, same explicit guards naming the missing variable. Reuse, do not reinvent: `tools/idp-lab/configure-keycloak.sh` already creates a realm, a group, a public client, a group-membership mapper writing the claim into the **identity** token and a person in that group, through Keycloak's admin API, and its header comment records the settings whose defaults do not work; `tools/idp-lab/lab-up.sh` and `make-certificates.sh` show the startup and certificate shape. The differences from the lab: one container not four, no compose file (a bare `docker run` is enough and the lab's compose carries Authentik too), ports bound so the cluster can reach them rather than loopback-only, and **the certificate is issued from the CA `tools/ci-jwks-ca.sh` left on the primary** (`~/.sf-ci-jwks-ca` by default, `SF_CI_JWKS_CA_DIR` to override — see `cluster_ci_tests/test_federation.py:143-160` for how the test already reads it) with a `subjectAltName` covering the address the cluster will use, because phase 8's step 8b found a SAN-less certificate fails on a hostname mismatch that no CA bundle setting can repair. Also enable the client's **direct access grant**, which 9c needs and the lab does not set. Pin the image tag to the one `tools/idp-lab/docker-compose.yml` already pins, and fail loudly rather than pulling `latest`. Install Docker if it is absent, and say in the header comment why that is acceptable on a throwaway CI node and unacceptable anywhere else, in the register `ci-jwks-ca.sh` uses for the same judgement. Write a descriptor the tests read — `~/.sf-ci-idp.json`, mode `u=r,go=`, holding `issuer_url`, `client_id`, `username`, `password`, `group` and `image` — and nothing else: the tests must not have to know Keycloak's admin API. Add a seam test in `shakenfist/tests/` in the manner of `test_ci_cluster_nodes_seams.py`, covering at least that the script exits non-zero with `ci-environment.sh` unsourced, and that the descriptor it writes parses and carries every key 9c reads. Do not touch `.github/`; 9b owns the caller. Do not write any test under `cluster_ci_tests/`; 9c owns those. |
-| 9b | medium | sonnet | none | **Lands in `shakenfist/actions`, not this repository**, as its own pull request, and opened only once 9a has merged here — the step tolerates the script being absent from an older component ref, as the JWKS step already does, so the order is safe either way but the reviewer should not have to hold two branches in their head. Add a step to `.github/workflows/smoke-cluster.yml` named *Stand up an identity provider*, immediately **after** *Trust a throwaway JWKS certificate authority* (D3: it consumes that step's CA), conditioned on `inputs.test_kind == 'functional' && inputs.stestr_config == 'cluster-ci.conf' && inputs.topology == 'slim-tier'` — read the existing step and match its shape exactly: the `if [ ! -f "${script}" ]` tolerance, the `. ${GITHUB_WORKSPACE}/ci-environment.sh`, the `${{ inputs.base_image_user }}` argument, a `timeout-minutes` (use 15; Keycloak's first start is slower than a CA mint). Its comment says what it is for, that it is slim-tier only and why — the primary is 4096 MiB in slim-primary and 12288 in slim-tier, cite both topology files — and that the tests fail rather than skip on this lane if it did not run. Change nothing else in that repository. |
+| 9b | medium | sonnet | none | **Lands in `shakenfist/actions`, not this repository**, as its own pull request. Order does not matter for correctness: finding 6 says the slim-tier lane runs neither on `pull_request` nor in the merge queue, so neither pull request's own CI exercises this step, and the step tolerates the script being absent from an older component ref as the JWKS step already does. What matters is that **both** are merged before the next weekly run, or that run exercises half the change. Add a step to `.github/workflows/smoke-cluster.yml` named *Stand up an identity provider*, immediately **after** *Trust a throwaway JWKS certificate authority* (D3: it consumes that step's CA), conditioned on `inputs.test_kind == 'functional' && inputs.stestr_config == 'cluster-ci.conf' && inputs.topology == 'slim-tier'` — read the existing step and match its shape exactly: the `if [ ! -f "${script}" ]` tolerance, the `. ${GITHUB_WORKSPACE}/ci-environment.sh`, the `${{ inputs.base_image_user }}` argument, a `timeout-minutes` (use 15; Keycloak's first start is slower than a CA mint). Its comment says what it is for, that it is slim-tier only and why — the primary is 4096 MiB in slim-primary and 12288 in slim-tier, cite both topology files — and that the tests fail rather than skip on this lane if it did not run. Change nothing else in that repository. |
 | 9c | xhigh | opus | none | Write `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_oidc_login.py`, covering the server half against the real provider. Read `cluster_ci_tests/test_federation.py` first and follow its conventions: the module docstring that says what is covered and what is not and why, `base.BaseNamespacedTestCase`, `requests` used directly wherever the exact status code is the assertion (the client library flattens 401/403/413/429 into typed exceptions), and `SafeHeaderMixin`. The provider descriptor is `~/.sf-ci-idp.json` (D4), read through a helper that: returns it when present; **fails** with a message naming the step in `shakenfist/actions` when it is absent and the suite is on slim-tier; and skips otherwise. Decide "am I on slim-tier" from the cluster rather than an environment variable if there is an existing way to do it — `cluster_ci_tests/test_nodes.py` carves the localhost topology out of the structural minimum and is the precedent to read — and if there is not, use the descriptor's absence plus a shipped variable and say in the docstring which it is. Cover: an issuer created with the provider's real `issuer_url`, `client_id` and `oidc_scopes` round-trips; `/auth/issuers/<>/discover` fills `authorization_endpoint`, `token_endpoint`, `jwks_uri` and `device_authorization_endpoint` from the real document (D6, and compare against the committed `shakenfist/tests/files/idp/keycloak-discovery.json` only for *shape*, never for values — the lab's issuer URL is not CI's); a group-bound mapping rule plus an identity token obtained through the direct access grant exchanges at `/auth/login` for a working credential set; the minted key works against a real endpoint and is scoped as the rule says; the key's metadata from phase 6 reports its expiry, scopes and provenance, and the provenance names the person who logged in (D6); a token whose group claim matches no rule is refused; and the audience trap phase 4's survey found — an issuer configured with the cluster API URL as its audience refuses a login that the correct `client_id` audience accepts — because that is the one misconfiguration the operator guide used to invite and a functional test is where it stops being theoretical. Do not test the client: 9d owns that. Do not change any code under `shakenfist/` outside `deploy/`; if a test cannot be written without a code change, stop and report it as D7 requires. |
 | 9d | xhigh | opus | none | Add the client-driven device login to `test_oidc_login.py`, as its own test class. Run `sf-client login --flow device` as a subprocess — it is installed in the suite's venv by CI (finding 4), and `shakenfist_client/commandline/auth.py`'s docstring is the authority on its behaviour: instructions and warnings go to **stderr**, stdout carries only the command's own document, and no secret is ever printed, so the verification URI and user code must be read from the stream the module says carries them and the test must not assert on anything the module promises never to print. While it polls, play the person in a thread: GET the verification URI, post the credentials to Keycloak's login form, and post the device-grant approval. Confine every piece of HTML knowledge to one helper with a docstring saying it is tied to the pinned image tag and that the right response to it breaking is to fix it, not to loosen it, and that the alternative — reimplementing the flow — would test nothing. Assert that the login leaves usable credentials and that the namespace key it cached is the one the cluster minted, and that `sf-client logout` discards them. Then mutation-test the suspicious half with the `mutation-check` skill, each mutant under `timeout` and with `-B`: make the approver thread approve nothing (the test must fail, not hang past the step budget — if it hangs, the deadline is missing and that is a finding); make the login use `--flow browser` where no browser exists; make the descriptor's password wrong; make the approval succeed for a *different* user and confirm the provenance assertion fails. Record the table in Results. A surviving mutant is a missing test. |
 | 9e | medium | sonnet | none | Documentation and close-out. `docs/developer_guide/` gains a short account of what the cluster suite now covers for human login and what it deliberately does not — the authorization-code flow has no functional coverage and `client-python`'s unit tests are what cover it (D5), and Authentik's CI coverage is its captures and its lab, not a running provider (D1) — placed with the existing CI documentation rather than in a new page, and `docs/developer_guide/ci.md`'s workflow table updated if the new step belongs in it. Nothing in `docs/` may name a plan, a phase, a decision or a step: a pre-commit hook enforces it. Add `tools/ci-idp-keycloak.sh` to whatever index `tools/` has, if it has one. Then fill this plan's Results and Definition of done, and record in Future work: Authentik in CI once a lane has the memory, the authorization-code flow once a lane has a browser, and anything D7 turned into an issue. |
@@ -293,6 +338,7 @@ repository and is sequenced after 9a.
 | Docker on an SF node interferes with cluster networking | The slim-tier primary is a hypervisor and the network node, which is the worst case for this, and Docker's own iptables rules are the specific hazard. 9a must check and report, not assume: the first run of the lane is the evidence, and the node-level checks the workflow already runs after the suite are where a broken bridge would show. If it does interfere, the provider moves to a node that is not the network node and 9c's reachability assumption is revisited — that is a plan amendment, not a workaround. |
 | The HTML scraping in 9d rots | D5 accepts this explicitly. The tag is pinned, the knowledge is in one helper, and the helper's docstring says the fix is to fix it. A loosened assertion that passes against a changed login page is the failure mode, and the mutation table in 9d is what makes a silently-passing approver visible. |
 | The tests skip everywhere and nobody notices | This is finding 5's failure, repeated. D4's guard is the mitigation and it is a done-criterion, not a note: on slim-tier, a missing descriptor fails. The reviewer should check that guard by reading it, because a guard that itself skips is indistinguishable from no guard. |
+| Weekly coverage lets a login regression reach `develop` | Accepted at the back brief, and recorded in D2 rather than hidden. The weekly lane files a `ci-failure` issue naming the commit tested and the last commit the lane passed on (`tools/ci_report_scheduled_failures.py`), so a red run reaches a person. The mitigation that would actually close it is a merge-gating lane with enough memory, which is another repository's decision and is named in Future work. |
 | The phase finds a real defect and grows to fix it | D7. The reviewer's job is to push back on any code change under `shakenfist/` outside `deploy/` in this branch. |
 | 9d's subprocess hangs and burns the step budget | The device grant has an `expires_in` and phase 7's poll loop has a deadline, so the honest failure is a failed assertion. The mutant that approves nothing is there to prove it, and it runs under `timeout`. |
 
@@ -317,7 +363,12 @@ repository and is sequenced after 9a.
       the step skipped.
 * [ ] On slim-tier, removing the descriptor makes
       `test_oidc_login.py` **fail**; on slim-primary it makes it
-      skip. Both demonstrated, not argued.
+      skip. Demonstrated by a `workflow_dispatch` of
+      `scheduled-tests.yml` once both pull requests are ready, which
+      Michael authorised at the back brief because it deploys a
+      nested cluster on sfcbr. Finding 6 is why the pull requests
+      cannot show it themselves. The skip half is demonstrated by the
+      merge queue's own slim-primary run.
 * [ ] `/auth/issuers/<>/discover` is asserted against the real
       provider's document and fills all four endpoints, including
       `device_authorization_endpoint` read with `json` rather than
@@ -398,9 +449,39 @@ change a workflow every component in the fleet consumes
 (`smoke-cluster.yml`), which is why 9b is scoped to one step and
 forbidden from touching anything else there.
 
+## Execution notes
+
+Execution began on 2026-11-27 (AEDT). The back brief was answered
+before step 9a started, and one of its four answers changed the plan:
+
+1. **D1 and D2 — kept, with finding 6 recorded.** Checking D2's own
+   premise before running a step found that `slim-tier` is a weekly
+   lane rather than a merge-gating one, which the plan had not said
+   and which makes this phase's coverage weekly. Michael kept
+   slim-tier on that understanding rather than risking a flaky merge
+   gate on a 4096 MiB primary. D2, the scope section, the risks
+   table, this phase's share of the master plan and the guard's
+   definition of done were all corrected before any code was
+   written; finding 6 records the fact at its source.
+2. **The descriptor — the six planned keys, and 9a may add.** If the
+   provider configuration turns out to need a seventh, 9a adds it and
+   reports it, so 9c is written against what exists rather than
+   against what this plan predicted.
+3. **Local containers — allowed.** The step agents may stand Keycloak
+   up in Docker on the development host, as phase 8 did for its
+   captures, so the script and the HTML helper are validated against
+   a real provider rather than written blind. No live cluster and no
+   sfcbr involvement.
+4. **The guard's proof — a `workflow_dispatch` of the weekly lanes**,
+   authorised in advance because it deploys a nested cluster. It runs
+   once both pull requests are ready, not before.
+
 ## Future work
 
-Filled in by 9e.
+Filled in by 9e. One entry is already owed: a merge-gating lane with
+enough memory for a provider, which would turn this phase's weekly
+coverage into a gate, and which is a capacity decision in
+`shakenfist/actions` rather than here.
 
 ## Results
 

@@ -1722,6 +1722,19 @@ installs — the cluster resolves discovery, the JWKS fetch
 and the login exchange through the one
 `FEDERATION_JWKS_CA_BUNDLE` trust store.
 
+The lane with that memory is the **weekly** one. Both
+merge-gating lanes use the `slim-primary` topology and so
+have the smaller primary, which means this phase's coverage
+runs once a week against `develop` and a failure arrives as
+a `ci-failure` issue rather than blocking a merge. That was
+accepted deliberately, because a provider in 4096 MiB beside
+the suite risks a flaky gate on the fleet's smallest
+primary, and raising that primary is a capacity decision in
+`shakenfist/actions` in the middle of its own sizing trial.
+So the human login path gains its first real-provider
+coverage here and still has no merge-gating functional test,
+which phase 10 should record.
+
 **Phase 10 — push audit.** Runs `PUSH-AUDIT.md` over the
 accumulated diff of every phase in this plan against
 `develop`, not the last phase's diff alone. Findings land as
