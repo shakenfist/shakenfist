@@ -222,6 +222,69 @@ files nothing: `report_failures` prints the issue it would have filed
 to its log, because the failure is the branch's and not the lane's,
 and only runs of the default branch are reported.
 
+### Human login is covered against a real provider, weekly
+
+The federated exchange is tested against a throwaway JWKS server the test
+process runs itself (`cluster_ci_tests/test_federation.py`), which is the
+right trade for validation and no use at all for a *flow*: discovery reads
+a document we did not write, and the login exchange trades a token a
+provider minted for its own reasons. So the cluster suite also stands up
+one real OpenID Connect provider, Keycloak in a container on the cluster's
+primary, and `cluster_ci_tests/test_oidc_login.py` covers, against it:
+
+- discovery, with an issuer configured from the provider's real issuer URL
+  and every login endpoint filled in from the document it publishes;
+- the login exchange at `/auth/login`, with a group bound mapping rule;
+- the credential set that login mints, and the metadata on its key,
+  including its provenance;
+- a refusal, when the identity's group matches no rule, and a login whose
+  audience is checked against the client identifier rather than the API's
+  URL;
+- a real `sf-client login --flow device`, run as a subprocess, with the
+  test playing the person at the provider's own pages while the client
+  polls, and asserting what the client leaves in its cache.
+
+**This coverage is weekly. It does not gate a merge.** The provider runs
+on the `debian-13-slim-tier` lane only, because that lane's primary is the
+one with the memory for it: 12288 MiB in the `slim-tier` topology, against
+4096 MiB in `slim-primary`, which is what both merge-gating lanes put the
+suite on. A login regression therefore arrives as a `ci-failure` issue from
+the weekly run, up to a week after the change which caused it, and not as a
+blocked merge. `shakenfist/tests/test_ci_oidc_login_guard.py` fails a pull
+request which moves that lane into the merge queue or adds a topology the
+suite's rule for "is a provider expected here?" has no answer for.
+
+On the lane that is supposed to have a provider the tests fail rather than
+skip when the provider's descriptor is missing, so a bring-up step which
+quietly stopped working is a failure and not a silent gap.
+
+**What has no functional coverage.** The authorization code flow is not
+exercised against a running provider, because it needs a browser and the
+suite's host has none. `client-python`'s own unit tests are what cover it.
+
+**Authentik is not run in CI.** Its coverage is its committed captures
+under `shakenfist/tests/files/idp/` (a discovery document and a claim set),
+the reproducible lab in `tools/idp-lab/`, and the walkthrough in the
+operator guide. One provider was chosen because two do not fit: Authentik
+needs four containers and database migrations on a cold first boot, and the
+primary's memory does not stretch to running both.
+
+Where the pieces live:
+
+| Piece | Location |
+|-------|----------|
+| Bring-up: certificate, container, realm, client, person, descriptor | `tools/ci-idp-keycloak.sh` |
+| The step which calls it | `smoke-cluster.yml` in `shakenfist/actions` |
+| The tests | `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_oidc_login.py` |
+| The person's half of a device login, parsed from the provider's HTML | `shakenfist/deploy/shakenfist_ci/idp_pages.py`, unit tested against the captured pages in `shakenfist/tests/files/idp/keycloak-device-*.html` |
+| The guard on where the provider may run | `shakenfist/tests/test_ci_oidc_login_guard.py` |
+| Regenerating the captures | `tools/idp-lab/capture-fixtures.sh` |
+
+The provider's certificate is signed by the authority `tools/ci-jwks-ca.sh`
+already installs, which the cluster trusts through
+`FEDERATION_JWKS_CA_BUNDLE`. `sf-client` has no equivalent setting, so the
+device login test points it at that authority with `REQUESTS_CA_BUNDLE`.
+
 ## The live MariaDB tests
 
 `shakenfist/tests/test_mariadb_*_live.py` need a real MariaDB server rather

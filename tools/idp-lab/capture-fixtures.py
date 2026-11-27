@@ -25,6 +25,12 @@ discovery document, the issuers, the set of claim names, and the shape
 and value of the group claim -- which is what a reviewer comparing a
 regenerated capture with the committed one should read.
 
+For Keycloak it also saves the two HTML pages a person sees during that
+device login, scrubbed, as keycloak-device-signin-page.html and
+keycloak-device-confirm-page.html. Those are what the unit tests for
+shakenfist_ci/idp_pages.py parse, so the parser is checked against a page
+a real provider served rather than one somebody remembered.
+
 No credential and no signed token is written anywhere: only the
 decoded claim set, with the subject replaced. The identity is an
 invented lab person, and this refuses to write a claim set which names
@@ -208,7 +214,44 @@ def html_form_action(page, marker=None):
     return match.group(1).replace('&amp;', '&'), text
 
 
-def keycloak_id_token(settings):
+# What the saved HTML pages have scrubbed, and what replaces it. These
+# are per-login identifiers which a committed page has no business
+# carrying: the session code and execution identifier authorise the
+# form post, the grant code authorises the confirmation, and the
+# argument to checkAuthSession is an auth session identifier which
+# lives in a script rather than a form, which is the one a scrub of
+# the forms alone misses. The placeholders match the committed files.
+PAGE_SCRUBS = [
+    (re.compile(r'(session_code=)[^&"\']+'), r'\1SESSION-CODE-SCRUBBED'),
+    (re.compile(r'(execution=)[^&"\']+'), r'\1EXECUTION-SCRUBBED'),
+    (re.compile(r'(tab_id=)[^&"\']+'), r'\1TAB-SCRUBBED'),
+    (re.compile(r'(checkAuthSession\(\s*")[^"]*(")'), r'\1AUTH-SESSION-ID-SCRUBBED\2'),
+    (re.compile(r'(name="code" value=")[^"]*(")'), r'\1GRANT-CODE-SCRUBBED\2'),
+]
+
+
+def save_page(page, path):
+    """Write one provider page with its per-login identifiers scrubbed.
+
+    There are now two parsers for these pages in this repository, and
+    they are separate on purpose. html_form_action above runs on a
+    development host beside the lab and only has to find a form action
+    in a page it just fetched. shakenfist_ci/idp_pages.py is what the
+    cluster suite uses to play the person, and has to stay free of any
+    import from the suite so that a unit test can load it by path; it
+    cannot share code with a script that lives under tools/. A reader
+    who changes how one reads these pages should look at the other.
+    """
+    text = page.decode('utf-8', errors='replace')
+    for pattern, replacement in PAGE_SCRUBS:
+        text = pattern.sub(replacement, text)
+
+    with open(path, 'w') as f:
+        f.write(text)
+    print('wrote %s' % path)
+
+
+def keycloak_id_token(settings, output_dir=None):
     """Complete a Keycloak device login and return its identity token.
 
     Three things about this provider's device login are worth knowing
@@ -228,6 +271,8 @@ def keycloak_id_token(settings):
 
     _, page = session.request(codes['verification_uri_complete'])
     action, _ = html_form_action(page, marker='password')
+    if output_dir:
+        save_page(page, os.path.join(output_dir, 'keycloak-device-signin-page.html'))
     _, page = session.form(action, {'username': settings['person'],
                                     'password': settings['person_password'],
                                     'credentialId': ''})
@@ -235,6 +280,8 @@ def keycloak_id_token(settings):
     text = page.decode('utf-8', errors='replace')
     if 'name="accept"' in text:
         action, text = html_form_action(page, marker='accept')
+        if output_dir:
+            save_page(page, os.path.join(output_dir, 'keycloak-device-confirm-page.html'))
         consent = re.search(r'name="code" value="([^"]*)"', text)
         if not consent:
             raise CaptureFailed('The consent page carried no code: %s' % text[:300])
@@ -392,7 +439,7 @@ def capture(provider, settings, output_dir):
     write_json(os.path.join(output_dir, '%s-discovery.json' % provider), document)
 
     if provider == 'keycloak':
-        token = keycloak_id_token(settings)
+        token = keycloak_id_token(settings, output_dir)
     else:
         token = authentik_id_token(settings)
 
@@ -413,7 +460,7 @@ def capture(provider, settings, output_dir):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--output-dir', required=True,
-                        help='where the four captures are written')
+                        help='where the captures are written')
     parser.add_argument('--provider', action='append', choices=['keycloak', 'authentik'],
                         help='capture one provider rather than both; repeatable')
     args = parser.parse_args()

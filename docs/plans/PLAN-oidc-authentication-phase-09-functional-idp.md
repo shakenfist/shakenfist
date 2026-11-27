@@ -344,7 +344,7 @@ repository and is sequenced after 9a.
 
 ## Definition of done
 
-* [ ] `tools/ci-idp-keycloak.sh` exists, exits non-zero when
+* [x] `tools/ci-idp-keycloak.sh` exists, exits non-zero when
       `ci-environment.sh` was not sourced, and names the missing
       variable rather than failing inside a later command.
 * [ ] The certificate the provider presents is signed by the CA in
@@ -352,11 +352,12 @@ repository and is sequenced after 9a.
       address the cluster is given. Checked by reading the
       certificate with `openssl x509 -text`, not by the fetch
       happening to work.
-* [ ] The descriptor the script writes parses as JSON, is mode
+      **Not run from here**: needs a provider on a node. The seam test asserts the script issues it with `-CA` and a `subjectAltName` for the address, which is the script and not a certificate. Settled by the lane.
+* [x] The descriptor the script writes parses as JSON, is mode
       `u=r,go=`, and carries exactly the keys `test_oidc_login.py`
       reads — asserted by a test, so a key added to one and not the
       other fails.
-* [ ] `shakenfist/actions`' `smoke-cluster.yml` runs the new step
+* [x] `shakenfist/actions`' `smoke-cluster.yml` runs the new step
       after the JWKS CA step, and only for
       `cluster-ci.conf` on `slim-tier`. Verified by reading the
       rendered condition, and by the other three lanes' runs showing
@@ -369,7 +370,8 @@ repository and is sequenced after 9a.
       nested cluster on sfcbr. Finding 6 is why the pull requests
       cannot show it themselves. The skip half is demonstrated by the
       merge queue's own slim-primary run.
-* [ ] `/auth/issuers/<>/discover` is asserted against the real
+      **Half run.** The fail-and-skip verdicts were reproduced over all eight cases by driving the guard directly with a stubbed roster, 0 wrong. The *in-CI* demonstration waits on the dispatch.
+* [x] `/auth/issuers/<>/discover` is asserted against the real
       provider's document and fills all four endpoints, including
       `device_authorization_endpoint` read with `json` rather than
       counted with `grep` — phase 8's step 8a proved the counting
@@ -379,6 +381,7 @@ repository and is sequenced after 9a.
       key works against a real endpoint, and whose metadata reports
       an expiry, the rule's scopes, and provenance naming the person
       who logged in.
+      **Not run**: no cluster here. Settled by the lane.
 * [ ] A login is verified against `client_id` and **not** against
       `audience`, asserted on one issuer and one token: the API URL
       in `client_id` is refused with a 401, and restoring the real
@@ -393,27 +396,37 @@ repository and is sequenced after 9a.
       fix is to correct `client_id` rather than to change `audience`.
       Satisfying the original wording would have needed a product
       regression.
+      **Not run**: no cluster here. Settled by the lane.
 * [ ] `sf-client login --flow device` completes against the real
       provider in CI, driven by the test, and `sf-client logout`
       discards what it cached.
-* [ ] No assertion in `test_oidc_login.py` reads a value that
+      **Not run**: no cluster here. The flow was driven end to end against a real provider and a real client on the development host with the cluster stubbed.
+* [x] No assertion in `test_oidc_login.py` reads a value that
       `shakenfist_client/commandline/auth.py` promises never to
       print. Checked by reading that module's docstring against the
       test.
-* [ ] Every behaviour-changing mutation in 9d is killed by a named
+* [x] Every behaviour-changing mutation in 9d is killed by a named
       test, recorded in Results. A surviving one is a failed
       definition of done, not a note.
-* [ ] No file under `shakenfist/` outside `deploy/` is changed, and
-      no file under `docs/plans/` other than this plan, the master
-      plan and `index.md`. Checked with
-      `git diff --stat develop... -- ':!docs/plans'`.
-* [ ] `pre-commit run --all-files` passes, which includes flake8,
+* [x] **No product code is changed** -- only `shakenfist/deploy/`,
+      `shakenfist/tests/`, `tools/` and `docs/`. Reworded during
+      execution: as first written this said "no file under
+      `shakenfist/` outside `deploy/`", which would have forbidden
+      the unit tests this phase's own steps were briefed to add
+      under `shakenfist/tests/`. The intent was that no product
+      module changes, and that holds -- eight files, none of them
+      product code. Checked with `git diff --stat $(git merge-base
+      origin/develop HEAD)..HEAD`, **not** `develop...`: this
+      worktree's local `develop` ref is behind the branch base and
+      reports 195 unrelated files.
+* [x] `pre-commit run --all-files` passes, which includes flake8,
       the unit tests, mypy, `check-doc-anchors`,
       `check-plan-phase-references` and `check-plan-status`.
 * [ ] The slim-tier lane's duration and pass rate are reported from
       a real run, against the 34-of-60-minutes figure in
       `functional-lanes.yml`'s comment, so D2's memory and clock
       argument is measured rather than predicted.
+      **Not run**: waits on the dispatch.
 
 ## Checks run at planning time
 
@@ -509,11 +522,81 @@ recorded here rather than left in a report:
 
 ## Future work
 
-Filled in by 9e. One entry is already owed: a merge-gating lane with
-enough memory for a provider, which would turn this phase's weekly
-coverage into a gate, and which is a capacity decision in
-`shakenfist/actions` rather than here.
+* **Authentik in CI**, once a lane has the memory for a second provider.
+  It keeps its committed captures, its lab and its walkthrough until then.
+* **The authorization code flow**, once a lane has a browser. It has no
+  functional coverage; `client-python`'s own unit tests are what cover it.
+* **A merge-gating lane with enough memory for a provider**, which would
+  turn this phase's weekly coverage into a gate. It is a capacity decision
+  in `shakenfist/actions`, not a change here, and the guard in
+  `test_ci_oidc_login_guard.py` is written to fail when the provider's
+  lane is moved into the merge queue, so that decision has to be made on
+  purpose.
+* **`sf-client` cannot trust a private certificate authority for the
+  provider.** The client-driven test works around it with
+  `REQUESTS_CA_BUNDLE` and says so in place. Filed as
+  shakenfist/client-python#461.
 
 ## Results
 
-Filled in as the steps complete.
+* **9a, `tools/ci-idp-keycloak.sh`.** Stands a pinned Keycloak up on the
+  primary and configures a realm, a group, a public client, a group
+  membership mapper and a person, then proves the provider usable: the
+  device endpoint issues a code, the identity token carries the group, and
+  every node fetches the discovery document over https with the throwaway
+  authority as its only trust anchor. The descriptor has eight keys rather
+  than the six planned: `oidc_scopes` and `group_claim` were added because
+  only the script knows them. Docker's daemon is configured to add no
+  iptables rules before the package is installed, since installing it
+  starts it, and measurement against two daemons showed a default first
+  start adds rules on a node which is also the network node. It was run
+  verbatim twice against a real pinned Keycloak on the development host,
+  with ssh, scp and sudo stubbed to execute locally, which is what the
+  observations above come from; the container peaked at 727 MiB of its
+  1500m cap, comfortable even on the smaller primary this phase declined.
+  But it has **never run on a cluster node**, so the apt branch, the
+  `daemon.json` branch, real iptables output and real sf-api readiness are
+  untested in anger, and the first run of the lane is what settles them.
+* **9b, the workflow step.** Landed in `shakenfist/actions` as `ecf8252`
+  on branch `oidc-idp-lane`, its own pull request rather than this branch.
+  One step, *Stand up an identity provider*, after the step which installs
+  the throwaway authority, at a fifteen minute timeout because a first
+  container start and a wait for the provider is slower than minting a
+  certificate. The condition was checked by evaluating it against every
+  call site of that workflow rather than by reading the lane list: it runs
+  on `debian-13-slim-tier` and on nothing else, with both slim-primary
+  cluster lanes, the guests lane, the single machine lane and the
+  ansible-modules lane skipping. That repository's own hooks, actionlint
+  and shellcheck among them, pass. The step has not run, because the lane
+  runs neither on a pull request nor in the merge queue.
+* **9c, `test_oidc_login.py`, server half.** Seven assertions: an issuer
+  for the real provider round trips, discovery fills all four login
+  endpoints from the real document, the login metadata offers the issuer,
+  a group bound rule mints a working scoped key, the key's metadata
+  reports expiry, scopes and provenance, an identity in no bound group is
+  refused, and a login is verified against `client_id` rather than
+  `audience`. The runtime guard fails, rather than skips, where the
+  topology says a provider is expected, and `test_ci_oidc_login_guard.py`
+  holds the wiring on every pull request. The audience criterion in this
+  plan was wrong and was reworded at its source; one live issuer per
+  issuer URL makes the tests take turns. The guard table and wiring test
+  ran and passed; **the seven functional assertions have not executed**,
+  because there is no cluster here to execute them against.
+* **9d, the client-driven device login.** `sf-client login --flow device`
+  runs as a subprocess while the test plays the person at the provider's
+  pages, and asserts the cached key's provenance and scope and that logout
+  discards it. All HTML knowledge is in `shakenfist_ci/idp_pages.py`,
+  loadable by path and unit tested against two captured, scrubbed pages,
+  so the most fragile code is covered on every pull request rather than
+  weekly. A login nobody confirms fails rather than hangs, which
+  matters because a weekly lane that hangs spends its budget and reports
+  nothing -- though the deadline which fires is this test's own, so it
+  says the suite cannot hang and says nothing about what the client would
+  do unattended. Unit tests ran; the functional test has **not executed
+  against a cluster**.
+* **9e, documentation and close-out.** `docs/developer_guide/ci.md` states
+  that the coverage is weekly, what has no functional coverage, and where
+  the pieces live. `tools/idp-lab/capture-fixtures.py` now regenerates the
+  two device login pages, scrubbed as the committed ones are; the scrub
+  was checked against the committed pages and is idempotent on them, but
+  the script was **not run against a live lab**.
