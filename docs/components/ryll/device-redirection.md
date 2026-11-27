@@ -187,32 +187,34 @@ enabled.
 ### GUI Components
 
 The USB panel is a right-side panel toggled by Menu → USB,
-rendered alongside the traffic viewer panel (both use `egui::SidePanel::right`
+rendered alongside the traffic viewer panel (both use `egui::Panel::right`
 with different IDs).
 
-**State tracking on RyllApp:**
+**State tracking on `UsbPanel`** (`ryll/src/app/ui/usb_panel.rs`, held by
+`RyllApp`):
 
-- `usb_tx` — mpsc sender to the UsbredirChannel, created in `RyllApp::new()`
-  and threaded through `run_connection()`. Mirrors the `input_tx` pattern.
-- `usb_channel_ready` — set when `UsbChannelReady` event arrives, cleared on
+- `tx` — mpsc sender to the UsbredirChannel, created in `RyllApp::new()`
+  and threaded through `run_connection()`; installed on the panel by
+  `UsbPanel::reset_for_session`. Mirrors the `input_tx` pattern.
+- `channel_ready` — set when `UsbChannelReady` event arrives, cleared on
   usbredir channel disconnect.
-- `usb_connecting` / `usb_disconnecting` — operation in progress flags, cleared
+- `connecting` / `disconnecting` — operation in progress flags, cleared
   on success/failure events.
-- `usb_device_description` — set by `UsbDeviceConnected`, cleared by
+- `device_description` — set by `UsbDeviceConnected`, cleared by
   `UsbDeviceDisconnected` and channel disconnect.
-- `usb_connected_at` — timestamp for the elapsed connection timer.
-- `usb_available_devices` — enumerated device list, refreshed on panel open
+- `connected_at` — timestamp for the elapsed connection timer.
+- `available_devices` — enumerated device list, refreshed on panel open
   and via Refresh button.
-- `usb_virtual_disks` — session-scoped virtual disk paths from CLI flags and
+- `virtual_disks` — session-scoped virtual disk paths from CLI flags and
   runtime additions.
 
 **Command flow:**
 
 The GUI sends identity-based `UsbCommand` variants (`ConnectPhysical { bus,
 address }` (Linux only), `ConnectVirtualDisk { path, read_only }`,
-`DisconnectDevice`) via
-`usb_tx`. The channel handler does async device lookup and open in its tokio
-context, sending `UsbDeviceConnected`, `UsbDeviceDisconnected`, or
+`DisconnectDevice`) via the panel's `tx`. The channel handler does
+async device lookup and open in its tokio context, sending
+`UsbDeviceConnected`, `UsbDeviceDisconnected`, or
 `UsbConnectFailed` events back to the app. If a device is already connected
 when a connect command arrives, the handler disconnects it first.
 

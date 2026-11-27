@@ -1239,13 +1239,32 @@ The scanner jobs above enforce policy that lives in files at the
 repository root, and changing that policy has rules the files
 themselves do not state:
 
-- **Ignoring a RustSec advisory** requires adding the advisory
-  ID to *both* `deny.toml` and `.cargo/audit.toml`, with an
-  inline comment on each entry giving the rationale. Both
-  scanners run on every pull request and both must pass, so the
-  two ignore lists have to stay in sync — editing only
-  `deny.toml` produces a red `cargo audit` job. Ignores are debt
-  and should not accumulate silently.
+- **Ignoring a RustSec advisory** means adding its ID to the
+  ignore list of each scanner that actually fails on it —
+  `deny.toml` for `cargo deny`, `.cargo/audit.toml` for
+  `cargo audit` — with an inline comment giving the rationale,
+  and a section in the supply-chain follow-ups plan. The two
+  lists are not mirrors. `cargo audit` fails only on
+  vulnerabilities and warns about unmaintained and unsound
+  crates; `cargo deny` also fails on unmaintained and unsound
+  advisories, but only for direct dependencies (the
+  `unmaintained` and `unsound` scopes in `deny.toml`). So
+  confirm a scanner fails without the entry before adding it:
+  an ignore that suppresses nothing implies a gate that does
+  not exist, and `cargo deny` reports one in its own list as
+  `advisory-not-detected`. Ignores are debt and should not
+  accumulate silently.
+- **Warnings become issues, not ignores.** The weekly
+  `Supply chain` cron runs `rustsec/audit-check`, which reads
+  `.cargo/audit.toml` too, and on a scheduled run it opens one
+  issue for each vulnerability and each unmaintained or unsound
+  warning whose ID no issue or pull request title names, open
+  or closed (the action's search has no state filter). A
+  warning that fails neither scanner therefore gets one
+  tracking issue, filed once. Leave it to do that rather than
+  adding an ignore to stop it. An advisory that `cargo deny`
+  fails on but `cargo audit` only warns about gets both: an
+  entry in `deny.toml` and a tracking issue.
 - **Allowing a new licence** means adding a permissive SPDX
   identifier to `deny.toml`'s `licenses.allow` array. The
   `licenses.exceptions` array is for a narrower case: a single
