@@ -16,9 +16,12 @@ this file covers what only a real provider can cover:
   the identity token obtained from the provider's direct access grant,
 * the metadata of the key that login mints, including its provenance,
 * a refusal when the identity's group matches no rule,
-* and which column a login's audience is verified against, which is
-  the one misconfiguration an operator can make here and never
-  diagnose from the refusal.
+* which column a login's audience is verified against, which is the one
+  misconfiguration an operator can make here and never diagnose from
+  the refusal,
+* and the command a person actually runs: ``sf-client login --flow
+  device``, as a subprocess, with the test playing the person at the
+  provider's own pages while the client polls.
 
 The provider is stood up by ``tools/ci-idp-keycloak.sh``, called from a
 step in the ``shakenfist/actions`` workflow which deploys the cluster,
@@ -28,6 +31,13 @@ exact status code is the assertion, because the client library maps
 responses onto typed exceptions and flattens the distinctions this file
 cares about; the administrative routes go through the client, as they
 do in ``test_federation.py``.
+
+The client is driven as a command rather than imported. What is being
+covered there is the thing a person types -- which stream it talks on,
+what it leaves on disk and what it discards -- so it is run as the
+console script CI installs into this suite's virtualenv, with the
+person's half of the device authorization grant performed by a thread
+beside it.
 
 **Which deployments expect a provider, and how that is decided.** A
 test which skips when its fixture is missing, where the thing that
@@ -65,6 +75,12 @@ attachment is read by whoever reads the job.
 
 import json
 import os
+import re
+import shutil
+import stat
+import subprocess
+import tempfile
+import threading
 import time
 
 import jwt
@@ -72,6 +88,7 @@ import requests
 from testtools import content
 
 from shakenfist_ci import base
+from shakenfist_ci import idp_pages
 from shakenfist_ci import sizing
 from shakenfist_client import apiclient
 
@@ -139,6 +156,50 @@ ISSUER_CLAIM_POLL = 3
 RULE_SCOPES = ['artifact.read']
 RULE_KEY_TTL = 3600
 RULE_KEY_PREFIX = 'ci'
+
+# The client, as CI installs it: client-python is pip installed into the
+# virtualenv this suite runs out of, so its console script is on PATH.
+# Run as a command and not imported, because what is covered is what a
+# person types.
+SF_CLIENT = 'sf-client'
+
+# The two things the client says when it has started a device
+# authorization, as shakenfist_client/commandline/auth.py's
+# _show_the_code() writes them -- on the *error* stream, because that
+# module keeps standard output for the command's own document. Both
+# spellings of the second line, because which one appears is the
+# provider's choice and not the client's: a provider which sends a
+# verification URI with the code already in it gets "confirm", and one
+# which does not gets "enter".
+#
+# The device code is deliberately absent. That module promises never to
+# print it -- it is the credential the poll loop presents -- so a test
+# which read it would be asserting the promise is broken.
+TOLD_THE_URI = re.compile(r'^To log in, open (\S+)$')
+TOLD_THE_CODE = re.compile(r'^and (?:confirm|enter) the code (.+)\.$')
+
+# How long the whole login may take, from the command starting to it
+# exiting. This is the test's own deadline and it is the reason a login
+# nobody completes fails rather than hanging: the provider's device code
+# lives for ten minutes and the client correctly polls for as long as
+# the provider said it may, so the only thing which can stop a login
+# that is never approved is here. A successful one takes about fifteen
+# seconds, nearly all of it the poll interval the provider asks for.
+LOGIN_DEADLINE = 180
+
+# How long to wait for the person's thread to finish after the command
+# has exited or been killed. It is doing bounded HTTP by then or
+# nothing at all, so this only has to be long enough not to be a race.
+PERSON_JOIN = 60
+
+# What a logout has to sweep up besides the cache itself, as
+# shakenfist_client/credentials.py names them: a process killed between
+# writing a temporary and renaming it over the cache leaves the whole
+# credential set behind under this prefix, so a logout which removed
+# only credentials.json would leave a key the cluster still honours on
+# disk. The test plants one and asserts it goes.
+CACHE_TEMPORARY_PREFIX = '.credentials-'
+CACHE_TEMPORARY_SUFFIX = '.tmp'
 
 
 def _endpoint_suffixes(document, issuer_url):
@@ -810,3 +871,513 @@ class TestHumanLogin(ProviderFixture, base.BaseNamespacedTestCase):
         minted = self._log_in_successfully(identity)
         self.assertEqual(self.namespace, minted['namespace'])
         self.assertEqual(RULE_SCOPES, minted['scopes'])
+
+
+class TestTheClientsDeviceLogin(ProviderFixture, base.BaseNamespacedTestCase):
+    """``sf-client login --flow device``, run as a person runs it.
+
+    The tests above reach the login exchange the way a test can: they
+    ask the provider for an identity token through its direct access
+    grant and post it to ``/auth/login`` themselves. That covers the
+    cluster's half completely and the client's half not at all. This
+    class covers the other side of the same login -- the device
+    authorization grant as RFC 8628 defines it, the client's poll loop,
+    the credential cache it writes and the logout which discards it --
+    by running the command and playing the person it is waiting for.
+
+    Three things make that possible without a browser:
+
+    * the provider's confirmation pages are plain HTML forms, driven by
+      ``shakenfist_ci/idp_pages.py`` and nothing else -- which is where
+      every piece of HTML knowledge lives, and where the brittleness of
+      that is argued;
+    * the client says where to go and what to confirm on its error
+      stream, which this test reads as it arrives rather than after the
+      command exits -- the command does not exit until the person has
+      finished;
+    * and the credential cache is ``$XDG_CONFIG_HOME/shakenfist``, read
+      at the moment it is used, so the variable can point it at a
+      directory this test made and removes. That matters more than it
+      looks: this suite runs on a cluster node whose own home directory
+      is nobody's to write a long lived credential into.
+
+    What is deliberately not covered is the other flow. The
+    authorization code grant needs a browser on the host running the
+    login and this host has none, so it has no functional coverage at
+    all; ``client-python``'s own unit tests are what cover it.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'oidcclient'
+        super().__init__(*args, **kwargs)
+
+    def setUp(self):
+        super().setUp()
+
+        # Named rather than assumed, so that a suite whose virtualenv
+        # does not hold the client says so instead of reporting that a
+        # login did not happen.
+        self.sf_client = shutil.which(SF_CLIENT)
+        self.assertTrue(
+            self.sf_client,
+            'there is no %s on PATH, so the client cannot be driven. CI '
+            'installs client-python into the virtualenv this suite runs out '
+            'of, and the step which does it is in shakenfist/actions.'
+            % SF_CLIENT)
+
+        self.config_home = tempfile.mkdtemp(prefix='sf-ci-oidc-')
+        self.addCleanup(shutil.rmtree, self.config_home, True)
+        self.cache_path = os.path.join(
+            self.config_home, 'shakenfist', 'credentials.json')
+
+        # The session the person's half uses, with the authority the
+        # provider's certificate was issued from. Built here rather than
+        # in idp_pages, which is kept loadable by a unit test and so
+        # knows nothing about requests or about this cluster.
+        session = requests.Session()
+        session.verify = CI_CA_CERT
+        self.pages = idp_pages.ProviderLoginPages(session)
+
+    # -- running the client --------------------------------------------
+
+    def _client_environment(self):
+        """The environment the client is run in, and why each part is set.
+
+        ``XDG_CONFIG_HOME`` and ``HOME`` both point at this test's own
+        throwaway directory. The first is what decides where the
+        credential cache goes; the second is belt and braces, so that a
+        path built from ``~`` by anything at all lands in the same
+        place. Nothing this test runs may write a credential into the
+        home directory of whoever the suite runs as.
+
+        ``REQUESTS_CA_BUNDLE`` is the authority the provider's
+        certificate was issued from, and **it is a workaround rather
+        than the way this is meant to be done**. The client verifies the
+        provider with ``requests``' own defaults, a bundle of public
+        authorities; it has no option for an authority of one's own, and
+        nothing it prints or documents mentions needing one. This
+        provider's certificate comes from the throwaway authority
+        ``tools/ci-jwks-ca.sh`` minted, so without this line every login
+        here fails on a TLS verification the client cannot be told
+        about -- which is exactly what happens to an operator whose
+        self-hosted provider sits behind their own authority, while the
+        cluster side of the same deployment has a configuration key for
+        it. That is a gap in the client rather than in this deployment,
+        and this line stands in for the capability it is missing. It
+        applies to every request the client makes, and the cluster's own
+        API is served over plaintext here, so nothing else is affected
+        by it.
+
+        The suite's own credential is removed. ``login`` builds its
+        client from an API URL alone and never reads these, but a
+        credential in the environment of the one command whose whole
+        subject is which credential it ends up holding is a confusion
+        worth not having.
+        """
+        env = dict(os.environ)
+        env['HOME'] = self.config_home
+        env['XDG_CONFIG_HOME'] = self.config_home
+        env['REQUESTS_CA_BUNDLE'] = CI_CA_CERT
+        for name in ('SHAKENFIST_NAMESPACE', 'SHAKENFIST_KEY',
+                     'SHAKENFIST_API_URL'):
+            env.pop(name, None)
+        return env
+
+    def _run_the_client(self, args, timeout=LOGIN_DEADLINE):
+        """Run the client to completion, for the verbs nobody has to answer."""
+        completed = subprocess.run(
+            [self.sf_client] + args, stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            env=self._client_environment(), timeout=timeout, check=False)
+        return completed
+
+    def _the_only_device_login_offered(self):
+        """Assert this cluster offers one device login, and that it is ours.
+
+        Unauthenticated, as the client's own request to this route is.
+        The client asks which provider to use when more than one can run
+        the flow, and this test gives it no terminal to ask on -- so an
+        issuer left behind by something else would stop the login with a
+        question rather than let it run. There is one provider in this
+        deployment and the cluster permits one issuer per issuer URL, so
+        there is one right answer and this asserts it rather than
+        tolerating a second.
+        """
+        resp = requests.get(self.base_url + '/auth/login', timeout=30)
+        self.assertEqual(200, resp.status_code, resp.text)
+
+        offered = [entry for entry in resp.json()
+                   if entry.get('device_authorization_endpoint') and
+                   entry.get('token_endpoint')]
+        self.assertEqual(
+            [self.issuer_name], [entry['name'] for entry in offered],
+            'this cluster offers a device login through more than this '
+            'test\'s own issuer, so the client would ask which one to use '
+            'and there is nobody to answer')
+        return offered[0]
+
+    # -- being the person ----------------------------------------------
+
+    def _be_the_person(self, stream, report):
+        """Read what the client says, and do the person's half of it.
+
+        Runs in a thread beside the login because the login is waiting
+        for it: the client is polling the provider while this runs, and
+        it is the provider -- not this test -- which tells the client
+        the login happened.
+
+        Nothing here asserts or fails. A failure in testtools is an
+        exception and an exception in a thread is swallowed, so every
+        outcome is recorded in ``report`` and the test's own thread does
+        the asserting.
+
+        It has no deadline of its own, deliberately. Reading this stream
+        blocks until the client writes a line or exits, and the deadline
+        that matters is the one in ``_log_in_as_a_person``: when it
+        fires it kills the client, which closes this stream and ends
+        this loop.
+        """
+        try:
+            while True:
+                line = stream.readline()
+                if not line:
+                    return
+                line = line.rstrip('\n')
+                report['said'].append(line)
+
+                if report['uri'] is None:
+                    told = TOLD_THE_URI.match(line)
+                    if told:
+                        report['uri'] = told.group(1)
+                if report['code'] is None:
+                    told = TOLD_THE_CODE.match(line)
+                    if told:
+                        report['code'] = told.group(1)
+
+                if report['uri'] and report['code'] and not report['acted']:
+                    # Once: the client prints this once, and a second
+                    # confirmation of a code already spent is a request
+                    # with nothing behind it.
+                    report['acted'] = True
+                    report['approval'] = self.pages.approve(
+                        report['uri'], report['code'],
+                        self.descriptor['username'],
+                        self.descriptor['password'])
+        except Exception as e:
+            report['broke'] = '%s: %s' % (type(e).__name__, e)
+
+    def _log_in_as_a_person(self, flow='device'):
+        """Run a login and be the person it waits for.
+
+        Returns what happened: the exit code, both streams, how long it
+        took, and the person's own report. Nothing is asserted, because
+        a refused login is one of the things this file asserts about --
+        except for a login which never finishes at all, which is this
+        method's deadline. That deadline is the reason a login nobody
+        confirms fails rather than hanging: the provider's device code
+        lives for ten minutes and the client is right to poll for as
+        long as the provider said it may, so the only thing which can
+        stop an unconfirmed login inside a job's budget is here.
+        """
+        report = {'said': [], 'uri': None, 'code': None, 'acted': False,
+                  'approval': None, 'broke': None, 'stopped': None}
+        document = os.path.join(self.config_home, 'stdout')
+        started = time.time()
+
+        # The document goes to a file and not a pipe: this thread is
+        # waiting for the command to exit rather than reading its
+        # standard output, and a pipe nobody reads is a buffer which can
+        # fill. The error stream is a pipe because it is read as it
+        # arrives -- the code the person has to confirm is on it.
+        with open(document, 'w') as out:
+            proc = subprocess.Popen(
+                [self.sf_client, '--json', '--apiurl', self.base_url,
+                 'login', '--flow', flow],
+                stdin=subprocess.DEVNULL, stdout=out,
+                stderr=subprocess.PIPE, text=True, close_fds=True,
+                env=self._client_environment())
+            person = threading.Thread(
+                target=self._be_the_person, args=(proc.stderr, report))
+            person.start()
+
+            # Waited for in a loop rather than with one timeout, for the
+            # sake of the second branch: a person who cannot finish --
+            # a page which has changed, a password the provider refuses
+            # -- leaves the client correctly polling for a confirmation
+            # which is never coming, and waiting that out would report
+            # her error as a deadline three minutes later. The deadline
+            # is still what stops a login nobody confirmed, which is a
+            # different thing: there the person did not break, she was
+            # never asked.
+            deadline = started + LOGIN_DEADLINE
+            while True:
+                returncode = proc.poll()
+                if returncode is not None:
+                    break
+                if report['broke']:
+                    report['stopped'] = 'the person could not finish'
+                elif time.time() > deadline:
+                    report['stopped'] = (
+                        'the deadline of %d seconds' % LOGIN_DEADLINE)
+                if report['stopped']:
+                    proc.kill()
+                    returncode = proc.wait()
+                    break
+                time.sleep(1)
+            person.join(PERSON_JOIN)
+
+        with open(document) as f:
+            stdout = f.read()
+
+        return {'returncode': returncode, 'stdout': stdout,
+                'stderr': '\n'.join(report['said']),
+                'seconds': time.time() - started, 'person': report}
+
+    def _attach(self, name, text, secrets=()):
+        """Attach what the client printed, with any secret taken out first.
+
+        A detail is read by whoever reads the job. The client promises
+        to print no secret at all and this test asserts that it did
+        not -- but the assertion comes after the attachment, so the
+        attachment cannot be the thing that publishes one.
+        """
+        for secret in secrets:
+            if secret:
+                text = text.replace(secret, '(redacted)')
+        self.addDetail(name, content.text_content(text))
+
+    def _report_on(self, login):
+        """What happened, as a paragraph for a failure message."""
+        person = login['person']
+        return ('the client exited %s after %.1f seconds%s; the person was '
+                'told to open %s and confirm %s, acted: %s, approval: %s, '
+                'and her own error was %s'
+                % (login['returncode'], login['seconds'],
+                   ' and was killed at %s' % person['stopped']
+                   if person['stopped'] else '',
+                   person['uri'], person['code'], person['acted'],
+                   person['approval'], person['broke']))
+
+    # -- the login, as the command runs it -----------------------------
+
+    def test_a_device_login_caches_the_key_the_cluster_minted(self):
+        rule = self._create_rule()
+
+        # Who the cluster should say logged in. Asked of the provider
+        # directly, with the grant the tests above use: the subject is
+        # the same person's whichever flow produced the token, and the
+        # token the device flow produces is one this test never sees --
+        # the client does not print it, and promises not to.
+        expected = self._claims_of(self._identity_token())
+        self._the_only_device_login_offered()
+
+        login = self._log_in_as_a_person()
+        self._attach('login_stderr', login['stderr'],
+                     secrets=[self.descriptor['password']])
+        self._attach('login_stdout', login['stdout'],
+                     secrets=[self.descriptor['password']])
+        self.addDetail('login_seconds',
+                       content.text_content('%.1f' % login['seconds']))
+
+        # The person first, because every later assertion is about what
+        # her login produced, and because a login which was never
+        # confirmed has to report that rather than reporting a command
+        # which did not finish.
+        person = login['person']
+        self.assertIsNone(
+            person['broke'],
+            'the person\'s half of the login could not be played: %s'
+            % self._report_on(login))
+        self.assertTrue(
+            person['acted'],
+            'the client never said where to go and what to confirm, so there '
+            'was nothing to confirm: %s' % self._report_on(login))
+        self.assertTrue(
+            person['approval'] and person['approval']['approved'],
+            'the device login was not confirmed at the provider: %s'
+            % self._report_on(login))
+
+        # The code in the link and the code the person was asked to
+        # confirm are the same code. That is the whole purpose of
+        # printing it beside a link which already carries it, so it is
+        # worth asserting rather than assuming.
+        self.assertIn('user_code=%s' % person['code'],
+                      person['approval']['uri'])
+
+        self.assertEqual(
+            0, login['returncode'],
+            'the login was confirmed at the provider and the client still '
+            'refused it: %s' % self._report_on(login))
+
+        # -- what the command said it did
+        try:
+            rows = json.loads(login['stdout'])
+        except ValueError as e:
+            self.fail(
+                'the client\'s standard output did not parse as JSON (%s), '
+                'and that stream carries the command\'s own document and '
+                'nothing else -- everything it says to a person goes to the '
+                'error stream' % e)
+
+        self.assertEqual(
+            1, len(rows),
+            'one rule matched this identity, so one credential should have '
+            'been minted and reported: %s' % rows)
+        row = rows[0]
+        self.assertEqual(self.base_url, row['apiurl'])
+        self.assertEqual(self.namespace, row['namespace'])
+        self.assertTrue(row['key_name'].startswith(RULE_KEY_PREFIX + '-'),
+                        'key_name is %r' % row['key_name'])
+        self.assertEqual(RULE_SCOPES, row['scopes'])
+        self.assertTrue(
+            row['current'],
+            'one credential was minted, so it is the selection and the next '
+            'command would present it')
+
+        # -- what it left on disk
+        self.assertTrue(
+            os.path.exists(self.cache_path),
+            'the login reported credentials and cached none at %s. That path '
+            'is $XDG_CONFIG_HOME/shakenfist/credentials.json, and this test '
+            'pointed the variable at a directory of its own.'
+            % self.cache_path)
+        self.assertEqual(
+            0o600, stat.S_IMODE(os.stat(self.cache_path).st_mode),
+            'the cached credential is readable by somebody other than its '
+            'owner')
+
+        with open(self.cache_path) as f:
+            cached = json.load(f)
+        entries = [c for c in cached['credentials']
+                   if c.get('apiurl') == self.base_url]
+        self.assertEqual(
+            1, len(entries),
+            'the cache holds %d credentials for this cluster' % len(entries))
+        entry = entries[0]
+        self.assertEqual(row['key_name'], entry['key_name'])
+        self.assertEqual(self.namespace, entry['namespace'])
+        self.assertEqual({'apiurl': self.base_url,
+                          'namespace': self.namespace,
+                          'key_name': row['key_name']},
+                         cached['current'])
+
+        key = entry['key']
+        self.assertTrue(key.startswith('sfk_'),
+                        'a cluster minted secret must carry the prefix')
+
+        # Neither stream carried a secret, which is the property that
+        # module says is easiest to undo by accident. Asserted on the
+        # streams as they were, after the details above were attached
+        # with these values taken out.
+        for stream in ('stdout', 'stderr'):
+            self.assertNotIn(
+                key, login[stream],
+                'the client printed the namespace key the cluster minted on '
+                'its %s' % stream)
+            self.assertNotIn(
+                self.descriptor['password'], login[stream],
+                'the client printed the person\'s password on its %s'
+                % stream)
+
+        # -- the cached key is the one this cluster minted, for her
+        metadata = self._key_metadata(entry['key_name'])
+        self._attach('key_metadata',
+                     json.dumps(metadata, indent=4, sort_keys=True),
+                     secrets=[key])
+        self.assertEqual(self.namespace, metadata['namespace'])
+        self.assertEqual(RULE_SCOPES, metadata['scopes'])
+
+        provenance = metadata['provenance']
+        self.assertEqual('login', provenance['source'])
+        self.assertEqual(self.issuer_name, provenance['issuer'])
+        self.assertEqual(rule, provenance['rule_name'])
+        self.assertEqual(
+            expected['sub'], provenance['sub'],
+            'the cluster minted this key for a different identity from the '
+            'one which logged in. The person the descriptor names is %s, and '
+            'the provenance records somebody else.'
+            % self.descriptor['username'])
+        self.assertEqual(
+            {self.descriptor['group_claim']: [self.descriptor['group']]},
+            provenance['claims'])
+
+        # And it works, as far as the rule says and no further. A key
+        # the cluster did not mint could not authenticate at all, so
+        # this is the half of "the one the cluster minted" that the
+        # cluster itself answers.
+        token = self._bearer(self.namespace, key)
+        resp = requests.get(
+            self.base_url + '/artifacts',
+            headers={'Authorization': 'Bearer %s' % token}, timeout=30)
+        self.assertEqual(200, resp.status_code, resp.text)
+        resp = requests.get(
+            self.base_url + '/instances',
+            headers={'Authorization': 'Bearer %s' % token}, timeout=30)
+        self.assertEqual(
+            403, resp.status_code,
+            'the key this login cached reached the instance list, and the '
+            'rule granted it only %s' % RULE_SCOPES)
+
+        # -- and a logout discards it
+        #
+        # The cache file is not the only thing holding the key. A client
+        # killed between writing its temporary and renaming it over the
+        # cache leaves the whole credential set behind under a name of
+        # its own, and a logout which swept up only credentials.json
+        # would leave a key the cluster still honours on this disk after
+        # the person asked for it to be discarded. So one is planted and
+        # asserted on, with a secret which is not a secret.
+        planted = os.path.join(
+            os.path.dirname(self.cache_path),
+            '%sstep%s' % (CACHE_TEMPORARY_PREFIX, CACHE_TEMPORARY_SUFFIX))
+        with open(planted, 'w') as f:
+            json.dump({'version': 1, 'credentials': [
+                {'apiurl': self.base_url, 'namespace': self.namespace,
+                 'key_name': 'not-a-real-key', 'key': 'sfk_not-a-real-key'}]},
+                f)
+
+        out = self._run_the_client(['--json', 'logout'])
+        self.addDetail('logout_stdout', content.text_content(out.stdout))
+        self.addDetail('logout_stderr', content.text_content(out.stderr))
+        self.assertEqual(0, out.returncode, out.stderr)
+
+        discarded = json.loads(out.stdout)
+        self.assertEqual(
+            self.cache_path, discarded['path'],
+            'the logout discarded a cache somewhere other than the one the '
+            'login wrote')
+        self.assertEqual(
+            1, discarded['discarded'],
+            'the login cached one credential and the logout counted %s'
+            % discarded['discarded'])
+
+        self.assertFalse(
+            os.path.exists(self.cache_path),
+            '%s survived a logout' % self.cache_path)
+        self.assertFalse(
+            os.path.exists(planted),
+            'a write temporary holding a credential survived a logout, so a '
+            'key the cluster still honours is still on this disk')
+
+        # Nothing else in that directory holds it either, whatever it is
+        # called.
+        directory = os.path.dirname(self.cache_path)
+        for name in sorted(os.listdir(directory)):
+            path = os.path.join(directory, name)
+            if not os.path.isfile(path):
+                continue
+            with open(path, errors='replace') as f:
+                self.assertNotIn(
+                    key, f.read(),
+                    '%s still holds the key this login cached' % path)
+
+        # The cluster was never asked, which is why all of that matters:
+        # a logout is the removal of a local file and revokes nothing,
+        # so the key it discarded still works.
+        self.assertEqual(
+            200, requests.post(
+                self.base_url + '/auth',
+                json={'namespace': self.namespace, 'key': key},
+                timeout=30).status_code,
+            'the key a logout discarded locally stopped working at the '
+            'cluster, so the logout revoked something')
