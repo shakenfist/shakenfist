@@ -784,6 +784,9 @@ not help here. Use the snapshot to answer "where did the audio go?"
 - **`data_packets_decoded` (roughly equal to `data_packets_received`)**:
   Audio decoder is keeping up. If decoded is significantly less than
   received, the decoder is failing or too slow; check `data_packets_decode_failed`.
+  An Opus session with more than 2 `channels` fails every packet by
+  construction (an Opus decoder takes 1 or 2), so look at `channels` in
+  `current_session` first.
 
 - **`device_callbacks_total` increasing**: CoreAudio (macOS), WASAPI
   (Windows), or ALSA (Linux) is pulling audio samples from the device.
@@ -808,6 +811,17 @@ not help here. Use the snapshot to answer "where did the audio go?"
 - **`data_packets_unsupported_codec` > 0**: The server negotiated a codec
   ryll cannot play, so every DATA packet is being dropped. ryll also raises
   a notification the first time this happens.
+
+- **`starts_refused` > 0**: A `PLAYBACK_START` declared a channel count or
+  sample rate outside the range any output could serve, so the stream it
+  described was dropped whole rather than set up. The accepted ranges are
+  1 to 8 channels and 4 kHz to 384 kHz; a real server sends 2 channels at
+  48 kHz. A non-zero count means something upstream is malformed or
+  hostile, not misconfigured. The log carries the values of the first
+  refusal only (it is a once-per-session warning, so a server cannot
+  flood it); the counter carries the rest. A refusal leaves any running
+  stream alone, so with a live `current_session` its codec, rate and
+  channels may describe a stream the server has since replaced.
 
 - **`output`**: The device the sound is going to. If it is not the device
   you are listening to, the problem is local routing, not ryll or the

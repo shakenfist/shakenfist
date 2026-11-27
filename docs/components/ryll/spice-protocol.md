@@ -884,6 +884,58 @@ The design choices behind that, so they are not reopened:
   in headless was rejected, since unattended runs are where it is most
   useful.
 
+## Values a server chooses
+
+Parsing a message proves it was well formed, not that what it says is
+usable. A `BoundedReader` refuses a body that is too short or a length
+that runs past the data, and the fuzz targets keep it panic-free, but a
+field whose every bit pattern is in range — a `u32` channel count, a
+`u32` sample rate — survives parsing whatever a server put in it. Those
+values are not inert: ryll sizes buffers from them, divides by them, and
+hands them to threads a long way from the message they arrived in. So
+each is checked where it is **stored into channel state**, not where it
+is eventually used, because by then the check has no way to refuse the
+message that supplied it.
+
+Three rules follow from that, and they are the same rule in three
+places:
+
+- **Image geometry** is bounded by the shared caps in [Decode
+  limits](#decode-limits), applied before the allocation they size.
+- **Audio geometry** is bounded by `PlaybackStart::playable()`: 1 to 8
+  channels, and 4 kHz to 384 kHz. A `PLAYBACK_START` outside either
+  range is dropped whole and counted in `starts_refused`, leaving any
+  stream already playing untouched — a clamped value would set up an
+  output for a stream the server never described, and silently. The
+  danger is concrete: the channel count reaches a per-frame `Vec` and a
+  resampling ratio on the audio thread, where `0xffffffff` channels is an
+  8 GiB allocation inside a real-time callback, and a zero sample rate is
+  the numerator of a ratio that never advances. The `format` field is
+  *not* checked here; it selects the layout of the `DATA` that follows,
+  which the data path has to recognise anyway.
+- **Server-supplied text** is passed through `sanitise_untrusted`, which
+  replaces every C0 and C1 control, `DEL`, `U+2028` and `U+2029`, and
+  Unicode `Bidi_Control` character with `U+FFFD`. `SPICE_MSG_NOTIFY` is
+  the message that carries it, and `Notify::message_text()` is the only
+  accessor any channel uses, so the sanitising happens once rather than
+  at seven call sites. The length cap (`NOTIFY_MAX_MESSAGE_LEN`, 64 KiB)
+  bounds the bytes on the wire; it does nothing about what is in them.
+  Sanitising keeps the character count but not the byte count — each
+  one-byte control becomes the three-byte `U+FFFD` — so the sanitised
+  text can be up to 192 KiB, and anything that re-emits it under a byte
+  cap must cap the result. Unsanitised, a notify reaches past the
+  message it was given: a newline forges log lines, an `ESC[` or the 8-bit CSI
+  drives the terminal of whoever reads the log or watches `stderr`, and a
+  bidi override reorders what a human sees without changing a byte. The
+  raw bytes stay on `Notify::message` for a capture or a bug report.
+
+What ryll deliberately does *not* police is the content a human asked
+for. A guest is entitled to play loud audio and to draw a bright screen,
+and nothing in a sample or a pixel distinguishes a hostile one from a
+game. Note that `PLAYBACK_VOLUME` is recorded for bug reports and never
+applied, so a server has no lever on output level at all: ryll's own
+volume control is the only one, and it is clamped to 0–100.
+
 ## Keyboard Scancodes
 
 Ryll maps egui key events to AT keyboard scancodes for the SPICE protocol.

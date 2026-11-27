@@ -35,7 +35,7 @@ enqueue` status check:
 |-----|--------|--------------|
 | `Lint` | self-hosted `l` | `make lint` (rustfmt + clippy) and `make package-check` (every crate packaged and built from its tarball, as `cargo publish` would) |
 | `Cross-check Windows` | self-hosted `l` | `make check-windows` |
-| `Build (Linux x86_64)` | self-hosted `l` | `make release`, both `--web` smoke tests, `make test`, `.deb` and `.rpm` |
+| `Build (Linux x86_64)` | self-hosted `l` | `make release`, both `--web` smoke tests, `make test`, `make test-crates` (each published crate's tests in its own cargo resolution), `.deb` and `.rpm` |
 | `cargo audit` | self-hosted `s` | RustSec advisory check with the `cargo audit` CLI: fails on a vulnerability, prints unmaintained and unsound warnings without failing. It does not use `rustsec/audit-check`, whose check-run update fails intermittently ([rustsec/audit-check#56](https://github.com/rustsec/audit-check/issues/56)) |
 | `cargo deny` | self-hosted `s` | Licence, ban, and advisory policy (`deny.toml`) |
 | `gitleaks` | self-hosted `s` | Secret scanning over full history |
@@ -970,6 +970,7 @@ Makefile, so the local commands are the ones CI runs:
 make lint            # rustfmt + clippy, as the Lint job
 make check-windows   # the Windows cross-check
 make test            # the unit test suite
+make test-crates     # each published crate in its own resolution (slower: rebuilds)
 make web-smoke       # --web startup and shutdown
 make web-smoke-tls   # the same, with TLS
 make rdp-smoke       # the RDP smoke lane (rdp-smoke.yml)

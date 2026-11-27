@@ -88,7 +88,8 @@ promoting it to every channel adds complexity without a clear
 immediate payoff. Revisit if a future channel needs a time-ordered
 event log.
 
-Every snapshot has a serialiser test in `ryll/src/bugreport.rs`
+Every snapshot has a serialiser test in
+`shakenfist-spice-renderer/tests/snapshots.rs`
 (`test_<channel>_snapshot_serialises`) that constructs a fully
 populated snapshot, serialises it to JSON, and asserts each field is
 present — catching serde renames before they reach a real bug report.
@@ -206,7 +207,12 @@ snapshot surfaces:
   `sample_rate_hz`, `channels`, and `codec` (Opus, raw PCM, or an
   unrecognised codec number)
 - `start_count` / `stop_count` — cumulative `PLAYBACK_START` /
-  `PLAYBACK_STOP` messages received since session open
+  `PLAYBACK_STOP` messages received since session open; `start_count`
+  counts only the STARTs that were acted on
+- `starts_refused` — cumulative `PLAYBACK_START` messages dropped
+  because the channel count or sample rate they declared was outside
+  what any output could serve. No real server sends one, so a non-zero
+  value means the server is malformed or adversarial
 - `last_volume_per_channel`, `last_mute`, `last_latency_ms` — the
   most recent volume, mute, and latency-hint values set by the server
 
@@ -322,7 +328,9 @@ point following the baseline template in this document.
 4. **Wire the bug-report side** in `ryll/src/bugreport.rs` so the
    appropriate report type's `channel_name()` resolves to the new
    channel and its snapshot lands in the report's channel-state JSON.
-5. **Write a serialiser test** mirroring the
+5. **Write a serialiser test** in
+   `shakenfist-spice-renderer/tests/snapshots.rs`, next to the type
+   added in step 3 and mirroring the
    `test_display_snapshot_serialises` pattern: construct a snapshot
    with all fields populated, serialise to JSON, and assert that each
    field is present with the expected value. This catches serde

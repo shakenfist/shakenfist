@@ -96,7 +96,7 @@ the file is tests.
 | Test group | Lines |
 |---|---:|
 | `BugReport::assemble`, per report type | ~716 |
-| Serialisation of types the **renderer crate** owns | ~645 |
+| Serialisation of types the **renderer crate** owns | 651 |
 | Zip writers and `DisconnectCause` | ~370 |
 | Traffic ring buffer and per-channel caps | ~300 |
 | ryll-owned snapshot types (`AppSnapshot`, `Ui*`, `Keyboard*`) | ~215 |
@@ -173,7 +173,7 @@ are session infrastructure that the report happens to serialise:
    the tests across files expensive if the fixture is not
    extracted first.
 
-### 645 lines of tests belong to another crate
+### 651 lines of tests belong to another crate
 
 `test_display_snapshot_serialises` and its eight siblings
 (`inputs`, `cursor`, `main`, `playback`, `playback_codec`,
@@ -208,7 +208,7 @@ web mode's bug report as "missing (out of MVP scope)" in all
 four rows, so there is no second consumer pulling any of this
 into `shakenfist-spice-renderer` the way `PLAN-app-split`'s
 phase 1 found for the draw-op dispatch. The one relocation this
-plan does make -- the 645 lines of tests -- goes to the crate
+plan does make -- the 651 lines of tests -- goes to the crate
 that already owns the types, and moves no production code at
 all.
 
@@ -244,13 +244,16 @@ all.
    The `pub use shakenfist_spice_renderer::snapshots::{...}`
    block at the top goes too. It re-exports fifteen names, of
    which exactly one -- `ChannelSnapshots`, in
-   `app/connection.rs`, `auto_snapshot.rs`, `main.rs` and
-   `rdp.rs` -- is used anywhere outside `bugreport.rs`. The
-   other fourteen are re-exported for nothing, which is what the
-   `#[allow(unused_imports)]` above the block is suppressing,
-   and the block is why `docs/diagnostics.md` believes
-   `ChannelSnapshots` lives in ryll. Four imports change; an
-   allow and fourteen dead re-exports go.
+   `app/connection.rs`, `app/mod.rs`, `auto_snapshot.rs`,
+   `main.rs` and `rdp.rs` -- is used anywhere outside
+   `bugreport.rs`. The other fourteen are re-exported for
+   nothing, which is what the `#[allow(unused_imports)]` above
+   the block is suppressing, and the block is why
+   `docs/diagnostics.md` believes `ChannelSnapshots` lives in
+   ryll. Five imports change; an allow and fourteen dead
+   re-exports go. (Phase 1's survey corrected this count from
+   four: `app/mod.rs`'s `use` is wrapped across three lines and
+   escaped the single-line grep the first count used.)
 
 5. **Pure moves.** Phase 3 is `git mv` plus `use`, `mod` and
    visibility edits and nothing else, so `git blame -C -C`
@@ -302,15 +305,15 @@ duplication" -- which is the symptom, not the fix.
 
 ## Open questions
 
-1. **Three sibling modules, or one `bugreport/` tree?** The
-   mission states siblings and the consumer list above is the
-   argument, but it is the one decision in this plan that
-   changes every import site, so phase 1 confirms it against the
-   full consumer list before phase 3 acts on it. The fallback,
-   if the traffic and snapshot consumers turn out to be thinner
-   than they look, is `bugreport/traffic/` and
-   `bugreport/snapshot/` with the same file split -- cheaper to
-   do and worse to live with.
+1. **Answered in phase 1 (decision 2): three sibling modules.**
+   Original question: three siblings, or one `bugreport/` tree?
+   Phase 1's consumer survey settles it -- eight of the
+   seventeen files that import from `crate::bugreport` import
+   nothing from it that is about bug reports, so a
+   `bugreport/traffic/` subtree would leave all eight still
+   naming `bugreport` in their imports, which is the defect the
+   split is for. The per-name table phase 3 executes is in
+   `PLAN-bugreport-split-phase-01-renderer-tests.md`.
 
 2. **Where do the five helpers go?** `png.rs` and `format.rs` at
    the crate root is the proposal. The alternative is to leave
@@ -319,16 +322,19 @@ duplication" -- which is the symptom, not the fix.
    a single `util.rs` -- is rejected: a module named for nothing
    accretes.
 
-3. **Integration test or unit test for the relocated snapshot
-   tests?** `shakenfist-spice-renderer/tests/snapshots.rs`
-   (the crate already has `tests/control_socket.rs`) keeps
-   `src/snapshots.rs` at 1,154 lines and off the baseline;
-   folding them into `src/snapshots.rs` instead puts it at
-   roughly 1,800 and onto the baseline, trading one baseline
-   entry for another. The tests serialise public types, so the
-   integration form should compile unchanged -- phase 1 confirms
-   that every type and field they touch is `pub`, and falls back
-   to the unit form (with a baseline entry and a reason) if not.
+3. **Answered in phase 1 (decision 1): an integration test,
+   `shakenfist-spice-renderer/tests/snapshots.rs`.** Original
+   question: integration test or unit test? Every type and every
+   field the moved tests touch is `pub`, `serde_json` and
+   `shakenfist-spice-protocol` are already unconditional
+   dependencies of the renderer crate (so available to its
+   integration tests), and `snapshots.rs` carries no
+   `cfg(feature)` gate, so the new target also compiles under
+   `tools/check-slim-renderer.sh`'s `--no-default-features
+   --all-targets` lane. Folding them into `src/snapshots.rs`
+   would have taken it from 1,154 lines to roughly 1,800 and put
+   it in the baseline, trading the entry this plan removes for a
+   new one.
 
 4. **`ReportSources<'_>` struct or a builder?** A borrowed
    struct of the six handles is the smaller change and removes
@@ -351,7 +357,7 @@ duplication" -- which is the symptom, not the fix.
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
-| 1. Relocate the renderer's tests | PLAN-bugreport-split-phase-01-renderer-tests.md | Not started | |
+| 1. Relocate the renderer's tests | [PLAN-bugreport-split-phase-01-renderer-tests.md](/components/ryll/plans/PLAN-bugreport-split-phase-01-renderer-tests/) | In progress | |
 | 2. Collapse the duplication | PLAN-bugreport-split-phase-02-dedup.md | Not started | |
 | 3. Three modules | PLAN-bugreport-split-phase-03-modules.md | Not started | |
 | 4. `ReportSources` | PLAN-bugreport-split-phase-04-sources.md | Not started | |
@@ -378,8 +384,14 @@ than merely smaller.
 **Planning effort: medium.** The work is mechanical; the
 judgement is in confirming the destination.
 
+Phase plan:
+[PLAN-bugreport-split-phase-01-renderer-tests.md](/components/ryll/plans/PLAN-bugreport-split-phase-01-renderer-tests/),
+which carries the consumer survey, the ten survey findings and
+the answers to open questions 1 and 3.
+
 Answer open questions 1 and 3. Move the nine snapshot
-serialisation tests (~645 lines) to
+serialisation tests (651 lines, in two blocks phase 1's survey
+pins exactly) to
 `shakenfist-spice-renderer/tests/snapshots.rs`, keeping the
 `#[expect(clippy::too_many_lines)]` on
 `test_display_snapshot_serialises` and its reason verbatim --
@@ -396,7 +408,7 @@ question 1. `git grep -c 'crate::bugreport' -- ryll/src` found
 24 references in 17 files besides the module itself at the time
 of writing.
 
-Expected: `bugreport.rs` down to roughly 4,465 lines, one
+Expected: `bugreport.rs` down to 4,455 lines, one
 baseline entry lowered, no new files in ryll, no production code
 touched.
 
@@ -421,7 +433,7 @@ intentional, is the whole of the work.
 
 Still one file at the end of this phase. Expected: roughly
 `-400` lines of code and `-200` of tests, so `bugreport.rs`
-around 3,865.
+around 3,855.
 
 ### Phase 3: Three modules
 
@@ -432,7 +444,7 @@ good; high if it raised surprises.
 `ryll/src/traffic/` and `ryll/src/snapshot/`, and split to the
 target layout above, tests moving with the code they test. Drop
 the `pub use shakenfist_spice_renderer::snapshots::{...}` block
-and repoint the four files that import `ChannelSnapshots`
+and repoint the five files that import `ChannelSnapshots`
 through it at the renderer crate. Pure
 moves: `use`, `mod`, visibility and nothing else, so the commits
 are reviewable as moves and `git blame -C -C` follows.
@@ -938,7 +950,7 @@ because the following statements will be true:
 * No module in `ryll/src/` imports a type from `crate::bugreport`
   that is not about bug reports, and no call site imports a
   renderer-crate type through a ryll re-export.
-* The 645 lines of snapshot serialisation tests run in
+* The 651 lines of snapshot serialisation tests run in
   `shakenfist-spice-renderer`, and `ryll` no longer tests types
   it does not define.
 * The code passes `pre-commit run --all-files` (rustfmt,
@@ -1020,6 +1032,14 @@ Already known, and deliberately out of scope:
   `UsbredirSnapshot` and `WebdavSnapshot` carry diagnostic
   fields a connection report could also surface. This plan moves
   that `TODO`; it does not resolve it.
+* **`test_display_snapshot_serialises` is 271 lines and carries
+  an `#[expect(clippy::too_many_lines)]`.** Now that it lives in
+  the crate that defines `DisplaySnapshot`, a shared fixture
+  builder would retire that expectation without crossing a crate
+  boundary. It is left alone because one fully populated fixture
+  is the thing the test exists to pin, and because rewriting a
+  test this plan has just moved verbatim costs the move its
+  reviewability. Raised by the review of phase 1.
 * **The webdav channel records no traffic**, so `TrafficBuffers`
   deliberately has no webdav ring while `ChannelSnapshots` has a
   webdav field. The asymmetry is documented in `buffer_for`'s
@@ -1056,10 +1076,25 @@ to be found again:
   re-exported. Phase 3 removes the re-export; the documentation
   fix goes with it.
 
-The issue tracker has not been scanned for this plan yet. Phase
-1 does that scan and records the result here, together with any
-open issue that names `bugreport.rs`, the traffic viewer or the
-report zip layout.
+Phase 1 scanned the 114 open issues. Two touch the code this
+plan moves, and neither is in scope -- recorded so that a later
+phase does not resolve one by accident while moving code past
+it:
+
+* **#784, "Record webdav channel traffic in the bug-report ring
+  buffer"**, is the issue for the asymmetry documented in
+  `TrafficBuffers::buffer_for`'s doc comment. Phase 3 moves the
+  comment and the gap into `traffic/mod.rs` unchanged.
+* **#548, "DisplaySnapshot is shared by every display
+  channel"**, is a renderer-crate design issue about a type
+  whose tests phase 1 relocates -- which is an argument for the
+  relocation: if #548 is fixed, the fixture that has to change
+  will be in the same crate as the type.
+
+Nothing else among the open issues names `bugreport.rs`, the
+traffic viewer or the report zip layout. #716 and #433
+(auto-snapshot counters), #400 (`--capture` pcap alignment) and
+#291 (a web diagnostics panel) are adjacent and untouched.
 
 ### Back brief
 
