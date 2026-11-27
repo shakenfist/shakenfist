@@ -17,7 +17,6 @@ Every workflow in `.github/workflows/`:
 | `code-formatting.yml` | Whole-tree formatting sweep | Daily schedule, manual, self-test PR |
 | `codeql-analysis.yml` | CodeQL static analysis | Push, PR, weekly schedule |
 | `pin-indirect-dependencies.yml` | Reconcile pinned indirect dependencies, adding new ones and removing obsolete ones (runs `tools/pin-indirect-dependencies.sh`) | Daily schedule, PR self-test |
-| `renovate.yml` | Self-hosted Renovate dependency updates | Hourly schedule, manual |
 | `ci-headroom-health.yml` | Harvest the ten newest merge runs' CI headroom bundles and assert the probe which wrote them is still working (runs `tools/ci_headroom_health.py`; see [Is the instrument still alive?](ci_cloud_sizing.md#is-the-instrument-still-alive)). The one headroom check allowed to fail, because it is scheduled: it must never gain a PR or merge_group trigger | Weekly schedule (Mondays 07:30 UTC), manual |
 | `export-repo-config.yml` | Export GitHub repo settings to version control, via a shared reusable workflow in the `actions/` repository | Daily schedule |
 | `pr-re-review.yml` | Re-review PR on bot command | `@shakenfist-bot please re-review` |
@@ -32,6 +31,20 @@ Every workflow in `.github/workflows/`:
 | `refresh-website.yml` | Trigger a GitHub Pages rebuild | Daily schedule, manual |
 | `sync-external-docs.yml` | Import the sibling repositories' documentation into `docs/components/` | Hourly schedule, manual |
 | `release.yml` | Build and publish a release | Tag push, manual |
+
+Dependency updates are not in that table, because Renovate does not run
+from this repository. It runs from the fleet runner,
+`.github/workflows/renovate-fleet.yml` in
+[shakenfist/development](https://github.com/shakenfist/development), which
+works over every managed repository in one pass. All this repository
+carries is `renovate.json`, which extends the fleet preset
+`local>shakenfist/development:renovate-fleet` and adds only what is
+particular to Shaken Fist -- the package groups, and the custom manager for
+the Ansible tool pins in `functional-tests.yml`. A repository-local
+Renovate workflow is a consistency-audit failure rather than a belt and
+braces, because two Renovate instances over one repository race on branch
+creation; see the
+[Renovate audit](../components/development/audits/renovate.md).
 
 ## Merge lanes and weekly lanes
 
