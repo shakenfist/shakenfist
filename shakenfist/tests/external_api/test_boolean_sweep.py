@@ -88,6 +88,7 @@ from unittest import mock
 from shakenfist.config import config
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import declarations
+from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.tests.external_api.test_required_sweep import (
     SweepFixtureTestCase)
 
@@ -249,6 +250,84 @@ BOOLEAN_READS = {
         'spy': {'target': 'shakenfist.external_api.util.assign_floating_ip',
                 'returns': None},
         'read': 'called',
+        'verdict': 'agrees',
+    },
+
+    # require_success, inside a dependency edge, on the three routes
+    # which take one. The two lists read the same field differently, so
+    # each endpoint has two rows.
+    #
+    # A depends_on row's observable is the edge list which reaches
+    # AgentOperation.new(), because that is what the dispatcher will
+    # read the field from: a truthy spelling has to arrive as True and
+    # a falsy one as False. The creating call is wrapped rather than
+    # replaced, so the request still answers 200 -- its response is not
+    # the observable, since the agent operation listing row above stubs
+    # the hydration a created operation's view comes back through. A runs_after row's observable is the
+    # status code, because the field is *refused* on an ordering edge
+    # (issue #5091) -- so a truthy spelling must answer 400 exactly as a
+    # JSON true does, and a falsy one must be accepted exactly as a JSON
+    # false is. That refusal's wording has its own test in
+    # test_agent_operation_parameters.py; what this measures is that the
+    # handler reads the boolean the way the published schema says it is
+    # read, in both directions.
+    ('InstanceAgentExecuteEndpoint', 'post', 'depends_on.require_success'): {
+        'method': 'post',
+        'url': '/instances/{instance}/agent/execute',
+        'body': {'command_line': 'id',
+                 'depends_on': [{'op_uuid': '{agentop}'}]},
+        'spy': {'target':
+                'shakenfist.operations.agentoperation.AgentOperation.new',
+                'wraps': True},
+        'read': 'kwarg:depends_on',
+        'verdict': 'agrees',
+    },
+    ('InstanceAgentExecuteEndpoint', 'post', 'runs_after.require_success'): {
+        'method': 'post',
+        'url': '/instances/{instance}/agent/execute',
+        'body': {'command_line': 'id',
+                 'runs_after': [{'op_uuid': '{agentop}'}]},
+        'read': 'status',
+        'verdict': 'agrees',
+    },
+    ('InstanceAgentGetEndpoint', 'post', 'depends_on.require_success'): {
+        'method': 'post',
+        'url': '/instances/{instance}/agent/get',
+        'body': {'path': '/etc/hostname',
+                 'depends_on': [{'op_uuid': '{agentop}'}]},
+        'spy': {'target':
+                'shakenfist.operations.agentoperation.AgentOperation.new',
+                'wraps': True},
+        'read': 'kwarg:depends_on',
+        'verdict': 'agrees',
+    },
+    ('InstanceAgentGetEndpoint', 'post', 'runs_after.require_success'): {
+        'method': 'post',
+        'url': '/instances/{instance}/agent/get',
+        'body': {'path': '/etc/hostname',
+                 'runs_after': [{'op_uuid': '{agentop}'}]},
+        'read': 'status',
+        'verdict': 'agrees',
+    },
+    ('InstanceAgentPutEndpoint', 'post', 'depends_on.require_success'): {
+        'method': 'post',
+        'url': '/instances/{instance}/agent/put',
+        'body': {'blob_uuid': '{blob}', 'path': '/etc/hostname',
+                 'mode': '0644',
+                 'depends_on': [{'op_uuid': '{agentop}'}]},
+        'spy': {'target':
+                'shakenfist.operations.agentoperation.AgentOperation.new',
+                'wraps': True},
+        'read': 'kwarg:depends_on',
+        'verdict': 'agrees',
+    },
+    ('InstanceAgentPutEndpoint', 'post', 'runs_after.require_success'): {
+        'method': 'post',
+        'url': '/instances/{instance}/agent/put',
+        'body': {'blob_uuid': '{blob}', 'path': '/etc/hostname',
+                 'mode': '0644',
+                 'runs_after': [{'op_uuid': '{agentop}'}]},
+        'read': 'status',
         'verdict': 'agrees',
     },
 
@@ -552,7 +631,20 @@ class BooleanSweepTestCase(SweepFixtureTestCase):
         agent_ops.start()
         self.addCleanup(agent_ops.stop)
 
+        # The two synthetic uuids above have no rows behind them, so
+        # the listing's hydration is stood in for. The fixture
+        # operation is resolved for real, because the dependency edge
+        # rows below reach this same stub and
+        # api_base.agent_operation_dependencies() asks the object it
+        # gets back for its type and its namespace -- a stand-in which
+        # answered those with MagicMocks would refuse every edge, and a
+        # stand-in which answered them plausibly would accept an edge
+        # naming nothing at all.
+        real_from_db = AgentOperation.from_db
+
         def _agentop(uuid, *args, **kwargs):
+            if str(uuid) == str(self.agentop.uuid):
+                return real_from_db(str(uuid), *args, **kwargs)
             op = mock.MagicMock()
             op.external_view.return_value = {'uuid': uuid}
             return op

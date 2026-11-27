@@ -531,12 +531,15 @@ class AgentOperation(BaseOperation):
         op_uuid, and dep_state is the state that dependency was
         observed in. dep_state may be a value no AgentOperation ever
         holds: 'missing' for a dependency which no longer exists at
-        all, and 'unreadable' for one whose state could not be read
-        before the wait budget ran out. Both are deliberate. A client
+        all, 'unreadable' for one whose state could not be read
+        before the wait budget ran out, and 'nonzero-exit' for one
+        which completed but whose command failed on an edge which
+        asked for success. All three are deliberate. A client
         has to be able to tell a dependency which failed from one which
-        went away, and either of those from a node which could not
-        reach its database, even though all three cost the dependent
-        the same fate.
+        went away, either of those from a node which could not reach
+        its database, and all of them from one which ran and whose
+        command failed, even though each costs the dependent the same
+        fate.
 
         This is for depends_on only. A runs_after edge is an ordering
         hint rather than a fate-sharing one, so an unsatisfiable

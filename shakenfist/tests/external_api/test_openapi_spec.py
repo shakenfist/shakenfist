@@ -285,6 +285,11 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
         # what it says. api_base.agent_operation_dependencies() is what
         # backs the existence and namespace rules, which no schema can
         # express; these bounds are backed by the schema itself.
+        # require_success publishes no bound at all, only a type: it is
+        # the same object in both lists, and that it is meaningful in
+        # one of them and refused in the other is a rule no JSON Schema
+        # here can carry -- agent_operation_dependencies() refuses it,
+        # which is why that refusal has a test of its own.
         ('/instances/{instance_ref}/agent/put', 'post', 'depends_on',
          {'type': 'array',
           'maxItems': 64,
@@ -296,6 +301,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
                   'op_uuid': {'type': 'string', 'format': 'uuid'},
                   'settle_seconds': {'type': 'number', 'minimum': 0,
                                      'maximum': 300},
+                  'require_success': {'type': 'boolean'},
               }}}),
         ('/instances/{instance_ref}/agent/put', 'post', 'runs_after',
          {'type': 'array',
@@ -308,6 +314,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
                   'op_uuid': {'type': 'string', 'format': 'uuid'},
                   'settle_seconds': {'type': 'number', 'minimum': 0,
                                      'maximum': 300},
+                  'require_success': {'type': 'boolean'},
               }}}),
         ('/instances/{instance_ref}/agent/get', 'post', 'depends_on',
          {'type': 'array',
@@ -320,6 +327,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
                   'op_uuid': {'type': 'string', 'format': 'uuid'},
                   'settle_seconds': {'type': 'number', 'minimum': 0,
                                      'maximum': 300},
+                  'require_success': {'type': 'boolean'},
               }}}),
         ('/instances/{instance_ref}/agent/get', 'post', 'runs_after',
          {'type': 'array',
@@ -332,6 +340,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
                   'op_uuid': {'type': 'string', 'format': 'uuid'},
                   'settle_seconds': {'type': 'number', 'minimum': 0,
                                      'maximum': 300},
+                  'require_success': {'type': 'boolean'},
               }}}),
         ('/instances/{instance_ref}/agent/execute', 'post', 'depends_on',
          {'type': 'array',
@@ -344,6 +353,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
                   'op_uuid': {'type': 'string', 'format': 'uuid'},
                   'settle_seconds': {'type': 'number', 'minimum': 0,
                                      'maximum': 300},
+                  'require_success': {'type': 'boolean'},
               }}}),
         ('/instances/{instance_ref}/agent/execute', 'post', 'runs_after',
          {'type': 'array',
@@ -356,6 +366,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
                   'op_uuid': {'type': 'string', 'format': 'uuid'},
                   'settle_seconds': {'type': 'number', 'minimum': 0,
                                      'maximum': 300},
+                  'require_success': {'type': 'boolean'},
               }}}),
         ('/networks', 'post', 'netblock', {'type': 'string'}),
         ('/networks/{network_ref}/events', 'get', 'limit',

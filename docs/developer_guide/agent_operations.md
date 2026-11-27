@@ -90,10 +90,25 @@ All three creating calls take two optional lists of edges, each naming
 agent operations which already exist:
 
 * **`depends_on` is fate sharing.** The new operation runs only if the
-  operation it names succeeded. If that operation errored, expired, was
+  operation it names finished. If that operation errored, expired, was
   aborted or has gone away, the dependent does not run at all: it is
   moved to the `abort` terminal state, and its `dependency_failure`
   field says which dependency, and in what state, caused that.
+
+    Finishing is not the same as succeeding. A command which exits
+    non-zero *completes* its operation -- the exit code is a result, not
+    a failure, which is what lets a caller submit
+    `something || true` deliberately and what `return-code` readers
+    rely on -- so by default this edge is satisfied by a dependency
+    whose command failed. Set
+    [`require_success`](api_reference/instances.md#agentdependency) on
+    the edge for the stronger reading, and the dependent aborts with a
+    `dependency_failure` state of `nonzero-exit` instead of running
+    against whatever the failed command left behind. The field needs a
+    server advertising the
+    `agentoperation-dependency-require-success` capability token and a
+    client which knows the key, since an API client refuses an edge key
+    it has not heard of rather than sending it on.
 * **`runs_after` is ordering only.** The new operation waits for the
   named operation to finish and then runs, whatever that operation's
   outcome was. A `runs_after` edge never aborts anything and never sets

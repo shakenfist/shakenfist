@@ -593,6 +593,15 @@ API_CAPABILITIES = {
         # fields it sends are unknown to the older service and are dropped.
         # See the agent operation section of the database operator guide.
         'agentoperation-dependencies',
+        # agentoperation-dependency-require-success names the
+        # require_success field on a depends_on edge, which makes the edge
+        # satisfied only if the dependency's commands exited zero. A token
+        # of its own rather than part of the one above, because the default
+        # is the opposite -- a dependency which completed satisfies an edge
+        # whatever its commands exited with (issue #5091) -- so a client
+        # which could not tell the two apart would believe it had asked for
+        # the stronger edge and get the weaker one.
+        'agentoperation-dependency-require-success',
         # placement-query tells a client it can ask POST /placement
         # whether a set of instance shapes would fit the cluster now,
         # and therefore that it need not rebuild the scheduler's

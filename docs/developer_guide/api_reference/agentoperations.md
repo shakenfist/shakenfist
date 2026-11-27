@@ -7,8 +7,9 @@ which are executed in return, with results for each being gathered as they execu
 An operation which declared a `depends_on` edge also carries `dependency_failure`,
 which is `null` unless that edge caused it to be aborted. It then holds
 `op_type`, `op_uuid` and `state` for the dependency responsible. `state` is
-usually one of the dependency's own states, but it is also where the two
-strings `missing` and `unreadable` appear, so a client which branches on it
+usually one of the dependency's own states, but it is also where the three
+strings `missing`, `unreadable` and `nonzero-exit` appear, so a client which
+branches on it
 must expect a value no operation can hold. See
 [declaring dependencies between agent operations](/developer_guide/api_reference/instances/#declaring-dependencies-between-agent-operations)
 for what each of those means and when it is written, and

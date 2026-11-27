@@ -65,6 +65,7 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
 
         self.daemon = sidechannel.Monitor.__new__(sidechannel.Monitor)
         self.daemon.terminal_dependency_cache = {}
+        self.daemon.dependency_success_cache = {}
         self.daemon.runs_after_warnings = {}
 
     # Helpers.
@@ -85,15 +86,19 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
             op.state = step
         return op
 
-    def _dependency(self, states=None, settle_seconds=None):
+    def _dependency(self, states=None, settle_seconds=None,
+                    require_success=None):
         """A real dependency operation, and the stored edge naming it."""
         dep_op = self._agentop(states=states)
-        return dep_op, self._edge(dep_op.uuid, settle_seconds=settle_seconds)
+        return dep_op, self._edge(dep_op.uuid,
+                                  settle_seconds=settle_seconds,
+                                  require_success=require_success)
 
-    def _edge(self, op_uuid, settle_seconds=None):
+    def _edge(self, op_uuid, settle_seconds=None, require_success=None):
         return {'op_type': ObjectType.AGENTOPERATION.value,
                 'op_uuid': str(op_uuid),
-                'settle_seconds': settle_seconds}
+                'settle_seconds': settle_seconds,
+                'require_success': require_success}
 
     def _missing_edge(self, settle_seconds=None):
         # Submission validated that this operation existed, so an edge
@@ -411,6 +416,223 @@ class SidechannelDependencyEvaluationTestCase(base.ShakenFistTestCase):
         self.assertFalse(dispatchable)
         self.assertIn('missing', reason)
         self.assertEqual(BaseOperation.STATE_ABORT, agentop.state.value)
+
+    # require_success, which asks a depends_on edge about the
+    # dependency's exit codes as well as its state. A command which
+    # exits non-zero completes its operation -- the exit code is a
+    # result, not a failure -- so without this field a fate-sharing edge
+    # runs its dependent against whatever the failed command left
+    # behind (issue #5091).
+    def _completed(self, results=None, settle_seconds=None,
+                   require_success=None):
+        """A dependency which completed, carrying the results given."""
+        dep_op, edge = self._dependency(
+            states=[AgentOperation.STATE_QUEUED,
+                    AgentOperation.STATE_EXECUTING,
+                    BaseOperation.STATE_COMPLETE],
+            settle_seconds=settle_seconds, require_success=require_success)
+        for (index, result) in enumerate(results or []):
+            dep_op.add_result(index, result)
+        return dep_op, edge
+
+    def _attribute_reads_of(self, op_uuid):
+        return [c for c in mariadb.get_agent_operation_attributes.call_args_list
+                if str(c.args[0]) == str(op_uuid)]
+
+    def test_a_nonzero_exit_dispatches_without_require_success(self):
+        # The floor, pinned deliberately: a non-zero exit is an ordinary
+        # result for plenty of commands, and reap_execute() and every
+        # health probe read return-code off a complete operation, so an
+        # edge which did not ask about the outcome must behave exactly
+        # as it did before this field existed.
+        _, edge = self._completed(results=[{'return-code': 1}])
+        agentop = self._agentop(depends_on=[edge])
+
+        dispatchable, reason = self.daemon._dependencies_met(
+            self.inst, agentop)
+
+        self.assertTrue(dispatchable)
+        self.assertIsNone(reason)
+        self.assertIsNone(agentop.dependency_failure)
+
+    def test_a_zero_exit_dispatches_on_a_require_success_edge(self):
+        _, edge = self._completed(
+            results=[{'return-code': 0}, {'return-code': 0}],
+            require_success=True)
+        agentop = self._agentop(depends_on=[edge])
+
+        dispatchable, reason = self.daemon._dependencies_met(
+            self.inst, agentop)
+
+        self.assertTrue(dispatchable)
+        self.assertIsNone(reason)
+        self.assertIsNone(agentop.dependency_failure)
+        # Nothing held it, so it was never blocked.
+        self.assertIsNone(self._stored_anchor(agentop))
+
+    def test_a_nonzero_exit_cascades_on_a_require_success_edge(self):
+        dep_op, edge = self._completed(
+            results=[{'return-code': 0}, {'return-code': 3}],
+            require_success=True)
+        agentop = self._agentop(depends_on=[edge])
+
+        dispatchable, reason = self.daemon._dependencies_met(
+            self.inst, agentop)
+
+        self.assertFalse(dispatchable)
+        self.assertIn('non-zero', reason)
+        self.assertEqual(BaseOperation.STATE_ABORT, agentop.state.value)
+        self.assertEqual(
+            {'op_type': ObjectType.AGENTOPERATION.value,
+             'op_uuid': str(dep_op.uuid),
+             'state': sidechannel.DEPENDENCY_NONZERO_EXIT},
+            agentop.dependency_failure)
+        # Not a state any operation holds, which is the point of it:
+        # the dependency really did reach complete. Distinct from the
+        # other two sentinels for the same reason they are distinct from
+        # each other -- the three have different remedies.
+        self.assertNotIn(sidechannel.DEPENDENCY_NONZERO_EXIT,
+                         AgentOperation.state_targets)
+        self.assertEqual(
+            3, len({sidechannel.DEPENDENCY_MISSING,
+                    sidechannel.DEPENDENCY_UNREADABLE,
+                    sidechannel.DEPENDENCY_NONZERO_EXIT}))
+
+    def test_a_result_with_no_return_code_satisfies_require_success(self):
+        # A file transfer records a stat and a blob rather than an exit
+        # code, and an operation which reached complete has done what
+        # such a command asked for, so an absent return-code is not
+        # evidence of a failure.
+        _, edge = self._completed(
+            results=[{'stat_result': {'size': 12}, 'content_blob': 'a-blob'}],
+            require_success=True)
+        agentop = self._agentop(depends_on=[edge])
+
+        self.assertTrue(
+            self.daemon._dependencies_met(self.inst, agentop)[0])
+
+    def test_an_operation_with_no_results_satisfies_require_success(self):
+        _, edge = self._completed(require_success=True)
+        agentop = self._agentop(depends_on=[edge])
+
+        self.assertTrue(
+            self.daemon._dependencies_met(self.inst, agentop)[0])
+
+    def test_a_nonzero_exit_cascades_before_the_settle_elapses(self):
+        # Checked before the settle verdict: there is nothing to settle
+        # for when the thing which was supposed to happen did not, and a
+        # caller who asked for both should not wait out a long settle to
+        # be told the dependency failed.
+        _, edge = self._completed(
+            results=[{'return-code': 1}], settle_seconds=300,
+            require_success=True)
+        agentop = self._agentop(depends_on=[edge])
+
+        dispatchable, reason = self.daemon._dependencies_met(
+            self.inst, agentop)
+
+        self.assertFalse(dispatchable)
+        self.assertIn('non-zero', reason)
+        self.assertEqual(sidechannel.DEPENDENCY_NONZERO_EXIT,
+                         agentop.dependency_failure['state'])
+
+    def test_require_success_is_ignored_on_a_runs_after_edge(self):
+        # The API refuses the field on an ordering edge, so this shape
+        # only arrives from a hand-written row -- and an ordering edge
+        # which started deciding outcomes would be the fate sharing it
+        # exists not to be.
+        _, edge = self._completed(
+            results=[{'return-code': 1}], require_success=True)
+        agentop = self._agentop(runs_after=[edge])
+
+        dispatchable, reason = self.daemon._dependencies_met(
+            self.inst, agentop)
+
+        self.assertTrue(dispatchable)
+        self.assertIsNone(reason)
+        self.assertIsNone(agentop.dependency_failure)
+
+    def test_a_require_success_verdict_is_read_once(self):
+        # The dependency is terminal before this is asked, so its
+        # results cannot change again. Without the cache an operation
+        # held by a second edge would re-read them on every pass.
+        dep_op, met = self._completed(
+            results=[{'return-code': 0}], require_success=True)
+        agentop = self._agentop(
+            depends_on=[met, self._edge(str(uuid.uuid4()))])
+
+        mariadb.get_agent_operation_attributes.reset_mock()
+        self.daemon._dependencies_met(self.inst, agentop)
+        self.daemon._dependencies_met(self.inst, agentop)
+
+        self.assertEqual(1, len(self._attribute_reads_of(dep_op.uuid)))
+        self.assertEqual({str(dep_op.uuid): True},
+                         self.daemon.dependency_success_cache)
+
+    def _unreadable_results(self, dep_op):
+        """Fail only this dependency's attributes read.
+
+        Scoped to the one operation, because the dependent reads its own
+        attributes row through the same function: a blanket failure also
+        loses the wait anchor, which re-anchors the budget at now on
+        every pass and so can never be spent. That is the right
+        behaviour for a backend which is down for everything -- hold,
+        do not judge -- and it is not what these two tests are about.
+        """
+        real = mariadb.get_agent_operation_attributes
+
+        def read(aop_uuid):
+            if str(aop_uuid) == str(dep_op.uuid):
+                return None
+            return real(aop_uuid)
+
+        return mock.patch.object(
+            mariadb, 'get_agent_operation_attributes', side_effect=read)
+
+    def test_an_unreadable_result_blocks_rather_than_cascading(self):
+        # A read which failed is evidence of nothing, so it must not
+        # abort anything: the same choice the state read makes, for the
+        # same reason, and bounded the same way.
+        dep_op, edge = self._completed(
+            results=[{'return-code': 0}], require_success=True)
+        agentop = self._agentop(depends_on=[edge])
+
+        with self._unreadable_results(dep_op):
+            dispatchable, reason = self.daemon._dependencies_met(
+                self.inst, agentop)
+
+        self.assertFalse(dispatchable)
+        self.assertIn('could not be read', reason)
+        self.assertEqual(BaseOperation.STATE_QUEUED, agentop.state.value)
+        self.assertIsNone(agentop.dependency_failure)
+
+    def test_an_unreadable_result_past_the_budget_says_unreadable(self):
+        dep_op, edge = self._completed(
+            results=[{'return-code': 0}], require_success=True)
+        agentop = self._agentop(depends_on=[edge])
+        self._anchor(agentop, 301)
+
+        with self._unreadable_results(dep_op):
+            dispatchable, reason = self.daemon._dependencies_met(
+                self.inst, agentop)
+
+        self.assertFalse(dispatchable)
+        self.assertIn('gave up', reason)
+        self.assertEqual(BaseOperation.STATE_ABORT, agentop.state.value)
+        self.assertEqual(sidechannel.DEPENDENCY_UNREADABLE,
+                         agentop.dependency_failure['state'])
+
+    def test_a_new_dispatcher_generation_forgets_success_verdicts(self):
+        # The same lifetime as the terminal state cache, for the same
+        # reason: a replacement thread starts cold.
+        self.daemon.dispatcher_generation = 7
+        self.daemon.dispatcher_thread = None
+        self.daemon.dependency_success_cache = {'stale': True}
+
+        with mock.patch.object(sidechannel.threading, 'Thread'):
+            self.daemon.start_dispatcher()
+
+        self.assertEqual({}, self.daemon.dependency_success_cache)
 
     # runs_after, which is ordering only. These are the four places the
     # two lists disagree.

@@ -71,6 +71,7 @@ from shakenfist.external_api import instance as instance_api
 from shakenfist.external_api import placement as placement_api
 from shakenfist.instance import Instance
 from shakenfist.mapping_rule import MappingRule
+from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.tests.external_api.test_request_validation import (
     AuthenticatedStackTestCase)
@@ -851,7 +852,20 @@ class SweepFixtureTestCase(AuthenticatedStackTestCase):
         poll_patch.start()
         self.addCleanup(poll_patch.stop)
 
+        # One agent operation for a dependency edge to name. A
+        # depends_on or runs_after edge is refused unless it names an
+        # operation which already exists in a namespace the caller can
+        # read, so without this every row which carries an edge would
+        # record that refusal rather than what it is measuring. It is
+        # deliberately not enqueued on the instance: nothing here needs
+        # it to be dispatchable, and the instance's queue is read by
+        # other rows.
+        self.agentop = AgentOperation.new(
+            str(uuid4()), 'system', str(self.instance.uuid),
+            [{'command': 'execute', 'commandline': 'true'}])
+
         self.fixtures = {
+            'agentop': str(self.agentop.uuid),
             'artifact': str(self.artifact.uuid),
             'instance': str(self.instance.uuid),
             'network': str(self.network.uuid),

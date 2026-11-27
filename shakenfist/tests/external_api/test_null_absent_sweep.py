@@ -172,6 +172,10 @@ PROBES = {
     # request they are measured against.
     ('agentdependency', 'op_uuid'): AGENTOP,
     ('agentdependency', 'settle_seconds'): 30,
+    # True rather than False, because False is what an omitted
+    # require_success already means: a probe of False would be
+    # indistinguishable from the omission it is measured against.
+    ('agentdependency', 'require_success'): True,
 }
 
 #: Everything one request did, canonicalised. ``instances`` is what

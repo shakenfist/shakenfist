@@ -907,6 +907,20 @@ def agent_operation_dependencies(depends_on, runs_after, caller_namespace):
                     '%d seconds'
                     % (name, index, config.AGENT_OPERATION_DEPENDENCY_WAIT))
 
+            # Refused on an ordering edge rather than ignored there. A
+            # runs_after edge is satisfied by any finished dependency and
+            # says nothing about the outcome, so there is no answer this
+            # field could have on one -- and a parameter which is quietly
+            # dropped is how the gap this field closes went unnoticed for a
+            # release (issue #5091). The published object is shared by both
+            # lists, so the model cannot make this refusal; this helper
+            # knows which list it is walking.
+            if name == 'runs_after' and dependency.require_success:
+                return None, sf_api.error(
+                    400,
+                    '%s[%d]: require_success is only meaningful on a '
+                    'depends_on edge' % (name, index))
+
             # suppress_failure_audit because this lookup must not write an
             # event: a refused request creates nothing, and an audit event
             # naming the operation would be written against an object in a
@@ -1331,6 +1345,21 @@ AGENTDEPENDENCYSPEC_SCHEMA: dict[str, Any] = {
                 'before treating this edge as satisfied, for a caller whose '
                 'next step needs the guest to settle after whatever the '
                 'dependency changed. Omit it to be satisfied immediately.')
+        },
+        'require_success': {
+            'type': 'boolean',
+            # No default published, because an omitted boolean and an
+            # explicit false mean the same thing here and a published
+            # default would invite a caller to send one.
+            'description': (
+                'Satisfy this edge only if the named operation\'s commands '
+                'succeeded, as well as it having finished. A command which '
+                'exits non-zero completes its operation normally -- the exit '
+                'code is a result, not a failure -- so without this a '
+                'depends_on edge runs its dependent after a dependency whose '
+                'command failed. Only meaningful on a depends_on edge: a '
+                'runs_after edge decides nothing about an outcome, so one '
+                'which carries this is refused with a 400.')
         },
     },
 }
