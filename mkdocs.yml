@@ -488,6 +488,7 @@ nav:
                 - "Image decoder hardening": components/ryll/plans/PLAN-decoder-hardening.md
                 - "Splitting app.rs": components/ryll/plans/PLAN-app-split.md
                 - "RDP frontend": components/ryll/plans/PLAN-rdp-frontend.md
+                - "Untrusted value and text sweep": components/ryll/plans/PLAN-untrusted-value-sweep.md
                 - "Crate boundaries and transcoding out": components/ryll/plans/PLAN-crate-boundaries.md
                 - "Splitting bugreport.rs": components/ryll/plans/PLAN-bugreport-split.md
     - Features: features.md

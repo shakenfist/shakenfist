@@ -222,10 +222,13 @@ so a broken build here is never a network problem. The compiler
 they need is the same one the "Xcode Command Line Tools" step above
 installs, so on a correctly set-up machine this just works.
 
-Both dependencies are also unconditional: neither is behind a Cargo
-feature, so `cargo build --no-default-features` still compiles both
-of them. There is no flag that skips this step -- if the compiler is
-broken, the fix is the compiler, not the feature set.
+Both dependencies sit behind default-on features of
+`shakenfist-spice-compression` (`encode` and `h264-decode` for
+openh264, `mozjpeg` for mozjpeg-sys), and every `ryll` build takes
+them, so there is no `ryll` build flag that skips this step -- if
+the compiler is broken, the fix is the compiler, not the feature
+set. Only a library consumer that leaves those features off avoids
+them.
 
 If the build fails inside either crate's compile step, check that
 the Xcode Command Line Tools are actually active:

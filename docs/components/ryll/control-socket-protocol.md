@@ -56,8 +56,11 @@ Version history:
   `stats` result, counting frames a server sent with a dest rect that
   encloses no pixels, which used to be counted as painted.  Added the
   `paste_not_enabled` error code, returned by `paste` in a session
-  started without `--enable-paste-as-keystrokes`.  The field and the
-  code are additive; the `paste` answer is a deliberate behaviour
+  started without `--enable-paste-as-keystrokes`.  Added
+  `starts_refused` to the `playback` object, counting `PLAYBACK_START`
+  messages refused for a channel count or sample rate no output could
+  serve; `starts` now counts only the STARTs acted on.  The fields and
+  the code are additive; the `paste` answer is a deliberate behaviour
   change: in such a session v1.6 answered `ok` and then typed nothing
   and sent no event, so a client that took that `ok` as success was
   already wrong, and now hears so.
@@ -888,7 +891,8 @@ linking and survive `STOP` and the next `START`. It holds:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `starts` | u64 | `PLAYBACK_START` messages received. |
+| `starts` | u64 | `PLAYBACK_START` messages acted on. A refused one is in `starts_refused` instead, so `starts` can trail `stops`. |
+| `starts_refused` | u64 | From v1.7. `PLAYBACK_START` messages refused because the channel count or sample rate was outside what any output could serve (1 to 8 channels, 4 kHz to 384 kHz). Non-zero means the server is malformed or adversarial. |
 | `stops` | u64 | `PLAYBACK_STOP` messages received. |
 | `packets_received` | u64 | `PLAYBACK_DATA` messages received, decodable or not. |
 | `packets_decoded` | u64 | `DATA` packets decoded (Opus) or passed through (raw PCM). |
@@ -918,7 +922,7 @@ The same poll from a ryll with the `audio` feature, while Opus audio
 plays, also carries:
 
 ```
-"playback": {"starts": 1, "stops": 0, "packets_received": 3120, "packets_decoded": 3120, "decode_failures": 0, "bytes_received": 411840, "codec": "opus", "sample_rate": 48000, "channels": 2}
+"playback": {"starts": 1, "starts_refused": 0, "stops": 0, "packets_received": 3120, "packets_decoded": 3120, "decode_failures": 0, "bytes_received": 411840, "codec": "opus", "sample_rate": 48000, "channels": 2}
 ```
 
 ---

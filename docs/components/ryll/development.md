@@ -19,6 +19,14 @@ make release
 # Run tests
 make test
 
+# Run each published library crate's tests in its own cargo
+# resolution, as a crates.io consumer builds it. `make test` is one
+# invocation over the workspace, and cargo unifies features across an
+# invocation, so this is the only lane that sees a crate with the
+# features it has by itself. Slower than `make test`, because each
+# resolution rebuilds the dependencies whose features differ.
+make test-crates
+
 # Run linting (rustfmt + clippy)
 make lint
 
@@ -78,10 +86,13 @@ openh264 C++ sources, and `mozjpeg-sys` compiles vendored
 libjpeg-turbo (see
 [spice-protocol.md](/components/ryll/spice-protocol/#image-types-and-compression)
 for why that buys a no-runtime-dependency JPEG fallback). Neither
-crate downloads a prebuilt binary, and neither is optional --
-they're unconditional dependencies of `shakenfist-spice-compression`
-and `shakenfist-spice-renderer`, so every `ryll` build compiles them
-regardless of which Cargo features are enabled. A missing compiler
+crate downloads a prebuilt binary. Both sit behind default-on
+features of `shakenfist-spice-compression` (`encode` and
+`h264-decode` for openh264, `mozjpeg` for mozjpeg-sys), and `ryll`
+takes the renderer's default features, so every `ryll` build
+compiles them and a C/C++ compiler is a build prerequisite. A
+library consumer that leaves those features off does not build
+them. A missing compiler
 fails the build during their `cc`-crate compile step, not at link
 time, so the error surfaces early with a clear "no C compiler
 found"-style message. NASM (`nasm`) is not required for either
