@@ -221,8 +221,25 @@ PERSON_LAST='Person'
 
 # Where tools/ci-jwks-ca.sh left the signing material, on the primary.
 # A relative path is relative to the ssh user's home, which is where
-# that script puts it; SF_CI_JWKS_CA_DIR overrides it, as it does for
-# cluster_ci_tests/test_federation.py.
+# that script puts it.
+#
+# SF_CI_JWKS_CA_DIR overrides it, and its three readers do not mean the
+# same thing by it -- which matters because overriding it is how a
+# person reproduces a CI failure by hand:
+#
+#   * here it is a path on the *primary*, read by the commands this
+#     script sends over ssh, and relative by default;
+#   * cluster_ci_tests/test_oidc_login.py and
+#     cluster_ci_tests/test_federation.py read it as a path on whatever
+#     host runs the suite, defaulting to an absolute ~/... -- the same
+#     directory as this one whenever that host is the primary, which in
+#     CI it is, and a different one as soon as it is not;
+#   * tools/ci-jwks-ca.sh, which creates the authority in the first
+#     place, does not honour it at all and always writes
+#     ~/.sf-ci-jwks-ca.
+#
+# So overriding it means overriding it for each side separately, and
+# putting the authority somewhere else means moving it by hand.
 CA_DIR="${SF_CI_JWKS_CA_DIR:-.sf-ci-jwks-ca}"
 
 # Where that script installed the bundle on every node. The last check
@@ -388,6 +405,7 @@ printf '%s\n' \
     "KC_BOOTSTRAP_ADMIN_PASSWORD=${ADMIN_PASSWORD}" \
     "KC_HOSTNAME=${KEYCLOAK_URL}" \
     "KC_HTTP_ENABLED=false" \
+    "KC_HTTPS_PORT=${IDP_PORT}" \
     "KC_HTTPS_CERTIFICATE_FILE=/opt/keycloak/conf/tls.crt" \
     "KC_HTTPS_CERTIFICATE_KEY_FILE=/opt/keycloak/conf/tls.key" \
     > "${workdir}/container.env"
@@ -561,10 +579,26 @@ echo "  the provider answered after about ${waited}s"
 
 TOKEN=''
 
+# How every administrative request below presents that token: a curl
+# configuration file on the primary holding the whole header, rather
+# than -H with the token interpolated into it.
+#
+# The same rule as the two passwords, and for the same reason -- a
+# bearer token for the master realm's admin-cli client is a credential,
+# and a credential in a command line is readable in ps for the life of
+# the request by anything else on the host, and is in the ssh command
+# line on the runner as well. The passwords were already kept out this
+# way and this was not, which left the script enforcing for two of its
+# three credentials a rule it states as absolute.
+#
+# curl's --config reads "header = ..." as the long form of -H, and the
+# file is removed with the grant files once the requests which read it
+# are done.
+REMOTE_AUTH=''
+
 # A read, whose document comes back over ssh to be parsed here.
 kc_get() {
-    on_primary "${REMOTE_CURL} \
-        -H 'Authorization: Bearer ${TOKEN}' '${KEYCLOAK_URL}$1'"
+    on_primary "${REMOTE_CURL} ${REMOTE_AUTH} '${KEYCLOAK_URL}$1'"
 }
 
 # A write, printing the HTTP status so the caller can tell "created"
@@ -584,8 +618,7 @@ kc_write() {
         data="--data '${body}'"
     fi
     on_primary "${REMOTE_CURL} --output /dev/null \
-        --write-out '%{http_code}' --request ${method} \
-        -H 'Authorization: Bearer ${TOKEN}' \
+        --write-out '%{http_code}' --request ${method} ${REMOTE_AUTH} \
         -H 'Content-Type: application/json' ${data} \
         '${KEYCLOAK_URL}${path}'"
 }
@@ -627,6 +660,16 @@ TOKEN=$(on_primary "${REMOTE_CURL} --request POST \
     json_member access_token)
 [ -n "${TOKEN}" ] || \
     fail "could not get an administrative token from ${KEYCLOAK_URL}"
+
+# Written through stdin under a umask, exactly as the passwords are, so
+# the token reaches the primary without passing through a command line
+# on either host. Quoted in the file because a curl configuration file
+# otherwise ends the value at the first space, and "Bearer x" has one.
+printf 'header = "Authorization: Bearer %s"\n' "${TOKEN}" \
+    > "${workdir}/admin-auth"
+to_primary "${remote_state}/admin-auth" < "${workdir}/admin-auth" \
+    > /dev/null
+REMOTE_AUTH="--config '${remote_state}/admin-auth'"
 
 echo "Configuring the ${REALM} realm"
 kc_expect_created "realm ${REALM}" \
@@ -836,13 +879,20 @@ if plaintext:
 print("  %s publishes all four endpoints over https" % document["issuer"])
 ' "${ISSUER_URL}"
 
-# The three files whose only purpose was to keep a credential out of a
+# The four files whose only purpose was to keep a credential out of a
 # command line have no reason to outlive the requests that read them.
 # The administrative password does stay on the node, in the container's
 # environment file, because the container needs it for as long as it
 # runs; the person's stays in the descriptor, because the tests do.
 on_primary "rm -f '${remote_state}/admin-grant' \
+    '${remote_state}/admin-auth' \
     '${remote_state}/person-grant' '${remote_state}/person.json'"
+
+# And nothing below makes an administrative request, so the variable
+# which names the file that has just gone is emptied rather than left
+# pointing at it: a request added after this point fails as
+# unauthenticated instead of failing to find a configuration file.
+REMOTE_AUTH=''
 
 # -- the descriptor -------------------------------------------------
 #

@@ -187,6 +187,18 @@ TOLD_THE_CODE = re.compile(r'^and (?:confirm|enter) the code (.+)\.$')
 # seconds, nearly all of it the poll interval the provider asks for.
 LOGIN_DEADLINE = 180
 
+# How long the client has to tell the person where to go and what to
+# confirm. Separate from the deadline below, and much shorter, because
+# the two failures are different and only one of them is this test's
+# fault: a client which never instructs anybody is a client whose two
+# lines have been reworded (TOLD_THE_URI and TOLD_THE_CODE above, which
+# this repository cannot check against client-python), and waiting the
+# full deadline out for it reports that as "nobody confirmed the login"
+# three minutes later and spends three minutes of a weekly budget doing
+# it. A real device authorization answers in about a second, so this is
+# two orders of magnitude of slack and still fails inside a job.
+TOLD_BY = 30
+
 # How long to wait for the person's thread to finish after the command
 # has exited or been killed. It is doing bounded HTTP by then or
 # nothing at all, so this only has to be long enough not to be a race.
@@ -289,34 +301,22 @@ class ProviderFixture:
         reading this verdict was reached on and is quoted in both the
         failure and the skip, so a job's output says which branch was
         taken rather than only what happened.
+
+        The decision itself is sizing.provider_is_expected(), a pure
+        function of the node roster and this host's addresses, so that
+        every roster shape the fleet can present is exercised by
+        shakenfist/tests/test_ci_oidc_login_guard.py on every pull
+        request. It decides whether a missing provider is a failure or a
+        skip, and it is only ever reached on a lane which runs neither on
+        pull_request nor in the merge queue -- the one kind of logic
+        which must not live in a module nothing can load.
+
+        The two readings it needs are gathered here, because both are
+        requests: the roster from the cluster, and this host's addresses
+        from the host.
         """
-        nodes = self.system_client.get_nodes()
-
-        if sizing.is_single_machine(nodes):
-            return False, (
-                'this is a single machine deployment -- one node holding '
-                'every role -- which the cluster suite is run against '
-                'deliberately and on which no provider is stood up')
-
-        local = [n for n in nodes if self._node_is_local(n)]
-        if not local:
-            return False, (
-                'the host running this suite is not one of the cluster\'s '
-                '%d nodes, so it is not a deployment anything stood a '
-                'provider up on' % len(nodes))
-
-        node = local[0]
-        if not node.get('is_hypervisor'):
-            return False, (
-                'the host running this suite is cluster node %s, which is '
-                'not a hypervisor -- the topology which carries a provider '
-                'gives its primary the hypervisor, network and database '
-                'roles together, and this one has none of them'
-                % node.get('name'))
-
-        return True, (
-            'the host running this suite is cluster node %s, which is also '
-            'a hypervisor' % node.get('name'))
+        return sizing.provider_is_expected(
+            self.system_client.get_nodes(), self._local_ipv4_addresses())
 
     def _require_a_provider(self):
         """The descriptor, or a failure where one was promised, or a skip.
@@ -430,7 +430,38 @@ class ProviderFixture:
                             'waiting for %s to be free: %s'
                             % (self.descriptor['issuer_url'], e.text)))
                     waited = True
-                time.sleep(ISSUER_CLAIM_POLL)
+
+                # Waited out by listing rather than by re-posting, which
+                # matters because of where the create does its work: it
+                # runs discovery *before* taking the issuer URL lock,
+                # since discovery is an outbound fetch and the lock is a
+                # cluster wide one (external_api/auth.py, "Before the
+                # lock"). So every losing POST makes sf-api fetch this
+                # provider's discovery document and its keys before the
+                # URL check refuses it -- on the node which is also
+                # running the provider and five test workers, from four
+                # tests at once, every ISSUER_CLAIM_POLL seconds. A
+                # listing costs one read instead and is enough to know
+                # when to try again.
+                self._wait_for_the_issuer_url(deadline)
+
+    def _wait_for_the_issuer_url(self, deadline):
+        """Poll until no live issuer claims this provider's URL.
+
+        Returns when the URL looks free, or when `deadline` passes --
+        in which case the caller's next POST answers 409 again and
+        reports the wait, so there is no second copy of that failure
+        here. Nothing is asserted from the gap between this returning
+        and that POST: the create takes the lock and re-checks, which
+        is what actually decides.
+        """
+        issuer_url = self.descriptor['issuer_url']
+        while time.time() < deadline:
+            time.sleep(ISSUER_CLAIM_POLL)
+            live = self.system_client._request_url(
+                'GET', '/auth/issuers').json()
+            if not [i for i in live if i.get('issuer_url') == issuer_url]:
+                return
 
     def _delete_issuer(self):
         """Release the issuer URL, and say so if it could not be released.
@@ -662,12 +693,23 @@ class TestHumanLogin(ProviderFixture, base.BaseNamespacedTestCase):
         # own address and this provider is at the cluster's, so what can
         # be compared is where each endpoint sits relative to the issuer
         # URL of the document it came from.
-        self.assertTrue(
-            os.path.exists(DISCOVERY_CAPTURE),
-            '%s is missing, so the live document cannot be compared against '
-            'a capture of this provider version. The cluster suite runs out '
-            'of a checkout of this repository, which is where that capture '
-            'lives.' % DISCOVERY_CAPTURE)
+        #
+        # The four assertions above are this test's load-bearing half and
+        # need no capture; the comparison below is the extra. So an absent
+        # capture ends the test here rather than failing it: the path
+        # reaches up out of the installed suite into the checkout, which
+        # holds today because CI copies this repository to the primary and
+        # cluster-ci.conf runs from shakenfist/deploy, and is a layout
+        # rather than a guarantee. load_budget() makes the same reach for
+        # the same reason and has the same fallback.
+        if not os.path.exists(DISCOVERY_CAPTURE):
+            self.addDetail('capture_missing', content.text_content(
+                '%s is absent, so the live document was not compared against '
+                'a capture of this provider version. Every endpoint '
+                'assertion above ran. The suite is not running out of a '
+                'checkout of this repository, which is where that capture '
+                'lives.' % DISCOVERY_CAPTURE))
+            return
         with open(DISCOVERY_CAPTURE) as f:
             captured = json.load(f)
 
@@ -1080,7 +1122,8 @@ class TestTheClientsDeviceLogin(ProviderFixture, base.BaseNamespacedTestCase):
         stop an unconfirmed login inside a job's budget is here.
         """
         report = {'said': [], 'uri': None, 'code': None, 'acted': False,
-                  'approval': None, 'broke': None, 'stopped': None}
+                  'approval': None, 'broke': None, 'stopped': None,
+                  'still_acting': False}
         document = os.path.join(self.config_home, 'stdout')
         started = time.time()
 
@@ -1096,8 +1139,12 @@ class TestTheClientsDeviceLogin(ProviderFixture, base.BaseNamespacedTestCase):
                 stdin=subprocess.DEVNULL, stdout=out,
                 stderr=subprocess.PIPE, text=True, close_fds=True,
                 env=self._client_environment())
+            # A daemon, so a person stuck in an HTTP call which never
+            # answers cannot hold up this worker's exit. What she was
+            # doing is reported below either way.
             person = threading.Thread(
-                target=self._be_the_person, args=(proc.stderr, report))
+                target=self._be_the_person, args=(proc.stderr, report),
+                daemon=True)
             person.start()
 
             # Waited for in a loop rather than with one timeout, for the
@@ -1110,12 +1157,18 @@ class TestTheClientsDeviceLogin(ProviderFixture, base.BaseNamespacedTestCase):
             # different thing: there the person did not break, she was
             # never asked.
             deadline = started + LOGIN_DEADLINE
+            instructed_by = started + TOLD_BY
             while True:
                 returncode = proc.poll()
                 if returncode is not None:
                     break
                 if report['broke']:
                     report['stopped'] = 'the person could not finish'
+                elif (not (report['uri'] and report['code'])
+                        and time.time() > instructed_by):
+                    report['stopped'] = (
+                        'the client had not said where to go and what to '
+                        'confirm within %d seconds' % TOLD_BY)
                 elif time.time() > deadline:
                     report['stopped'] = (
                         'the deadline of %d seconds' % LOGIN_DEADLINE)
@@ -1125,6 +1178,15 @@ class TestTheClientsDeviceLogin(ProviderFixture, base.BaseNamespacedTestCase):
                     break
                 time.sleep(1)
             person.join(PERSON_JOIN)
+            # join() with a timeout returns whether or not the thread
+            # finished, and everything below reads `report`, which that
+            # thread writes. A join which timed out is therefore recorded
+            # as part of what happened rather than silently producing a
+            # half-written report: it is only reachable when the provider
+            # has stopped answering mid-approval, which is exactly when
+            # what the person managed to do is the thing worth knowing.
+            if person.is_alive():
+                report['still_acting'] = True
 
         with open(document) as f:
             stdout = f.read()
@@ -1151,12 +1213,16 @@ class TestTheClientsDeviceLogin(ProviderFixture, base.BaseNamespacedTestCase):
         person = login['person']
         return ('the client exited %s after %.1f seconds%s; the person was '
                 'told to open %s and confirm %s, acted: %s, approval: %s, '
-                'and her own error was %s'
+                'and her own error was %s%s'
                 % (login['returncode'], login['seconds'],
                    ' and was killed at %s' % person['stopped']
                    if person['stopped'] else '',
                    person['uri'], person['code'], person['acted'],
-                   person['approval'], person['broke']))
+                   person['approval'], person['broke'],
+                   '; she was still acting when this gave up waiting for '
+                   'her after %d seconds, so what she reports may be '
+                   'incomplete' % PERSON_JOIN
+                   if person.get('still_acting') else ''))
 
     # -- the login, as the command runs it -----------------------------
 

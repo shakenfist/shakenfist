@@ -31,6 +31,17 @@ same kind of thing -- arithmetic over a published reading, with no cluster
 needed to check it -- so ``shakenfist/tests/test_ci_structural_minimum.py``
 exercises those boundaries in ``pre-commit`` instead of in a merge-queue
 cluster job.
+
+A third thing is here for a sharper version of that reason.
+``provider_is_expected()`` decides whether a deployment is one an
+identity provider was stood up on, which is what makes a missing
+provider a failure on one topology and a skip everywhere else. That
+verdict is only ever reached on the weekly lane which carries a
+provider, so a mistake in it cannot be found on a pull request at all --
+and the two ways of getting it wrong are a merge gate which fails on
+every cluster and a skip indistinguishable from coverage which has never
+worked. ``shakenfist/tests/test_ci_oidc_login_guard.py`` exercises it
+over every roster shape the fleet can present.
 """
 
 import math
@@ -261,6 +272,93 @@ def is_single_machine(nodes):
     return bool(node.get('is_hypervisor')
                 and node.get('is_network_node')
                 and node.get('is_database_node'))
+
+
+# The roles the node an identity provider is stood up on carries, all
+# three at once. It is not a description of a provider's requirements --
+# a container needs no role at all -- it is the shape which identifies
+# the one topology sized to host one, and it is deliberately the same
+# three flags ``is_single_machine()`` reads just above. The two are told
+# apart by node count and nothing else, which is why the carve-out below
+# comes first.
+# Each as (the flag Node.external_view() publishes, what to call it in a
+# sentence), because the verdict's reason is read by a person looking at a
+# job's output and "carries is_database_node" is not a sentence.
+PROVIDER_NODE_ROLES = (('is_hypervisor', 'hypervisor'),
+                       ('is_network_node', 'network'),
+                       ('is_database_node', 'database'))
+
+
+def provider_is_expected(nodes, local_addresses):
+    """Whether this deployment is one an identity provider was stood up on.
+
+    Returns an ``(expected, because)`` pair, where ``because`` is the
+    reading the verdict was reached on, written to be quoted verbatim in
+    whatever the caller does with it. ``cluster_ci_tests/test_oidc_login.py``
+    quotes it in a passing run's details, in its skip and in its failure,
+    so a job's output says which branch was taken and not only what
+    happened.
+
+    ``nodes`` is the roster ``GET /nodes`` publishes; ``local_addresses``
+    is the set of IPv4 addresses configured on the host running the
+    suite, which is how the caller already identifies itself in a roster
+    (``base.TestCaseWithCleanup._node_is_local()``, by mesh IP rather
+    than by name, because the Shaken Fist node name and the OS fqdn
+    differ in CI).
+
+    Here, as a pure function of those two readings, for the reason the
+    module docstring gives: the verdict decides whether a missing
+    provider is a failure or a skip on a lane that runs neither on
+    ``pull_request`` nor in the merge queue, so a mistake in it surfaces
+    up to a week later as either a red weekly job on every cluster or a
+    skip nobody can tell from a provider which has never worked. Nothing
+    checkable only on that lane should decide that.
+
+    The role test is all three of ``PROVIDER_NODE_ROLES`` together, and
+    not the hypervisor role alone. The hypervisor flag by itself is
+    enough to separate the two topologies deployed today -- the
+    merge-gating primary carries the database role and is not a
+    hypervisor -- but it is weaker than the invariant
+    ``test_ci_oidc_login_guard.py`` proves on this function's behalf,
+    which is that the provider's topology has a node carrying all three
+    and no merge-gating topology has one. A merge-gating primary which
+    gained the hypervisor role alone would satisfy the weaker test on
+    every merge-gating lane and fail every test in that file on every
+    merge; under the stronger one it reads as "no provider expected" and
+    skips. Keeping the runtime check the same shape as the proven
+    invariant is the point: the two sides of the reasoning are then one
+    fact rather than two which can drift apart.
+    """
+    nodes = nodes or []
+    local_addresses = local_addresses or set()
+
+    if is_single_machine(nodes):
+        return False, (
+            'this is a single machine deployment -- one node holding every '
+            'role -- which the cluster suite is run against deliberately '
+            'and on which no provider is stood up')
+
+    local = [n for n in nodes if n.get('ip') in local_addresses]
+    if not local:
+        return False, (
+            'the host running this suite is not one of the cluster\'s %d '
+            'nodes, so it is not a deployment anything stood a provider up '
+            'on' % len(nodes))
+
+    node = local[0]
+    held = [name for flag, name in PROVIDER_NODE_ROLES if node.get(flag)]
+    if len(held) != len(PROVIDER_NODE_ROLES):
+        return False, (
+            'the host running this suite is cluster node %s, which carries '
+            '%s -- the topology which carries a provider gives its primary '
+            'the hypervisor, network and database roles together'
+            % (node.get('name'),
+               '%s and not the others' % ', '.join(held) if held
+               else 'none of those three roles'))
+
+    return True, (
+        'the host running this suite is cluster node %s, which carries the '
+        'hypervisor, network and database roles together' % node.get('name'))
 
 
 def _violation(requirement, observed, minimum, consequence):

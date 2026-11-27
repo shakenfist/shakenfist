@@ -160,6 +160,61 @@ class IdpPagesTestCase(base.ShakenFistTestCase):
                          'the first form on the page was taken rather than '
                          'the one which asks for a password')
 
+    def test_an_input_after_a_form_is_not_a_field_of_that_form(self):
+        # An input outside any form but following one: a locale picker,
+        # an anti-forgery field beside the form rather than in it. Both
+        # providers' templates emit such things on some screens, and the
+        # committed captures do not, so this is constructed. Attributing
+        # it to the form above it is wrong in both directions -- it can
+        # make a form appear to ask for a field it does not, and it can
+        # make a page with exactly one password form read as two.
+        stray = '<input type="hidden" name="password" value="decoy">'
+        page = _Page(self.confirm + stray, CONFIRM_URL)
+
+        forms = self._pages().forms_of(page)
+        self.assertEqual(
+            [['code']], [[f['name'] for f in form['fields']]
+                         for form in forms],
+            'an input after the form it follows was read as one of its '
+            'fields, so which form asks for what is decided by position '
+            'rather than by the markup')
+
+        # And so the page still reads as a page carrying no password
+        # form at all, rather than as one whose confirmation form asks
+        # for a password.
+        e = self.assertRaises(idp_pages.PageSequenceChanged,
+                              self._pages().form_asking_for, page,
+                              'password')
+        self.assertIn('0 forms carrying a field', str(e))
+
+    def test_a_page_cut_off_mid_form_is_refused_and_not_half_posted(self):
+        # A page truncated part way through a tag -- a short read, a
+        # provider which closed the connection -- loses that tag
+        # entirely. close() says the document has ended but does not
+        # recover an unterminated one, which is measured here rather
+        # than assumed, because the thing worth pinning is what the
+        # caller does about it: the form comes back a field short, and
+        # the field it is short of is the one it is selected by, so the
+        # page is refused by name. The failure mode this rules out is
+        # posting a sign in form with no password in it and reading the
+        # provider's complaint as a refused credential.
+        page = _Page('<form id="kc-form-login"><input name="username">'
+                     '<input name="password"', SIGN_IN_URL)
+
+        self.assertEqual(
+            [['username']],
+            [[f['name'] for f in form['fields']]
+             for form in self._pages().forms_of(page)])
+
+        e = self.assertRaises(idp_pages.PageSequenceChanged,
+                              self._pages().form_asking_for, page,
+                              'password')
+        self.assertIn('0 forms carrying a field', str(e))
+        self.assertIn("'username'", str(e),
+                      'the refusal does not say what the truncated page did '
+                      'carry, which is what tells a reader it was cut off '
+                      'rather than changed')
+
     def test_the_confirmation_form_is_the_one_carrying_the_grant_code(self):
         page = _Page(self.confirm, CONFIRM_URL)
 

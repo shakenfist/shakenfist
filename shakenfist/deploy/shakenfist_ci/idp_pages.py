@@ -91,6 +91,7 @@ class ProviderLoginPages(HTMLParser):
         self.session = session
         self.timeout = timeout
         self._forms = []
+        self._in_form = False
 
     # -- reading a page ------------------------------------------------
 
@@ -100,7 +101,8 @@ class ProviderLoginPages(HTMLParser):
             self._forms.append({'id': attrs.get('id'),
                                 'action': attrs.get('action'),
                                 'fields': []})
-        elif tag == 'input' and self._forms:
+            self._in_form = True
+        elif tag == 'input' and self._in_form:
             # Inputs only. A button is sent because the caller named it
             # and never because the page carried it: a browser sends the
             # one submit the person clicked, and the confirmation form
@@ -110,11 +112,36 @@ class ProviderLoginPages(HTMLParser):
             self._forms[-1]['fields'].append(
                 {'name': attrs.get('name'), 'value': attrs.get('value')})
 
+    def handle_endtag(self, tag):
+        # Which form an input belongs to is the whole basis on which a
+        # form is chosen below, so a form has to end. Without this, an
+        # input a page carries outside any form but after one -- which
+        # these providers' templates do emit, for a locale picker or a
+        # hidden anti-forgery field beside the form rather than in it --
+        # is recorded as a field of the form above it. That can make
+        # form_asking_for() pick a form which does not ask for the
+        # field, or refuse a page which has exactly one form that does.
+        # The committed captures pin their field lists exactly, so the
+        # tests over them cannot tell the difference: this is correct in
+        # general rather than correct for the pinned release.
+        if tag == 'form':
+            self._in_form = False
+
     def forms_of(self, page):
         """Every form on a page, in order, with its action and its inputs."""
         self.reset()
         self._forms = []
+        self._in_form = False
         self.feed(page.text)
+        # Says the document has ended, which is what close() is for: the
+        # parser holds trailing input until it knows no more is coming.
+        # It does not recover a page cut off part way through a tag --
+        # measured, not assumed, and the unit test pins what happens
+        # instead: the truncated element is dropped, the form comes back
+        # a field short, and form_asking_for() below refuses the page by
+        # name rather than posting a form missing the field it was cut
+        # off inside.
+        self.close()
         return self._forms
 
     def form_asking_for(self, page, field):

@@ -28,12 +28,23 @@ instead:
 
 * **Every deployment the cluster suite runs against is one the guard has an
   answer for.** The guard decides "is a provider expected here?" from the
-  cluster: the host running the suite is identified in the node roster and
-  asked whether it is also a hypervisor, with the single machine deployment
-  carved out first. A topology running ``cluster-ci.conf`` which is neither the
-  one carrying a provider nor one of the two that carve out would be judged by a
-  rule nobody wrote about it, and on a weekly lane that failure arrives as an
-  issue up to a week later.
+  cluster: the host running the suite is identified in the node roster by its
+  mesh IP and asked whether it carries the hypervisor, network and database
+  roles together, with the single machine deployment carved out first. A
+  topology running ``cluster-ci.conf`` which is neither the one carrying a
+  provider nor one of the two that carve out would be judged by a rule nobody
+  wrote about it, and on a weekly lane that failure arrives as an issue up to a
+  week later.
+
+* **The verdict itself is right about each of those deployments.** It is
+  ``sizing.provider_is_expected()``, a pure function of the node roster and the
+  suite host's addresses, so the topologies above are not only enumerated here
+  but run through it -- including the roster shapes no topology has today,
+  which is where a guard like this one goes wrong. It was a method on the test
+  class until the review of the pull request which added it pointed out that
+  the fail-rather-than-skip decision the whole design rests on was exercised by
+  nothing: the tests here read the lane wiring, and the roster verdicts had
+  been driven by hand once, during execution, and committed nowhere.
 
 The topology figures are duplicated here rather than derived, for the reason
 ``test_ci_structural_minimum.py`` gives for duplicating its own: that repository
@@ -204,8 +215,9 @@ class ProviderLaneTestCase(base.ShakenFistTestCase):
                     entry['topology'], known,
                     '%s runs cluster-ci.conf against the %s topology, which '
                     'test_oidc_login.py\'s guard has nothing to say about. It '
-                    'decides whether a provider is expected by asking whether '
-                    'the host running the suite is also a hypervisor, so on '
+                    'decides whether a provider is expected by asking '
+                    'whether the host running the suite carries the '
+                    'hypervisor, network and database roles together, so on '
                     'an unconsidered topology it will either fail every test '
                     'in that file or skip them all, and nothing says which it '
                     'should have done. Add the topology here, and to the '
@@ -216,9 +228,13 @@ class ProviderLaneTestCase(base.ShakenFistTestCase):
         """The reading the guard is built on, checked against both topologies.
 
         The guard finds the host running the suite in the node roster and asks
-        whether it is a hypervisor. That works only because the two cluster
-        topologies really do differ in the roles their primary carries, which is
-        a fact about another repository's deploy and is modelled here.
+        whether it carries all three roles. That works only because the two
+        cluster topologies really do differ in the roles their primary carries,
+        which is a fact about another repository's deploy and is modelled here.
+
+        Asserted about the roster shape rather than through the function,
+        because this is the fact the function's predicate was chosen from. The
+        verdicts themselves are ProviderIsExpectedTestCase's business below.
         """
         _, tier = structural.SLIM_TIER
         _, primary = structural.SLIM_PRIMARY
@@ -232,7 +248,7 @@ class ProviderLaneTestCase(base.ShakenFistTestCase):
             1, len(holds_every_role(tier)),
             'The %s topology no longer has a node carrying the hypervisor, '
             'network and database roles together. That node is its primary, '
-            'and it being a hypervisor is the whole discriminator.'
+            'and those three roles together are the whole discriminator.'
             % PROVIDER_TOPOLOGY)
 
         self.assertEqual(
@@ -322,3 +338,166 @@ class DescriptorAndCaptureTestCase(base.ShakenFistTestCase):
         self.assertIn('device_authorization_endpoint', captured)
         self.assertIn('device_authorization_endpoint',
                       captured.get('mtls_endpoint_aliases') or {})
+
+
+class ProviderIsExpectedTestCase(base.ShakenFistTestCase):
+    """The verdict the fail-or-skip decision is made on, over every shape.
+
+    ``sizing.provider_is_expected()`` answers "is this a deployment a provider
+    was stood up on?" from the node roster and the suite host's addresses. It
+    is the whole of what makes a missing provider a failure in one place and a
+    skip in every other, and it is reached only on a lane which runs neither on
+    ``pull_request`` nor in the merge queue -- so these are the only tests
+    which can be wrong about it before a week has passed.
+
+    Both real topologies are run through it from each of their nodes, and then
+    the shapes no topology has: a roster this host is not in, a merge-gating
+    primary which has gained the hypervisor role on its own, and the single
+    machine deployment. The second of those is the case the predicate was
+    strengthened for -- under an ``is_hypervisor``-alone test it would read as
+    "a provider is expected" on every merge-gating lane and fail every test in
+    ``test_oidc_login.py`` on every merge.
+    """
+
+    sizing = structural.sizing
+
+    def _verdict(self, nodes, node):
+        """The verdict reached from `node`, as that node's host reaches it."""
+        return self.sizing.provider_is_expected(nodes, {node['ip']})
+
+    def test_the_provider_topology_expects_one_from_its_primary(self):
+        _, nodes = structural.SLIM_TIER
+        primary = nodes[0]
+
+        expected, because = self._verdict(nodes, primary)
+        self.assertTrue(
+            expected,
+            'The %s topology\'s primary is the host the suite runs on and the '
+            'host the provider is stood up on, and the guard read "%s". A '
+            'missing provider would skip there, which is the silent skip this '
+            'whole design exists to avoid.' % (PROVIDER_TOPOLOGY, because))
+        self.assertIn(primary['name'], because,
+                      'the verdict does not name the node it was reached '
+                      'from, and it is quoted verbatim in the failure')
+
+    def test_the_provider_topology_expects_none_from_its_other_nodes(self):
+        # Not a case CI produces -- the suite runs on the primary -- and worth
+        # pinning because it is the difference between "this cluster has a
+        # provider" and "this host has one". A sibling hypervisor carries no
+        # container and nothing wrote a descriptor into its home.
+        _, nodes = structural.SLIM_TIER
+        for node in nodes[1:]:
+            with self.subTest(node=node['name']):
+                expected, because = self._verdict(nodes, node)
+                self.assertFalse(expected, because)
+
+    def test_a_merge_gating_topology_expects_none_from_any_node(self):
+        _, nodes = structural.SLIM_PRIMARY
+        for node in nodes:
+            with self.subTest(node=node['name']):
+                expected, because = self._verdict(nodes, node)
+                self.assertFalse(
+                    expected,
+                    'A node of a merge-gating cluster topology was read as a '
+                    'deployment a provider was stood up on ("%s"), so every '
+                    'test in test_oidc_login.py would fail on every merge.'
+                    % because)
+
+    def test_a_hypervisor_role_alone_does_not_expect_a_provider(self):
+        """The drift this predicate is shaped to survive.
+
+        The merge-gating primary carries the database role and is not a
+        hypervisor, so the hypervisor flag alone separates the two topologies
+        today. If that primary ever gains the hypervisor role -- a change in
+        another repository, which this one consumes at ``@main`` with no pin --
+        a hypervisor-alone test would flip it to "expected" and fail every
+        test in that file on every merge. All three roles together is the same
+        invariant ``test_the_discriminator_separates_the_two_cluster_topologies``
+        proves, so the two sides of the reasoning cannot drift apart.
+        """
+        _, nodes = structural.SLIM_PRIMARY
+        nodes = [dict(node) for node in nodes]
+        primary = nodes[-1]
+        self.assertFalse(primary['is_hypervisor'], primary)
+        primary['is_hypervisor'] = True
+
+        expected, because = self._verdict(nodes, primary)
+        self.assertFalse(
+            expected,
+            'A merge-gating primary which gained the hypervisor role was read '
+            'as a deployment a provider was stood up on ("%s"). It carries '
+            'neither the network nor the database role of the topology which '
+            'really has one.' % because)
+        self.assertIn('hypervisor', because,
+                      'the verdict does not say which roles it did find')
+
+    def test_a_host_outside_the_roster_expects_no_provider(self):
+        # The suite run from somewhere that is not a cluster node at all: a
+        # runner, a laptop. There is no node to read roles from, so there is
+        # nothing to say a provider was stood up here.
+        _, nodes = structural.SLIM_TIER
+
+        expected, because = self._verdict(nodes, {'ip': '192.0.2.1'})
+        self.assertFalse(expected, because)
+        self.assertIn(str(len(nodes)), because,
+                      'the verdict does not say how many nodes it looked '
+                      'through, which is what tells a reader the roster was '
+                      'read at all')
+
+    def test_the_single_machine_deployment_is_carved_out_first(self):
+        """And it has to be first, because its one node holds every role.
+
+        The single machine topology's node carries hypervisor, network and
+        database together -- the same shape as the provider topology's primary
+        -- so the two are told apart by node count and by nothing else. The
+        weekly ``debian-13-localhost`` lane runs ``cluster-ci.conf`` there
+        deliberately, and no provider is stood up for it.
+        """
+        node = {'uuid': 'one', 'name': 'one', 'ip': '10.0.0.1',
+                'is_hypervisor': True, 'is_network_node': True,
+                'is_database_node': True}
+
+        expected, because = self._verdict([node], node)
+        self.assertFalse(
+            expected,
+            'The single machine deployment was read as one a provider was '
+            'stood up on ("%s"), so every test in test_oidc_login.py would '
+            'fail on the localhost lane.' % because)
+        self.assertIn('single machine', because)
+
+    def test_an_empty_or_unreadable_roster_expects_no_provider(self):
+        # A cluster which published no roster at all is not a deployment to
+        # assert a missing provider against. It cannot happen on the lane that
+        # matters -- the suite has already talked to sf-api by this point --
+        # and the alternative is an IndexError in a guard.
+        for nodes in ([], None):
+            with self.subTest(nodes=nodes):
+                expected, because = self.sizing.provider_is_expected(
+                    nodes, {'10.0.0.10'})
+                self.assertFalse(expected, because)
+
+    def test_the_reason_is_always_a_sentence_about_this_cluster(self):
+        """Because it is quoted verbatim in a skip, a failure and a pass.
+
+        Every branch's reason is read by whoever reads the job, and the
+        failure it is quoted in is the one which says a provider was promised
+        and is not there. A branch which returned an empty or placeholder
+        reason would make that failure unactionable.
+        """
+        _, tier = structural.SLIM_TIER
+        _, primary = structural.SLIM_PRIMARY
+        single = {'uuid': 'one', 'name': 'one', 'ip': '10.0.0.1',
+                  'is_hypervisor': True, 'is_network_node': True,
+                  'is_database_node': True}
+
+        readings = ([(tier, node) for node in tier]
+                    + [(primary, node) for node in primary]
+                    + [([single], single), (tier, {'ip': '192.0.2.1'})])
+        for nodes, node in readings:
+            with self.subTest(node=node.get('name'), roster=len(nodes)):
+                _, because = self._verdict(nodes, node)
+                self.assertTrue(because)
+                self.assertGreater(len(because.split()), 8, because)
+                self.assertFalse(because.endswith('.'),
+                                 'the reason ends in a full stop, and it is '
+                                 'quoted mid-sentence: %r' % because)

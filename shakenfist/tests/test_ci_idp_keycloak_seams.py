@@ -100,6 +100,11 @@ def _read(relative):
 # provider's half of Keycloak's administrative API too.
 #
 # SF_SEAM_CA is how a test says the certificate authority is not there.
+# The token the stub provider issues, named here because two tests assert
+# about where it does and does not appear and a second copy of the string
+# would let one of them pass while the script leaked the other.
+ADMINISTRATIVE_TOKEN = 'stub-administrative-token'
+
 SSH_STUB = '''#!/usr/bin/env python3
 import base64
 import json
@@ -152,7 +157,7 @@ def token(claims):
 
 
 if '/realms/master/protocol/openid-connect/token' in url:
-    body = {'access_token': 'stub-administrative-token'}
+    body = {'access_token': '@@ADMINISTRATIVE_TOKEN@@'}
 elif '/realms/master/.well-known/openid-configuration' in url:
     body = {}
 elif 'protocol-mappers/models' in url:
@@ -180,6 +185,9 @@ else:
 
 json.dump(body, sys.stdout)
 '''
+
+SSH_STUB = SSH_STUB.replace('@@ADMINISTRATIVE_TOKEN@@',
+                            ADMINISTRATIVE_TOKEN)
 
 # scp is not called at all any more, and this is here so that it cannot start
 # being called quietly: anything it is handed is recorded and nothing is copied.
@@ -239,6 +247,21 @@ class CiIdpKeycloakScriptTestCase(base.ShakenFistTestCase):
     def _commands_containing(self, text):
         return [call['command'] for call in self._calls()
                 if text in call.get('command', '')]
+
+    def _wrote(self, name):
+        """What the script wrote to the primary under this basename.
+
+        Every document reaches the primary through ``to_primary``, which the
+        ssh stub records by the name it was written to, so a test asks for
+        one file rather than picking a document out of the calls.
+        """
+        path = os.path.join(self.stubs, 'wrote-%s' % name)
+        if not os.path.exists(path):
+            self.fail('the script wrote no %s to the primary. It sent %s'
+                      % (name, sorted(entry for entry in os.listdir(self.stubs)
+                                      if entry.startswith('wrote-'))))
+        with open(path) as f:
+            return f.read()
 
     def _descriptor(self):
         """The descriptor the script wrote to the primary, parsed.
@@ -373,6 +396,28 @@ class CiIdpKeycloakScriptTestCase(base.ShakenFistTestCase):
         self.assertIn("--data-urlencode 'password@", self._sent())
         self.assertIn('rm -f', self._commands_containing('person-grant')[-1])
 
+        # The administrative token is held to the same rule, which is the
+        # whole of what this test is named after and was once asserted only
+        # of the password. It is a credential for the master realm's
+        # admin-cli client, it is on the command line of every
+        # administrative request if it is passed with -H, and ps on the
+        # primary is readable by anything else running there.
+        for call in self._calls():
+            command = call.get('command', '')
+            self.assertNotIn(ADMINISTRATIVE_TOKEN, command)
+            self.assertNotIn('Bearer', command)
+
+        # Which works by the same mechanism, so it is asserted the same way:
+        # a file written through stdin under a umask, named to curl, and
+        # removed with the others.
+        self.assertIn("--config '", self._sent())
+        self.assertIn('rm -f', self._commands_containing('admin-auth')[-1])
+        self.assertEqual(
+            'header = "Authorization: Bearer %s"' % ADMINISTRATIVE_TOKEN,
+            self._wrote('admin-auth').strip(),
+            'the configuration file curl is pointed at does not hold the '
+            'header it is there to hold')
+
     def test_the_certificate_covers_the_address_the_cluster_is_given(self):
         self.assertEqual(0, self._run().returncode)
         sent = self._sent()
@@ -434,6 +479,33 @@ class CiIdpKeycloakScriptTestCase(base.ShakenFistTestCase):
         # The host's network namespace, so Docker needs to add no address
         # translation on a node which is also the cluster's network node.
         self.assertIn('--network host', sent)
+
+    def test_one_constant_decides_the_port_the_provider_serves_on(self):
+        """The port the URLs are built from is also the port the container
+        serves on.
+
+        The container runs with ``--network host``, so Keycloak's own port
+        setting is what decides where it listens, and the issuer URL, the
+        readiness check, the certificate and every node's fetch are all built
+        from the script's constant. Those two agreed only because the constant
+        happened to equal the image's default: changing it -- the obvious
+        response to a port collision on the primary -- would have left the
+        provider on 8443 with everything else pointing somewhere else.
+        """
+        self.assertEqual(0, self._run().returncode)
+        environment = self._wrote('container.env')
+        port = self._descriptor()['issuer_url'].split(':')[2].split('/')[0]
+
+        self.assertIn(
+            'KC_HTTPS_PORT=%s' % port, environment,
+            'the container is not told to serve on the port the issuer URL '
+            'names, so the two agree only while the constant matches the '
+            'image default. The environment was: %s' % environment)
+        # And the hostname it mints its own URLs from carries the same port,
+        # because a token's iss claim has to equal the issuer URL the cluster
+        # was configured with, character for character.
+        self.assertIn('KC_HOSTNAME=https://%s:%s' % (CLUSTER['primary'], port),
+                      environment)
 
     def test_docker_is_configured_before_it_is_installed(self):
         self.assertEqual(0, self._run().returncode)

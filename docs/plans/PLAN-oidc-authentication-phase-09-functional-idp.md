@@ -337,8 +337,9 @@ repository and is sequenced after 9a.
 | Keycloak plus the suite exhausts the slim-tier primary | D2 picked the 12288 MiB primary deliberately and finding 3 records both numbers. 9a gives the container an explicit memory limit rather than letting it take what it likes, and the lane's own headroom probe (`ci_headroom_launch.sh`, already running in this workflow) is what would show it. If the lane's pass rate or duration moves, the provider comes out of it rather than the lane growing. |
 | Docker on an SF node interferes with cluster networking | The slim-tier primary is a hypervisor and the network node, which is the worst case for this, and Docker's own iptables rules are the specific hazard. 9a must check and report, not assume: the first run of the lane is the evidence, and the node-level checks the workflow already runs after the suite are where a broken bridge would show. If it does interfere, the provider moves to a node that is not the network node and 9c's reachability assumption is revisited — that is a plan amendment, not a workaround. |
 | The HTML scraping in 9d rots | D5 accepts this explicitly. The tag is pinned, the knowledge is in one helper, and the helper's docstring says the fix is to fix it. A loosened assertion that passes against a changed login page is the failure mode, and the mutation table in 9d is what makes a silently-passing approver visible. |
-| The tests skip everywhere and nobody notices | This is finding 5's failure, repeated. D4's guard is the mitigation and it is a done-criterion, not a note: on slim-tier, a missing descriptor fails. The reviewer should check that guard by reading it, because a guard that itself skips is indistinguishable from no guard. |
+| The tests skip everywhere and nobody notices | This is finding 5's failure, repeated. D4's guard is the mitigation and it is a done-criterion, not a note: on slim-tier, a missing descriptor fails. The guard was to be checked by reading, since a guard which itself skips is indistinguishable from no guard — and the review of the pull request made the sharper point that a guard checked only by reading is the same failure one level removed. The verdict is now `sizing.provider_is_expected()`, a pure function of the node roster and the suite host's addresses, and every roster shape the fleet can present is run through it on every pull request. |
 | Weekly coverage lets a login regression reach `develop` | Accepted at the back brief, and recorded in D2 rather than hidden. The weekly lane files a `ci-failure` issue naming the commit tested and the last commit the lane passed on (`tools/ci_report_scheduled_failures.py`), so a red run reaches a person. The mitigation that would actually close it is a merge-gating lane with enough memory, which is another repository's decision and is named in Future work. |
+| The two pull requests are merged in the wrong order | They are not symmetric, which the plan did not say until the review of this one pointed it out. The `shakenfist/actions` step tolerates a missing script, so **actions first is safe**: the step runs, finds no script, says so, and the suite skips or fails exactly as it would have before. This repository first is not: the guard judges "a provider is expected here" from the cluster's topology and not from whether anything tried to stand one up, so the next weekly `debian-13-slim-tier` run would fail every test in `test_oidc_login.py` and file a `ci-failure` issue. The mitigation is to merge the actions pull request first, or both before the next weekly run, and both pull request bodies say so. |
 | The phase finds a real defect and grows to fix it | D7. The reviewer's job is to push back on any code change under `shakenfist/` outside `deploy/` in this branch. |
 | 9d's subprocess hangs and burns the step budget | The device grant has an `expires_in` and phase 7's poll loop has a deadline, so the honest failure is a failed assertion. The mutant that approves nothing is there to prove it, and it runs under `timeout`. |
 
@@ -519,6 +520,65 @@ recorded here rather than left in a report:
   effectively serial and costs well under a minute, which is the right
   trade at this size; a suite that grew many more provider tests would
   want a different one.
+
+### The first review round, 2026-11-27 (AEDT)
+
+The automated reviewer raised one `document` item, ten `consider` and
+one observation on `dfeacf19`, and nine of the twelve were taken. They
+clustered on one thing worth recording: the guard this phase is built
+around was checkable only by reading it.
+
+* **The verdict moved into `shakenfist_ci/sizing.py`** as
+  `provider_is_expected()`, a pure function of the node roster and the
+  suite host's addresses, and its predicate was strengthened from "this
+  host is a hypervisor" to "this host carries the hypervisor, network
+  and database roles together". The weaker test separates today's two
+  topologies, but it is weaker than the invariant the unit tests prove
+  on its behalf: a merge-gating primary which gained the hypervisor role
+  alone — a change in `shakenfist/actions`, which this repository
+  consumes at `@main` with no pin — would have flipped the verdict to
+  "a provider is expected" on every merge-gating lane and failed every
+  test in `test_oidc_login.py` on every merge. Eight roster cases now
+  run on every pull request.
+* **Five smaller defects in new code**, each a thing which is correct
+  today for a reason nobody wrote down: the HTML parser attributed an
+  input following a form to that form, because it never ended one; the
+  administrative bearer token was interpolated into every remote command
+  line, in a script which argues at length that a credential has no
+  business in one; `IDP_PORT` built every URL but was never given to the
+  container, so the constant agreed with reality only because it matched
+  the image's default; the person's thread was joined with a timeout and
+  then read regardless; and `SF_CI_JWKS_CA_DIR` means three different
+  things to its three readers, which is now said where it is read.
+* **Two cheaper waits.** `_claim_the_issuer()` waited out a 409 by
+  re-posting, and the create runs discovery *before* taking the issuer
+  URL lock, so each losing attempt cost sf-api an outbound discovery and
+  JWKS fetch — on the node also running the provider and five workers,
+  from several tests at once. It now polls a listing and posts when the
+  URL is free. And a client which stops saying where to go now fails in
+  30 seconds naming what it did print, rather than spending the full
+  180 second deadline to report it as a login nobody confirmed.
+
+One claim in the review did not survive checking, and the measurement is
+worth keeping: it held that calling `HTMLParser.close()` after `feed()`
+would recover a page truncated part way through a tag. It does not —
+`close()` ends the document but does not complete an unterminated
+element. The call is correct use of the API and was kept; what the unit
+test asserts is what really happens, which is that the truncated element
+is dropped, the form comes back short of the field it is selected by,
+and the page is refused by name rather than posted half-filled. Nine
+mutants were run over the round's new properties: eight killed by a
+named test, and that `close()` call the one deliberate survivor, since
+it has no observable effect on a parser which reads only tags.
+
+Two items were declined. Recording the cluster suite's dependency on
+`shakenfist_client`'s two instruction lines belongs in `client-python`
+beside `_show_the_code()`, not here, and is a separate pull request in a
+separate repository. And the branch of the verdict which reports "this
+host is not in the cluster's roster" still skips rather than fails: it
+is reachable only if the suite is one day run from somewhere that is not
+a cluster node at all, the skip names the reason, and failing there
+would be asserting about a deployment nobody described.
 
 ## Future work
 

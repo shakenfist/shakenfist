@@ -256,7 +256,19 @@ suite's rule for "is a provider expected here?" has no answer for.
 
 On the lane that is supposed to have a provider the tests fail rather than
 skip when the provider's descriptor is missing, so a bring-up step which
-quietly stopped working is a failure and not a silent gap.
+quietly stopped working is a failure and not a silent gap. Which lane that
+is, the suite works out from the cluster rather than from a setting: it
+finds the host running the suite in the node roster by its mesh IP and asks
+whether that node carries the hypervisor, network and database roles
+together, which is the shape of the provider topology's primary and of no
+merge-gating one, with the single-machine deployment carved out first
+because its one node also holds every role. That verdict is
+`sizing.provider_is_expected()` -- a pure function, so every roster shape
+the fleet can present is exercised on every pull request. It is deliberately
+not a method on the test class: the decision it makes is reached only on a
+lane that runs neither on a pull request nor in the merge queue, so getting
+it wrong either fails every cluster job for a week or skips in a way nobody
+can tell from coverage that has never worked.
 
 **What has no functional coverage.** The authorization code flow is not
 exercised against a running provider, because it needs a browser and the
@@ -277,7 +289,8 @@ Where the pieces live:
 | The step which calls it | `smoke-cluster.yml` in `shakenfist/actions` |
 | The tests | `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_oidc_login.py` |
 | The person's half of a device login, parsed from the provider's HTML | `shakenfist/deploy/shakenfist_ci/idp_pages.py`, unit tested against the captured pages in `shakenfist/tests/files/idp/keycloak-device-*.html` |
-| The guard on where the provider may run | `shakenfist/tests/test_ci_oidc_login_guard.py` |
+| The verdict on whether a provider is expected on this deployment | `sizing.provider_is_expected()` in `shakenfist/deploy/shakenfist_ci/sizing.py` |
+| The guard on where the provider may run, and on that verdict | `shakenfist/tests/test_ci_oidc_login_guard.py` |
 | Regenerating the captures | `tools/idp-lab/capture-fixtures.sh` |
 
 The provider's certificate is signed by the authority `tools/ci-jwks-ca.sh`
