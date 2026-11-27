@@ -15539,6 +15539,39 @@ which imports nothing from the rest of the suite, for the reason
 <code>sizing.py</code> does: <code>shakenfist/tests/test_ci_node_accounting.py</code> loads it
 by path and exercises it on every pull request, where the test which
 calls it runs only in the merge queue.</p>
+<h3 id="teardown-is-asserted-on-the-node-not-only-through-the-api">Teardown is asserted on the node, not only through the API<a class="headerlink" href="#teardown-is-asserted-on-the-node-not-only-through-the-api" title="Permanent link">&para;</a></h3>
+<p>An object's delete is reported done by the API as soon as the
+cluster-wide bookkeeping is finished, which says nothing about the files
+and daemons the hosting node still holds. Residue of that kind is
+invisible until the node runs short of disk, so two mixins under
+<code>deploy/shakenfist_ci/</code> assert the host side of a delete instead, and
+both are subclassed from the smoke and cluster suites so a break shows
+up on the pull request rather than in the merge queue:</p>
+<ul>
+<li><code>dhcp_state.py</code> -- a deleted network's dnsmasq configuration
+  directory, and so its <code>leases</code> file, is gone from the network node.</li>
+<li><code>instance_state.py</code> -- a deleted instance's directory under
+  <code>STORAGE_PATH</code>, the nvram file libvirt boots a UEFI instance from, and
+  its libvirt domain are all gone from the hypervisor it was pinned to.</li>
+</ul>
+<p>Three things both do deliberately. They <strong>read the state before the
+delete</strong>, because state which was never there is also state which was
+removed, and an assertion which cannot tell those apart passes on a
+cluster where nothing works. They <strong>poll for absence</strong>, because teardown
+is asynchronous and queued behind whatever else that node's workers are
+doing. And they <strong>read as root and skip loudly if they cannot</strong>
+(<code>_require_node_sudo()</code>), so a deploy which tightens a mode makes the
+test skip with the node named rather than report state it cannot see as
+removed.</p>
+<p>The instance mixin asks libvirt for the nvram path with <code>virsh dumpxml</code>
+rather than deriving it from <code>STORAGE_PATH</code>. The nvram is libvirt's file
+rather than Shaken Fist's, and the two steps are coupled: libvirt
+refuses to undefine a domain which still has nvram unless it is asked to
+remove the nvram too, so a failed unlink leaves the domain defined and
+the domain then holds its disks. That is the shape of the defect the
+cleaner's several <code>virsh undefine --nvram</code> paths exist for, and naming
+all three kinds of residue in one failure message is what tells them
+apart.</p>
 <h3 id="credentials-go-through-the-environment-not-argv">Credentials go through the environment, not argv<a class="headerlink" href="#credentials-go-through-the-environment-not-argv" title="Permanent link">&para;</a></h3>
 <p><code>_exec()</code> in the command-line tests writes every command it runs to stderr,
 and the harness prints it again on failure. So the namespace key reaches
@@ -15823,11 +15856,6 @@ type, target bus, driver format and cache mode. The reader is
 <code>virsh domblklist</code> helpers. An nvme disk is invisible to it, because
 libvirt has no <code>&lt;disk&gt;</code> element for one and Shaken Fist renders it as
 <code>qemu:commandline</code> arguments instead.</p>
-<p>One question in the same family is still unasked: whether deleting an
-instance removes its directory and nvram from the hypervisor, the
-instance-side counterpart of the dnsmasq-directory check in
-<code>dhcp_state.py</code>, tracked as
-<a href="https://github.com/shakenfist/shakenfist/issues/5072">#5072</a>.</p>
 <h3 id="upgrade-data-verification">Upgrade data verification<a class="headerlink" href="#upgrade-data-verification" title="Permanent link">&para;</a></h3>
 <p>Every functional job deploys a fresh cluster, so nothing in the suite
 observes an upgraded one. <code>cluster_ci_tests/test_upgrades.py</code> used to
