@@ -16695,13 +16695,32 @@ machines.</p>
 repository root, and changing that policy has rules the files
 themselves do not state:</p>
 <ul>
-<li><strong>Ignoring a RustSec advisory</strong> requires adding the advisory
-  ID to <em>both</em> <code>deny.toml</code> and <code>.cargo/audit.toml</code>, with an
-  inline comment on each entry giving the rationale. Both
-  scanners run on every pull request and both must pass, so the
-  two ignore lists have to stay in sync — editing only
-  <code>deny.toml</code> produces a red <code>cargo audit</code> job. Ignores are debt
-  and should not accumulate silently.</li>
+<li><strong>Ignoring a RustSec advisory</strong> means adding its ID to the
+  ignore list of each scanner that actually fails on it —
+  <code>deny.toml</code> for <code>cargo deny</code>, <code>.cargo/audit.toml</code> for
+  <code>cargo audit</code> — with an inline comment giving the rationale,
+  and a section in the supply-chain follow-ups plan. The two
+  lists are not mirrors. <code>cargo audit</code> fails only on
+  vulnerabilities and warns about unmaintained and unsound
+  crates; <code>cargo deny</code> also fails on unmaintained and unsound
+  advisories, but only for direct dependencies (the
+  <code>unmaintained</code> and <code>unsound</code> scopes in <code>deny.toml</code>). So
+  confirm a scanner fails without the entry before adding it:
+  an ignore that suppresses nothing implies a gate that does
+  not exist, and <code>cargo deny</code> reports one in its own list as
+  <code>advisory-not-detected</code>. Ignores are debt and should not
+  accumulate silently.</li>
+<li><strong>Warnings become issues, not ignores.</strong> The weekly
+  <code>Supply chain</code> cron runs <code>rustsec/audit-check</code>, which reads
+  <code>.cargo/audit.toml</code> too, and on a scheduled run it opens one
+  issue for each vulnerability and each unmaintained or unsound
+  warning whose ID no issue or pull request title names, open
+  or closed (the action's search has no state filter). A
+  warning that fails neither scanner therefore gets one
+  tracking issue, filed once. Leave it to do that rather than
+  adding an ignore to stop it. An advisory that <code>cargo deny</code>
+  fails on but <code>cargo audit</code> only warns about gets both: an
+  entry in <code>deny.toml</code> and a tracking issue.</li>
 <li><strong>Allowing a new licence</strong> means adding a permissive SPDX
   identifier to <code>deny.toml</code>'s <code>licenses.allow</code> array. The
   <code>licenses.exceptions</code> array is for a narrower case: a single

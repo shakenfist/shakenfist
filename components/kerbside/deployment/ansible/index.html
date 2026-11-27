@@ -15137,7 +15137,7 @@ needs are described once, in
 </tr>
 <tr>
 <td>systemd units</td>
-<td><code>kerbside-api.service</code>, gunicorn on <code>0.0.0.0:13002</code> in plain HTTP, and <code>kerbside-daemon.service</code>, the daemon with the SPICE proxy as its child. Both run as <code>kerbside</code> and are wanted by <code>multi-user.target</code>.</td>
+<td><code>kerbside-api.service</code>, gunicorn on <code>0.0.0.0:13002</code> in plain HTTP, and <code>kerbside-daemon.service</code>, the daemon with the SPICE proxy as its child. Both run as <code>kerbside</code>, sandboxed by systemd as <a href="/components/kerbside/deployment/manual/#what-it-deploys">Deploying Kerbside by hand</a> describes, and are wanted by <code>multi-user.target</code>.</td>
 </tr>
 <tr>
 <td>Database schema</td>

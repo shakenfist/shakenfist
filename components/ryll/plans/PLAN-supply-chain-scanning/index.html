@@ -15445,7 +15445,10 @@ work is one PR, roughly seven files.</p>
 <li><code>[graph]</code> targets Linux/macOS/Windows so we scan the
      full dependency set.</li>
 <li><code>[advisories]</code> — deny unmaintained + vulnerability
-     advisories; <code>yanked = "deny"</code>.</li>
+     advisories; <code>yanked = "deny"</code>. (Unmaintained advisories
+     turned out to be checked only for direct dependencies; see
+     the <em>Situation</em> section of <code>PLAN-supply-chain-followups.md</code>
+     for the scope cargo-deny actually applies.)</li>
 <li><code>[licenses]</code> allowlist as decided above.</li>
 <li><code>[[licenses.exceptions]]</code> entry for
      <code>epaint_default_fonts</code> allowing <code>LicenseRef-UFL-1.0</code>.</li>
@@ -15541,7 +15544,11 @@ work is one PR, roughly seven files.</p>
   until we see the baseline noise.</li>
 <li>Enabling <code>cargo deny</code> to block on unmaintained crates. We
   have at least one (<code>audiopus</code>) and the migration is
-  tracked separately in <code>PLAN-opus-decoder.md</code>.</li>
+  tracked separately in <code>PLAN-opus-decoder.md</code>. (Superseded:
+  <code>deny.toml</code> now blocks on unmaintained direct dependencies
+  only, by an explicit scope; see the <em>Situation</em> section of
+  <code>PLAN-supply-chain-followups.md</code>. Retained as the record of
+  what was deferred.)</li>
 <li>Extending self-hosted coverage to the macOS/Windows
   build matrix. Requires hardware we don't have.</li>
 </ul>

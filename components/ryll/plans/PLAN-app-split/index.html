@@ -15868,15 +15868,15 @@ with web mode).</p>
 </tr>
 <tr>
 <td>5. Panel state sub-structs</td>
-<td>PLAN-app-split-phase-05-substructs.md</td>
-<td>Not started</td>
+<td><a href="/components/ryll/plans/PLAN-app-split-phase-05-substructs/">PLAN-app-split-phase-05-substructs.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
 <td>6. Function-length lint</td>
 <td>shakenfist/development <code>PLAN-size-ratchet.md</code>, phase 3</td>
 <td>Complete</td>
-<td>(#746)</td>
+<td>debf8b1 (#746)</td>
 </tr>
 <tr>
 <td>7. Push audit</td>
@@ -15984,12 +15984,32 @@ calls them.</p>
 <p>One panel at a time, move its field cluster out of <code>RyllApp</code> into
 a struct owned by its <code>app/ui/*.rs</code> module, with a <code>show</code> method
 that takes <code>&amp;mut self</code> plus the specific shared state it needs
-as separate arguments. Start with the most self-contained (the
-WebDAV and USB panels, whose fields are already prefixed) and
-remove the two-pass render-then-act workarounds where disjoint
-borrows make them unnecessary. This is the phase that changes
-code rather than moving it, so it may land as more than one pull
-request; the phase plan decides the grouping.</p>
+as separate arguments. This is the phase that changes code rather
+than moving it, so it may land as more than one pull request; the
+phase plan decides the grouping.</p>
+<p>Three things this section got wrong before phase 5 was planned,
+all corrected here rather than only in the phase plan.</p>
+<p>It asked for the two-pass render-then-act workarounds to be
+removed "where disjoint borrows make them unnecessary". None of
+the five is caused by <code>RyllApp</code> being a god struct, so none is
+removed by splitting it up: two are cross-panel actions that
+become returned outcomes, one is a borrow of the very field being
+rendered, and two are egui's own closures. What the phase can
+deliver is that no deferred action crosses a module boundary as a
+<code>&amp;mut</code> out-param; see survey finding 1 of the phase plan.</p>
+<p>It named "the WebDAV and USB panels, whose fields are already
+prefixed" as the most self-contained starting point. They are the
+least self-contained: <code>events.rs</code> and <code>connection.rs</code> write their
+fields 41 times between them, because channel events and not the
+panels drive that state. The traffic viewer, which this section
+did not mention, has no external writer at all and is the only
+pure field move of the three, so it goes first.</p>
+<p>Consequently the phase is larger than "move its field cluster"
+implies: those 41 field writes become a named
+<code>pub(in crate::app)</code> method per transition on the panel, which is
+the phase's real payoff. Moving the fields without the
+transitions would leave <code>events.rs</code> reaching into a sub-struct's
+privates, which is a rename rather than an encapsulation.</p>
 <h3 id="phase-6-function-length-lint">Phase 6: Function-length lint<a class="headerlink" href="#phase-6-function-length-lint" title="Permanent link">&para;</a></h3>
 <p>Enable <code>clippy::too_many_lines</code> workspace-wide (via
 <code>[workspace.lints.clippy]</code> in the root <code>Cargo.toml</code>) and set

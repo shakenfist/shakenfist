@@ -15127,6 +15127,19 @@ and this page assumes you have read it.</p>
 <p>Both run as the <code>kerbside</code> user, restart five seconds after any exit
 that systemd did not ask for, and are wanted by <code>multi-user.target</code>.
 The comments in each file give the reasons behind its directives.</p>
+<p>Both are also sandboxed by systemd, because Kerbside needs nothing
+beyond its own user. They hold no capabilities and cannot gain any,
+see the filesystem read-only apart from a <code>/tmp</code> of their own and,
+for the daemon, the <code>/run/kerbside</code> systemd creates for its socket,
+cannot see <code>/home</code> or other users' processes, and are limited to the
+address families and system calls an ordinary network service uses.
+The proxy is the daemon's child, so it is confined with the daemon.
+That matters most for the proxy, because it parses SPICE from the
+network. <code>systemd-analyze security kerbside-daemon</code> shows what each
+directive buys. The units assume systemd 247 or later, which every
+directive in them needs; an older systemd starts them anyway,
+ignoring the directives it does not know with a warning in the
+journal, so check there on an older host.</p>
 <p>Every file this page has you copy, the units included, lives in the
 repository rather than in the wheel. The links here go to <code>develop</code>,
 which is the code being worked on rather than the release you
@@ -15218,8 +15231,26 @@ may create, so systemd creates it for the service user. Kerbside logs
 to syslog, which on a systemd host lands in the journal, so
 <code>journalctl</code> is where its logs are. <code>LOG_OUTPUT_PATH</code> changes that
 (see
-<a href="/components/kerbside/configuration/#logging-and-monitoring-settings">configuration.md</a>),
-and a file it names has to be writable by the <code>kerbside</code> user.</p>
+<a href="/components/kerbside/configuration/#logging-and-monitoring-settings">configuration.md</a>).
+<code>stdout</code> needs nothing more, because systemd sends it to the journal
+too. A file needs a directory the <code>kerbside</code> user can write, and,
+because the units make the filesystem read-only, a drop-in in each
+unit naming that directory. <code>systemctl edit kerbside-daemon</code> opens
+one, and <code>kerbside-api</code> needs the same:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">[Service]</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="na">ReadWritePaths</span><span class="o">=</span><span class="s">/var/log/kerbside</span>
+</code></pre></div>
+<p>The same applies to the daemon's <code>API_SOCKET_PATH</code>: only the default,
+under <code>/run/kerbside</code>, is writable, so a socket elsewhere needs its
+directory in a <code>ReadWritePaths=</code> drop-in on <code>kerbside-daemon</code>.
+Two other settings meet the sandbox. A listener on a
+port below 1024 needs both <code>CapabilityBoundingSet=CAP_NET_BIND_SERVICE</code>
+and <code>AmbientCapabilities=CAP_NET_BIND_SERVICE</code> in the unit's drop-in,
+because the units' empty bounding set removes the capability from the
+ambient set too. And a <code>SQL_URL</code> whose unix socket is under <code>/tmp</code>
+cannot reach it from the units' private <code>/tmp</code>; move the database's
+socket, for example to Debian's default <code>/run/mysqld/mysqld.sock</code>,
+rather than relaxing <code>PrivateTmp=</code>.</p>
 <p>The role also keeps its helper scripts in <code>/srv/kerbside/bin</code> and a
 record of what it last deployed in <code>/srv/kerbside</code>. Neither is needed
 by hand.</p>
@@ -15237,7 +15268,9 @@ by hand.</p>
   each.</li>
 </ul>
 <h2 id="how-to-use-it">How to use it<a class="headerlink" href="#how-to-use-it" title="Permanent link">&para;</a></h2>
-<p>Every command runs as root.</p>
+<p>Every command on this page runs as root, because it creates users,
+directories and units. Kerbside itself never runs as root: both units
+start it as the <code>kerbside</code> user.</p>
 <ol>
 <li>
 <p><strong>Install the OS packages.</strong> Install the build dependencies in
@@ -15249,19 +15282,19 @@ by hand.</p>
 <p><strong>Create the user and group.</strong></p>
 </li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>groupadd<span class="w"> </span>--system<span class="w"> </span>kerbside
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>useradd<span class="w"> </span>--system<span class="w"> </span>--gid<span class="w"> </span>kerbside<span class="w"> </span>--no-create-home<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span>--home-dir<span class="w"> </span>/srv/kerbside<span class="w"> </span>--shell<span class="w"> </span>/usr/sbin/nologin<span class="w"> </span>kerbside
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>groupadd<span class="w"> </span>--system<span class="w"> </span>kerbside
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>useradd<span class="w"> </span>--system<span class="w"> </span>--gid<span class="w"> </span>kerbside<span class="w"> </span>--no-create-home<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span>--home-dir<span class="w"> </span>/srv/kerbside<span class="w"> </span>--shell<span class="w"> </span>/usr/sbin/nologin<span class="w"> </span>kerbside
 </code></pre></div>
 <p>The home is named but not created here, because the next step
    creates it owned by root rather than by <code>kerbside</code>.</p>
 <ol>
 <li><strong>Create the virtual environment and install Kerbside.</strong></li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>install<span class="w"> </span>-d<span class="w"> </span>-o<span class="w"> </span>root<span class="w"> </span>-g<span class="w"> </span>root<span class="w"> </span>-m<span class="w"> </span><span class="m">0755</span><span class="w"> </span>/srv/kerbside
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>/srv/kerbside/venv
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>/srv/kerbside/venv/bin/pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span>pip
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>/srv/kerbside/venv/bin/pip<span class="w"> </span>install<span class="w"> </span><span class="nv">kerbside</span><span class="o">==</span>X.Y.Z
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>install<span class="w"> </span>-d<span class="w"> </span>-o<span class="w"> </span>root<span class="w"> </span>-g<span class="w"> </span>root<span class="w"> </span>-m<span class="w"> </span><span class="m">0755</span><span class="w"> </span>/srv/kerbside
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>/srv/kerbside/venv
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>/srv/kerbside/venv/bin/pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span>pip
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>/srv/kerbside/venv/bin/pip<span class="w"> </span>install<span class="w"> </span><span class="nv">kerbside</span><span class="o">==</span>X.Y.Z
 </code></pre></div>
 <p>Install a tagged release, for the reason
    <a href="/components/kerbside/installation/#installing-with-pip">Installing with pip</a>
@@ -15286,11 +15319,11 @@ by hand.</p>
    with their final owner and mode before putting anything secret in
    them:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>install<span class="w"> </span>-d<span class="w"> </span>-o<span class="w"> </span>root<span class="w"> </span>-g<span class="w"> </span>kerbside<span class="w"> </span>-m<span class="w"> </span><span class="m">0750</span><span class="w"> </span>/etc/kerbside
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>install<span class="w"> </span>-o<span class="w"> </span>root<span class="w"> </span>-g<span class="w"> </span>kerbside<span class="w"> </span>-m<span class="w"> </span><span class="m">0640</span><span class="w"> </span>kerbside.conf.example<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span>/etc/kerbside/kerbside.ini
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>install<span class="w"> </span>-o<span class="w"> </span>root<span class="w"> </span>-g<span class="w"> </span>kerbside<span class="w"> </span>-m<span class="w"> </span><span class="m">0640</span><span class="w"> </span>/dev/null<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span>/etc/kerbside/sources.yaml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>install<span class="w"> </span>-d<span class="w"> </span>-o<span class="w"> </span>root<span class="w"> </span>-g<span class="w"> </span>kerbside<span class="w"> </span>-m<span class="w"> </span><span class="m">0750</span><span class="w"> </span>/etc/kerbside
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>install<span class="w"> </span>-o<span class="w"> </span>root<span class="w"> </span>-g<span class="w"> </span>kerbside<span class="w"> </span>-m<span class="w"> </span><span class="m">0640</span><span class="w"> </span>kerbside.conf.example<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span>/etc/kerbside/kerbside.ini
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>install<span class="w"> </span>-o<span class="w"> </span>root<span class="w"> </span>-g<span class="w"> </span>kerbside<span class="w"> </span>-m<span class="w"> </span><span class="m">0640</span><span class="w"> </span>/dev/null<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span>/etc/kerbside/sources.yaml
 </code></pre></div>
 <p><code>kerbside.conf.example</code> is
    <a href="https://github.com/shakenfist/kerbside/blob/develop/etc/kerbside.conf.example">etc/kerbside.conf.example</a>,
@@ -15322,11 +15355,11 @@ by hand.</p>
 <li><strong>Install the proxy's TLS material.</strong> The role reads it from
    <code>/etc/kerbside/pki</code>, and this page uses the same names:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>install<span class="w"> </span>-d<span class="w"> </span>-o<span class="w"> </span>root<span class="w"> </span>-g<span class="w"> </span>root<span class="w"> </span>-m<span class="w"> </span><span class="m">0755</span><span class="w"> </span>/etc/kerbside/pki
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>install<span class="w"> </span>-o<span class="w"> </span>root<span class="w"> </span>-g<span class="w"> </span>root<span class="w"> </span>-m<span class="w"> </span><span class="m">0644</span><span class="w"> </span>server-cert.pem<span class="w"> </span>ca-cert.pem<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span>/etc/kerbside/pki/
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>install<span class="w"> </span>-o<span class="w"> </span>root<span class="w"> </span>-g<span class="w"> </span>kerbside<span class="w"> </span>-m<span class="w"> </span><span class="m">0640</span><span class="w"> </span>server-key.pem<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span>/etc/kerbside/pki/server-key.pem
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>install<span class="w"> </span>-d<span class="w"> </span>-o<span class="w"> </span>root<span class="w"> </span>-g<span class="w"> </span>root<span class="w"> </span>-m<span class="w"> </span><span class="m">0755</span><span class="w"> </span>/etc/kerbside/pki
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>install<span class="w"> </span>-o<span class="w"> </span>root<span class="w"> </span>-g<span class="w"> </span>root<span class="w"> </span>-m<span class="w"> </span><span class="m">0644</span><span class="w"> </span>server-cert.pem<span class="w"> </span>ca-cert.pem<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span>/etc/kerbside/pki/
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>install<span class="w"> </span>-o<span class="w"> </span>root<span class="w"> </span>-g<span class="w"> </span>kerbside<span class="w"> </span>-m<span class="w"> </span><span class="m">0640</span><span class="w"> </span>server-key.pem<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span>/etc/kerbside/pki/server-key.pem
 </code></pre></div>
 <p>The proxy runs as <code>kerbside</code>, so the key is readable by its group
    and by nobody else. The certificate and CA are not secret. The
@@ -15342,8 +15375,8 @@ by hand.</p>
    <a href="https://github.com/shakenfist/kerbside/blob/develop/ansible/roles/kerbside/files/kerbside-host-subject.py">kerbside-host-subject.py</a>,
    which needs only the virtual environment's Python, and you can do
    the same:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>/srv/kerbside/venv/bin/python<span class="w"> </span>kerbside-host-subject.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span>/etc/kerbside/pki/server-cert.pem
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>/srv/kerbside/venv/bin/python<span class="w"> </span>kerbside-host-subject.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span>/etc/kerbside/pki/server-cert.pem
 </code></pre></div>
 <p>It prints the value to use. Its comments say why <code>openssl x509
    -subject</code> is not a substitute.</p>
@@ -15351,14 +15384,14 @@ by hand.</p>
 <li><strong>Create the database, then its schema.</strong> Kerbside does not create
    its database or its user. On MariaDB:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">DATABASE</span><span class="w"> </span><span class="k">IF</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">EXISTS</span><span class="w"> </span><span class="n">kerbside</span><span class="p">;</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">USER</span><span class="w"> </span><span class="k">IF</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">EXISTS</span><span class="w"> </span><span class="s1">'kerbside'</span><span class="o">@</span><span class="s1">'localhost'</span><span class="w"> </span><span class="n">IDENTIFIED</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="s1">'CHANGEME'</span><span class="p">;</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="k">GRANT</span><span class="w"> </span><span class="k">ALL</span><span class="w"> </span><span class="k">PRIVILEGES</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">kerbside</span><span class="p">.</span><span class="o">*</span><span class="w"> </span><span class="k">TO</span><span class="w"> </span><span class="s1">'kerbside'</span><span class="o">@</span><span class="s1">'localhost'</span><span class="p">;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">DATABASE</span><span class="w"> </span><span class="k">IF</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">EXISTS</span><span class="w"> </span><span class="n">kerbside</span><span class="p">;</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">USER</span><span class="w"> </span><span class="k">IF</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">EXISTS</span><span class="w"> </span><span class="s1">'kerbside'</span><span class="o">@</span><span class="s1">'localhost'</span><span class="w"> </span><span class="n">IDENTIFIED</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="s1">'CHANGEME'</span><span class="p">;</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="k">GRANT</span><span class="w"> </span><span class="k">ALL</span><span class="w"> </span><span class="k">PRIVILEGES</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">kerbside</span><span class="p">.</span><span class="o">*</span><span class="w"> </span><span class="k">TO</span><span class="w"> </span><span class="s1">'kerbside'</span><span class="o">@</span><span class="s1">'localhost'</span><span class="p">;</span>
 </code></pre></div>
 <p>Use the host Kerbside connects from in place of <code>localhost</code> if the
    database is elsewhere, and put the same user and password in
    <code>sql_url</code>. Then create the schema, as the <code>kerbside</code> user:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>runuser<span class="w"> </span>-u<span class="w"> </span>kerbside<span class="w"> </span>--<span class="w"> </span>/srv/kerbside/venv/bin/kerbside<span class="w"> </span>db<span class="w"> </span>upgrade
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>runuser<span class="w"> </span>-u<span class="w"> </span>kerbside<span class="w"> </span>--<span class="w"> </span>/srv/kerbside/venv/bin/kerbside<span class="w"> </span>db<span class="w"> </span>upgrade
 </code></pre></div>
 <p>This is the role's own invocation. Running it as <code>kerbside</code> rather
    than as root proves that the service user can read
@@ -15370,10 +15403,10 @@ by hand.</p>
 <li><strong>Install and start the units.</strong> Copy both unit files into
    <code>/etc/systemd/system/</code> unchanged, then:</li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>install<span class="w"> </span>-o<span class="w"> </span>root<span class="w"> </span>-g<span class="w"> </span>root<span class="w"> </span>-m<span class="w"> </span><span class="m">0644</span><span class="w"> </span>kerbside-api.service<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span>kerbside-daemon.service<span class="w"> </span>/etc/systemd/system/
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>systemctl<span class="w"> </span>daemon-reload
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>systemctl<span class="w"> </span><span class="nb">enable</span><span class="w"> </span>--now<span class="w"> </span>kerbside-daemon<span class="w"> </span>kerbside-api
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>install<span class="w"> </span>-o<span class="w"> </span>root<span class="w"> </span>-g<span class="w"> </span>root<span class="w"> </span>-m<span class="w"> </span><span class="m">0644</span><span class="w"> </span>kerbside-api.service<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span>kerbside-daemon.service<span class="w"> </span>/etc/systemd/system/
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>systemctl<span class="w"> </span>daemon-reload
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>systemctl<span class="w"> </span><span class="nb">enable</span><span class="w"> </span>--now<span class="w"> </span>kerbside-daemon<span class="w"> </span>kerbside-api
 </code></pre></div>
 <p>They expect the user, the virtual environment and the paths above,
    and need no editing if you have followed this page. The daemon
@@ -15383,19 +15416,19 @@ by hand.</p>
 <ol>
 <li><strong>Check it works.</strong></li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>systemctl<span class="w"> </span>status<span class="w"> </span>kerbside-daemon<span class="w"> </span>kerbside-api
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>journalctl<span class="w"> </span>-u<span class="w"> </span>kerbside-daemon<span class="w"> </span>-u<span class="w"> </span>kerbside-api
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s1">'Accept: application/json'</span><span class="w"> </span>http://127.0.0.1:13002/
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>systemctl<span class="w"> </span>status<span class="w"> </span>kerbside-daemon<span class="w"> </span>kerbside-api
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>journalctl<span class="w"> </span>-u<span class="w"> </span>kerbside-daemon<span class="w"> </span>-u<span class="w"> </span>kerbside-api
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s1">'Accept: application/json'</span><span class="w"> </span>http://127.0.0.1:13002/
 </code></pre></div>
 <p>Both units should be <code>active (running)</code>. One that is
    <code>activating (auto-restart)</code> is exiting and being restarted, and
    its journal says why. The <code>curl</code> is the request the role waits
    for: <code>GET /</code> with a JSON <code>Accept</code> header needs no authentication,
    and a working API answers it with</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p">{</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span><span class="nt">"capabilities"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ok"</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="p">{</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">    </span><span class="nt">"capabilities"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ok"</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="p">}</span>
 </code></pre></div>
 <p>The daemon reads its sources as soon as it starts, and again every
    sixty seconds. A source that cannot be used is marked errored, and
@@ -15424,11 +15457,12 @@ by hand.</p>
      kerbside-api</code> opens one. Bind to an address other hosts can
      reach, and add <code>--certfile</code> and <code>--keyfile</code> naming the API's
      certificate and key:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">[Service]</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="na">ExecStart</span><span class="o">=</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="na">ExecStart</span><span class="o">=</span><span class="s">/srv/kerbside/venv/bin/gunicorn --bind ADDRESS:13002 </span>\
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="s">--workers 2 --timeout 300 --name kerbside-api </span>\
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">    </span><span class="s">--certfile CERTIFICATE --keyfile KEY kerbside.api:app</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">[Service]</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="na">ExecStart</span><span class="o">=</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="na">ExecStart</span><span class="o">=</span><span class="s">/srv/kerbside/venv/bin/gunicorn --bind ADDRESS:13002 </span>\
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="s">--workers 2 --timeout 300 --name kerbside-api </span>\
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">    </span><span class="s">--no-control-socket --certfile CERTIFICATE --keyfile KEY </span>\
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">    </span><span class="s">kerbside.api:app</span>
 </code></pre></div>
 <p>The empty <code>ExecStart=</code> clears the unit's own, which systemd
  needs before it accepts another. gunicorn runs as <code>kerbside</code>, so
@@ -15445,17 +15479,17 @@ by hand.</p>
 <p>An upgrade by hand does what the role does, in the same order:
 install the new release, migrate the database, bring the units up to
 date, restart.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>/srv/kerbside/venv/bin/pip<span class="w"> </span>install<span class="w"> </span><span class="nv">kerbside</span><span class="o">==</span>X.Y.Z
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>runuser<span class="w"> </span>-u<span class="w"> </span>kerbside<span class="w"> </span>--<span class="w"> </span>/srv/kerbside/venv/bin/kerbside<span class="w"> </span>db<span class="w"> </span>upgrade
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>diff<span class="w"> </span>/etc/systemd/system/kerbside-daemon.service<span class="w"> </span>kerbside-daemon.service
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>diff<span class="w"> </span>/etc/systemd/system/kerbside-api.service<span class="w"> </span>kerbside-api.service
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>/srv/kerbside/venv/bin/pip<span class="w"> </span>install<span class="w"> </span><span class="nv">kerbside</span><span class="o">==</span>X.Y.Z
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>runuser<span class="w"> </span>-u<span class="w"> </span>kerbside<span class="w"> </span>--<span class="w"> </span>/srv/kerbside/venv/bin/kerbside<span class="w"> </span>db<span class="w"> </span>upgrade
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>diff<span class="w"> </span>/etc/systemd/system/kerbside-daemon.service<span class="w"> </span>kerbside-daemon.service
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>diff<span class="w"> </span>/etc/systemd/system/kerbside-api.service<span class="w"> </span>kerbside-api.service
 </code></pre></div>
 <p>The role renders both units again on every deploy. By hand, that is
 the two <code>diff</code>s, against the unit files from the new release's tag.
 If either differs, install it as step 7 does and run <code>systemctl
 daemon-reload</code>. A drop-in from step 9 survives that, because it is a
 separate file. Then restart:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>systemctl<span class="w"> </span>restart<span class="w"> </span>kerbside-daemon<span class="w"> </span>kerbside-api
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>systemctl<span class="w"> </span>restart<span class="w"> </span>kerbside-daemon<span class="w"> </span>kerbside-api
 </code></pre></div>
 <p>Upgrading <code>kerbside</code> does not upgrade the client libraries from step
 3. If the new release's
@@ -15507,6 +15541,10 @@ are.</p>
 <tr>
 <td>TLS on the API is untested</td>
 <td>Neither a reverse proxy nor gunicorn's <code>--certfile</code> and <code>--keyfile</code> is exercised anywhere, and Kerbside ships no reverse proxy configuration, because it would be a second untested file.</td>
+</tr>
+<tr>
+<td>No AppArmor or SELinux policy</td>
+<td>The units' systemd sandboxing is the confinement Kerbside ships, and it reaches the role's units, which <code>sf-e2e</code> runs. A mandatory access control profile would be one per policy framework, would have to follow every client library a source can need, and no lane would run it.</td>
 </tr>
 <tr>
 <td>No distribution packages</td>

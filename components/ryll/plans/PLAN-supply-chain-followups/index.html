@@ -12402,27 +12402,16 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#tracked-debt" class="md-nav__link">
+  <a href="#tracked-debt-ignored-advisories" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tracked debt
+        Tracked debt: ignored advisories
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Tracked debt">
+    <nav class="md-nav" aria-label="Tracked debt: ignored advisories">
       <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-paste-1015-unmaintained-rustsec-2024-0436" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. paste 1.0.15 unmaintained (RUSTSEC-2024-0436)
-      
-    </span>
-  </a>
-  
-</li>
         
           <li class="md-nav__item">
   <a href="#2-rsa-0910-marvin-timing-attack-rustsec-2023-0071" class="md-nav__link">
@@ -12440,6 +12429,34 @@
     <span class="md-ellipsis">
       
         3. rustls-pemfile 2.2.0 unmaintained (RUSTSEC-2025-0134)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tracked-warnings-unmaintained-transitive-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tracked warnings: unmaintained transitive dependencies
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tracked warnings: unmaintained transitive dependencies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-paste-1015-unmaintained-rustsec-2024-0436" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. paste 1.0.15 unmaintained (RUSTSEC-2024-0436)
       
     </span>
   </a>
@@ -15098,27 +15115,16 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#tracked-debt" class="md-nav__link">
+  <a href="#tracked-debt-ignored-advisories" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tracked debt
+        Tracked debt: ignored advisories
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Tracked debt">
+    <nav class="md-nav" aria-label="Tracked debt: ignored advisories">
       <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-paste-1015-unmaintained-rustsec-2024-0436" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. paste 1.0.15 unmaintained (RUSTSEC-2024-0436)
-      
-    </span>
-  </a>
-  
-</li>
         
           <li class="md-nav__item">
   <a href="#2-rsa-0910-marvin-timing-attack-rustsec-2023-0071" class="md-nav__link">
@@ -15136,6 +15142,34 @@
     <span class="md-ellipsis">
       
         3. rustls-pemfile 2.2.0 unmaintained (RUSTSEC-2025-0134)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tracked-warnings-unmaintained-transitive-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tracked warnings: unmaintained transitive dependencies
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tracked warnings: unmaintained transitive dependencies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-paste-1015-unmaintained-rustsec-2024-0436" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. paste 1.0.15 unmaintained (RUSTSEC-2024-0436)
       
     </span>
   </a>
@@ -15302,31 +15336,49 @@ were folded into the scanners PR:</p>
 <p>All four were removed from <code>deny.toml</code> and
 <code>.cargo/audit.toml</code> in September 2026, after <code>cargo deny</code>
 reported them as <code>advisory-not-detected</code>.</p>
-<p>The remaining items have been added to the
-<code>[advisories].ignore</code> list in <code>deny.toml</code> with inline
-rationale so that <code>cargo deny check</code> passes against
-<code>develop</code>. This plan tracks the debt so we can pay it down.</p>
-<p>Each ignore entry in <code>deny.toml</code> has a matching section
-below. When an ignore is resolved, delete both the
-<code>deny.toml</code> entry and the section here in the same PR.</p>
-<h2 id="tracked-debt">Tracked debt<a class="headerlink" href="#tracked-debt" title="Permanent link">&para;</a></h2>
-<h3 id="1-paste-1015-unmaintained-rustsec-2024-0436">1. <code>paste</code> 1.0.15 unmaintained (RUSTSEC-2024-0436)<a class="headerlink" href="#1-paste-1015-unmaintained-rustsec-2024-0436" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Ignore rationale:</strong> the author archived the crate but
-  did not publish a fix or a CVE. A drop-in fork (<code>pastey</code>)
-  exists with the same API. <code>paste</code> reaches us transitively.</li>
-<li><strong>Attack surface:</strong> none direct; it is a proc-macro for
-  identifier pasting used at compile time. The risk is
-  only that it no longer receives bug fixes.</li>
-<li><strong>Action plan:</strong></li>
-<li><code>cargo tree -i paste</code> to find direct dependents.</li>
-<li>For each direct dependent we control, swap to <code>pastey</code>
-     if they accept the patch, or vendor-patch.</li>
-<li>For upstream dependents we don't control, wait for
-     their migration. Re-check every 6 months.</li>
-<li><strong>Remove ignore when:</strong> <code>paste</code> no longer appears in
-  <code>cargo tree</code>, or the RustSec advisory is withdrawn.</li>
-</ul>
+<p>In November 2026 eight more ignore entries were removed
+although nothing they covered had been fixed: six items, 1 and
+4-8 below, with item 5 covering three advisory IDs.
+Run with no ignores at all, neither scanner failed on any of
+them, and the <code>cargo audit</code> and <code>cargo deny</code> lanes both
+passed once they were gone (CI run 45772182263, where
+<code>cargo audit</code> lists all eight as warnings). All are
+unmaintained-status advisories against transitive
+dependencies. As observed in November 2026, cargo-deny checks
+unmaintained and unsound advisories only for the workspace's
+direct dependencies by default; <code>deny.toml</code> now states that
+scope explicitly (<code>unmaintained</code> and <code>unsound</code>), so it no
+longer rests on a default. Both are real scope keys: the
+<code>cargo deny</code> lane on the tree that set them (CI run
+45789484154) reported no unknown-field diagnostic, and
+widening both to <code>"all"</code> locally makes cargo-deny fail on the
+tracked warnings below and on transitive unsound advisories
+in <code>heapless</code> and <code>lru</code>. cargo-deny never reported the
+eight and flagged each ignore as <code>advisory-not-detected</code>;
+cargo audit reports them as warnings, which do not fail the
+job. The ignores gated nothing, and their presence implied a
+gate that did not exist. The debt itself is still real, so
+those items stay below under <em>Tracked warnings</em>.</p>
+<p>The remaining items are on the <code>[advisories].ignore</code> lists
+with inline rationale so that the scanners pass against
+<code>develop</code>: both in <code>deny.toml</code>, and RUSTSEC-2023-0071 alone in
+<code>.cargo/audit.toml</code>, because cargo audit does not fail on
+RUSTSEC-2025-0134. Each list holds only what its own scanner
+fails on. Because cargo audit warns about RUSTSEC-2025-0134
+without ignoring it, the weekly cron tracks it with an issue
+too, as it does the tracked warnings below; an ignore entry
+and an issue for the same advisory is expected, not a
+double count. This plan
+tracks the debt so we can pay it down.</p>
+<p>Each ignore entry has a matching section below. When an
+ignore is resolved, delete the entry and the section here in
+the same PR. Before adding an ignore, confirm the scanner
+actually fails without it.</p>
+<p>Item numbers are stable identifiers: <code>deny.toml</code>,
+<code>.cargo/audit.toml</code> and other sections of this file cite them,
+so an item keeps its number when it moves between sections,
+and the sections are not in numeric order.</p>
+<h2 id="tracked-debt-ignored-advisories">Tracked debt: ignored advisories<a class="headerlink" href="#tracked-debt-ignored-advisories" title="Permanent link">&para;</a></h2>
 <h3 id="2-rsa-0910-marvin-timing-attack-rustsec-2023-0071">2. <code>rsa</code> 0.9.10 Marvin timing attack (RUSTSEC-2023-0071)<a class="headerlink" href="#2-rsa-0910-marvin-timing-attack-rustsec-2023-0071" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Ignore rationale:</strong> no fixed version is available in
@@ -15371,9 +15423,39 @@ below. When an ignore is resolved, delete both the
 <li><strong>Remove ignore when:</strong> <code>rustls-pemfile</code> no longer
   appears in <code>cargo tree</code>.</li>
 </ul>
+<h2 id="tracked-warnings-unmaintained-transitive-dependencies">Tracked warnings: unmaintained transitive dependencies<a class="headerlink" href="#tracked-warnings-unmaintained-transitive-dependencies" title="Permanent link">&para;</a></h2>
+<p>These advisories fail neither scanner, so they carry no
+ignore: cargo audit lists them as warnings on every run, and
+cargo-deny does not check them at all. They are tracked here
+because each is still debt worth paying down. Each is also
+tracked by a GitHub issue that the weekly <code>Supply chain</code>
+cron's <code>rustsec/audit-check</code> files for any warning no issue or
+pull request title names yet; this section keeps the
+reasoning, the issue the status. Leave the issue open until
+the crate leaves <code>cargo tree</code>. If one turns
+into a vulnerability advisory, or the crate becomes a direct
+dependency, the scanners will fail and it moves back up to
+the ignored list (or, better, gets fixed).</p>
+<h3 id="1-paste-1015-unmaintained-rustsec-2024-0436">1. <code>paste</code> 1.0.15 unmaintained (RUSTSEC-2024-0436)<a class="headerlink" href="#1-paste-1015-unmaintained-rustsec-2024-0436" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Rationale:</strong> the author archived the crate but
+  did not publish a fix or a CVE. A drop-in fork (<code>pastey</code>)
+  exists with the same API. <code>paste</code> reaches us transitively.</li>
+<li><strong>Attack surface:</strong> none direct; it is a proc-macro for
+  identifier pasting used at compile time. The risk is
+  only that it no longer receives bug fixes.</li>
+<li><strong>Action plan:</strong></li>
+<li><code>cargo tree -i paste</code> to find direct dependents.</li>
+<li>For each direct dependent we control, swap to <code>pastey</code>
+     if they accept the patch, or vendor-patch.</li>
+<li>For upstream dependents we don't control, wait for
+     their migration. Re-check every 6 months.</li>
+<li><strong>Resolved when:</strong> <code>paste</code> no longer appears in
+  <code>cargo tree</code>, or the RustSec advisory is withdrawn.</li>
+</ul>
 <h3 id="4-ttf-parser-0251-unmaintained-rustsec-2026-0192">4. <code>ttf-parser</code> 0.25.1 unmaintained (RUSTSEC-2026-0192)<a class="headerlink" href="#4-ttf-parser-0251-unmaintained-rustsec-2026-0192" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Ignore rationale:</strong> the author has declared the crate
+<li><strong>Rationale:</strong> the author has declared the crate
   unmaintained and recommends <code>skrifa</code>. It reaches us via
   egui's font stack (<code>ab_glyph</code> -&gt; <code>owned_ttf_parser</code> -&gt;
   <code>ttf-parser</code>), so there is nothing to change on our side
@@ -15387,12 +15469,12 @@ below. When an ignore is resolved, delete both the
      another maintained parser.</li>
 <li>Re-check on each eframe upgrade (we already take these
      via renovate).</li>
-<li><strong>Remove ignore when:</strong> <code>ttf-parser</code> no longer appears in
+<li><strong>Resolved when:</strong> <code>ttf-parser</code> no longer appears in
   <code>cargo tree</code>, or maintenance resumes upstream.</li>
 </ul>
 <h3 id="5-zvariant-zbus_names-zvariant_derive-unmaintained-rustsec-2026-0370-0371-0372">5. <code>zvariant</code> / <code>zbus_names</code> / <code>zvariant_derive</code> unmaintained (RUSTSEC-2026-0370, -0371, -0372)<a class="headerlink" href="#5-zvariant-zbus_names-zvariant_derive-unmaintained-rustsec-2026-0370-0371-0372" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Ignore rationale:</strong> upstream folded all three crates
+<li><strong>Rationale:</strong> upstream folded all three crates
   into <code>zbus</code> 6.0.0 (as its <code>zvariant</code> and <code>names</code> modules)
   and stopped maintaining them standalone. They reach us via
   eframe's Linux accessibility stack (<code>egui-winit</code> -&gt;
@@ -15406,12 +15488,12 @@ below. When an ignore is resolved, delete both the
 <li>Track accesskit / atspi for a migration to <code>zbus</code> 6.</li>
 <li>Re-check on each eframe upgrade (we already take these
      via renovate).</li>
-<li><strong>Remove ignore when:</strong> <code>zbus</code> 5.x (and with it these
+<li><strong>Resolved when:</strong> <code>zbus</code> 5.x (and with it these
   three crates) no longer appears in <code>cargo tree</code>.</li>
 </ul>
 <h3 id="6-pin-utils-011-unmaintained-rustsec-2026-0441">6. <code>pin-utils</code> 0.1.1 unmaintained (RUSTSEC-2026-0441)<a class="headerlink" href="#6-pin-utils-011-unmaintained-rustsec-2026-0441" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Ignore rationale:</strong> the upstream repository was archived
+<li><strong>Rationale:</strong> the upstream repository was archived
   on 1 October 2026 after the 0.1.1 release and there is no
   successor crate, so no version bump can clear this one
   (<code>cargo deny</code> says so itself: "No safe upgrade is
@@ -15420,8 +15502,8 @@ below. When an ignore is resolved, delete both the
   <code>webrtc-util</code> 0.17.2 -&gt; <code>nix</code> 0.26.4, and
   <code>ironrdp-connector</code> -&gt; <code>sspi</code> -&gt; <code>async-dnssd</code>. Both
   scanners read the whole lockfile rather than a feature
-  resolution, so feature-gating a path would not help even
-  where we could.</li>
+  resolution, so feature-gating a path would not silence the
+  warning even where we could.</li>
 <li><strong>Attack surface:</strong> none of substance. <code>pin-utils</code> is three
   pinning macros with no parsing, I/O or arithmetic; this is
   an unmaintained-status advisory, not a vulnerability. Its
@@ -15433,10 +15515,8 @@ below. When an ignore is resolved, delete both the
   <code>tests/webrtc_h264_smoke.rs</code>, and the second arrives
   through <code>shakenfist-spice-rdp</code> behind the default-off <code>rdp</code>
   feature, which release builds do not enable. That makes
-  this a weaker-risk acceptance than items 2 and 3, which are
-  in the shipped TLS path; the ignore exists only because
-  both scanners read the lockfile rather than a feature
-  resolution.</li>
+  this a weaker risk than items 2 and 3, which are in the
+  shipped TLS path.</li>
 <li><strong>Action plan:</strong></li>
 <li>Move the renderer's <code>webrtc_h264_smoke</code> dev-dependency
      from <code>rtp</code> 0.17 onto <code>rtc::rtp</code>, which the webrtc 0.20
@@ -15447,12 +15527,12 @@ below. When an ignore is resolved, delete both the
 <li>Track ironrdp / sspi for a release that drops
      <code>async-dnssd</code>. Re-check on each ironrdp bump; renovate
      opens those for us.</li>
-<li><strong>Remove ignore when:</strong> <code>pin-utils</code> no longer appears in
+<li><strong>Resolved when:</strong> <code>pin-utils</code> no longer appears in
   <code>cargo tree</code>.</li>
 </ul>
 <h3 id="7-chrono-0445-unmaintained-rustsec-2026-0543">7. <code>chrono</code> 0.4.45 unmaintained (RUSTSEC-2026-0543)<a class="headerlink" href="#7-chrono-0445-unmaintained-rustsec-2026-0543" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Ignore rationale:</strong> the advisory (published 18 November
+<li><strong>Rationale:</strong> the advisory (published 18 November
   2026, announced in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/chronotope/chrono/issues/1768" title="GitHub Issue: chronotope/chrono #1768">chronotope/chrono#1768</a>) marks every
   <code>chrono</code> version unmaintained, and <code>cargo deny</code> reports "No
   safe upgrade is available!". ryll does not use <code>chrono</code>
@@ -15476,12 +15556,12 @@ below. When an ignore is resolved, delete both the
      <code>cargo tree -i chrono</code> on each.</li>
 <li>If upstream does not move, consider offering that
      migration as a patch to <code>dav-server</code>.</li>
-<li><strong>Remove ignore when:</strong> <code>chrono</code> no longer appears in
+<li><strong>Resolved when:</strong> <code>chrono</code> no longer appears in
   <code>cargo tree</code>.</li>
 </ul>
 <h3 id="8-humantime-240-unmaintained-rustsec-2026-0542">8. <code>humantime</code> 2.4.0 unmaintained (RUSTSEC-2026-0542)<a class="headerlink" href="#8-humantime-240-unmaintained-rustsec-2026-0542" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Ignore rationale:</strong> published with item 7. The advisory
+<li><strong>Rationale:</strong> published with item 7. The advisory
   says <code>humantime</code> is unmaintained because <code>chrono</code> is, and
   covers every version; there is no safe upgrade. It reaches
   us only through <code>console-subscriber</code> 0.5.0, the latest
@@ -15489,14 +15569,14 @@ below. When an ignore is resolved, delete both the
 <li><strong>Attack surface:</strong> effectively none. <code>console-subscriber</code>
   is enabled only by ryll's diagnostic <code>tokio-console</code>
   feature (<code>make build-tokio-console</code>), which release builds
-  leave out. The ignore exists because both scanners read
-  the whole lockfile rather than a feature resolution.</li>
+  leave out. The scanners still warn because they read the
+  whole lockfile rather than a feature resolution.</li>
 <li><strong>Action plan:</strong> the <code>tokio-console</code> feature is due to be
   removed when the K1 hang investigation closes (see the
   comment on the feature in <code>ryll/Cargo.toml</code>); that removal
-  retires this ignore. Failing that, a <code>console-subscriber</code>
+  retires this item. Failing that, a <code>console-subscriber</code>
   release that drops <code>humantime</code>.</li>
-<li><strong>Remove ignore when:</strong> <code>humantime</code> no longer appears in
+<li><strong>Resolved when:</strong> <code>humantime</code> no longer appears in
   <code>cargo tree</code>.</li>
 </ul>
 <h2 id="also-tracked-duplicate-version-warnings">Also tracked: duplicate-version warnings<a class="headerlink" href="#also-tracked-duplicate-version-warnings" title="Permanent link">&para;</a></h2>
@@ -15545,11 +15625,14 @@ practice it is the most exposed parser surface we ship.</p>
 <h2 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h2>
 <p>This plan is complete when:</p>
 <ul>
-<li>All <code>[advisories].ignore</code> entries in <code>deny.toml</code>
-  have been removed.</li>
+<li>All <code>[advisories].ignore</code> entries in <code>deny.toml</code> and
+  <code>.cargo/audit.toml</code> have been removed.</li>
 <li>Each corresponding section above has been deleted from
   this plan file.</li>
-<li><code>cargo deny check</code> still passes with no ignores in place.</li>
+<li>Every item under <em>Tracked warnings</em> has been resolved per
+  its own <em>Resolved when</em>, and that section is empty.</li>
+<li><code>cargo deny check</code> and <code>cargo audit</code> still pass with no
+  ignores in place.</li>
 <li>Separately tracked: duplicate-version policy has been
   tightened to <code>deny</code> (not a gate for this plan, but
   the natural next step).</li>
@@ -15558,17 +15641,16 @@ practice it is the most exposed parser surface we ship.</p>
 <ul>
 <li>Evaluate adding <code>cargo vet</code> once the current debt is
   cleared and we understand how noisy our baseline is.</li>
-<li>Consider a recurring monthly cron that opens an issue if
-  new advisories appear (<code>cargo audit</code> in CI produces the
-  signal; we need a mechanism to route it).</li>
-<li>Fail CI on a set difference between the advisory IDs in
-  <code>deny.toml</code> and those in <code>.cargo/audit.toml</code>. Forgetting
-  <code>.cargo/audit.toml</code> already turns the <code>cargo audit</code> job
-  red, but the reverse is silent, so a stale entry in either
-  file survives until someone notices by hand -- which is how
-  the September 2026 sweep above found its four. A periodic
-  run with an empty ignore list would surface the same thing
-  from the other side, as IDs reported <code>advisory-not-detected</code>.</li>
+<li>Fail CI on an ignore that suppresses nothing. A stale
+  entry survives until someone notices by hand -- which is
+  how the September 2026 sweep found its four and the
+  November 2026 one its eight. cargo-deny already names them
+  as <code>advisory-not-detected</code>; for <code>.cargo/audit.toml</code>, a run
+  with the list emptied shows which IDs still fail. The
+  lists deliberately differ (see <em>Situation</em>), so a set
+  difference between them is not the right check. A
+  fleet-wide version is being planned in
+  shakenfist/development.</li>
 </ul>
 
 

@@ -15518,30 +15518,32 @@ policy exists.</p>
 enabled.</p>
 <h3 id="gui-components">GUI Components<a class="headerlink" href="#gui-components" title="Permanent link">&para;</a></h3>
 <p>The USB panel is a right-side panel toggled by Menu → USB,
-rendered alongside the traffic viewer panel (both use <code>egui::SidePanel::right</code>
+rendered alongside the traffic viewer panel (both use <code>egui::Panel::right</code>
 with different IDs).</p>
-<p><strong>State tracking on RyllApp:</strong></p>
+<p><strong>State tracking on <code>UsbPanel</code></strong> (<code>ryll/src/app/ui/usb_panel.rs</code>, held by
+<code>RyllApp</code>):</p>
 <ul>
-<li><code>usb_tx</code> — mpsc sender to the UsbredirChannel, created in <code>RyllApp::new()</code>
-  and threaded through <code>run_connection()</code>. Mirrors the <code>input_tx</code> pattern.</li>
-<li><code>usb_channel_ready</code> — set when <code>UsbChannelReady</code> event arrives, cleared on
+<li><code>tx</code> — mpsc sender to the UsbredirChannel, created in <code>RyllApp::new()</code>
+  and threaded through <code>run_connection()</code>; installed on the panel by
+  <code>UsbPanel::reset_for_session</code>. Mirrors the <code>input_tx</code> pattern.</li>
+<li><code>channel_ready</code> — set when <code>UsbChannelReady</code> event arrives, cleared on
   usbredir channel disconnect.</li>
-<li><code>usb_connecting</code> / <code>usb_disconnecting</code> — operation in progress flags, cleared
+<li><code>connecting</code> / <code>disconnecting</code> — operation in progress flags, cleared
   on success/failure events.</li>
-<li><code>usb_device_description</code> — set by <code>UsbDeviceConnected</code>, cleared by
+<li><code>device_description</code> — set by <code>UsbDeviceConnected</code>, cleared by
   <code>UsbDeviceDisconnected</code> and channel disconnect.</li>
-<li><code>usb_connected_at</code> — timestamp for the elapsed connection timer.</li>
-<li><code>usb_available_devices</code> — enumerated device list, refreshed on panel open
+<li><code>connected_at</code> — timestamp for the elapsed connection timer.</li>
+<li><code>available_devices</code> — enumerated device list, refreshed on panel open
   and via Refresh button.</li>
-<li><code>usb_virtual_disks</code> — session-scoped virtual disk paths from CLI flags and
+<li><code>virtual_disks</code> — session-scoped virtual disk paths from CLI flags and
   runtime additions.</li>
 </ul>
 <p><strong>Command flow:</strong></p>
 <p>The GUI sends identity-based <code>UsbCommand</code> variants (<code>ConnectPhysical { bus,
 address }</code> (Linux only), <code>ConnectVirtualDisk { path, read_only }</code>,
-<code>DisconnectDevice</code>) via
-<code>usb_tx</code>. The channel handler does async device lookup and open in its tokio
-context, sending <code>UsbDeviceConnected</code>, <code>UsbDeviceDisconnected</code>, or
+<code>DisconnectDevice</code>) via the panel's <code>tx</code>. The channel handler does
+async device lookup and open in its tokio context, sending
+<code>UsbDeviceConnected</code>, <code>UsbDeviceDisconnected</code>, or
 <code>UsbConnectFailed</code> events back to the app. If a device is already connected
 when a connect command arrives, the handler disconnects it first.</p>
 <p><strong>File picker:</strong></p>
