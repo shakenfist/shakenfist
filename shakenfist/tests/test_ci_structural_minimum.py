@@ -65,11 +65,20 @@ def _load_retries():
     return module
 
 
-def _node(uuid, hypervisor=False, network=False, database=False):
-    """One entry as ``GET /nodes`` publishes it, cut down to the role flags."""
+def _node(uuid, hypervisor=False, network=False, database=False, ip=None):
+    """One entry as ``GET /nodes`` publishes it, cut down to what is read.
+
+    The mesh IP is carried because it is how a node is identified as the
+    host running the suite -- by address rather than by name, since the
+    Shaken Fist node name and the OS fqdn differ in CI
+    (``base.TestCaseWithCleanup._node_is_local()``). Nothing in this
+    file reads it; ``test_ci_oidc_login_guard.py`` does, over these same
+    topology models.
+    """
     return {
         'uuid': uuid,
         'name': uuid,
+        'ip': ip,
         'is_hypervisor': hypervisor,
         'is_network_node': network,
         'is_database_node': database,
@@ -107,6 +116,9 @@ def _topology(ledgers, network_node=0, database_nodes=(),
     fixtures are the real topologies rather than a sketch of them.
     ``roster_omits`` names hypervisor indexes which are absent from
     ``per_node`` -- a node whose metrics are not fresh yet.
+
+    Each node is given a distinct mesh IP, because which node is the one
+    running the suite is decided by address; see ``_node()``.
     """
     nodes = []
     per_node = {}
@@ -114,11 +126,13 @@ def _topology(ledgers, network_node=0, database_nodes=(),
         uuid = 'hv%d' % index
         nodes.append(_node(
             uuid, hypervisor=True, network=(index == network_node),
-            database=(index in database_nodes)))
+            database=(index in database_nodes),
+            ip='10.0.0.%d' % (10 + index)))
         if index not in roster_omits:
             per_node[uuid] = _entry(ledger, publish_cpu_limit)
     for index in range(database_only_nodes):
-        nodes.append(_node('db%d' % index, database=True))
+        nodes.append(_node('db%d' % index, database=True,
+                           ip='10.0.0.%d' % (20 + index)))
     return per_node, nodes
 
 

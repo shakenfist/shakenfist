@@ -105,10 +105,17 @@ tools/idp-lab/capture-fixtures.sh
 
 That drives a complete device login at each provider — the flow
 `sf-client login` uses, including the confirmation step a person has to
-press at each of them — and overwrites the four files under
+press at each of them — and overwrites the files under
 `shakenfist/tests/files/idp/`, so the result is a diff in the working
-tree. `--output-dir` writes them somewhere else instead, and
-`--provider` does one provider.
+tree. The same Keycloak login also saves the two HTML pages a person sees
+during it, the sign-in page and the device confirmation page, as
+`keycloak-device-signin-page.html` and `keycloak-device-confirm-page.html`.
+Those are the pages the cluster suite's device login test is written
+against, and are scrubbed on the way out: the session code, the
+`execution` and `tab_id` identifiers, the grant code and the argument to
+`checkAuthSession(...)`, which is an auth session identifier in a script
+that a scrub of the forms alone would miss. `--output-dir` writes them
+somewhere else instead, and `--provider` does one provider.
 
 **The result will not be byte-identical to what is committed, and is
 not meant to be.** Signing keys, timestamps (`exp`, `iat`,

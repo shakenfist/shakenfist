@@ -1444,8 +1444,8 @@ not land anywhere else.
 | 5. Admin as a claim | shakenfist | TBD | Abandoned | — |
 | 6. Serving namespace key metadata (#3672) | shakenfist, client-python | [PLAN-oidc-authentication-phase-06-key-metadata.md](PLAN-oidc-authentication-phase-06-key-metadata.md) | Complete | shakenfist `e37a8f8931` (#4975), `683b591c6b` (#4979); client-python `1bd5d3c` (#454). The second shakenfist pull request carries review rounds two and three, which arrived while the first was already in the merge queue |
 | 7. Interactive CLI flows, the credential set and the token cache | client-python | [PLAN-oidc-authentication-phase-07-client-flows.md](https://github.com/shakenfist/client-python/blob/9fa1ff244970fed548dfefe5142a7a516f48abc3/docs/plans/PLAN-oidc-authentication-phase-07-client-flows.md) (in shakenfist/client-python) | Complete | client-python `9fa1ff2449` (#456) |
-| 8. Worked operator examples for Keycloak and Authentik | shakenfist | [PLAN-oidc-authentication-phase-08-worked-examples.md](PLAN-oidc-authentication-phase-08-worked-examples.md) | Proposed | — |
-| 9. Functional coverage against a containerised IdP | shakenfist | TBD | Not started | — |
+| 8. Worked operator examples for Keycloak and Authentik | shakenfist | [PLAN-oidc-authentication-phase-08-worked-examples.md](PLAN-oidc-authentication-phase-08-worked-examples.md) | Complete | `25c09b60ae` (#5028) |
+| 9. Functional coverage against a real provider | shakenfist, actions | [PLAN-oidc-authentication-phase-09-functional-idp.md](PLAN-oidc-authentication-phase-09-functional-idp.md) | Proposed | — |
 | 10. Push audit | shakenfist | PLAN-oidc-authentication-phase-10-push-audit.md | Not started | — |
 
 The `Merged` column records what put each phase on `develop`:
@@ -1693,16 +1693,47 @@ which is not a string -- so the binding the operator guide
 advises cannot fire. The phase therefore carries a change to
 claim matching as well as the documentation.
 
-**Phase 9 — functional coverage against a containerised
-IdP.** The federation exchange already has functional
-coverage in `test_federation.py` under
+**Phase 9 — functional coverage against a real provider.**
+The *service account* exchange has functional coverage in
+`test_federation.py` under
 `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/`, but
 against a throwaway in-process JWKS server rather than a
 real provider — which is the right trade for testing
-validation and no use at all for testing a flow. This phase
-stands up a real IdP in a container and drives a login
-through it headlessly, which is also the only honest test of
-phase 3's discovery and of phase 8's worked examples.
+validation and no use at all for testing a flow. The human
+login path has none: nothing under `cluster_ci_tests/`
+mentions `/auth/login`, `/auth/issuers/<uuid>/discover`,
+`client_id` or `oidc_scopes`, so discovery, the login
+exchange, the credential set, key metadata and the whole
+client flow are untested outside unit tests. This phase
+stands a real provider up and drives a login through it
+headlessly, which is also the only honest test of discovery
+and of the worked operator examples.
+
+Its plan picked one provider rather than two, and one lane
+rather than four, on a measurement: the primary runs the
+functional suite and has 4096 MiB in the `slim-primary`
+topology against 12288 MiB in `slim-tier`, so `slim-tier` is
+the only lane with room for a provider beside the suite. The
+workflow step that stands it up lands in
+`shakenfist/actions`, which is why this phase names two
+repositories, and the provider's certificate is issued from
+the certificate authority `tools/ci-jwks-ca.sh` already
+installs — the cluster resolves discovery, the JWKS fetch
+and the login exchange through the one
+`FEDERATION_JWKS_CA_BUNDLE` trust store.
+
+The lane with that memory is the **weekly** one. Both
+merge-gating lanes use the `slim-primary` topology and so
+have the smaller primary, which means this phase's coverage
+runs once a week against `develop` and a failure arrives as
+a `ci-failure` issue rather than blocking a merge. That was
+accepted deliberately, because a provider in 4096 MiB beside
+the suite risks a flaky gate on the fleet's smallest
+primary, and raising that primary is a capacity decision in
+`shakenfist/actions` in the middle of its own sizing trial.
+So the human login path gains its first real-provider
+coverage here and still has no merge-gating functional test,
+which phase 10 should record.
 
 **Phase 10 — push audit.** Runs `PUSH-AUDIT.md` over the
 accumulated diff of every phase in this plan against
