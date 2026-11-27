@@ -597,6 +597,21 @@ recorded here rather than left in a report:
 * **9e, documentation and close-out.** `docs/developer_guide/ci.md` states
   that the coverage is weekly, what has no functional coverage, and where
   the pieces live. `tools/idp-lab/capture-fixtures.py` now regenerates the
-  two device login pages, scrubbed as the committed ones are; the scrub
-  was checked against the committed pages and is idempotent on them, but
-  the script was **not run against a live lab**.
+  two device login pages, scrubbed as the committed ones are. **Run
+  against a live lab** on 2026-11-27: both providers up, Keycloak
+  configured, `capture-fixtures.sh --provider keycloak` wrote all four
+  of its captures into a scratch directory, and the two freshly
+  captured pages carry every placeholder the committed ones do --
+  including the auth session identifier inside a `<script>`, which a
+  form-only scrub had missed and which was corrected by hand in the
+  committed pages, so the script reproduces that correction rather
+  than merely tolerating it. No live session code, execution, tab
+  identifier, grant code or auth session identifier survives. The
+  parser's unit test was then run against the freshly captured pages
+  in place of the committed ones and passed all fourteen assertions,
+  which is the check that matters: the captures are reproducible in
+  the sense that a regenerated pair still proves what the committed
+  pair proves. Byte equality is not the test and the script's own
+  header says why -- signing keys, timestamps and session identifiers
+  are per-login. The lab was taken down afterwards and no container
+  of it remains.
