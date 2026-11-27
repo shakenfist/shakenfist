@@ -13493,6 +13493,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-bugreport-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting bugreport.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -17178,8 +17206,9 @@ describes.</p>
 releases were sent as presses (so the guest auto-repeated forever),
 the bytes of extended scancodes were reversed (nineteen keys dead,
 every arrow among them), and browser auto-repeat was forwarded. (The
-last was later reversed: forwarding repeats is correct, see design
-decision 24.) The first two were one cause, a reimplementation of an
+last was later reversed: forwarding repeats is correct, see "Key
+auto-repeat is the client's job" in
+<a href="/components/ryll/design-decisions/">design-decisions.md</a>.) The first two were one cause, a reimplementation of an
 encoding <code>make_scancode</code> already owned, and the unit tests asserted
 the buggy values, because they were written from the implementation
 rather than the contract, one calling <code>0xE048</code> "wire-format" in a

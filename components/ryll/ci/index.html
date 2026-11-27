@@ -13105,6 +13105,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-bugreport-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting bugreport.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -16424,6 +16452,21 @@ use GitHub-hosted runners and carry <code>audit-ok:
 github-hosted-runner</code> markers for the workflow-standards
 consistency audit.</p>
 <h2 id="workflow-inventory">Workflow inventory<a class="headerlink" href="#workflow-inventory" title="Permanent link">&para;</a></h2>
+<p>Renovate is not in this table. Dependency updates reach ryll from
+the fleet runner in shakenfist/development, which works over every
+managed repository in one pass, so ryll carries only <code>renovate.json</code>
+and no workflow of its own; see the fleet audit
+<a href="https://github.com/shakenfist/development/blob/main/docs/audits/renovate.md">renovate</a>.</p>
+<p><code>renovate.json</code> extends that repository's <code>renovate-fleet.json</code>
+preset, which is where the policy now lives: the weekly and monthly
+schedules, the dependency dashboard, <code>automerge: false</code> for minor,
+patch and digest updates, the three-day <code>minimumReleaseAge</code>,
+enabling Renovate's pre-commit manager (which keeps the revs in
+<code>.pre-commit-config.yaml</code> current), and the regex versioning that
+lets it read <code>shellcheck-py</code>'s four-component tags. A change to any
+of those is a pull request against shakenfist/development, not
+ryll. What stays in ryll's file is what only ryll knows: the holds
+and groupings that follow from its own dependency graph.</p>
 <table>
 <thead>
 <tr>
@@ -16467,10 +16510,6 @@ consistency audit.</p>
 <tr>
 <td><code>rdp-smoke.yml</code></td>
 <td>Nightly FreeRDP against <code>ryll --rdp</code> against a QEMU guest: authentication, frames, input, reconnects, takeover and Ctrl+C; advisory, not a gate</td>
-</tr>
-<tr>
-<td><code>renovate.yml</code></td>
-<td>Automated dependency updates (hourly)</td>
 </tr>
 <tr>
 <td><code>export-repo-config.yml</code></td>
@@ -16542,8 +16581,8 @@ move together. See
 for what the unfixed version cost, and the fleet audit
 <a href="https://github.com/shakenfist/development/blob/main/audits/merge-group-cancellation.md">merge-group-cancellation</a>.</p>
 <p>Scheduled, push-to-default, and release workflows must <strong>not</strong>
-enable <code>cancel-in-progress</code>. Cancelling a release mid-publish,
-or a renovate run mid-PR-creation, leaves partial state behind.</p>
+enable <code>cancel-in-progress</code>. Cancelling a release mid-publish
+leaves partial state behind.</p>
 <p><code>fuzz.yml</code> is the awkward case: it is scheduled, but it also
 takes a <code>workflow_dispatch</code>, and a manual run <em>should</em> supersede
 an in-flight nightly rather than queue behind it. It resolves

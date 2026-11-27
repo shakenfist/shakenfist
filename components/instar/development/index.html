@@ -4856,6 +4856,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#source-file-size" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source file size
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#diagrams" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13089,6 +13100,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-bugreport-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting bugreport.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15253,6 +15292,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#source-file-size" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source file size
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#diagrams" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15630,10 +15680,64 @@ Docker, ensuring consistent tooling regardless of local Rust installation.</p>
   <code>tests/helpers/scratch.py</code>, which tolerates instar removing a failed
   run's empty output on every Python; the reason is in
   <a href="/components/instar/testing/">testing.md</a>. The <code>ci-tooling</code> job runs the same script.</li>
+<li><code>source-size-ratchet</code>, which fails when a source file over 1,500
+  lines has grown past its entry in <code>tools/source-size-baseline</code>, or
+  has crossed 1,500 without one. See "Source file size" below.</li>
 </ul>
 <p>To auto-fix formatting issues:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>./scripts/check-rust.sh<span class="w"> </span>fix
 </code></pre></div>
+<h2 id="source-file-size">Source file size<a class="headerlink" href="#source-file-size" title="Permanent link">&para;</a></h2>
+<p>A file that is already too long rarely gets there in one pull request.
+It grows a few dozen lines at a time, each landing reviewed on its own
+merits, and none of them is the one that made it large. instar's
+<code>src/vmm/src/main.rs</code> grew on all nineteen of its landings over the
+months before this was measured, at a median of 235 lines each: a
+review scoped to one diff cannot see that, which is why the rule is
+enforced by a tool rather than by taste.</p>
+<p><code>PUSH-AUDIT.md</code>'s <code>source-file-size</code> block is the policy -- what to ask
+of a long file, and why splitting at a line number rather than at a
+seam is worse than not splitting at all. The enforcement is
+<code>tools/source-size-ratchet.py</code>, copied verbatim from
+shakenfist/development's <code>templates/source-size-ratchet/</code>. The
+<code>source-size-ratchet</code> pre-commit hook runs it on every commit, and
+<code>functional-tests.yml</code>'s <code>Check paths</code> job runs it on every pull
+request and merge group. Both, because instar does not run
+<code>pre-commit run --all-files</code> in CI the way the rest of the fleet does,
+so the hook on its own would only ever stop a commit by someone who
+had run <code>pre-commit install</code>.</p>
+<p>There is no cap and nothing is ever forced to split. Every tracked
+source file over 1,500 lines is listed in <code>tools/source-size-baseline</code>
+with its length. A listed file may stay exactly that long for ever; it
+may not grow, and no new file may cross 1,500, unless the change that
+does it also edits the baseline -- a one-line diff a reviewer cannot
+scroll past -- and says in the pull request description why the file
+should grow rather than split. Raising an entry is allowed: it <em>is</em> the
+stated reason the block asks for.</p>
+<p>Three things follow that are easy to get wrong:</p>
+<ul>
+<li><strong>Shrinking needs nothing.</strong> An entry higher than its file is not a
+  failure. <code>python3 -I tools/source-size-ratchet.py --update</code> lowers
+  entries that have shrunk and drops files that have gone or fallen
+  under the threshold. It never raises an entry and never adds a file,
+  because that edit is the reviewable decision. <code>--init</code> is for
+  adoption only: run it later and it silently accepts whatever has
+  grown.</li>
+<li><strong>Never buy lines back by deleting comments or docstrings.</strong> The
+  tool counts lines and cannot tell the difference; the block counts
+  that trade as a finding rather than a win.</li>
+<li><strong>The baseline is not the whole rule.</strong> The ratchet's threshold is
+  1,500 and its extension list is fleet-wide, so it says nothing about
+  a file growing through the 800-line candidate-to-split band, and
+  nothing about workflow YAML. The push audit covers both by hand with
+  <code>tools/audit/source-size.sh</code>; the "In this project" note under
+  <code>source-file-size</code> in <code>PUSH-AUDIT.md</code> is the full division of labour.</li>
+</ul>
+<p><code>tools/source-size-exclude</code> holds the trees the count skips: one glob
+per line, each with a comment saying why. Only <code>prototypes/</code> is there,
+as reference material rather than shipped code. Generated and vendored
+code belongs there; a hand-written file that is merely long belongs in
+the baseline, where its length is visible.</p>
 <h2 id="diagrams">Diagrams<a class="headerlink" href="#diagrams" title="Permanent link">&para;</a></h2>
 <p>Diagrams of structure or flow -- components and the arrows between them,
 an ordered exchange of messages, a state machine -- are written as fenced
@@ -16628,6 +16732,7 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 <li><code>tools/ci/test-check-no-changelog.sh</code> - Tests for that guard: the root file, a nested one, no extension, another case, and names that only contain the word; the <code>ci-tooling</code> CI job runs it</li>
 <li><code>tools/ci/check-no-named-temporary-file.sh</code> - Fails if a Python file under <code>tests/</code> names <code>NamedTemporaryFile</code>: a failed <code>convert</code>, <code>dd</code> or <code>copy</code> removes the empty output it created (#849), and on Python 3.10 and 3.11 the stdlib's cleanup then raises, which only the merge queue's older-Python legs see (#959). Tests use <code>ScratchFile</code> from <code>tests/helpers/scratch.py</code>, the one exempt file. Runs as the <code>no-named-temporary-file</code> pre-commit hook and in the <code>ci-tooling</code> CI job</li>
 <li><code>tools/ci/test-check-no-named-temporary-file.sh</code> - Tests for that guard: the refused-convert shape #959 was about, an import by name, a helper module, every hit counted, the exemption holding only for its named file, code outside <code>tests/</code> not read, and a git failure exiting 2 rather than reading as clean; the <code>ci-tooling</code> CI job runs it</li>
+<li><code>tools/source-size-ratchet.py</code> - Fails when a tracked source file over 1,500 lines has grown past its entry in <code>tools/source-size-baseline</code>, or has crossed 1,500 with no entry. Copied verbatim from shakenfist/development's <code>templates/source-size-ratchet/</code> and not to be edited here; <code>tools/source-size-exclude</code> is this repository's own, and holds <code>prototypes/</code>. Runs as the <code>source-size-ratchet</code> pre-commit hook and, because instar does not run <code>pre-commit run --all-files</code> in CI, also as a step of <code>functional-tests.yml</code>'s <code>Check paths</code> job, which every pull request and merge group runs. See "Source file size" above</li>
 <li><code>tools/check-no-capability-claims.py</code> - Fails, naming the line, if anything in the tree claims instar cannot read or compose a differencing image; five operations compose one, so the claim is false wherever it is made. It reads flattened paragraphs across <code>src/**/*.rs</code>, <code>tests/**/*.py</code>, <code>docs/**/*.md</code>, <code>tools/**/*.py</code> and <code>scripts/**/*.py</code>, so a sentence wrapped mid-phrase and one inside an assertion message are both caught. <code>docs/plans/</code> is exempt: it records what was true when each phase was planned. <code>--self-test</code> checks the pattern against the nine forms it must and must not catch, plus that the globs still read the tree from any working directory; the <code>ci-tooling</code> CI job runs both</li>
 <li><code>tools/ci/check-stestr-run.sh</code> - Decides whether a stestr run is a result at all: a worker lost to the subunit &gt;4MB packet-size limit, a worker reported with <code>N/A</code> elapsed, a missing totals block, a run shorter than its own discovery count, and a selection in which every test skipped all exit 0 with a totals block that reads like a pass. Takes the output file and the discovery count, the count either as a number or as <code>in-output</code> to read the <code>selection contains N tests</code> line the run printed; the count is mandatory, because the one caller that could omit it did, and a count of zero is refused in either spelling, because a selection that matched nothing clears every floor there is. It expects one run per file and refuses a file holding two totals blocks, because every number it reads is the last one in the file. The <code>integration-core</code> and two <code>integration-convert-*</code> CI jobs and <code>tools/test-package-functional.sh</code> all call it, so every job that runs a stestr selection shares one implementation</li>
 <li><code>tools/ci/test-check-stestr-run.sh</code> - Tests for that guard against totals blocks in the shape stestr really prints, including that a legitimate run with many skips still passes; the <code>ci-tooling</code> CI job runs it</li>

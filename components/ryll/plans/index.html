@@ -12880,6 +12880,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-bugreport-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting bugreport.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15315,6 +15343,13 @@ from archiving a completed phase plan.</p>
 <td>Settle where the web and RDP transcodes belong and whether the <code>shakenfist-spice-*</code> crates should leave ryll. Records the single-session-frontend versus multi-tenant-gateway distinction and the trigger for ever extracting a crate, stops <code>shakenfist-spice-rdp</code>'s IronRDP 1.89 MSRV leaking onto every published crate, gives <code>--web</code> the library crate <code>--rdp</code> already has so a proxy-side web gateway is glue rather than a second implementation, moves andris and Kerbside off git <code>rev</code> pins on ryll <code>develop</code> onto published versions, and gives Kerbside a current statement of direction for serving both web and RDP out of the proxy while ryll keeps its own modes</td>
 <td>Not started</td>
 <td>1. Decision record, 2. MSRV de-leak, 3. Web frontend crate, 4. Release and downstream pins, 5. Kerbside transcoding-out direction, 6. Push audit (phase plans pending)</td>
+</tr>
+<tr>
+<td>2026-11-27</td>
+<td><a href="/components/ryll/plans/PLAN-bugreport-split/">Splitting bugreport.rs</a></td>
+<td>Break the 5,110-line <code>ryll/src/bugreport.rs</code> -- the largest <code>ryll/src/</code> entry in <code>tools/source-size-baseline</code> -- into three sibling modules named for what they actually hold: <code>ryll/src/traffic/</code> (the <code>TrafficSink</code>, the ring buffers and the session clock that the status bar and traffic viewer use), <code>ryll/src/snapshot/</code> (the session state the report serialises) and <code>ryll/src/bugreport/</code> (the report itself). Returns 645 lines of tests to <code>shakenfist-spice-renderer</code>, whose types they test; collapses five copy-pasted zip writers onto one core, along with the duplicated filename sanitiser, the five <code>#[allow(clippy::too_many_arguments)]</code> for one parameter list, and the fixture every <code>assemble</code> test rebuilds; and drops a re-export block of fifteen names of which one is used</td>
+<td>Not started</td>
+<td>1. Renderer tests, 2. Dedup, 3. Modules, 4. <code>ReportSources</code>, 5. Helpers, 6. Push audit (phase plans pending)</td>
 </tr>
 </tbody>
 </table>

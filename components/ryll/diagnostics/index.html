@@ -13106,6 +13106,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-bugreport-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting bugreport.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15853,7 +15881,8 @@ where inline I/O could stall the SPICE socket or the GUI.</p>
   differences from clock granularity saturate at zero, and the first
   samples after startup include startup lag until the 32-entry ring
   rotates.</li>
-<li><strong>MP4 finalisation is asynchronous, on purpose.</strong> See decision 6 in
+<li><strong>MP4 finalisation is asynchronous, on purpose.</strong> See "Unbuffered
+  capture I/O on dedicated threads" in
   <a href="/components/ryll/design-decisions/">design-decisions.md</a>: synchronous finalisation
   would put the caller back to blocking on the encoder draining, which is
   the stall the encoder thread removes.</li>
