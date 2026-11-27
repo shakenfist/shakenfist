@@ -169,10 +169,11 @@ render the web UI, and the Markdown documentation. Excluded, each
 with a reason recorded in that file, are the plan archive in
 `docs/plans/`, the generated protobuf stubs, the vendored sfui tree,
 the exported GitHub configuration, `Cargo.lock`, the qcow2 test
-fixtures, and `AUTHORS` and `LICENSE`. Anything matching neither
-list is reported by the consistency audit's
-`review-scope-completeness` check, so a new file type is a decision
-somebody makes rather than a silent omission.
+fixtures, the performance-run screenshots, the copied Material icon
+SVGs under `kerbside/api/templates/icons/`, and `AUTHORS` and
+`LICENSE`. Anything matching neither list is reported by the
+consistency audit's `review-scope-completeness` check, so a new file
+type is a decision somebody makes rather than a silent omission.
 
 The state (`REVIEWS.md`, `.vscode/*.weaudit*`) is maintained with
 `tools/review-tracking.sh`, a wrapper around the shared helper in the

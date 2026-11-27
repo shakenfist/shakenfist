@@ -217,12 +217,71 @@ Beyond the Rust hooks, `pre-commit run --all-files` also runs:
   `tests/helpers/scratch.py`, which tolerates instar removing a failed
   run's empty output on every Python; the reason is in
   [testing.md](/components/instar/testing/). The `ci-tooling` job runs the same script.
+- `source-size-ratchet`, which fails when a source file over 1,500
+  lines has grown past its entry in `tools/source-size-baseline`, or
+  has crossed 1,500 without one. See "Source file size" below.
 
 To auto-fix formatting issues:
 
 ```bash
 ./scripts/check-rust.sh fix
 ```
+
+## Source file size
+
+A file that is already too long rarely gets there in one pull request.
+It grows a few dozen lines at a time, each landing reviewed on its own
+merits, and none of them is the one that made it large. instar's
+`src/vmm/src/main.rs` grew on all nineteen of its landings over the
+months before this was measured, at a median of 235 lines each: a
+review scoped to one diff cannot see that, which is why the rule is
+enforced by a tool rather than by taste.
+
+`PUSH-AUDIT.md`'s `source-file-size` block is the policy -- what to ask
+of a long file, and why splitting at a line number rather than at a
+seam is worse than not splitting at all. The enforcement is
+`tools/source-size-ratchet.py`, copied verbatim from
+shakenfist/development's `templates/source-size-ratchet/`. The
+`source-size-ratchet` pre-commit hook runs it on every commit, and
+`functional-tests.yml`'s `Check paths` job runs it on every pull
+request and merge group. Both, because instar does not run
+`pre-commit run --all-files` in CI the way the rest of the fleet does,
+so the hook on its own would only ever stop a commit by someone who
+had run `pre-commit install`.
+
+There is no cap and nothing is ever forced to split. Every tracked
+source file over 1,500 lines is listed in `tools/source-size-baseline`
+with its length. A listed file may stay exactly that long for ever; it
+may not grow, and no new file may cross 1,500, unless the change that
+does it also edits the baseline -- a one-line diff a reviewer cannot
+scroll past -- and says in the pull request description why the file
+should grow rather than split. Raising an entry is allowed: it *is* the
+stated reason the block asks for.
+
+Three things follow that are easy to get wrong:
+
+- **Shrinking needs nothing.** An entry higher than its file is not a
+  failure. `python3 -I tools/source-size-ratchet.py --update` lowers
+  entries that have shrunk and drops files that have gone or fallen
+  under the threshold. It never raises an entry and never adds a file,
+  because that edit is the reviewable decision. `--init` is for
+  adoption only: run it later and it silently accepts whatever has
+  grown.
+- **Never buy lines back by deleting comments or docstrings.** The
+  tool counts lines and cannot tell the difference; the block counts
+  that trade as a finding rather than a win.
+- **The baseline is not the whole rule.** The ratchet's threshold is
+  1,500 and its extension list is fleet-wide, so it says nothing about
+  a file growing through the 800-line candidate-to-split band, and
+  nothing about workflow YAML. The push audit covers both by hand with
+  `tools/audit/source-size.sh`; the "In this project" note under
+  `source-file-size` in `PUSH-AUDIT.md` is the full division of labour.
+
+`tools/source-size-exclude` holds the trees the count skips: one glob
+per line, each with a comment saying why. Only `prototypes/` is there,
+as reference material rather than shipped code. Generated and vendored
+code belongs there; a hand-written file that is merely long belongs in
+the baseline, where its length is visible.
 
 ## Diagrams
 
@@ -1314,6 +1373,7 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 - `tools/ci/test-check-no-changelog.sh` - Tests for that guard: the root file, a nested one, no extension, another case, and names that only contain the word; the `ci-tooling` CI job runs it
 - `tools/ci/check-no-named-temporary-file.sh` - Fails if a Python file under `tests/` names `NamedTemporaryFile`: a failed `convert`, `dd` or `copy` removes the empty output it created (#849), and on Python 3.10 and 3.11 the stdlib's cleanup then raises, which only the merge queue's older-Python legs see (#959). Tests use `ScratchFile` from `tests/helpers/scratch.py`, the one exempt file. Runs as the `no-named-temporary-file` pre-commit hook and in the `ci-tooling` CI job
 - `tools/ci/test-check-no-named-temporary-file.sh` - Tests for that guard: the refused-convert shape #959 was about, an import by name, a helper module, every hit counted, the exemption holding only for its named file, code outside `tests/` not read, and a git failure exiting 2 rather than reading as clean; the `ci-tooling` CI job runs it
+- `tools/source-size-ratchet.py` - Fails when a tracked source file over 1,500 lines has grown past its entry in `tools/source-size-baseline`, or has crossed 1,500 with no entry. Copied verbatim from shakenfist/development's `templates/source-size-ratchet/` and not to be edited here; `tools/source-size-exclude` is this repository's own, and holds `prototypes/`. Runs as the `source-size-ratchet` pre-commit hook and, because instar does not run `pre-commit run --all-files` in CI, also as a step of `functional-tests.yml`'s `Check paths` job, which every pull request and merge group runs. See "Source file size" above
 - `tools/check-no-capability-claims.py` - Fails, naming the line, if anything in the tree claims instar cannot read or compose a differencing image; five operations compose one, so the claim is false wherever it is made. It reads flattened paragraphs across `src/**/*.rs`, `tests/**/*.py`, `docs/**/*.md`, `tools/**/*.py` and `scripts/**/*.py`, so a sentence wrapped mid-phrase and one inside an assertion message are both caught. `docs/plans/` is exempt: it records what was true when each phase was planned. `--self-test` checks the pattern against the nine forms it must and must not catch, plus that the globs still read the tree from any working directory; the `ci-tooling` CI job runs both
 - `tools/ci/check-stestr-run.sh` - Decides whether a stestr run is a result at all: a worker lost to the subunit >4MB packet-size limit, a worker reported with `N/A` elapsed, a missing totals block, a run shorter than its own discovery count, and a selection in which every test skipped all exit 0 with a totals block that reads like a pass. Takes the output file and the discovery count, the count either as a number or as `in-output` to read the `selection contains N tests` line the run printed; the count is mandatory, because the one caller that could omit it did, and a count of zero is refused in either spelling, because a selection that matched nothing clears every floor there is. It expects one run per file and refuses a file holding two totals blocks, because every number it reads is the last one in the file. The `integration-core` and two `integration-convert-*` CI jobs and `tools/test-package-functional.sh` all call it, so every job that runs a stestr selection shares one implementation
 - `tools/ci/test-check-stestr-run.sh` - Tests for that guard against totals blocks in the shape stestr really prints, including that a legitimate run with many skips still passes; the `ci-tooling` CI job runs it

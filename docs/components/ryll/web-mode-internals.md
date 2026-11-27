@@ -986,8 +986,9 @@ The web frontend shipped three input bugs that nothing caught: key
 releases were sent as presses (so the guest auto-repeated forever),
 the bytes of extended scancodes were reversed (nineteen keys dead,
 every arrow among them), and browser auto-repeat was forwarded. (The
-last was later reversed: forwarding repeats is correct, see design
-decision 24.) The first two were one cause, a reimplementation of an
+last was later reversed: forwarding repeats is correct, see "Key
+auto-repeat is the client's job" in
+[design-decisions.md](/components/ryll/design-decisions/).) The first two were one cause, a reimplementation of an
 encoding `make_scancode` already owned, and the unit tests asserted
 the buggy values, because they were written from the implementation
 rather than the contract, one calling `0xE048` "wire-format" in a
