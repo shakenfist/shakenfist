@@ -166,7 +166,8 @@ the app sending a command, because the usbredir channel is spawned inside
 `run_connection()` on a different thread from the GUI and plumbing a sender
 back was avoided for the CLI case. Interactive connect and disconnect use the
 `UsbCommand` channel described under GUI Components below
-(see also design decision 10 in [design-decisions.md](/components/ryll/design-decisions/)).
+(see also "USB panel uses identity-based commands" in
+[design-decisions.md](/components/ryll/design-decisions/)).
 
 **Known gaps.** `cancel_data_packet` is acknowledged in the log but not
 acted on ([#781](https://github.com/shakenfist/ryll/issues/781)), so an in-flight transfer
@@ -554,8 +555,10 @@ round-trips. The rest of the design follows from that.
   character holds its key down for half of that, rather than sending
   press and release together, because a BIOS or bootloader that polls
   key state once per frame can miss a pair that arrives in one TCP
-  segment. Pacing runs as a timer arm in the `select!` loop (design
-  decision 15) so a minute-long paste does not stop the channel
+  segment. Pacing runs as a timer arm in the `select!` loop (see
+  "Paste-as-keystrokes: cooperative state machine in the select!
+  loop" in [design-decisions.md](/components/ryll/design-decisions/)) so a
+  minute-long paste does not stop the channel
   serving the server or live input.
 - **Modifiers are released, then restored.** The trigger gesture is
   usually `Ctrl+Alt+V`, and typing with Ctrl or Alt down produces

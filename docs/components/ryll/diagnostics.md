@@ -324,7 +324,8 @@ where inline I/O could stall the SPICE socket or the GUI.
   differences from clock granularity saturate at zero, and the first
   samples after startup include startup lag until the 32-entry ring
   rotates.
-- **MP4 finalisation is asynchronous, on purpose.** See decision 6 in
+- **MP4 finalisation is asynchronous, on purpose.** See "Unbuffered
+  capture I/O on dedicated threads" in
   [design-decisions.md](/components/ryll/design-decisions/): synchronous finalisation
   would put the caller back to blocking on the encoder draining, which is
   the stall the encoder thread removes.

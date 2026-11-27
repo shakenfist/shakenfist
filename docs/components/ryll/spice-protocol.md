@@ -726,7 +726,8 @@ and a one-time hex dump of the payload, so a guest that does use one
 shows up in the session's gap list and in a `--pedantic` report with
 bytes to implement against. `DRAW_COMPOSITE` is different in that ryll
 advertises the `COMPOSITE` capability; see
-[design decision 7](/components/ryll/design-decisions/) for why the capability is
+"Display channel capabilities" in
+[design-decisions.md](/components/ryll/design-decisions/) for why the capability is
 sent.
 
 The ones that are implemented, each checked against spice-common:
