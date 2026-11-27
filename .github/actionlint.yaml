@@ -6,6 +6,7 @@ self-hosted-runner:
   labels:
     - vm
     - static
+    - persistent
     - claude-code
     - debian-13
     - debian-13-docker
