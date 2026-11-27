@@ -86,7 +86,7 @@ dependencies = [
     # runner, not the intended mode, so the pin stays rather than moving
     # to the test extra.
     "jsonschema==4.26.0",                 # mit
-    "packaging==26.3",                    # apache2
+    "packaging==26.4",                    # apache2
 
     "gunicorn[gevent]==27.0.1",           # mit
 
