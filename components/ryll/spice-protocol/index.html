@@ -12406,6 +12406,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#values-a-server-chooses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Values a server chooses
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#keyboard-scancodes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13142,6 +13153,34 @@
     
   
     RDP frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-untrusted-value-sweep/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Untrusted value and text sweep
   
 
     
@@ -15607,6 +15646,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#values-a-server-chooses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Values a server chooses
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#keyboard-scancodes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16714,6 +16764,55 @@ bug-report-per-gap automation on top.</p>
   in headless was rejected, since unattended runs are where it is most
   useful.</li>
 </ul>
+<h2 id="values-a-server-chooses">Values a server chooses<a class="headerlink" href="#values-a-server-chooses" title="Permanent link">&para;</a></h2>
+<p>Parsing a message proves it was well formed, not that what it says is
+usable. A <code>BoundedReader</code> refuses a body that is too short or a length
+that runs past the data, and the fuzz targets keep it panic-free, but a
+field whose every bit pattern is in range — a <code>u32</code> channel count, a
+<code>u32</code> sample rate — survives parsing whatever a server put in it. Those
+values are not inert: ryll sizes buffers from them, divides by them, and
+hands them to threads a long way from the message they arrived in. So
+each is checked where it is <strong>stored into channel state</strong>, not where it
+is eventually used, because by then the check has no way to refuse the
+message that supplied it.</p>
+<p>Three rules follow from that, and they are the same rule in three
+places:</p>
+<ul>
+<li><strong>Image geometry</strong> is bounded by the shared caps in <a href="#decode-limits">Decode
+  limits</a>, applied before the allocation they size.</li>
+<li><strong>Audio geometry</strong> is bounded by <code>PlaybackStart::playable()</code>: 1 to 8
+  channels, and 4 kHz to 384 kHz. A <code>PLAYBACK_START</code> outside either
+  range is dropped whole and counted in <code>starts_refused</code>, leaving any
+  stream already playing untouched — a clamped value would set up an
+  output for a stream the server never described, and silently. The
+  danger is concrete: the channel count reaches a per-frame <code>Vec</code> and a
+  resampling ratio on the audio thread, where <code>0xffffffff</code> channels is an
+  8 GiB allocation inside a real-time callback, and a zero sample rate is
+  the numerator of a ratio that never advances. The <code>format</code> field is
+  <em>not</em> checked here; it selects the layout of the <code>DATA</code> that follows,
+  which the data path has to recognise anyway.</li>
+<li><strong>Server-supplied text</strong> is passed through <code>sanitise_untrusted</code>, which
+  replaces every C0 and C1 control, <code>DEL</code>, <code>U+2028</code> and <code>U+2029</code>, and
+  Unicode <code>Bidi_Control</code> character with <code>U+FFFD</code>. <code>SPICE_MSG_NOTIFY</code> is
+  the message that carries it, and <code>Notify::message_text()</code> is the only
+  accessor any channel uses, so the sanitising happens once rather than
+  at seven call sites. The length cap (<code>NOTIFY_MAX_MESSAGE_LEN</code>, 64 KiB)
+  bounds the bytes on the wire; it does nothing about what is in them.
+  Sanitising keeps the character count but not the byte count — each
+  one-byte control becomes the three-byte <code>U+FFFD</code> — so the sanitised
+  text can be up to 192 KiB, and anything that re-emits it under a byte
+  cap must cap the result. Unsanitised, a notify reaches past the
+  message it was given: a newline forges log lines, an <code>ESC[</code> or the 8-bit CSI
+  drives the terminal of whoever reads the log or watches <code>stderr</code>, and a
+  bidi override reorders what a human sees without changing a byte. The
+  raw bytes stay on <code>Notify::message</code> for a capture or a bug report.</li>
+</ul>
+<p>What ryll deliberately does <em>not</em> police is the content a human asked
+for. A guest is entitled to play loud audio and to draw a bright screen,
+and nothing in a sample or a pixel distinguishes a hostile one from a
+game. Note that <code>PLAYBACK_VOLUME</code> is recorded for bug reports and never
+applied, so a server has no lever on output level at all: ryll's own
+volume control is the only one, and it is clamped to 0–100.</p>
 <h2 id="keyboard-scancodes">Keyboard Scancodes<a class="headerlink" href="#keyboard-scancodes" title="Permanent link">&para;</a></h2>
 <p>Ryll maps egui key events to AT keyboard scancodes for the SPICE protocol.
 Keys in the navigation cluster (arrow keys, Home, End, Insert, Delete,

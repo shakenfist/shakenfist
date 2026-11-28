@@ -12859,6 +12859,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-untrusted-value-sweep/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Untrusted value and text sweep
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-crate-boundaries/" class="md-nav__link">
         
   
@@ -15338,6 +15366,13 @@ from archiving a completed phase plan.</p>
 <td>(phases not yet written; the last of them is a push audit)</td>
 </tr>
 <tr>
+<td>2026-11-05</td>
+<td><a href="/components/ryll/plans/PLAN-untrusted-value-sweep/">Untrusted value and text sweep</a></td>
+<td>Validate every server-chosen wire value where it is stored and sanitise every server-supplied string in its accessor, so the class of bug the parser fuzzers cannot see (a field whose every bit pattern is in range) is closed across all channels rather than one message at a time; plus the gateway rule the RDP frontend needs (issue #692)</td>
+<td>In progress</td>
+<td>1. Audio and notify (inline), 2. Inventory, 3. Close the gaps, 4. Gateway validation, 5. Regression guards, 6. Push audit</td>
+</tr>
+<tr>
 <td>2026-11-21</td>
 <td><a href="/components/ryll/plans/PLAN-crate-boundaries/">Crate boundaries and transcoding out</a></td>
 <td>Settle where the web and RDP transcodes belong and whether the <code>shakenfist-spice-*</code> crates should leave ryll. Records the single-session-frontend versus multi-tenant-gateway distinction and the trigger for ever extracting a crate, stops <code>shakenfist-spice-rdp</code>'s IronRDP 1.89 MSRV leaking onto every published crate, gives <code>--web</code> the library crate <code>--rdp</code> already has so a proxy-side web gateway is glue rather than a second implementation, moves andris and Kerbside off git <code>rev</code> pins on ryll <code>develop</code> onto published versions, and gives Kerbside a current statement of direction for serving both web and RDP out of the proxy while ryll keeps its own modes</td>
@@ -15347,9 +15382,9 @@ from archiving a completed phase plan.</p>
 <tr>
 <td>2026-11-27</td>
 <td><a href="/components/ryll/plans/PLAN-bugreport-split/">Splitting bugreport.rs</a></td>
-<td>Break the 5,110-line <code>ryll/src/bugreport.rs</code> -- the largest <code>ryll/src/</code> entry in <code>tools/source-size-baseline</code> -- into three sibling modules named for what they actually hold: <code>ryll/src/traffic/</code> (the <code>TrafficSink</code>, the ring buffers and the session clock that the status bar and traffic viewer use), <code>ryll/src/snapshot/</code> (the session state the report serialises) and <code>ryll/src/bugreport/</code> (the report itself). Returns 645 lines of tests to <code>shakenfist-spice-renderer</code>, whose types they test; collapses five copy-pasted zip writers onto one core, along with the duplicated filename sanitiser, the five <code>#[allow(clippy::too_many_arguments)]</code> for one parameter list, and the fixture every <code>assemble</code> test rebuilds; and drops a re-export block of fifteen names of which one is used</td>
-<td>Not started</td>
-<td>1. Renderer tests, 2. Dedup, 3. Modules, 4. <code>ReportSources</code>, 5. Helpers, 6. Push audit (phase plans pending)</td>
+<td>Break the 5,110-line <code>ryll/src/bugreport.rs</code> -- the largest <code>ryll/src/</code> entry in <code>tools/source-size-baseline</code> -- into three sibling modules named for what they actually hold: <code>ryll/src/traffic/</code> (the <code>TrafficSink</code>, the ring buffers and the session clock that the status bar and traffic viewer use), <code>ryll/src/snapshot/</code> (the session state the report serialises) and <code>ryll/src/bugreport/</code> (the report itself). Returns 651 lines of tests to <code>shakenfist-spice-renderer</code>, whose types they test; collapses five copy-pasted zip writers onto one core, along with the duplicated filename sanitiser, the five <code>#[allow(clippy::too_many_arguments)]</code> for one parameter list, and the fixture every <code>assemble</code> test rebuilds; and drops a re-export block of fifteen names of which one is used</td>
+<td>In progress</td>
+<td><a href="/components/ryll/plans/PLAN-bugreport-split-phase-01-renderer-tests/">1. Renderer tests</a>, 2. Dedup, 3. Modules, 4. <code>ReportSources</code>, 5. Helpers, 6. Push audit</td>
 </tr>
 </tbody>
 </table>

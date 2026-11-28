@@ -13001,6 +13001,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-untrusted-value-sweep/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Untrusted value and text sweep
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-crate-boundaries/" class="md-nav__link">
         
   
@@ -15506,7 +15534,8 @@ but is deferred — display's <code>recent_decodes</code> is the only precedent 
 promoting it to every channel adds complexity without a clear
 immediate payoff. Revisit if a future channel needs a time-ordered
 event log.</p>
-<p>Every snapshot has a serialiser test in <code>ryll/src/bugreport.rs</code>
+<p>Every snapshot has a serialiser test in
+<code>shakenfist-spice-renderer/tests/snapshots.rs</code>
 (<code>test_&lt;channel&gt;_snapshot_serialises</code>) that constructs a fully
 populated snapshot, serialises it to JSON, and asserts each field is
 present — catching serde renames before they reach a real bug report.</p>
@@ -15608,7 +15637,12 @@ snapshot surfaces:</p>
   <code>sample_rate_hz</code>, <code>channels</code>, and <code>codec</code> (Opus, raw PCM, or an
   unrecognised codec number)
 - <code>start_count</code> / <code>stop_count</code> — cumulative <code>PLAYBACK_START</code> /
-  <code>PLAYBACK_STOP</code> messages received since session open
+  <code>PLAYBACK_STOP</code> messages received since session open; <code>start_count</code>
+  counts only the STARTs that were acted on
+- <code>starts_refused</code> — cumulative <code>PLAYBACK_START</code> messages dropped
+  because the channel count or sample rate they declared was outside
+  what any output could serve. No real server sends one, so a non-zero
+  value means the server is malformed or adversarial
 - <code>last_volume_per_channel</code>, <code>last_mute</code>, <code>last_latency_ms</code> — the
   most recent volume, mute, and latency-hint values set by the server</p>
 <p><strong>Data plumbing:</strong>
@@ -15714,7 +15748,9 @@ point following the baseline template in this document.</p>
 <li><strong>Wire the bug-report side</strong> in <code>ryll/src/bugreport.rs</code> so the
    appropriate report type's <code>channel_name()</code> resolves to the new
    channel and its snapshot lands in the report's channel-state JSON.</li>
-<li><strong>Write a serialiser test</strong> mirroring the
+<li><strong>Write a serialiser test</strong> in
+   <code>shakenfist-spice-renderer/tests/snapshots.rs</code>, next to the type
+   added in step 3 and mirroring the
    <code>test_display_snapshot_serialises</code> pattern: construct a snapshot
    with all fields populated, serialise to JSON, and assert that each
    field is present with the expected value. This catches serde

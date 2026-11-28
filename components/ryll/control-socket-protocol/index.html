@@ -13338,6 +13338,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-untrusted-value-sweep/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Untrusted value and text sweep
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-crate-boundaries/" class="md-nav__link">
         
   
@@ -16056,8 +16084,11 @@ implementing a verb.</p>
   <code>stats</code> result, counting frames a server sent with a dest rect that
   encloses no pixels, which used to be counted as painted.  Added the
   <code>paste_not_enabled</code> error code, returned by <code>paste</code> in a session
-  started without <code>--enable-paste-as-keystrokes</code>.  The field and the
-  code are additive; the <code>paste</code> answer is a deliberate behaviour
+  started without <code>--enable-paste-as-keystrokes</code>.  Added
+  <code>starts_refused</code> to the <code>playback</code> object, counting <code>PLAYBACK_START</code>
+  messages refused for a channel count or sample rate no output could
+  serve; <code>starts</code> now counts only the STARTs acted on.  The fields and
+  the code are additive; the <code>paste</code> answer is a deliberate behaviour
   change: in such a session v1.6 answered <code>ok</code> and then typed nothing
   and sent no event, so a client that took that <code>ok</code> as success was
   already wrong, and now hears so.</li>
@@ -17224,7 +17255,12 @@ linking and survive <code>STOP</code> and the next <code>START</code>. It holds:
 <tr>
 <td><code>starts</code></td>
 <td>u64</td>
-<td><code>PLAYBACK_START</code> messages received.</td>
+<td><code>PLAYBACK_START</code> messages acted on. A refused one is in <code>starts_refused</code> instead, so <code>starts</code> can trail <code>stops</code>.</td>
+</tr>
+<tr>
+<td><code>starts_refused</code></td>
+<td>u64</td>
+<td>From v1.7. <code>PLAYBACK_START</code> messages refused because the channel count or sample rate was outside what any output could serve (1 to 8 channels, 4 kHz to 384 kHz). Non-zero means the server is malformed or adversarial.</td>
 </tr>
 <tr>
 <td><code>stops</code></td>
@@ -17281,7 +17317,7 @@ counters move on a test host with no sound hardware too.</p>
 </code></pre></div>
 <p>The same poll from a ryll with the <code>audio</code> feature, while Opus audio
 plays, also carries:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>"playback": {"starts": 1, "stops": 0, "packets_received": 3120, "packets_decoded": 3120, "decode_failures": 0, "bytes_received": 411840, "codec": "opus", "sample_rate": 48000, "channels": 2}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>"playback": {"starts": 1, "starts_refused": 0, "stops": 0, "packets_received": 3120, "packets_decoded": 3120, "decode_failures": 0, "bytes_received": 411840, "codec": "opus", "sample_rate": 48000, "channels": 2}
 </code></pre></div>
 <hr />
 <h3 id="subscribe"><code>subscribe</code><a class="headerlink" href="#subscribe" title="Permanent link">&para;</a></h3>

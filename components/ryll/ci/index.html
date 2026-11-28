@@ -13084,6 +13084,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-untrusted-value-sweep/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Untrusted value and text sweep
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-crate-boundaries/" class="md-nav__link">
         
   
@@ -15539,7 +15567,7 @@ enqueue</code> status check:</p>
 <tr>
 <td><code>Build (Linux x86_64)</code></td>
 <td>self-hosted <code>l</code></td>
-<td><code>make release</code>, both <code>--web</code> smoke tests, <code>make test</code>, <code>.deb</code> and <code>.rpm</code></td>
+<td><code>make release</code>, both <code>--web</code> smoke tests, <code>make test</code>, <code>make test-crates</code> (each published crate's tests in its own cargo resolution), <code>.deb</code> and <code>.rpm</code></td>
 </tr>
 <tr>
 <td><code>cargo audit</code></td>
@@ -16442,9 +16470,10 @@ Makefile, so the local commands are the ones CI runs:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>make<span class="w"> </span>lint<span class="w">            </span><span class="c1"># rustfmt + clippy, as the Lint job</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>make<span class="w"> </span>check-windows<span class="w">   </span><span class="c1"># the Windows cross-check</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>make<span class="w"> </span><span class="nb">test</span><span class="w">            </span><span class="c1"># the unit test suite</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>make<span class="w"> </span>web-smoke<span class="w">       </span><span class="c1"># --web startup and shutdown</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>make<span class="w"> </span>web-smoke-tls<span class="w">   </span><span class="c1"># the same, with TLS</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>make<span class="w"> </span>rdp-smoke<span class="w">       </span><span class="c1"># the RDP smoke lane (rdp-smoke.yml)</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>make<span class="w"> </span>test-crates<span class="w">     </span><span class="c1"># each published crate in its own resolution (slower: rebuilds)</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>make<span class="w"> </span>web-smoke<span class="w">       </span><span class="c1"># --web startup and shutdown</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>make<span class="w"> </span>web-smoke-tls<span class="w">   </span><span class="c1"># the same, with TLS</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>make<span class="w"> </span>rdp-smoke<span class="w">       </span><span class="c1"># the RDP smoke lane (rdp-smoke.yml)</span>
 </code></pre></div>
 <p>The merge tier cannot be reproduced locally — we own no macOS,
 Windows, or aarch64 Linux hardware, which is also why those jobs

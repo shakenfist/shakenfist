@@ -13523,6 +13523,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-untrusted-value-sweep/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Untrusted value and text sweep
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-crate-boundaries/" class="md-nav__link">
         
   
@@ -17035,7 +17063,10 @@ not help here. Use the snapshot to answer "where did the audio go?"</p>
 <li>
 <p><strong><code>data_packets_decoded</code> (roughly equal to <code>data_packets_received</code>)</strong>:
   Audio decoder is keeping up. If decoded is significantly less than
-  received, the decoder is failing or too slow; check <code>data_packets_decode_failed</code>.</p>
+  received, the decoder is failing or too slow; check <code>data_packets_decode_failed</code>.
+  An Opus session with more than 2 <code>channels</code> fails every packet by
+  construction (an Opus decoder takes 1 or 2), so look at <code>channels</code> in
+  <code>current_session</code> first.</p>
 </li>
 <li>
 <p><strong><code>device_callbacks_total</code> increasing</strong>: CoreAudio (macOS), WASAPI
@@ -17065,6 +17096,18 @@ not help here. Use the snapshot to answer "where did the audio go?"</p>
 <p><strong><code>data_packets_unsupported_codec</code> &gt; 0</strong>: The server negotiated a codec
   ryll cannot play, so every DATA packet is being dropped. ryll also raises
   a notification the first time this happens.</p>
+</li>
+<li>
+<p><strong><code>starts_refused</code> &gt; 0</strong>: A <code>PLAYBACK_START</code> declared a channel count or
+  sample rate outside the range any output could serve, so the stream it
+  described was dropped whole rather than set up. The accepted ranges are
+  1 to 8 channels and 4 kHz to 384 kHz; a real server sends 2 channels at
+  48 kHz. A non-zero count means something upstream is malformed or
+  hostile, not misconfigured. The log carries the values of the first
+  refusal only (it is a once-per-session warning, so a server cannot
+  flood it); the counter carries the rest. A refusal leaves any running
+  stream alone, so with a live <code>current_session</code> its codec, rate and
+  channels may describe a stream the server has since replaced.</p>
 </li>
 <li>
 <p><strong><code>output</code></strong>: The device the sound is going to. If it is not the device

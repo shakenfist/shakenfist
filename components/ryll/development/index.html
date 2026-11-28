@@ -13101,6 +13101,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-untrusted-value-sweep/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Untrusted value and text sweep
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-crate-boundaries/" class="md-nav__link">
         
   
@@ -15543,20 +15571,28 @@ coding assistant conventions see
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># Run tests</span>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>make<span class="w"> </span><span class="nb">test</span>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># Run linting (rustfmt + clippy)</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>make<span class="w"> </span>lint
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="c1"># Run linting with auto-fix</span>
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>make<span class="w"> </span>lint-fix
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="c1"># Start a test QEMU SPICE server (UEFI latency guest, downloads on first run)</span>
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>make<span class="w"> </span>test-qemu
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>
-<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="c1"># Start a full XFCE desktop guest instead (downloads ~770MB on first run)</span>
-<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>make<span class="w"> </span>test-qemu-desktop
-<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>
-<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="c1"># Stop the test QEMU instance</span>
-<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>make<span class="w"> </span>test-qemu-stop
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># Run each published library crate's tests in its own cargo</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="c1"># resolution, as a crates.io consumer builds it. `make test` is one</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="c1"># invocation over the workspace, and cargo unifies features across an</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="c1"># invocation, so this is the only lane that sees a crate with the</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="c1"># features it has by itself. Slower than `make test`, because each</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="c1"># resolution rebuilds the dependencies whose features differ.</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>make<span class="w"> </span>test-crates
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="c1"># Run linting (rustfmt + clippy)</span>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>make<span class="w"> </span>lint
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="c1"># Run linting with auto-fix</span>
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>make<span class="w"> </span>lint-fix
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="c1"># Start a test QEMU SPICE server (UEFI latency guest, downloads on first run)</span>
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>make<span class="w"> </span>test-qemu
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="c1"># Start a full XFCE desktop guest instead (downloads ~770MB on first run)</span>
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>make<span class="w"> </span>test-qemu-desktop
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>
+<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="c1"># Stop the test QEMU instance</span>
+<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>make<span class="w"> </span>test-qemu-stop
 </code></pre></div>
 <p><code>make build</code>, <code>make release</code> and <code>make test</code> first run <code>make fetch</code>
 to populate the cargo cache over the network, then compile inside
@@ -15593,10 +15629,13 @@ openh264 C++ sources, and <code>mozjpeg-sys</code> compiles vendored
 libjpeg-turbo (see
 <a href="/components/ryll/spice-protocol/#image-types-and-compression">spice-protocol.md</a>
 for why that buys a no-runtime-dependency JPEG fallback). Neither
-crate downloads a prebuilt binary, and neither is optional --
-they're unconditional dependencies of <code>shakenfist-spice-compression</code>
-and <code>shakenfist-spice-renderer</code>, so every <code>ryll</code> build compiles them
-regardless of which Cargo features are enabled. A missing compiler
+crate downloads a prebuilt binary. Both sit behind default-on
+features of <code>shakenfist-spice-compression</code> (<code>encode</code> and
+<code>h264-decode</code> for openh264, <code>mozjpeg</code> for mozjpeg-sys), and <code>ryll</code>
+takes the renderer's default features, so every <code>ryll</code> build
+compiles them and a C/C++ compiler is a build prerequisite. A
+library consumer that leaves those features off does not build
+them. A missing compiler
 fails the build during their <code>cc</code>-crate compile step, not at link
 time, so the error surfaces early with a clear "no C compiler
 found"-style message. NASM (<code>nasm</code>) is not required for either
