@@ -458,11 +458,27 @@ elif ! sudo grep -q "\"iptables\"[[:space:]]*:[[:space:]]*false" \
     echo "  networking, start here."
 fi
 
+# Each package named explicitly. Debian split the client out of
+# docker.io at 26.1.4 -- docker-cli Replaces docker.io (<< 26.1.4) --
+# and docker.io only Recommends it, so with --no-install-recommends the
+# daemon installs and the docker command does not exist. The first run
+# of this script on a cluster node died at the version check below with
+# "sudo: docker: command not found"; a development host already has a
+# client, so it never reaches this branch and the gap did not show
+# until CI ran it. ca-certificates is on the same Recommends list and
+# the pull below needs it to verify the registry over TLS, so it is
+# named here rather than relied upon. The flag stays, because the rest
+# of that Recommends list is needrestart, criu, git, apparmor and more,
+# and none of it belongs on a CI node about to be destroyed.
+#
+# No apostrophes in this comment. The whole block is one single-quoted
+# string sent over ssh, so a prose apostrophe ends the string and runs
+# everything after it on the runner instead of the node.
 if ! command -v docker > /dev/null 2>&1; then
-    echo "  installing docker.io"
+    echo "  installing docker.io, docker-cli and ca-certificates"
     sudo apt-get update -q
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q \
-        --no-install-recommends docker.io
+        --no-install-recommends docker.io docker-cli ca-certificates
 fi
 sudo systemctl is-active --quiet docker || sudo systemctl start docker
 sudo docker version --format "  docker {{.Server.Version}}"'
