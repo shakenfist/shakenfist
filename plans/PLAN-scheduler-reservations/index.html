@@ -15003,144 +15003,11 @@
   
 </li>
         
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#dependencies-on-other-plans" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Dependencies on other plans
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#agent-guidance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Agent guidance
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Agent guidance">
-      <ul class="md-nav__list">
-        
           <li class="md-nav__item">
-  <a href="#execution-model" class="md-nav__link">
+  <a href="#audit-of-phases-00a-to-8" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Execution model
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#planning-effort" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Planning effort
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-level-guidance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step-level guidance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#management-session-review-checklist" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Management session review checklist
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#administration-and-logistics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Administration and logistics
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Administration and logistics">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#success-criteria" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Success criteria
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#future-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Future work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bugs fixed during this work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#documentation-index-maintenance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation index maintenance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Back brief
+        Audit of phases 00a to 8
       
     </span>
   </a>
@@ -15556,7 +15423,7 @@ table entirely (decision D8).</p>
 <td>4b. Client support for claims</td>
 <td><a href="../PLAN-scheduler-reservations-phase-04b-client/">PLAN-scheduler-reservations-phase-04b-client.md</a></td>
 <td>Complete</td>
-<td><code>c27ad9bf2</code> (#3930), <code>a5014b6ba</code> (#3949)</td>
+<td><code>c27ad9bf2</code> (#3930), <code>a5014b6ba</code> (#3949), client-python <code>135ab53042</code> (#375)</td>
 </tr>
 <tr>
 <td>4c. Conductor claim integration</td>
@@ -15580,7 +15447,7 @@ table entirely (decision D8).</p>
 <td>5b. The hard ceiling</td>
 <td><a href="../PLAN-scheduler-reservations-phase-05b-hard-ceiling/">PLAN-scheduler-reservations-phase-05b-hard-ceiling.md</a></td>
 <td>Complete</td>
-<td>—</td>
+<td><code>31f3350c1c</code> (#5087)</td>
 </tr>
 <tr>
 <td>6. Affinity model rework</td>
@@ -15614,8 +15481,8 @@ table entirely (decision D8).</p>
 </tr>
 <tr>
 <td>9. Push audit</td>
-<td>PLAN-scheduler-reservations-phase-09-push-audit.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-scheduler-reservations-phase-09-push-audit/">PLAN-scheduler-reservations-phase-09-push-audit.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 </tbody>
@@ -16577,13 +16444,25 @@ a passing question at close-out, not by any phase's own
 review, and nothing in a per-phase audit would have caught
 it. That defect is the reason this phase exists.</p>
 <p>So the diff under audit is the plan's cumulative diff, not
-<code>develop...HEAD</code>. Every wave-1 and wave-2 command in
-<code>PUSH-AUDIT.md</code> that names <code>develop...HEAD</code> is rewritten to
-<code>ea3c9bf63..develop</code> -- the commit immediately before phase
-0 merged (<code>87a58a81e^1</code>, 2026-07-30) -- restricted to the
-paths this plan touches, so the range does not drag in
-unrelated work merged over the same months. The phase plan
-pins the path list. The audit also re-checks every code identifier
+<code>develop...HEAD</code>.</p>
+<p><em>Corrected 2026-11-28 by the phase 9 survey (F1).</em> This
+section used to say that every wave-1 and wave-2 command in
+<code>PUSH-AUDIT.md</code> naming <code>develop...HEAD</code> is rewritten to
+<code>ea3c9bf63..develop</code> -- the commit immediately before phase 0
+merged (<code>87a58a81e^1</code>, 2026-07-30) -- restricted to a path
+list the phase plan pins. That instruction was written on
+2026-08-25 and is superseded. On 2026-09-13 <code>PUSH-AUDIT.md</code>
+gained a <em>What <code>$RANGE</code> means</em> section (<code>f445a9d31e</code>) which
+rules the union out in terms: the range comes from the
+<code>Merged</code> column, and "a plan with four merges gets four
+passes, not one pass over a union that git cannot express".
+The <code>plan-push-audit-phase</code> shared block agrees, and the
+path list goes with it -- every range is a pull request from
+this plan's own branches, so there is no unrelated work in
+one to filter out. The audit therefore runs once per range
+and pools the findings; phase 9's D1 is the range set, which
+is thirty-one merge commits here plus two in <code>client-python</code>.
+The audit also re-checks every code identifier
 the developer guide's guarded-counter pattern section cites
 (<code>docs/developer_guide/database_internals.md</code>, <em>Guarded counters for
 finite resources</em>) against <code>shakenfist/mariadb.py</code>, because phase 5
@@ -16613,6 +16492,72 @@ If the audit finds nothing, that is recorded in one sentence.</p>
 <p>Run this last, after every other phase, so the documentation
 the audit checks is the documentation the plan intended to ship
 and the client surface it reviews is the final one.</p>
+<h3 id="audit-of-phases-00a-to-8">Audit of phases 00a to 8<a class="headerlink" href="#audit-of-phases-00a-to-8" title="Permanent link">&para;</a></h3>
+<p>Run 2026-11-28 over thirty-one in-repository merge ranges and one
+in <code>client-python</code>, one pass per range and pooled. Twenty-one
+ranges carry code, about 35,000 non-plan insertions; ten contain
+nothing but plan files, because phase 0 was a decisions document
+and phase 4c's code lives in <code>shakenfist/private-ci</code>. The record,
+the per-lens reports and the disposition are in
+<a href="../PLAN-scheduler-reservations-phase-09-push-audit/">the phase plan</a>.</p>
+<p><strong>No blocking defect in production code.</strong> The admission
+transaction, its release mirror, the reconciler and the three claim
+CRUD transactions are correct on every question put to them; the
+guarded-<code>UPDATE</code>-first invariant holds on every path; the
+authorisation is correct, including against a body-override attack
+closed in three independent places; and all nineteen claims in the
+developer guide's guarded-counter section are still true. The three
+orphan defect fixes which belong to no phase row, and which no
+phase review ever covered, are all still in place.</p>
+<p><strong>Three places where one phase falsified another.</strong> All three are
+phase 5b's hard-ceiling flip, which was landed with a sweep for the
+word "advisory". The sweep was thorough in
+<code>tools/ci_headroom_report.py</code>, where it corrected six separate
+sites. It could not see two paraphrases of the same fact that do
+not contain the word: <code>docs/operator_guide/scheduler.md:1087</code> still
+says a claim exceedance is "a warning, not a refusal", four hundred
+lines from its own heading "The ceiling is enforced", and
+<code>docs/developer_guide/subsystem_internals.md:12</code> still says hard
+claim ceilings are "still to come", three hundred lines from "Claim
+ceilings are enforced". Each page was correct when its own phase
+edited it, so no per-phase review could have caught either. Graded
+blocking and fixed in a follow-up pull request.</p>
+<p><strong>The defect this phase was created by is fixed; its mirror image
+is not.</strong> Phase 4 shipped the claims API without advertising
+<code>auth: namespace-claims</code>. That string is now advertised and pinned
+by a test — but nothing <em>reads</em> it: <code>client-python</code>'s five base
+claim verbs gate on no capability, while two later claim methods in
+the same file gate on their own tokens. The plan learned to publish
+its contracts and not to consume them. Filed as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/464" title="GitHub Issue: shakenfist/client-python #464">client-python#464</a>.</p>
+<p><strong>Eight issues carry the advisory findings</strong> — <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/5110" title="GitHub Issue: shakenfist/shakenfist #5110">shakenfist#5110</a> to</p>
+<h1 id="5116-and-client-python464-covering-unobserved-cluster-ci-skips">5116 and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/464" title="GitHub Issue: shakenfist/client-python #464">client-python#464</a> — covering unobserved cluster-CI skips,<a class="headerlink" href="#5116-and-client-python464-covering-unobserved-cluster-ci-skips" title="Permanent link">&para;</a></h1>
+<p>a tenant disclosure asymmetry the plan's own later work draws the
+opposite line on, <code>mariadb.py</code>'s size (this plan added 4,326 of its
+34,127 lines, and the seam is self-labelled), published contracts
+kept correct only by hand, the reconcile pass's missing retry,
+duplicated helpers, and the ranking's missing held-room term.</p>
+<p><strong>Two findings dissolved under a sweep</strong>, which is the discipline
+working rather than a null result: the triple-single-quote
+convention was already broken eighteen times in the same file
+before phase 0 merged, and the plan-citation-in-code backlog is 370
+instances repository-wide across at least five plans, already
+tracked by <code>tools/check-plan-phase-references.py</code> with a stated
+remedy. Neither is this plan's defect.</p>
+<p><strong>One lens contradicted another.</strong> A reschedule publishing a claim
+refusal as transient was reported blocking and withdrawn: a move
+skips the claim guard entirely (<code>shakenfist/mariadb.py:30643</code>), so
+no claim-stage denial can arise on that path, which two tests pin.
+The site still reads as a defect, so the audit records why it is
+not and adds a comment saying so.</p>
+<p><strong>Five corrections were made at their source</strong>, the largest being
+that this section's own range instruction had been superseded by
+<code>PUSH-AUDIT.md</code>'s range rule a month after it was written. Also:
+the guarded-counter re-check this section asked for was unnecessary
+for the reason it gave, because that section documents the
+primitive rather than the enforcement policy the flip changed; and
+the ER_CHECKREAD invariant is not invisible to CI, being asserted
+directly on mocks and exercised against a MariaDB 11.8 runner whose
+script refuses to run without snapshot isolation on.</p>
 <h2 id="dependencies-on-other-plans">Dependencies on other plans<a class="headerlink" href="#dependencies-on-other-plans" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong><a href="https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-sql-pushdown-filtering.md"><code>PLAN-sql-pushdown-filtering</code></a> (retired) is the

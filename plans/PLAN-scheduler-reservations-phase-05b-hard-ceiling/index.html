@@ -15994,6 +15994,14 @@ with a warning. The canary for that is
 known.</strong> No CI has run on this branch. Item 17 below is outstanding
 for the same reason, and the brief's question is recorded here as
 open rather than guessed at.</p>
+<p><em>Closed out 2026-11-28 by phase 9.</em> The merge-queue run for #5087
+answers both. The inverted cluster CI test passed -- item 17's row has
+the run, the job and the timing -- and the flip cost that run nothing
+visible: the lane logged no <code>FAILED</code> test and no mention of
+<code>capacity_claim</code> or a claim 403 anywhere, so no create in it was
+refused at the claim stage. That is read off the lane's log rather
+than off a counter, so it is evidence of absence in the log and not a
+measurement.</p>
 <p>Future work:</p>
 <ul>
 <li>The forward-looking pool report still flags three residue pools as
@@ -16104,8 +16112,8 @@ recorded here as it reported them. Item 17 is reported as not run.</p>
 </tr>
 <tr>
 <td>17</td>
-<td><strong>not run</strong></td>
-<td>Satisfiable only in the merge queue. <code>functional_lanes</code> in <code>.github/workflows/functional-tests.yml</code> runs only on <code>merge_group</code> or <code>workflow_dispatch</code> and is explicitly excluded on <code>pull_request</code>, so the cluster CI test cannot be exercised by opening the pull request. It stays outstanding, and a <code>workflow_dispatch</code> run is the way to get it before merge</td>
+<td><strong>pass</strong>, after the fact</td>
+<td>Not run when this table was written: satisfiable only in the merge queue, because <code>functional_lanes</code> in <code>.github/workflows/functional-tests.yml</code> runs only on <code>merge_group</code> or <code>workflow_dispatch</code> and is explicitly excluded on <code>pull_request</code>. The merge queue has since run it. Recorded by phase 9's close-out on 2026-11-28: run <code>45877310889</code>, job <code>140107936676</code>, lane <code>Functional lanes / Debian 13 cluster (collection)</code>, at 2026-11-26 19:16:33 UTC -- <code>test_namespace_claims.TestNamespaceClaimAccounting.test_placements_draw_down_the_claim_and_the_ceiling_refuses [21.093576s] ... ok</code>. The merge queue selected only that cluster lane; <code>Ubuntu 24.04 cluster</code> was skipped, so "on every platform" is answered for the one cluster platform that ran and not for both</td>
 </tr>
 <tr>
 <td>18</td>
