@@ -209,9 +209,9 @@ refused at the claim stage. That is all of them or none, because the claim's
 limits are namespace-denominated and do not depend on which node is asked. Any
 other mixture of refusing stages keeps its `507`. As with the `507`, read
 `transient` rather than the status code: `capacity_refusal_is_transient()`
-(`shakenfist/external_api/base.py`) answers `false` for `capacity_claim`, and
-the stage is in neither `TRANSIENT_CAPACITY_STAGES` nor the permanent set in
-`shakenfist/constants.py`.
+(`shakenfist/constants.py`) answers `false` for `capacity_claim`, and the
+stage is in neither `TRANSIENT_CAPACITY_STAGES` nor the permanent set beside
+it.
 
 Only an admission which counts against the claim can be refused this way. A
 placement recorded for an instance which is already running on a node is not
