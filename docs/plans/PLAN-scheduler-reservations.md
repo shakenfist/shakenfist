@@ -356,17 +356,17 @@ table entirely (decision D8).
 | 3. Claim primitive and placement integration | [PLAN-scheduler-reservations-phase-03-primitive.md](PLAN-scheduler-reservations-phase-03-primitive.md) | Complete | `0144e36ed` (#3754), `921573c47` (#3888) |
 | 4. Namespace claims object and API | [PLAN-scheduler-reservations-phase-04-claims-api.md](PLAN-scheduler-reservations-phase-04-claims-api.md) | Complete | `7bd7bbd03` (#3790), `921573c47` (#3888) |
 | 4a. A satisfiable demand guard, and the phase 3/4 soaks | [PLAN-scheduler-reservations-phase-04a-demand-guard.md](PLAN-scheduler-reservations-phase-04a-demand-guard.md) | Complete | `b02ec6e5e` (#3843), `921573c47` (#3888) |
-| 4b. Client support for claims | [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md) | Complete | `c27ad9bf2` (#3930), `a5014b6ba` (#3949) |
+| 4b. Client support for claims | [PLAN-scheduler-reservations-phase-04b-client.md](PLAN-scheduler-reservations-phase-04b-client.md) | Complete | `c27ad9bf2` (#3930), `a5014b6ba` (#3949), client-python `135ab53042` (#375) |
 | 4c. Conductor claim integration | [PLAN-scheduler-reservations-phase-04c-conductor-claims.md](PLAN-scheduler-reservations-phase-04c-conductor-claims.md) | Complete | `c273627a2` (#3952), `948055063` (#4008), `8fc8ba961` (#4139), `2b767a9b1` (#4154) |
 | 5. Caller migration and hard ceiling | [PLAN-scheduler-reservations-phase-05-callers.md](PLAN-scheduler-reservations-phase-05-callers.md) | Complete | `660d4f65e7` (#4800) |
 | 5a. The calibration re-run | [PLAN-scheduler-reservations-phase-05a-hard-ceiling.md](PLAN-scheduler-reservations-phase-05a-hard-ceiling.md) | Complete | `3797716023` (#4917) |
-| 5b. The hard ceiling | [PLAN-scheduler-reservations-phase-05b-hard-ceiling.md](PLAN-scheduler-reservations-phase-05b-hard-ceiling.md) | Complete | — |
+| 5b. The hard ceiling | [PLAN-scheduler-reservations-phase-05b-hard-ceiling.md](PLAN-scheduler-reservations-phase-05b-hard-ceiling.md) | Complete | `31f3350c1c` (#5087) |
 | 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete | `597312d2a` (#3957), `b54f126e5` (#3971), `c37012c89` (#3972), `96c78fd63` (#4006) |
 | 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete | `30a02a918` (#4052) |
 | 7a. An operator-readable capacity surface | [PLAN-scheduler-reservations-phase-07a-capacity-surface.md](PLAN-scheduler-reservations-phase-07a-capacity-surface.md) | Complete | `e8585a874` (#4654), `3695f168a` (#4687) |
 | 7b. Capacity and claim views in sf-client | [PLAN-scheduler-reservations-phase-07b-client-views.md](https://github.com/shakenfist/client-python/blob/develop/docs/plans/PLAN-scheduler-reservations-phase-07b-client-views.md) (in shakenfist/client-python, on its `develop`) | Complete | client-python `d484fdc` (#442) |
 | 8. Documentation and operator guide, and the client release | [PLAN-scheduler-reservations-phase-08-docs.md](PLAN-scheduler-reservations-phase-08-docs.md) | Complete | `a005fba498` (#4737) |
-| 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started | — |
+| 9. Push audit | [PLAN-scheduler-reservations-phase-09-push-audit.md](PLAN-scheduler-reservations-phase-09-push-audit.md) | In progress | — |
 
 The `Merged` column records what put each phase on `develop`.
 These entries were reconstructed after the fact, because the
@@ -1351,13 +1351,26 @@ review, and nothing in a per-phase audit would have caught
 it. That defect is the reason this phase exists.
 
 So the diff under audit is the plan's cumulative diff, not
-`develop...HEAD`. Every wave-1 and wave-2 command in
-`PUSH-AUDIT.md` that names `develop...HEAD` is rewritten to
-`ea3c9bf63..develop` -- the commit immediately before phase
-0 merged (`87a58a81e^1`, 2026-07-30) -- restricted to the
-paths this plan touches, so the range does not drag in
-unrelated work merged over the same months. The phase plan
-pins the path list. The audit also re-checks every code identifier
+`develop...HEAD`.
+
+*Corrected 2026-11-28 by the phase 9 survey (F1).* This
+section used to say that every wave-1 and wave-2 command in
+`PUSH-AUDIT.md` naming `develop...HEAD` is rewritten to
+`ea3c9bf63..develop` -- the commit immediately before phase 0
+merged (`87a58a81e^1`, 2026-07-30) -- restricted to a path
+list the phase plan pins. That instruction was written on
+2026-08-25 and is superseded. On 2026-09-13 `PUSH-AUDIT.md`
+gained a *What `$RANGE` means* section (`f445a9d31e`) which
+rules the union out in terms: the range comes from the
+`Merged` column, and "a plan with four merges gets four
+passes, not one pass over a union that git cannot express".
+The `plan-push-audit-phase` shared block agrees, and the
+path list goes with it -- every range is a pull request from
+this plan's own branches, so there is no unrelated work in
+one to filter out. The audit therefore runs once per range
+and pools the findings; phase 9's D1 is the range set, which
+is thirty-one merge commits here plus two in `client-python`.
+The audit also re-checks every code identifier
 the developer guide's guarded-counter pattern section cites
 (`docs/developer_guide/database_internals.md`, *Guarded counters for
 finite resources*) against `shakenfist/mariadb.py`, because phase 5
@@ -1389,6 +1402,81 @@ If the audit finds nothing, that is recorded in one sentence.
 Run this last, after every other phase, so the documentation
 the audit checks is the documentation the plan intended to ship
 and the client surface it reviews is the final one.
+
+### Audit of phases 00a to 8
+
+Run 2026-11-28 over thirty-one in-repository merge ranges and one
+in `client-python`, one pass per range and pooled. Twenty-one
+ranges carry code, about 35,000 non-plan insertions; ten contain
+nothing but plan files, because phase 0 was a decisions document
+and phase 4c's code lives in `shakenfist/private-ci`. The record,
+the per-lens reports and the disposition are in
+[the phase plan](PLAN-scheduler-reservations-phase-09-push-audit.md).
+
+**No blocking defect in production code.** The admission
+transaction, its release mirror, the reconciler and the three claim
+CRUD transactions are correct on every question put to them; the
+guarded-`UPDATE`-first invariant holds on every path; the
+authorisation is correct, including against a body-override attack
+closed in three independent places; and all nineteen claims in the
+developer guide's guarded-counter section are still true. The three
+orphan defect fixes which belong to no phase row, and which no
+phase review ever covered, are all still in place.
+
+**Three places where one phase falsified another.** All three are
+phase 5b's hard-ceiling flip, which was landed with a sweep for the
+word "advisory". The sweep was thorough in
+`tools/ci_headroom_report.py`, where it corrected six separate
+sites. It could not see two paraphrases of the same fact that do
+not contain the word: `docs/operator_guide/scheduler.md:1087` still
+says a claim exceedance is "a warning, not a refusal", four hundred
+lines from its own heading "The ceiling is enforced", and
+`docs/developer_guide/subsystem_internals.md:12` still says hard
+claim ceilings are "still to come", three hundred lines from "Claim
+ceilings are enforced". Each page was correct when its own phase
+edited it, so no per-phase review could have caught either. Graded
+blocking and fixed in a follow-up pull request.
+
+**The defect this phase was created by is fixed; its mirror image
+is not.** Phase 4 shipped the claims API without advertising
+`auth: namespace-claims`. That string is now advertised and pinned
+by a test — but nothing *reads* it: `client-python`'s five base
+claim verbs gate on no capability, while two later claim methods in
+the same file gate on their own tokens. The plan learned to publish
+its contracts and not to consume them. Filed as client-python#464.
+
+**Eight issues carry the advisory findings** — shakenfist#5110 to
+#5116 and client-python#464 — covering unobserved cluster-CI skips,
+a tenant disclosure asymmetry the plan's own later work draws the
+opposite line on, `mariadb.py`'s size (this plan added 4,326 of its
+34,127 lines, and the seam is self-labelled), published contracts
+kept correct only by hand, the reconcile pass's missing retry,
+duplicated helpers, and the ranking's missing held-room term.
+
+**Two findings dissolved under a sweep**, which is the discipline
+working rather than a null result: the triple-single-quote
+convention was already broken eighteen times in the same file
+before phase 0 merged, and the plan-citation-in-code backlog is 370
+instances repository-wide across at least five plans, already
+tracked by `tools/check-plan-phase-references.py` with a stated
+remedy. Neither is this plan's defect.
+
+**One lens contradicted another.** A reschedule publishing a claim
+refusal as transient was reported blocking and withdrawn: a move
+skips the claim guard entirely (`shakenfist/mariadb.py:30643`), so
+no claim-stage denial can arise on that path, which two tests pin.
+The site still reads as a defect, so the audit records why it is
+not and adds a comment saying so.
+
+**Five corrections were made at their source**, the largest being
+that this section's own range instruction had been superseded by
+`PUSH-AUDIT.md`'s range rule a month after it was written. Also:
+the guarded-counter re-check this section asked for was unnecessary
+for the reason it gave, because that section documents the
+primitive rather than the enforcement policy the flip changed; and
+the ER_CHECKREAD invariant is not invisible to CI, being asserted
+directly on mocks and exercised against a MariaDB 11.8 runner whose
+script refuses to run without snapshot isolation on.
 
 ## Dependencies on other plans
 

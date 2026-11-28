@@ -674,6 +674,15 @@ known.** No CI has run on this branch. Item 17 below is outstanding
 for the same reason, and the brief's question is recorded here as
 open rather than guessed at.
 
+*Closed out 2026-11-28 by phase 9.* The merge-queue run for #5087
+answers both. The inverted cluster CI test passed -- item 17's row has
+the run, the job and the timing -- and the flip cost that run nothing
+visible: the lane logged no `FAILED` test and no mention of
+`capacity_claim` or a claim 403 anywhere, so no create in it was
+refused at the claim stage. That is read off the lane's log rather
+than off a counter, so it is evidence of absence in the log and not a
+measurement.
+
 Future work:
 
 - The forward-looking pool report still flags three residue pools as
@@ -713,7 +722,7 @@ recorded here as it reported them. Item 17 is reported as not run.
 | 14 | **pass** | `grep -i advisory docs/release_notes/v07-v08.md` finds nothing about claim ceilings, and the claim-creation status-code list below it is unchanged |
 | 15 | **pass** | The named selection ran 539 tests with 0 failures on the branch rebased onto `develop` at `e95538e30e` |
 | 16 | **pass** | `pre-commit run --all-files` passed all 16 hooks on the rebased branch, with the full unit suite among them; no hook was retried and no flake was accepted |
-| 17 | **not run** | Satisfiable only in the merge queue. `functional_lanes` in `.github/workflows/functional-tests.yml` runs only on `merge_group` or `workflow_dispatch` and is explicitly excluded on `pull_request`, so the cluster CI test cannot be exercised by opening the pull request. It stays outstanding, and a `workflow_dispatch` run is the way to get it before merge |
+| 17 | **pass**, after the fact | Not run when this table was written: satisfiable only in the merge queue, because `functional_lanes` in `.github/workflows/functional-tests.yml` runs only on `merge_group` or `workflow_dispatch` and is explicitly excluded on `pull_request`. The merge queue has since run it. Recorded by phase 9's close-out on 2026-11-28: run `45877310889`, job `140107936676`, lane `Functional lanes / Debian 13 cluster (collection)`, at 2026-11-26 19:16:33 UTC -- `test_namespace_claims.TestNamespaceClaimAccounting.test_placements_draw_down_the_claim_and_the_ceiling_refuses [21.093576s] ... ok`. The merge queue selected only that cluster lane; `Ubuntu 24.04 cluster` was skipped, so "on every platform" is answered for the one cluster platform that ran and not for both |
 | 18 | **pass** | Recorded below: the Execution row reads Complete, `index.md`'s count is 17 of 18 and agrees with the table; plan-blocker b21 is cleared by the management session, not by this step |
 
 ## Back brief
