@@ -55,8 +55,9 @@ volume, 14.8 GB in a week.
 A syslog handler cannot be redirected the way a console one is -- it owns
 a socket, not a stream, and has no ``setStream()`` -- so it is lifted off
 its logger for the duration of the test and a ``StreamHandler`` on the
-capture buffer is put in its place, carrying the original's formatter and
-level so what a failing test reports is what it would have logged.
+capture buffer is put in its place, carrying the original's formatter,
+level and filters so what a failing test reports is what it would have
+logged.
 
 The boundary, measured rather than reasoned about. Running
 ``shakenfist.tests.test_daemon_{cleaner,loglevel}`` (101 tests) straight
@@ -201,7 +202,11 @@ def forget_logger(name):
 
 
 class LogCapture:
-    """Redirect the console log handlers into memory for one test."""
+    """Contain the log handlers which write outside the test, for one test.
+
+    Console handlers are pointed at an in-memory buffer; host-syslog
+    handlers are lifted off their loggers and a buffer handler stands in.
+    """
 
     def __init__(self):
         self.buffer = io.StringIO()
@@ -222,11 +227,13 @@ class LogCapture:
         for logger, handler in syslog_handlers():
             self._redirected.add(id(logger))
             stand_in = logging.StreamHandler(self.buffer)
-            # Carry the formatter and level across: what a failing test
-            # reports should be what it would have written to syslog, and a
-            # handler-level filter is part of that.
+            # Carry the formatter, level and filters across: what a failing
+            # test reports should be what it would have written to syslog,
+            # and what the handler would have dropped is part of that.
             stand_in.setFormatter(handler.formatter)
             stand_in.setLevel(handler.level)
+            for record_filter in handler.filters:
+                stand_in.addFilter(record_filter)
             logger.removeHandler(handler)
             logger.addHandler(stand_in)
             self._substituted.append((logger, handler, stand_in))
@@ -270,12 +277,22 @@ class LogCapture:
             handler.setStream(stream)
 
         # Undone in reverse, and the stand-in is removed before the real
-        # handler goes back, so a logger never briefly carries both.
+        # handler goes back, so a logger never briefly carries both. The
+        # real handler returns at the end of the logger's handler list
+        # rather than at its old position; order only sequences emits.
         while self._substituted:
             logger, handler, stand_in = self._substituted.pop()
-            logger.removeHandler(stand_in)
+            # Only if the stand-in is still there. Something took it off
+            # during the test otherwise -- forget_logger() in a cleanup,
+            # which runs before this, or code under test clearing the
+            # logger -- and putting the real handler back would undo that,
+            # leaving a live syslog handler on a logger the test cleared.
+            # Same effect as setStream() on a detached console handler,
+            # which is inert.
+            if stand_in in logger.handlers:
+                logger.removeHandler(stand_in)
+                logger.addHandler(handler)
             stand_in.close()
-            logger.addHandler(handler)
 
         captured = self.buffer.getvalue() if keep else None
         self.buffer.close()

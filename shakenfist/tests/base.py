@@ -138,18 +138,21 @@ class ShakenFistTestCase(testtools.TestCase):
             self.addDetailUniqueName('log', content.text_content(captured))
 
         # This test gave a logger which was already handled a second
-        # handler on the real stdout or stderr. Its records go into the
-        # worker's output whatever this capture does, and one added in a
-        # setUp() without a matching cleanup is inherited by every test
-        # the worker runs next, each of which adds another. Attach a
-        # cleanup which removes it (self.preserve_log_handlers(), or
+        # handler writing outside the test: to the real stdout or
+        # stderr, or to the host's syslog socket. Its records go to that
+        # sink -- the worker's result stream, or the host's journal --
+        # whatever this capture does, and one added in a setUp() without
+        # a matching cleanup is inherited by every test the worker runs
+        # next, each of which adds another. Attach a cleanup which
+        # removes it (self.preserve_log_handlers(), or
         # logcapture.forget_logger() for a logger something else
         # configured), or capture with a handler of your own -- see
         # shakenfist/tests/external_api/test_request_logging.py.
         self.assertEqual(
             [], duplicates,
-            'This test added a second log handler writing to the process\'s '
-            'real stdout or stderr: %s. See '
+            'This test added a second log handler writing outside the '
+            'test (the process\'s real stdout or stderr, or the host\'s '
+            'syslog socket): %s. See '
             'ShakenFistTestCase._finish_log_capture() and '
             'shakenfist/tests/logcapture.py.' % ', '.join(duplicates))
 

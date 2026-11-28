@@ -9,7 +9,7 @@ result stream, so every record went to the console and a test which
 logged heavily ran at whatever speed that console could be drained
 (issue #4991). These tests pin the capture, the restore, the "only on
 failure" condition, and the guard against a test leaving a handler
-behind which writes to the real stdout again.
+behind which writes outside the test again.
 
 ``SyslogCaptureTestCase`` covers the other half of the same problem
 (issue #5106): a run which does not inherit ``tox.ini``'s setenv gets a
@@ -67,6 +67,10 @@ class _Recorded(testtools.TestResult):
 class _ProbeMixin:
     """A fake stdout, and a logger handled the way logs.setup() does."""
 
+    # Somewhere that is certainly not a live socket, so the probe handler
+    # has a unix address without being able to deliver anything.
+    DEAD_SOCKET = '/nonexistent/shakenfist-test-not-a-socket'
+
     def _fake_stdout(self):
         """Stand in for the process's real stdout.
 
@@ -81,6 +85,17 @@ class _ProbeMixin:
         patcher.start()
         self.addCleanup(patcher.stop)
         return fake
+
+    def _logger_writing_to(self, stream, name='shakenfist.tests.probe'):
+        """A logger handled the way logs.setup() handles one."""
+        logger = logging.getLogger(name)
+        handler = logging.StreamHandler(stream)
+        logger.addHandler(handler)
+        self.addCleanup(logger.removeHandler, handler)
+        original_level = logger.level
+        logger.setLevel(logging.INFO)
+        self.addCleanup(logger.setLevel, original_level)
+        return logger, handler
 
     def _logger_writing_to_syslog(self, address,
                                   name='shakenfist.tests.syslogprobe'):
@@ -98,17 +113,6 @@ class _ProbeMixin:
         logger.addHandler(handler)
         self.addCleanup(logger.removeHandler, handler)
         self.addCleanup(handler.close)
-        original_level = logger.level
-        logger.setLevel(logging.INFO)
-        self.addCleanup(logger.setLevel, original_level)
-        return logger, handler
-
-    def _logger_writing_to(self, stream, name='shakenfist.tests.probe'):
-        """A logger handled the way logs.setup() handles one."""
-        logger = logging.getLogger(name)
-        handler = logging.StreamHandler(stream)
-        logger.addHandler(handler)
-        self.addCleanup(logger.removeHandler, handler)
         original_level = logger.level
         logger.setLevel(logging.INFO)
         self.addCleanup(logger.setLevel, original_level)
@@ -300,6 +304,30 @@ class CapturedLogReportingTestCase(_ProbeMixin, base.ShakenFistTestCase):
         self.assertIn('added a second log handler',
                       recorded.details['traceback'].as_text())
 
+    def test_duplicating_a_syslog_handler_names_the_syslog_sink(self):
+        # The message is what a test author off tox reads when they trip
+        # the guard, so it has to point at syslog, not only at stdout.
+        logger, _handler = self._logger_writing_to_syslog(
+            self.DEAD_SOCKET,
+            name='shakenfist.tests.syslogprobe_duplicate')
+        added = []
+
+        def body(inner):
+            handler = logging_handlers.SysLogHandler(
+                address=self.DEAD_SOCKET)
+            logger.addHandler(handler)
+            added.append(handler)
+
+        recorded = self._run_case(body)
+        for handler in added:
+            logger.removeHandler(handler)
+            handler.close()
+
+        self.assertEqual('failure', recorded.outcome)
+        traceback = recorded.details['traceback'].as_text()
+        self.assertIn("the host's syslog socket", traceback)
+        self.assertIn('syslogprobe_duplicate (SysLogHandler)', traceback)
+
 
 class SyslogCaptureTestCase(_ProbeMixin, base.ShakenFistTestCase):
     """The host's syslog socket is redirected on the same terms as stdout.
@@ -308,10 +336,6 @@ class SyslogCaptureTestCase(_ProbeMixin, base.ShakenFistTestCase):
     host's, a network address is a test's own), the substitution, the
     restore, and that a handler installed mid-test is still reported.
     """
-
-    # Somewhere that is certainly not a live socket, so the probe handler
-    # has a unix address without being able to deliver anything.
-    DEAD_SOCKET = '/nonexistent/shakenfist-test-not-a-socket'
 
     def test_a_unix_syslog_handler_is_found(self):
         logger, handler = self._logger_writing_to_syslog(self.DEAD_SOCKET)
@@ -340,31 +364,34 @@ class SyslogCaptureTestCase(_ProbeMixin, base.ShakenFistTestCase):
         # nothing it emits can reach the socket: there is no "wrote to
         # syslog" to assert the absence of, which is the point.
         self.assertNotIn(handler, logger.handlers)
+        # And the stand-in is not itself an escape, or every test which
+        # had a substitution would fail its own base-class check.
+        self.assertEqual([], capture.duplicate_handlers())
         logger.info('while captured')
 
         captured = capture.stop(keep=True)
         self.assertIn('while captured', captured)
 
         # Restored, and the stand-in is gone rather than left beside it.
-        self.assertIn(handler, logger.handlers)
-        self.assertEqual([handler], [h for h in logger.handlers
-                                     if isinstance(h, (logging_handlers.SysLogHandler,
-                                                       logging.StreamHandler))])
+        self.assertEqual([handler], logger.handlers)
 
     def test_the_substitute_carries_the_formatter_and_level(self):
         logger, handler = self._logger_writing_to_syslog(self.DEAD_SOCKET)
         handler.setFormatter(logging.Formatter('prefixed: %(message)s'))
         handler.setLevel(logging.WARNING)
+        handler.addFilter(lambda record: 'dropped' not in record.getMessage())
 
         capture = logcapture.LogCapture().start()
         logger.info('below the handler level')
         logger.warning('at the handler level')
+        logger.warning('dropped by the handler filter')
         captured = capture.stop(keep=True)
 
         # What a failing test reports should be what the handler would
-        # have written, so a handler-level filter has to come across too.
+        # have written, so its level and filters have to come across too.
         self.assertIn('prefixed: at the handler level', captured)
         self.assertNotIn('below the handler level', captured)
+        self.assertNotIn('dropped by the handler filter', captured)
 
     def test_a_syslog_handler_added_during_a_test_is_a_duplicate(self):
         logger, _handler = self._logger_writing_to_syslog(self.DEAD_SOCKET)
@@ -378,6 +405,38 @@ class SyslogCaptureTestCase(_ProbeMixin, base.ShakenFistTestCase):
 
         self.assertIn('%s (SysLogHandler)' % logger.name,
                       capture.duplicate_handlers())
+
+    def test_console_and_syslog_on_one_logger_are_both_contained(self):
+        fake = self._fake_stdout()
+        name = 'shakenfist.tests.bothprobe'
+        logger, console = self._logger_writing_to(fake, name=name)
+        _logger, syslog = self._logger_writing_to_syslog(self.DEAD_SOCKET,
+                                                         name=name)
+
+        capture = logcapture.LogCapture().start()
+        self.assertEqual([], capture.duplicate_handlers())
+        self.assertNotIn(syslog, logger.handlers)
+        logger.info('to both sinks')
+        captured = capture.stop(keep=True)
+
+        # Once through each handler, both into the buffer, none out.
+        self.assertEqual(2, captured.count('to both sinks'))
+        self.assertEqual('', fake.getvalue())
+        self.assertIs(fake, console.stream)
+        self.assertEqual([console, syslog], logger.handlers)
+
+    def test_a_stand_in_removed_during_the_test_is_not_undone(self):
+        # forget_logger() in a cleanup runs before the base class stops
+        # the capture, so it drops the stand-in rather than the real
+        # handler. Putting the real one back afterwards would leave a
+        # live syslog handler on a logger the test asked to be cleared.
+        logger, handler = self._logger_writing_to_syslog(self.DEAD_SOCKET)
+
+        capture = logcapture.LogCapture().start()
+        logcapture.forget_logger(logger.name)
+        capture.stop()
+
+        self.assertEqual([], logger.handlers)
 
 
 class LogToStdoutDefaultTestCase(base.ShakenFistTestCase):

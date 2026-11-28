@@ -469,10 +469,23 @@ success as well, so attaching it unconditionally would send the same
 volume back the other way. `shakenfist/tests/logcapture.py` owns the
 mechanism.
 
+The host's syslog is contained on the same terms (issue #5106). When
+`SHAKENFIST_LOG_TO_STDOUT` is not `'1'` -- any run that does not
+inherit `tox.ini`'s setenv, such as an IDE test explorer or a hand-typed
+`stestr run` -- `logs.setup()` installs a `SysLogHandler('/dev/log')`
+instead, and one such run wrote 14.8 GB to a workstation's journal in a
+week. Two things now prevent that: importing `shakenfist.tests` defaults
+the variable to `'1'`, and for a syslog handler installed anyway the
+capture lifts it off its logger for the test and stands a buffer handler
+in its place, carrying its formatter, level and filters. Why the
+decision moved out of `tox.ini` is in
+[An environment variable is not a test fixture](coding_rules.md#an-environment-variable-is-not-a-test-fixture).
+
 Three things follow for a test author:
 
-- **A test must not give an already-handled logger a second console
-  handler.** The capture redirects the handlers which existed when the
+- **A test must not give an already-handled logger a second handler
+  writing outside the test** -- to the real stdout or stderr, or to the
+  host's syslog. The capture redirects the handlers which existed when the
   test started, so one added during it bypasses the capture, and one
   added in a `setUp()` without a matching cleanup is inherited by every
   test the worker runs after it -- each of which adds another. 45 lines
