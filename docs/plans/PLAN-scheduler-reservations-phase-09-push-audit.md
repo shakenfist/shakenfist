@@ -565,3 +565,1031 @@ D1, D2, D3 and D6 need no gate: they follow `PUSH-AUDIT.md`'s own range
 rule and the shared block, and F1 and F3 are the evidence. D9 needs
 none either -- it is the `plan-phase-landing` block's standing
 exception for a push-audit phase.
+
+## Findings
+
+### Wave 1
+
+#### Tree-level checks at the tip
+
+Run once, at the tip, in this worktree. No merge commit was checked
+out.
+
+`timeout 2400 pre-commit run --all-files`
+Passed (exit 0); every hook passed.
+
+`timeout 2400 tox`
+Passed (exit 0): py3 OK, flake8 OK, cover OK, 70% total coverage.
+
+`timeout 600 tools/mermaid-lint.sh`
+Passed (exit status read directly, 0); every diagram rendered ok.
+
+`timeout 1200 tox -e genprotos`
+Passed (exit 0).
+
+`git diff --exit-code shakenfist/protos`
+Clean (exit 0): the generated stubs are up to date, so no restore
+was needed.
+
+Note on the sweep output below: the over-120-character and print()
+greps hit generated protobuf descriptors, two operator scripts
+whose output is print(), and one historical comment mentioning
+etcd. None is a defect in itself, and the management session
+confirmed each class by file rather than by inference. Every
+over-120 line is a `DESCRIPTOR` line in a generated
+`shakenfist/protos/*_pb2.py`. Every added `print(` is in
+`tools/exercise-namespace-claims.py` (33 in `921573c475`) or
+`tools/ci_headroom_report.py` (84 in `30a02a918a`, 9 in
+`31f3350c1c`), both of which are operator-run report scripts for
+which stdout is the interface. The `etcd` hit is
+`# v1: schema creation. v2: etcd data-import marker (historical).`
+
+#### 113e4efb57
+
+`git diff 113e4efb57^1 113e4efb57 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+no output
+
+`git diff 113e4efb57^1 113e4efb57 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff 113e4efb57^1 113e4efb57 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff 113e4efb57^1 113e4efb57 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff 113e4efb57^1 113e4efb57 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff 113e4efb57^1 113e4efb57 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff 113e4efb57^1 113e4efb57 --stat | tail -1`
+```
+ 15 files changed, 1434 insertions(+), 25 deletions(-)
+```
+
+`git diff 113e4efb57^1 113e4efb57 -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+28
+```
+
+`git diff 113e4efb57^1 113e4efb57 --name-only -- 'docs/*' '*.md'`
+```
+AGENTS.md
+ARCHITECTURE.md
+docs/operator_guide/scheduler.md
+docs/plans/PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md
+docs/plans/PLAN-scheduler-reservations.md
+docs/plans/index.md
+docs/release_notes/v07-v08.md
+```
+
+`git diff 113e4efb57^1 113e4efb57 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### c27ad9bf27
+
+`git diff c27ad9bf27^1 c27ad9bf27 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+no output
+
+`git diff c27ad9bf27^1 c27ad9bf27 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff c27ad9bf27^1 c27ad9bf27 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff c27ad9bf27^1 c27ad9bf27 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff c27ad9bf27^1 c27ad9bf27 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff c27ad9bf27^1 c27ad9bf27 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff c27ad9bf27^1 c27ad9bf27 --stat | tail -1`
+```
+ 9 files changed, 1576 insertions(+), 133 deletions(-)
+```
+
+`git diff c27ad9bf27^1 c27ad9bf27 -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+2
+```
+
+`git diff c27ad9bf27^1 c27ad9bf27 --name-only -- 'docs/*' '*.md'`
+```
+docs/developer_guide/ci.md
+docs/plans/PLAN-scheduler-reservations-phase-00-decisions.md
+docs/plans/PLAN-scheduler-reservations-phase-00a-load-aware-ordering.md
+docs/plans/PLAN-scheduler-reservations-phase-04b-client.md
+docs/plans/PLAN-scheduler-reservations-phase-04c-conductor-claims.md
+docs/plans/PLAN-scheduler-reservations.md
+docs/plans/index.md
+```
+
+`git diff c27ad9bf27^1 c27ad9bf27 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### 80bffad56e
+
+`git diff 80bffad56e^1 80bffad56e -- '*.py' | grep -nE '^\+[^+].{120,}'`
+no output
+
+`git diff 80bffad56e^1 80bffad56e -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff 80bffad56e^1 80bffad56e -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+```
+18:+# v1: schema creation. v2: etcd data-import marker (historical).
+```
+
+`git diff 80bffad56e^1 80bffad56e -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff 80bffad56e^1 80bffad56e -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff 80bffad56e^1 80bffad56e -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff 80bffad56e^1 80bffad56e --stat | tail -1`
+```
+ 6 files changed, 709 insertions(+), 9 deletions(-)
+```
+
+`git diff 80bffad56e^1 80bffad56e -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+14
+```
+
+`git diff 80bffad56e^1 80bffad56e --name-only -- 'docs/*' '*.md'`
+```
+CLAUDE.md
+docs/operator_guide/database.md
+docs/plans/PLAN-scheduler-reservations-phase-01-node-metrics-columns.md
+docs/plans/PLAN-scheduler-reservations.md
+```
+
+`git diff 80bffad56e^1 80bffad56e -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### d3a91cdef5
+
+`git diff d3a91cdef5^1 d3a91cdef5 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+```
+1886:+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0e\x64\x61tabase.proto\x12\x11shakenfist.protos\x1a\x16shakenfist_enums.proto\"-\n\x0bStatusReply\x12\x0f\n\x07success\x18\x01 \x0
+```
+
+`git diff d3a91cdef5^1 d3a91cdef5 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff d3a91cdef5^1 d3a91cdef5 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff d3a91cdef5^1 d3a91cdef5 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff d3a91cdef5^1 d3a91cdef5 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff d3a91cdef5^1 d3a91cdef5 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff d3a91cdef5^1 d3a91cdef5 --stat | tail -1`
+```
+ 35 files changed, 5577 insertions(+), 96 deletions(-)
+```
+
+`git diff d3a91cdef5^1 d3a91cdef5 -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+102
+```
+
+`git diff d3a91cdef5^1 d3a91cdef5 --name-only -- 'docs/*' '*.md'`
+```
+AGENTS.md
+ARCHITECTURE.md
+CLAUDE.md
+README.md
+docs/operator_guide/database.md
+docs/operator_guide/installation.md
+docs/operator_guide/scheduler.md
+docs/operator_guide/upgrades.md
+docs/plans/PLAN-byo-mariadb-phase-01-statelessness.md
+docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md
+docs/plans/PLAN-scheduler-reservations.md
+docs/release_notes/v07-v08.md
+```
+
+`git diff d3a91cdef5^1 d3a91cdef5 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### 0144e36ede
+
+`git diff 0144e36ede^1 0144e36ede -- '*.py' | grep -nE '^\+[^+].{120,}'`
+```
+2733:+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0e\x64\x61tabase.proto\x12\x11shakenfist.protos\x1a\x16shakenfist_enums.proto\"-\n\x0bStatusReply\x12\x0f\n\x07success\x18\x01 \x0
+```
+
+`git diff 0144e36ede^1 0144e36ede -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff 0144e36ede^1 0144e36ede -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff 0144e36ede^1 0144e36ede -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff 0144e36ede^1 0144e36ede -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff 0144e36ede^1 0144e36ede -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff 0144e36ede^1 0144e36ede --stat | tail -1`
+```
+ 47 files changed, 9755 insertions(+), 1160 deletions(-)
+```
+
+`git diff 0144e36ede^1 0144e36ede -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+186
+```
+
+`git diff 0144e36ede^1 0144e36ede --name-only -- 'docs/*' '*.md'`
+```
+AGENTS.md
+ARCHITECTURE.md
+CLAUDE.md
+docs/developer_guide/database_internals.md
+docs/developer_guide/standards.md
+docs/developer_guide/subsystem_internals.md
+docs/operator_guide/database.md
+docs/operator_guide/scheduler.md
+docs/plans/PLAN-scheduler-reservations-phase-00-decisions.md
+docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md
+docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md
+docs/plans/PLAN-scheduler-reservations.md
+docs/plans/index.md
+```
+
+`git diff 0144e36ede^1 0144e36ede -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### 921573c475
+
+`git diff 921573c475^1 921573c475 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+no output
+
+`git diff 921573c475^1 921573c475 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+```
+504:+        print('\n=== %s ===' % title)
+511:+            print('  FAIL  %s\n          %s' % (description, e))
+516:+            print('  ERROR %s\n          %s' % (description, trace))
+519:+        print('  ok    %s%s' % (
+530:+        print('  skip  %s  (%s)' % (description, why))
+```
+33 lines; truncated to the first 5.
+
+`git diff 921573c475^1 921573c475 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff 921573c475^1 921573c475 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff 921573c475^1 921573c475 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff 921573c475^1 921573c475 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff 921573c475^1 921573c475 --stat | tail -1`
+```
+ 10 files changed, 1420 insertions(+), 60 deletions(-)
+```
+
+`git diff 921573c475^1 921573c475 -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+6
+```
+
+`git diff 921573c475^1 921573c475 --name-only -- 'docs/*' '*.md'`
+```
+docs/operator_guide/scheduler.md
+docs/plans/PLAN-scheduler-reservations-phase-04-claims-api.md
+docs/plans/PLAN-scheduler-reservations-phase-04a-demand-guard.md
+docs/plans/PLAN-scheduler-reservations.md
+docs/plans/index.md
+```
+
+`git diff 921573c475^1 921573c475 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### 7bd7bbd03c
+
+`git diff 7bd7bbd03c^1 7bd7bbd03c -- '*.py' | grep -nE '^\+[^+].{120,}'`
+```
+3889:+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0e\x64\x61tabase.proto\x12\x11shakenfist.protos\x1a\x16shakenfist_enums.proto\"-\n\x0bStatusReply\x12\x0f\n\x07success\x18\x01 \x0
+4208:+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16shakenfist_enums.proto\x12\x11shakenfist.protos*\xd9\x07\n\nObjectType\x12\x1b\n\x17OBJECT_TYPE_UNSPECIFIED\x10\x00\x12\x1e\n\x1
+```
+
+`git diff 7bd7bbd03c^1 7bd7bbd03c -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff 7bd7bbd03c^1 7bd7bbd03c -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff 7bd7bbd03c^1 7bd7bbd03c -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff 7bd7bbd03c^1 7bd7bbd03c -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff 7bd7bbd03c^1 7bd7bbd03c -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff 7bd7bbd03c^1 7bd7bbd03c --stat | tail -1`
+```
+ 43 files changed, 9958 insertions(+), 158 deletions(-)
+```
+
+`git diff 7bd7bbd03c^1 7bd7bbd03c -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+217
+```
+
+`git diff 7bd7bbd03c^1 7bd7bbd03c --name-only -- 'docs/*' '*.md'`
+```
+ARCHITECTURE.md
+CLAUDE.md
+docs/developer_guide/authentication.md
+docs/developer_guide/database_internals.md
+docs/developer_guide/state_machine.md
+docs/developer_guide/subsystem_internals.md
+docs/operator_guide/database.md
+docs/operator_guide/scheduler.md
+docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md
+docs/plans/PLAN-scheduler-reservations-phase-04-claims-api.md
+docs/plans/PLAN-scheduler-reservations.md
+docs/plans/index.md
+```
+
+`git diff 7bd7bbd03c^1 7bd7bbd03c -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### b02ec6e5e5
+
+`git diff b02ec6e5e5^1 b02ec6e5e5 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+no output
+
+`git diff b02ec6e5e5^1 b02ec6e5e5 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff b02ec6e5e5^1 b02ec6e5e5 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff b02ec6e5e5^1 b02ec6e5e5 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff b02ec6e5e5^1 b02ec6e5e5 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff b02ec6e5e5^1 b02ec6e5e5 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff b02ec6e5e5^1 b02ec6e5e5 --stat | tail -1`
+```
+ 13 files changed, 1208 insertions(+), 125 deletions(-)
+```
+
+`git diff b02ec6e5e5^1 b02ec6e5e5 -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+8
+```
+
+`git diff b02ec6e5e5^1 b02ec6e5e5 --name-only -- 'docs/*' '*.md'`
+```
+docs/developer_guide/subsystem_internals.md
+docs/operator_guide/scheduler.md
+docs/plans/PLAN-scheduler-reservations-phase-00-decisions.md
+docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md
+docs/plans/PLAN-scheduler-reservations-phase-04a-demand-guard.md
+docs/plans/PLAN-scheduler-reservations.md
+docs/plans/index.md
+```
+
+`git diff b02ec6e5e5^1 b02ec6e5e5 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### a5014b6ba8
+
+`git diff a5014b6ba8^1 a5014b6ba8 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+no output
+
+`git diff a5014b6ba8^1 a5014b6ba8 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff a5014b6ba8^1 a5014b6ba8 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff a5014b6ba8^1 a5014b6ba8 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff a5014b6ba8^1 a5014b6ba8 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff a5014b6ba8^1 a5014b6ba8 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff a5014b6ba8^1 a5014b6ba8 --stat | tail -1`
+```
+ 5 files changed, 366 insertions(+), 74 deletions(-)
+```
+
+`git diff a5014b6ba8^1 a5014b6ba8 -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+0
+```
+
+`git diff a5014b6ba8^1 a5014b6ba8 --name-only -- 'docs/*' '*.md'`
+```
+docs/developer_guide/ci.md
+docs/plans/PLAN-scheduler-reservations-phase-04b-client.md
+docs/plans/PLAN-scheduler-reservations-phase-04c-conductor-claims.md
+docs/plans/PLAN-scheduler-reservations.md
+docs/plans/index.md
+```
+
+`git diff a5014b6ba8^1 a5014b6ba8 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### 660d4f65e7
+
+`git diff 660d4f65e7^1 660d4f65e7 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+no output
+
+`git diff 660d4f65e7^1 660d4f65e7 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff 660d4f65e7^1 660d4f65e7 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff 660d4f65e7^1 660d4f65e7 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff 660d4f65e7^1 660d4f65e7 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff 660d4f65e7^1 660d4f65e7 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff 660d4f65e7^1 660d4f65e7 --stat | tail -1`
+```
+ 15 files changed, 1016 insertions(+), 460 deletions(-)
+```
+
+`git diff 660d4f65e7^1 660d4f65e7 -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+5
+```
+
+`git diff 660d4f65e7^1 660d4f65e7 --name-only -- 'docs/*' '*.md'`
+```
+AGENTS.md
+ARCHITECTURE.md
+docs/developer_guide/subsystem_internals.md
+docs/operator_guide/scheduler.md
+docs/plans/PLAN-scheduler-reservations-phase-05-callers.md
+docs/plans/PLAN-scheduler-reservations.md
+```
+
+`git diff 660d4f65e7^1 660d4f65e7 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### 3797716023
+
+`git diff 3797716023^1 3797716023 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+no output
+
+`git diff 3797716023^1 3797716023 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff 3797716023^1 3797716023 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff 3797716023^1 3797716023 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff 3797716023^1 3797716023 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff 3797716023^1 3797716023 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff 3797716023^1 3797716023 --stat | tail -1`
+```
+ 9 files changed, 1472 insertions(+), 36 deletions(-)
+```
+
+`git diff 3797716023^1 3797716023 -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+8
+```
+
+`git diff 3797716023^1 3797716023 --name-only -- 'docs/*' '*.md'`
+```
+docs/plans/PLAN-scheduler-reservations-phase-05-callers.md
+docs/plans/PLAN-scheduler-reservations-phase-05a-hard-ceiling.md
+docs/plans/PLAN-scheduler-reservations.md
+docs/plans/index.md
+```
+
+`git diff 3797716023^1 3797716023 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### 31f3350c1c
+
+`git diff 31f3350c1c^1 31f3350c1c -- '*.py' | grep -nE '^\+[^+].{120,}'`
+no output
+
+`git diff 31f3350c1c^1 31f3350c1c -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+```
+2025:+    print('    These placements SUCCEEDED. A claim ceiling refuses a')
+2026:+    print('    scheduled create, so what landed here is an unguarded')
+2027:+    print('    ground-truth write -- a guard cannot refuse a domain which')
+2028:+    print('    already exists. It is the signal a declared footprint needs')
+2029:+    print('    revising, and it is never added to the refusal count above.')
+2038:+        print('  %d %s admitted OVER a namespace capacity claim, which only'
+2043:+        print('  an unguarded ground-truth write can now be; this is data')
+2044:+        print('  about the claim\'s size, not a failure, and it is no part')
+2045:+        print('  of the refusal counts above.')
+```
+
+`git diff 31f3350c1c^1 31f3350c1c -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff 31f3350c1c^1 31f3350c1c -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff 31f3350c1c^1 31f3350c1c -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff 31f3350c1c^1 31f3350c1c -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff 31f3350c1c^1 31f3350c1c --stat | tail -1`
+```
+ 30 files changed, 2275 insertions(+), 393 deletions(-)
+```
+
+`git diff 31f3350c1c^1 31f3350c1c -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+19
+```
+
+`git diff 31f3350c1c^1 31f3350c1c --name-only -- 'docs/*' '*.md'`
+```
+ARCHITECTURE.md
+docs/developer_guide/api_reference/instances.md
+docs/developer_guide/subsystem_internals.md
+docs/glossary.md
+docs/operator_guide/capacity_refusals.md
+docs/operator_guide/database.md
+docs/operator_guide/scheduler.md
+docs/plans/PLAN-scheduler-reservations-phase-05b-hard-ceiling.md
+docs/plans/PLAN-scheduler-reservations.md
+docs/plans/index.md
+docs/release_notes/v07-v08.md
+```
+
+`git diff 31f3350c1c^1 31f3350c1c -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### b54f126e53
+
+`git diff b54f126e53^1 b54f126e53 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+no output
+
+`git diff b54f126e53^1 b54f126e53 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff b54f126e53^1 b54f126e53 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff b54f126e53^1 b54f126e53 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff b54f126e53^1 b54f126e53 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff b54f126e53^1 b54f126e53 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff b54f126e53^1 b54f126e53 --stat | tail -1`
+```
+ 14 files changed, 1749 insertions(+), 73 deletions(-)
+```
+
+`git diff b54f126e53^1 b54f126e53 -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+50
+```
+
+`git diff b54f126e53^1 b54f126e53 --name-only -- 'docs/*' '*.md'`
+```
+ARCHITECTURE.md
+docs/developer_guide/ci.md
+docs/operator_guide/scheduler.md
+docs/user_guide/affinity.md
+```
+
+`git diff b54f126e53^1 b54f126e53 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### c37012c891
+
+`git diff c37012c891^1 c37012c891 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+no output
+
+`git diff c37012c891^1 c37012c891 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff c37012c891^1 c37012c891 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff c37012c891^1 c37012c891 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff c37012c891^1 c37012c891 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff c37012c891^1 c37012c891 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff c37012c891^1 c37012c891 --stat | tail -1`
+```
+ 3 files changed, 134 insertions(+), 1 deletion(-)
+```
+
+`git diff c37012c891^1 c37012c891 -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+12
+```
+
+`git diff c37012c891^1 c37012c891 --name-only -- 'docs/*' '*.md'`
+```
+docs/release_notes/v07-v08.md
+```
+
+`git diff c37012c891^1 c37012c891 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### 96c78fd63b
+
+`git diff 96c78fd63b^1 96c78fd63b -- '*.py' | grep -nE '^\+[^+].{120,}'`
+no output
+
+`git diff 96c78fd63b^1 96c78fd63b -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff 96c78fd63b^1 96c78fd63b -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff 96c78fd63b^1 96c78fd63b -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff 96c78fd63b^1 96c78fd63b -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff 96c78fd63b^1 96c78fd63b -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff 96c78fd63b^1 96c78fd63b --stat | tail -1`
+```
+ 6 files changed, 245 insertions(+), 56 deletions(-)
+```
+
+`git diff 96c78fd63b^1 96c78fd63b -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+0
+```
+
+`git diff 96c78fd63b^1 96c78fd63b --name-only -- 'docs/*' '*.md'`
+```
+GOALS.md
+docs/plans/PLAN-ci-cloud-sizing-phase-00-decisions.md
+docs/plans/PLAN-ci-cloud-sizing.md
+docs/plans/PLAN-scheduler-reservations-phase-06-affinity.md
+docs/plans/PLAN-scheduler-reservations.md
+docs/plans/index.md
+```
+
+`git diff 96c78fd63b^1 96c78fd63b -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### 30a02a918a
+
+`git diff 30a02a918a^1 30a02a918a -- '*.py' | grep -nE '^\+[^+].{120,}'`
+```
+844:+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0e\x64\x61tabase.proto\x12\x11shakenfist.protos\x1a\x16shakenfist_enums.proto\"-\n\x0bStatusReply\x12\x0f\n\x07success\x18\x01 \x01
+```
+
+`git diff 30a02a918a^1 30a02a918a -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+```
+2844:+        print('  NO CENSUS WAS SUPPLIED (--census was not given), so nothing is')
+2845:+        print('  known about what the capacity guard did. Not zero refusals.')
+2848:+        print('  NO CENSUS IS AVAILABLE: %s (%s)' % (census.status, census.detail))
+2849:+        print('  Read as "unknown", never as zero guard refusals.')
+2853:+        print('  NO CAPACITY GUARD EVENTS IN THIS CENSUS.')
+```
+84 lines; truncated to the first 5.
+
+`git diff 30a02a918a^1 30a02a918a -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff 30a02a918a^1 30a02a918a -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff 30a02a918a^1 30a02a918a -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff 30a02a918a^1 30a02a918a -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff 30a02a918a^1 30a02a918a --stat | tail -1`
+```
+ 27 files changed, 3391 insertions(+), 189 deletions(-)
+```
+
+`git diff 30a02a918a^1 30a02a918a -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+37
+```
+
+`git diff 30a02a918a^1 30a02a918a --name-only -- 'docs/*' '*.md'`
+```
+docs/developer_guide/subsystem_internals.md
+docs/operator_guide/events.md
+docs/operator_guide/scheduler.md
+docs/plans/PLAN-scheduler-reservations-phase-07-diagnostics.md
+docs/plans/PLAN-scheduler-reservations.md
+docs/plans/index.md
+```
+
+`git diff 30a02a918a^1 30a02a918a -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### e8585a8745
+
+`git diff e8585a8745^1 e8585a8745 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+```
+983:+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0e\x64\x61tabase.proto\x12\x11shakenfist.protos\x1a\x16shakenfist_enums.proto\"-\n\x0bStatusReply\x12\x0f\n\x07success\x18\x01 \x01
+```
+
+`git diff e8585a8745^1 e8585a8745 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff e8585a8745^1 e8585a8745 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff e8585a8745^1 e8585a8745 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff e8585a8745^1 e8585a8745 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff e8585a8745^1 e8585a8745 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff e8585a8745^1 e8585a8745 --stat | tail -1`
+```
+ 31 files changed, 2766 insertions(+), 88 deletions(-)
+```
+
+`git diff e8585a8745^1 e8585a8745 -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+55
+```
+
+`git diff e8585a8745^1 e8585a8745 --name-only -- 'docs/*' '*.md'`
+```
+docs/developer_guide/api_reference/admin.md
+docs/operator_guide/scheduler.md
+docs/plans/PLAN-scheduler-reservations-phase-07-diagnostics.md
+docs/plans/PLAN-scheduler-reservations-phase-07a-capacity-surface.md
+docs/plans/PLAN-scheduler-reservations.md
+```
+
+`git diff e8585a8745^1 e8585a8745 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### a005fba498
+
+`git diff a005fba498^1 a005fba498 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+no output
+
+`git diff a005fba498^1 a005fba498 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff a005fba498^1 a005fba498 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff a005fba498^1 a005fba498 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff a005fba498^1 a005fba498 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff a005fba498^1 a005fba498 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff a005fba498^1 a005fba498 --stat | tail -1`
+```
+ 9 files changed, 1167 insertions(+), 44 deletions(-)
+```
+
+`git diff a005fba498^1 a005fba498 -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+0
+```
+
+`git diff a005fba498^1 a005fba498 --name-only -- 'docs/*' '*.md'`
+```
+ARCHITECTURE.md
+docs/developer_guide/database_internals.md
+docs/developer_guide/subsystem_internals.md
+docs/glossary.md
+docs/operator_guide/scheduler.md
+docs/plans/PLAN-scheduler-reservations-phase-08-docs.md
+docs/plans/PLAN-scheduler-reservations.md
+docs/plans/index.md
+docs/release_notes/v07-v08.md
+```
+
+`git diff a005fba498^1 a005fba498 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### 49e98a67c8
+
+`git diff 49e98a67c8^1 49e98a67c8 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+no output
+
+`git diff 49e98a67c8^1 49e98a67c8 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff 49e98a67c8^1 49e98a67c8 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff 49e98a67c8^1 49e98a67c8 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff 49e98a67c8^1 49e98a67c8 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff 49e98a67c8^1 49e98a67c8 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff 49e98a67c8^1 49e98a67c8 --stat | tail -1`
+```
+ 4 files changed, 232 insertions(+), 36 deletions(-)
+```
+
+`git diff 49e98a67c8^1 49e98a67c8 -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+7
+```
+
+`git diff 49e98a67c8^1 49e98a67c8 --name-only -- 'docs/*' '*.md'`
+```
+docs/operator_guide/scheduler.md
+```
+
+`git diff 49e98a67c8^1 49e98a67c8 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### 45332ff810
+
+`git diff 45332ff810^1 45332ff810 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+no output
+
+`git diff 45332ff810^1 45332ff810 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff 45332ff810^1 45332ff810 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff 45332ff810^1 45332ff810 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff 45332ff810^1 45332ff810 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff 45332ff810^1 45332ff810 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff 45332ff810^1 45332ff810 --stat | tail -1`
+```
+ 3 files changed, 310 insertions(+), 14 deletions(-)
+```
+
+`git diff 45332ff810^1 45332ff810 -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+5
+```
+
+`git diff 45332ff810^1 45332ff810 --name-only -- 'docs/*' '*.md'`
+no output
+
+`git diff 45332ff810^1 45332ff810 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### a5c6216339
+
+`git diff a5c6216339^1 a5c6216339 -- '*.py' | grep -nE '^\+[^+].{120,}'`
+no output
+
+`git diff a5c6216339^1 a5c6216339 -- '*.py' | grep -nE '^\+[^+].*\bprint\('`
+no output
+
+`git diff a5c6216339^1 a5c6216339 -- '*.py' | grep -nE '^\+[^+].*\betcd\b'`
+no output
+
+`git diff a5c6216339^1 a5c6216339 -- '*.py' | grep -nE '^\+[^+].*\bmariadb\.get_all_[a-z_]+\(' | grep -v '# nopushdown:'`
+no output
+
+`git diff a5c6216339^1 a5c6216339 -- '*.py' | grep -nE '^\+.*\b(TODO|FIXME|HACK|XXX)\b'`
+no output
+
+`git diff a5c6216339^1 a5c6216339 -- '*.py' | grep -nE '^\+.*(# noqa|# type: ignore|pragma: no cover)'`
+no output
+
+`git diff a5c6216339^1 a5c6216339 --stat | tail -1`
+```
+ 4 files changed, 346 insertions(+), 25 deletions(-)
+```
+
+`git diff a5c6216339^1 a5c6216339 -- '*.py' | grep -cE '^\+\s*def test_'`
+```
+7
+```
+
+`git diff a5c6216339^1 a5c6216339 --name-only -- 'docs/*' '*.md'`
+```
+docs/operator_guide/scheduler.md
+```
+
+`git diff a5c6216339^1 a5c6216339 -- '*.py' | grep -nE '^\+.*\b(subprocess\.|os\.system|shell=True)\b'`
+no output
+
+#### 2fcfe8afcb
+
+`git rev-list --parents -n1 2fcfe8afcb`: 3 hashes (merge commit, two parents)
+`git diff --name-only 2fcfe8afcb^1 2fcfe8afcb`: 2 files, all under docs/plans/
+
+#### 87a58a81ef
+
+`git rev-list --parents -n1 87a58a81ef`: 3 hashes (merge commit, two parents)
+`git diff --name-only 87a58a81ef^1 87a58a81ef`: 3 files, all under docs/plans/
+
+#### a16d32aecd
+
+`git rev-list --parents -n1 a16d32aecd`: 3 hashes (merge commit, two parents)
+`git diff --name-only a16d32aecd^1 a16d32aecd`: 2 files, all under docs/plans/
+
+#### b93539322c
+
+`git rev-list --parents -n1 b93539322c`: 3 hashes (merge commit, two parents)
+`git diff --name-only b93539322c^1 b93539322c`: 2 files, all under docs/plans/
+
+#### c273627a28
+
+`git rev-list --parents -n1 c273627a28`: 3 hashes (merge commit, two parents)
+`git diff --name-only c273627a28^1 c273627a28`: 2 files, all under docs/plans/
+
+#### 9480550630
+
+`git rev-list --parents -n1 9480550630`: 3 hashes (merge commit, two parents)
+`git diff --name-only 9480550630^1 9480550630`: 2 files, all under docs/plans/
+
+#### 8fc8ba961a
+
+`git rev-list --parents -n1 8fc8ba961a`: 3 hashes (merge commit, two parents)
+`git diff --name-only 8fc8ba961a^1 8fc8ba961a`: 2 files, all under docs/plans/
+
+#### 2b767a9b1f
+
+`git rev-list --parents -n1 2b767a9b1f`: 3 hashes (merge commit, two parents)
+`git diff --name-only 2b767a9b1f^1 2b767a9b1f`: 3 files, all under docs/plans/
+
+#### 597312d2a7
+
+`git rev-list --parents -n1 597312d2a7`: 3 hashes (merge commit, two parents)
+`git diff --name-only 597312d2a7^1 597312d2a7`: 3 files, all under docs/plans/
+
+#### 3695f168aa
+
+`git rev-list --parents -n1 3695f168aa`: 3 hashes (merge commit, two parents)
+`git diff --name-only 3695f168aa^1 3695f168aa`: 3 files, all under docs/plans/
+
