@@ -711,8 +711,11 @@ well under that. A wedged `dnsmasq`, or a namespace the probe cannot
 reach, costs the full timeout. The probes run one network at a time.
 
 So the pass has two cost regimes, and the difference between them is
-large: a node whose networks are all healthy pays roughly an
-interpreter start each, while a node in the middle of an incident
+large: a node whose networks are all healthy pays tens of milliseconds
+each -- four execs, one of them the probe's interpreter start, plus a
+few database reads, more on a network with many guests because the
+vxlan mesh audit looks up where each of them is -- while a node in the
+middle of an incident
 affecting many `dnsmasq` processes at once pays the timeout for each
 affected network. A few hundred networks in the second state is more
 than the 30 second cadence allows for.
@@ -720,14 +723,27 @@ than the 30 second cadence allows for.
 Every pass which runs therefore logs what it cost:
 
 ```
-Maintenance pass complete; health_check_seconds=1.84; networks=112; networks_deferred=0; pass_seconds=2.31
+Maintenance pass complete; health_check_seconds=5.84; networks=112; networks_deferred=0; networks_with_guests=40; pass_seconds=6.31
 ```
 
 * `networks` is how many networks the pass health checked.
+  `health_check_seconds` divided by it is what one health check costs
+  on this node, which is the figure to size the budget below against.
+  `networks` and `networks_deferred` together cover only the networks
+  the pass reached the health check for: a network in `delete_wait`, or
+  one whose state changed in the last minute, is in neither, so the two
+  can sum to less than the number of networks the node is on.
 * `health_check_seconds` is the wall time inside those checks, summed.
   This is the term which grows with network count.
 * `networks_deferred` is how many networks the pass did not reach
   because it spent its health check budget (see below).
+* `networks_with_guests` is how many networks had an interface attached
+  when the pass started, which is what puts a network first in the
+  health check order. It is read from the database once per pass, and a
+  failed read leaves it at zero: a zero against a node with guests
+  means that pass fell back to longest-waiting order. It is absent when
+  the budget is disabled, because the order then decides nothing and
+  the read is not made.
 * `pass_seconds` is the whole pass, through to the stray vxlan
   handling at its end. The difference between it and
   `health_check_seconds` is the pass's fixed cost, any reconciliations
@@ -763,11 +779,24 @@ of the interval) is how long one pass may spend health checking before
 it defers the rest to a later pass. Setting it to zero disables the
 bound.
 
-Because a healthy network is checked in milliseconds, a well cluster
-never reaches this however many networks it has: the bound costs
-nothing until something is actually wrong. What it stops is the
-degraded case, where enough unreachable `dnsmasq` processes to spend
-2 seconds each would otherwise take the pass past its own cadence.
+At tens of milliseconds per healthy network, the default reaches
+somewhere between one and a few hundred networks per pass, depending
+on the node and on how many guests the networks have. A network node
+on fewer networks than that never reaches the bound while it is well.
+One on more defers some of them every pass even when nothing is wrong,
+and reaches each of them over several passes -- the networks with
+guests on every pass, the empty ones in rotation. That is the bound
+keeping the pass inside its cadence, which is its job; if you would
+rather every network were checked every pass and `pass_seconds` leaves
+the room, raise the budget towards the interval. What the bound is
+chiefly for is the degraded case, where enough unreachable `dnsmasq`
+processes to spend 2 seconds each would otherwise take the pass past
+its own cadence.
+
+The bound covers the health checks and nothing else. A deferred network
+is still loaded from the database each pass, before the pass decides
+to defer it, so that per-network read is part of `pass_seconds` however
+small the budget.
 
 Networks with an interface attached are checked first, then the
 longest-waiting, so within each of those two groups the bound defers
@@ -786,10 +815,10 @@ waits for the pass which reaches it.
 
 Preferring networks which have guests on them is what makes a large
 number of unused networks close to free for the network node. It only
-decides anything when the budget is scarce -- on a well cluster every
-network is checked every pass whatever the count -- and when it is
-scarce, an empty network has nothing which can fail to get a DHCP
-lease, so it is the right thing to go without. Which networks have
+decides anything when the budget is scarce -- on a node the budget
+reaches every network of, every network is checked every pass -- and
+when it is scarce, an empty network has nothing which can fail to get
+a DHCP lease, so it is the right thing to go without. Which networks have
 interfaces is one read of the table per pass, not one per network.
 
 When a pass starts deferring, it says so against the node:
@@ -807,9 +836,10 @@ The passes in between are in the log stream with their
 Unlike the overrun event this is not in itself a fault -- the bound
 working is the pass declining to overrun. It does mean some networks
 went unchecked, so drift on them is repaired a pass or more later than
-it otherwise would be, as described above. Seeing it regularly on a healthy cluster means
-the budget is too small for the network count; seeing it during an
-incident is the bound doing its job.
+it otherwise would be, as described above. Seeing it on a healthy
+cluster means the node is on more networks than the budget reaches,
+which is a choice between rotating through them and raising the budget;
+seeing it during an incident is the bound doing its job.
 
 ## Stray vxlan reaping
 
@@ -948,7 +978,12 @@ is emitted by the enqueuing process, not by the dispatcher:
       `wait_seconds` divides into: `queue_seconds` is time the row
       sat in the database queue unclaimed, and `dispatch_seconds` is
       time this daemon held it after claiming it. They sum to
-      `wait_seconds`.
+      `wait_seconds`. `dispatch_seconds` is read from one node's clock
+      at both ends; `queue_seconds` is measured from the operation's
+      creation time, which may have been taken on another node, so it
+      carries any clock skew between the two. A negative
+      `queue_seconds` is that skew rather than a measurement to act
+      on.
 
       This is the distinction that matters when a wait is long and
       `defer_count` is zero, which is most of them: over nine in ten

@@ -609,6 +609,36 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
             busy_networks=['net-a'])
 
         active['mariadb'].find_network_interfaces.assert_not_called()
+        self.assertNotIn('networks_with_guests', _pass_cost_fields(active))
+
+    def test_the_pass_reports_how_many_of_its_networks_have_guests(self):
+        """The busy read degrades to an empty set on a database error,
+        and with it the order to longest-waiting. The count on the pass
+        cost line is what makes that visible. It counts this node's
+        networks only: an interface on a network the node is not on
+        orders nothing here.
+        """
+        nets = [_build_mock_network(uuid='net-a', vxid=1, is_okay=True),
+                _build_mock_network(uuid='net-b', vxid=2, is_okay=True)]
+        active = self._run_one_iteration(
+            network_node=True, networks=nets,
+            busy_networks=['net-a', 'net-elsewhere'])
+
+        self.assertEqual(
+            1, _pass_cost_fields(active)['networks_with_guests'])
+
+    def test_a_failed_interface_read_reports_no_networks_with_guests(self):
+        """find_network_interfaces() logs and returns nothing on a
+        database error, which is indistinguishable here from a cluster
+        with no guests. The zero is the signal, so it must be reported
+        rather than left out.
+        """
+        nets = [_build_mock_network(uuid='net-a', vxid=1, is_okay=True)]
+        active = self._run_one_iteration(
+            network_node=True, networks=nets, busy_networks=[])
+
+        self.assertEqual(
+            0, _pass_cost_fields(active)['networks_with_guests'])
 
     def test_pass_seconds_includes_the_stray_vxlan_handling(self):
         """``pass_seconds`` is the whole pass, through to the stray vxlan

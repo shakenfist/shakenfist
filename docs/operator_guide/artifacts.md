@@ -182,7 +182,13 @@ carrying:
 * `bytes` -- the size of the blob. It is the same whatever the source,
   so it is traffic only where `source` says something moved: summing it
   over `cluster` gives the bytes replicated inside the cluster, and over
-  `internet` the bytes the cluster pulled from outside.
+  `internet` the bytes the cluster pulled from outside. Both describe
+  the image's own blob only. An image which is a thin snapshot depends
+  on a chain of parent blobs, and those are replicated to the node
+  alongside it -- each marked by a `fetching dependency` status event
+  -- without being counted here, in `bytes` or in `source`. A leaf
+  reported as `node` can still have had a parent replicated for it, so
+  for clusters with thin snapshots these sums are a lower bound.
 * `seconds` -- how long the fetch took.
 * `blob_uuid` -- the blob the fetch produced.
 

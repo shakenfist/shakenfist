@@ -581,7 +581,9 @@ class ImageFetchHelper:
         # already writes a handful of status events per create, so one
         # more is in proportion. ``bytes`` is the blob's size whatever
         # the source; it is traffic only where ``source`` says something
-        # moved.
+        # moved. It is this blob only: a thin snapshot's parent chain is
+        # replicated by ensure_local() and get_image()'s dependency walk
+        # without being counted, so the sums are a lower bound there.
         add_event_multi(
             EVENT_TYPE_USAGE, self.objects, 'image fetch complete',
             extra={

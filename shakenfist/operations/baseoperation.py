@@ -249,7 +249,12 @@ class BaseClusterOperation(BaseOperation):
         operation which never deferred -- about nine in ten of the long
         waits -- had its whole wait as a single bracket with nothing
         inside it, and "nobody asked for this queue" could not be told
-        from "we had it and sat on it" (issue 3974).
+        from "we had it and sat on it" (issue 3974). Both ends of
+        ``dispatch_seconds`` are this node's clock, but ``created_at``
+        may have been taken on another node, so ``queue_seconds``
+        carries any skew between the two and can come out negative.
+        Neither half is clamped, so they still sum to ``wait_seconds``,
+        which has always had the same exposure.
 
         ``deliveries`` is how many times the work item has been handed
         out, this delivery included. ``defer_count`` counts deliberate

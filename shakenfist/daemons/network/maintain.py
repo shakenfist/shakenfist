@@ -130,9 +130,12 @@ def health_check_order(network_uuids, busy_networks=frozenset()):
     dependent on dictionary order.
 
     The order only decides anything when a pass runs out of health
-    check budget, which on a well cluster never happens -- every check
-    costs milliseconds and every network is reached. It matters during
-    degradation, when the budget is scarce, and there the networks with
+    check budget. A healthy check costs tens of milliseconds on the
+    network node, so that happens on a well cluster only once the node
+    is on more networks than the budget reaches -- the low hundreds at
+    the default. It matters most during degradation, when every
+    unreachable dnsmasq spends a full probe timeout, and there the
+    networks with
     guests on them are the ones worth spending it on: an empty network
     has nothing which can fail to get a DHCP lease. That is also what
     makes many unused networks close to free for the network node,
@@ -743,7 +746,8 @@ class Job(util_concurrency.Job):
         return False
 
     def _report_pass_cost(self, pass_started, networks_considered,
-                          health_seconds, networks_deferred):
+                          health_seconds, networks_deferred,
+                          networks_with_guests=None):
         """Report what one maintenance pass cost.
 
         The log line is emitted every pass. It is deliberately the
@@ -769,6 +773,14 @@ class Job(util_concurrency.Job):
         fixed cost of the pass, the reconciliations it enqueued and the
         stray vxlan handling at its end.
 
+        ``networks_with_guests`` is how many of this node's networks had
+        an interface attached, which is what decides the health check
+        order. The read behind it degrades to an empty set on a database
+        error, and so to longest-waiting order; reporting the count is
+        what makes that visible, as a zero against a node with guests.
+        It is None, and left out, when the bound is disabled and the
+        read is not made.
+
         A pass skipped by the queue-depth guard does no work and reports
         nothing here; its node event says why it was skipped.
         """
@@ -779,6 +791,8 @@ class Job(util_concurrency.Job):
             'pass_seconds': round(pass_seconds, 3),
             'health_check_seconds': round(health_seconds, 3),
         }
+        if networks_with_guests is not None:
+            fields['networks_with_guests'] = networks_with_guests
         LOG.with_fields(fields).info('Maintenance pass complete')
 
         # Spending the budget is worth saying out loud, because it means
@@ -930,8 +944,11 @@ class Job(util_concurrency.Job):
             # and the order only matters when the budget can run out, so
             # with the bound disabled the read is not worth making.
             busy_networks = frozenset()
+            networks_with_guests = None
             if config.MAINTAIN_HEALTH_CHECK_BUDGET_SECONDS:
                 busy_networks = networks_with_interfaces()
+                networks_with_guests = sum(
+                    1 for u in host_networks if str(u) in busy_networks)
             for network_uuid in health_check_order(
                     host_networks, busy_networks):
                 n = network.Network.from_db(
@@ -970,14 +987,16 @@ class Job(util_concurrency.Job):
                     # Network state changed in the last minute, punt for now
                     continue
 
-                # Health check budget. A healthy network is checked in
-                # milliseconds, so this is never reached on a well
-                # cluster whatever the network count; what it bounds is
-                # the degraded case, where every unreachable dnsmasq
-                # costs a full DHCP_PROBE_TIMEOUT and the pass can take
-                # longer to check its networks than the interval it runs
-                # at (issue 4971). The networks not reached this pass
-                # are the ones this list starts with next pass.
+                # Health check budget. A healthy network costs tens of
+                # milliseconds to check on the network node (four execs,
+                # one an interpreter start, plus database reads), so a
+                # well node reaches this only once it is on more networks
+                # than the budget covers. What it is for is the degraded
+                # case, where every unreachable dnsmasq costs a full
+                # DHCP_PROBE_TIMEOUT and the pass can take longer to
+                # check its networks than the interval it runs at (issue
+                # 4971). The networks not reached this pass are the ones
+                # this list starts with next pass.
                 #
                 # The continue skips the whole rest of this body for a
                 # deferred network, not just its health check: no routed
@@ -1210,4 +1229,4 @@ class Job(util_concurrency.Job):
             # otherwise report a duration inside its cadence.
             self._report_pass_cost(
                 pass_started, networks_considered, health_seconds,
-                networks_deferred)
+                networks_deferred, networks_with_guests)

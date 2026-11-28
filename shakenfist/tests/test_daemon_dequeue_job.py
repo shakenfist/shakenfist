@@ -95,3 +95,52 @@ class DequeueJobPoolFullTestCase(base.ShakenFistTestCase):
 
         # And it got there without asking the database anything.
         self.assertEqual(0, mock_dequeue.call_count)
+
+
+class DequeueJobConstructsRealJobTestCase(base.ShakenFistTestCase):
+    """The dispatcher's arguments reach the real sf-queues Job.
+
+    dequeue_job() hands each worker its arguments positionally, and the
+    other tests here pass a mock as the processing class, so an arity or
+    ordering mismatch against workitem.Job's constructor would go
+    unnoticed. This drives the real class and checks the claim time and
+    delivery count arrive where the execution duration event reads them
+    (issue 3974).
+    """
+
+    def test_claim_time_and_deliveries_reach_the_job(self):
+        from shakenfist.daemons.queues import workitem
+
+        pool = daemon.WorkerPoolDaemon.__new__(daemon.WorkerPoolDaemon)
+        pool.workers = {}
+        pool.usable_cpus = 8
+        pool.metrics = {}
+        pool.metrics_acquired_at = 0
+
+        items = [('q-one', 'job-1', {'op': 'a'}, 1),
+                 ('q-two', 'job-2', {'op': 'b'}, 3)]
+        with mock.patch('shakenfist.daemons.daemon.config') as mock_config, \
+                mock.patch('shakenfist.daemons.daemon.time') as mock_time, \
+                mock.patch('shakenfist.daemons.daemon.threading'), \
+                mock.patch.object(daemon, 'clear_abort_path'), \
+                mock.patch.object(daemon.mariadb, 'get_node_metrics',
+                                  return_value={}), \
+                mock.patch.object(daemon.mariadb, 'dequeue_work_items',
+                                  return_value=items):
+            mock_config.NODE_UUID = NODE_UUID
+            mock_time.time.return_value = 12_345.0
+            self.assertEqual(daemon.DequeueOutcome.STARTED,
+                             pool.dequeue_job(workitem.Job))
+
+        first = pool.workers['job-1']['object']
+        second = pool.workers['job-2']['object']
+        self.assertIsInstance(first, workitem.Job)
+        self.assertEqual(
+            ('q-one', 'job-1', {'op': 'a'}, 2, 12_345.0, 1),
+            (first.queue_name, first.jobname, first.workitem,
+             first.batch_size, first.dequeued_at, first.deliveries))
+        # One claim time for the whole batch, but each item's own count.
+        self.assertEqual(
+            ('q-two', 'job-2', {'op': 'b'}, 2, 12_345.0, 3),
+            (second.queue_name, second.jobname, second.workitem,
+             second.batch_size, second.dequeued_at, second.deliveries))

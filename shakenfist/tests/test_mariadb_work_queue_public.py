@@ -244,6 +244,35 @@ class PublicWorkQueueDispatchTestCase(base.ShakenFistTestCase):
             stub.return_value.RestartQueueClaimsBy, call.call_args.args[0])
         mock_log.error.assert_called_once()
 
+    def test_grpc_dequeue_carries_deliveries_and_zero_from_an_old_server(
+            self):
+        # The reply is serialised and parsed, as it is on the wire. The
+        # second item is what an sf-database from before the field sends:
+        # nothing, which must arrive as zero so the execution duration
+        # event reports the count as unknown rather than as a first
+        # delivery during a mixed-version window (issue 3974).
+        from shakenfist.protos import database_pb2
+
+        reply = database_pb2.DequeueReply(items=[
+            database_pb2.DequeuedItem(
+                queue_name='q', job_name='7', work_item='{"op": "a"}',
+                deliveries=2),
+            database_pb2.DequeuedItem(
+                queue_name='q', job_name='8', work_item='{"op": "b"}'),
+        ])
+        wire = database_pb2.DequeueReply.FromString(
+            reply.SerializeToString())
+
+        with mock.patch('shakenfist.mariadb._get_database_stub'), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           return_value=wire):
+            items = mariadb._grpc_work_queue_dequeue_batch(
+                ['q'], 'uuid-alpha', 5)
+
+        self.assertEqual(
+            [('q', '7', {'op': 'a'}, 2), ('q', '8', {'op': 'b'}, 0)],
+            items)
+
     @mock.patch('shakenfist.mariadb._grpc_work_queue_restart')
     @mock.patch('shakenfist.mariadb._direct_work_queue_restart')
     @mock.patch(
