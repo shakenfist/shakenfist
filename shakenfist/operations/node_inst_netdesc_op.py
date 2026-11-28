@@ -296,6 +296,17 @@ class NodeInstNetdescOp(BaseClusterOperation):
                 # below need not parse it back out (D30). It does not
                 # reach the API, but it does reach the instance, which
                 # publishes it as error_stage (issue 4568).
+                #
+                # The stage is unconditional, and can be: a reschedule
+                # is always a move, because the instance already has a
+                # placement and the candidate list excludes the node it
+                # is on. The admission guard skips the claim entirely
+                # for a move -- a move consumes no new namespace
+                # capacity, since the instance's allocation has been
+                # counted there since its first placement -- so no
+                # candidate here can be refused at the claim stage, and
+                # there is no all-claim refusal to publish as
+                # capacity_claim the way the create path does.
                 raise LowResourceException(
                     'No node had capacity for this instance, '
                     f'{len(denials)} candidates refused it',
