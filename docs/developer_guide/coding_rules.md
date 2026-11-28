@@ -1113,3 +1113,42 @@ arm is a label, not a diagnosis. The width and the message compound: a
 arm is a prerequisite for replacing it with written prose -- which is what
 the work on not returning SQL text to a caller (issue 5027) does to every
 one of these handlers.
+
+## An event on a tenant's object is published to the tenant
+
+`GET /instance/<ref>/events` is gated by `requires_instance_ownership` and
+nothing else. There is no event-type filter on it, no per-field redaction
+anywhere in `object_events_response()`, and no plan for either: an event is a
+durable record, so the only place the audience of one can be decided is where
+it is written. Before putting a figure in an event's `extra`, ask who can read
+the object it is addressed to.
+
+The scheduling refusal path got this wrong in both directions at once. A
+capacity denial carries the guard's working -- for the `node` stage the
+candidate's own `limit`, `used`, `held`, `cpu_load_1` and `expected_demand`,
+and for the `cluster` stage the cluster's totals net of what every other
+namespace has claimed -- and all of it was evented against the instance, which
+is to say published to the namespace that asked for the instance. The HTTP
+responses on the same path were already careful: the 507 says only how many
+candidates refused, and `claim_capacity_error()` filters a claim denial down to
+the caller's own claim's dimension, limit, used and shortfall. So the leak was
+the event and not the response, which is exactly the shape this rule is for
+(issue 5111).
+
+The line was already drawn for the same data, one module away.
+`POST /placement` publishes its per-node answer only to
+`caller_has_admin_rights()`, because "a tenant learning which node UUIDs
+exist, how much room each has and which filter stage each failed is a cluster
+topology disclosure no other endpoint gives a non-administrator". When two
+surfaces carry the same figures, the stricter one is the project's position and
+the looser one is the defect -- not a judgement to be re-made per call site.
+
+The fix is not to stop recording the figures. `Instance.place_on_candidates()`
+writes each refusal twice: once against `log_targets` (the instance, and the
+operation for the start redirect) naming the node and the stage, and once
+against the refusing node itself carrying the `dimensions`. Node events are
+admin-only (`NodeEventsEndpoint` is `@caller_is_admin`), so nothing is lost to
+an operator. The set level events then render through
+`instance.tenant_denial_extra()`, which is the one place that decides what a
+namespace may read about a walk, rather than three call sites each spreading a
+`denials` dict into an `extra`.

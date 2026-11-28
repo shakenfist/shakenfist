@@ -65,6 +65,7 @@ metrics. The headlines:
 - A schema backfill runs in bounded batches.
 - An arm which blames the caller catches the caller's own exception
   type.
+- An event on a tenant's object is published to the tenant.
 
 ## Things that will bite you
 
