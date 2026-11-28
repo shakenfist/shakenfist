@@ -312,7 +312,7 @@ jobs:
         timeout-minutes: 5
         run: |
           . /tmp/venv-test/bin/activate
-          uv pip install ansible-lint==26.11.0 ansible-core==2.22.0
+          uv pip install ansible-lint==26.11.1 ansible-core==2.22.0
           ansible-lint --config-file shakenfist/deploy/collection/.ansible-lint \
               shakenfist/deploy/collection/
 
