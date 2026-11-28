@@ -997,11 +997,16 @@ class InstancesEndpoint(api_base.Resource):
             placed_on = str(n.uuid)
             node_state = n.state.value
             if node_state != Node.STATE_CREATED:
+                # None means the daemon state rows could not be read, which
+                # a null in the event would make look like "none degraded".
+                degraded = n.get_degraded_daemons()
                 n.add_event(
                     EVENT_TYPE_AUDIT, 'API query for node told node not ready',
                     extra={
                         'node_state': node_state,
-                        'degraded_daemons': n.get_degraded_daemons()
+                        'degraded_daemons': (
+                            degraded if degraded is not None
+                            else 'unreadable'),
                     })
                 return sf_api.error(404, f'Specified node {placed_on} not ready')
 

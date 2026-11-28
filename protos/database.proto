@@ -1465,9 +1465,13 @@ message NodeAttributesProto {
   reserved 9;
   reserved "instances_json";
 
-  // Daemon tracking (JSON-encoded lists)
-  string daemons_json = 10;
-  string daemon_states_json = 11;
+  // Daemon registration and per-daemon state are both the
+  // node_daemon_states rows: a registration *is* a row there. The legacy
+  // node_attributes.daemons JSON list and daemon_states JSON dict have no
+  // reader and no writer, so they are no longer carried on the wire.
+  // Tags reserved to prevent accidental reuse.
+  reserved 10, 11;
+  reserved "daemons_json", "daemon_states_json";
 
   // Software versions (JSON-encoded lists)
   string qemu_version_json = 12;

@@ -3865,8 +3865,6 @@ class NodeAttributesProto(_message.Message):
     IS_HYPERVISOR_FIELD_NUMBER: _builtins.int
     IS_NETWORK_NODE_FIELD_NUMBER: _builtins.int
     IS_EVENTLOG_NODE_FIELD_NUMBER: _builtins.int
-    DAEMONS_JSON_FIELD_NUMBER: _builtins.int
-    DAEMON_STATES_JSON_FIELD_NUMBER: _builtins.int
     QEMU_VERSION_JSON_FIELD_NUMBER: _builtins.int
     HAS_QEMU_VERSION_FIELD_NUMBER: _builtins.int
     LIBVIRT_VERSION_JSON_FIELD_NUMBER: _builtins.int
@@ -3890,9 +3888,6 @@ class NodeAttributesProto(_message.Message):
     is_hypervisor: _builtins.bool
     is_network_node: _builtins.bool
     is_eventlog_node: _builtins.bool
-    daemons_json: _builtins.str
-    """Daemon tracking (JSON-encoded lists)"""
-    daemon_states_json: _builtins.str
     qemu_version_json: _builtins.str
     """Software versions (JSON-encoded lists)"""
     has_qemu_version: _builtins.bool
@@ -3925,8 +3920,6 @@ class NodeAttributesProto(_message.Message):
         is_hypervisor: _builtins.bool = ...,
         is_network_node: _builtins.bool = ...,
         is_eventlog_node: _builtins.bool = ...,
-        daemons_json: _builtins.str = ...,
-        daemon_states_json: _builtins.str = ...,
         qemu_version_json: _builtins.str = ...,
         has_qemu_version: _builtins.bool = ...,
         libvirt_version_json: _builtins.str = ...,
@@ -3943,7 +3936,7 @@ class NodeAttributesProto(_message.Message):
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["daemon_states_json", b"daemon_states_json", "daemons_json", b"daemons_json", "dependency_versions_json", b"dependency_versions_json", "has_installed_version", b"has_installed_version", "has_libvirt_version", b"has_libvirt_version", "has_python_implementation", b"has_python_implementation", "has_python_version", b"has_python_version", "has_qemu_version", b"has_qemu_version", "has_spice_server_cert_subject", b"has_spice_server_cert_subject", "installed_version", b"installed_version", "is_database_node", b"is_database_node", "is_etcd_master", b"is_etcd_master", "is_eventlog_node", b"is_eventlog_node", "is_hypervisor", b"is_hypervisor", "is_network_node", b"is_network_node", "last_seen", b"last_seen", "libvirt_version_json", b"libvirt_version_json", "process_metrics_json", b"process_metrics_json", "python_implementation", b"python_implementation", "python_version_json", b"python_version_json", "qemu_version_json", b"qemu_version_json", "spice_server_cert_subject", b"spice_server_cert_subject", "uuid", b"uuid"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["dependency_versions_json", b"dependency_versions_json", "has_installed_version", b"has_installed_version", "has_libvirt_version", b"has_libvirt_version", "has_python_implementation", b"has_python_implementation", "has_python_version", b"has_python_version", "has_qemu_version", b"has_qemu_version", "has_spice_server_cert_subject", b"has_spice_server_cert_subject", "installed_version", b"installed_version", "is_database_node", b"is_database_node", "is_etcd_master", b"is_etcd_master", "is_eventlog_node", b"is_eventlog_node", "is_hypervisor", b"is_hypervisor", "is_network_node", b"is_network_node", "last_seen", b"last_seen", "libvirt_version_json", b"libvirt_version_json", "process_metrics_json", b"process_metrics_json", "python_implementation", b"python_implementation", "python_version_json", b"python_version_json", "qemu_version_json", b"qemu_version_json", "spice_server_cert_subject", b"spice_server_cert_subject", "uuid", b"uuid"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

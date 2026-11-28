@@ -1741,7 +1741,7 @@ dedicated attribute tables:
 | Table | Object Type | Key Fields |
 |-------|-------------|------------|
 | `blob_attributes` | Blob | uuid, size, info, last_used, retention |
-| `node_attributes` | Node | uuid, last_seen, installed_version, roles, daemons, versions, metrics. Per-daemon state lives in `node_daemon_states` since v19; the legacy `daemon_states` JSON column on this table is no longer read or written. Instance placement lives in `object_references` as `instance_location` rows since `object_references` schema v3; the dual-write and the union into reads have been removed; the legacy `instances` JSON column itself remains in place (nullable, unread) as a rollback fallback until a later release drops it |
+| `node_attributes` | Node | uuid, last_seen, installed_version, roles, versions, metrics. Daemon registration and per-daemon state both live in `node_daemon_states` since v19 -- a registration *is* a row there -- so the legacy `daemons` and `daemon_states` JSON columns on this table are no longer read or written. Instance placement lives in `object_references` as `instance_location` rows since `object_references` schema v3; the dual-write and the union into reads have been removed. All three legacy JSON columns (`daemons`, `daemon_states`, `instances`) remain in place (nullable, unread) as a rollback fallback, and are dropped together in a later release |
 | `namespace_attributes` | Namespace | name, trust (JSON). Keys live in `namespace_keys` / `namespace_key_attributes` since the v2 `namespace_keys` migration; the legacy `keys` JSON column was dropped by this table's v3 migration |
 | `namespace_key_attributes` | NamespaceKey | uuid, key (base64 encoded bcrypt hash), nonce, expiry (nullable epoch seconds), scopes (nullable JSON list), provenance (nullable JSON dict) |
 | `trusted_issuer_attributes` | TrustedIssuer | uuid, issuer_url, jwks_uri (nullable since v2), audience, authorization_endpoint (nullable LONGTEXT), token_endpoint (nullable LONGTEXT), device_authorization_endpoint (nullable LONGTEXT), client_id (nullable), oidc_scopes (nullable, space separated), discovered_at (nullable epoch seconds) |
@@ -1975,7 +1975,6 @@ CREATE TABLE node_attributes (
     installed_version VARCHAR(64),
     -- Complex structures as JSON
     roles JSON,
-    daemons JSON,
     metrics JSON
 );
 ```
@@ -2003,6 +2002,13 @@ an N+1 hydration loop from every caller, and dropping the columns
 needed no data migration because every UUID in them was derivable
 from `network_interfaces`. `PUSH-AUDIT.md` carries a review bullet
 so the pattern is not reintroduced.
+
+`node_attributes.daemons` was the same shape without the foreign key:
+a JSON list of the daemons registered on a node, maintained beside the
+`node_daemon_states` row that each registration already created. A
+registration is now simply the existence of that row, which
+`Node.get_registered_daemons()` queries, so the two records can no
+longer disagree — they are one record.
 
 ### Abstract Base Classes
 

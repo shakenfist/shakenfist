@@ -906,7 +906,37 @@ read-side union were removed once every placement writer had moved onto
 the atomic admission primitive; the column itself remains declared in
 the table (nullable, no longer read or written)
 so upgraded databases keep a rollback fallback, and is dropped in a later
-release — the same treatment as the legacy `daemon_states` column.
+release — the same treatment as the legacy `daemons` and
+`daemon_states` columns, which `node_daemon_states` replaced and which
+go in the same drop.
+
+Daemon registration took the same route for the same reason.
+`node_attributes.daemons` was a JSON list maintained by
+read-modify-write beside the `node_daemon_states` row that
+`set_daemon_state()` wrote, so the two records could disagree:
+`register_daemon()` needed a no-op guard precisely because resetting an
+already-running daemon's state to `STOPPED` on a re-register left it
+stuck stopped and reported the whole node degraded. A registration is
+now exactly a `node_daemon_states` row — `register_daemon()` creates it,
+`deregister_daemon()` deletes it, `Node.get_registered_daemons()`
+queries it — so the no-op guard reads the very record it protects and
+the `daemons` attribute lock is gone. `get_degraded_daemons()` reads
+registration and state from that one query, and it and
+`get_registered_daemons()` return `None` rather than an empty list when
+the read fails, because an empty list is the positive claim that nothing
+is degraded (or registered) and a database error must not get to make
+it. `register_daemon()` raises `DatabaseUnavailable` on that `None`
+rather than guessing: treating "could not read" as "not registered"
+would write `STOPPED` over a running daemon, the fault the guard exists
+to prevent.
+
+Because the row is the registration and `set_daemon_state()` upserts it,
+deregistration is order-dependent: any state write after
+`deregister_daemon()` registers the daemon again, and a write of
+`STOPPING` or `STOPPED` from a daemon on its way down then holds the node
+degraded. A daemon must be stopped, and unable to write its state again,
+before it is deregistered. The deploy's database-daemon teardown in
+`roles/node/tasks/config.yml` stops the unit first for this reason.
 
 Placement rows are written only by two `sf-database` RPCs,
 `AdmitInstancePlacement` and `ReleaseInstancePlacement`, each performing its

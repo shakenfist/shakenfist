@@ -12434,6 +12434,17 @@ def _get_node_attributes_table() -> sa.Table:
                     'is_database_node', sa.Boolean(),
                     nullable=False, default=False
                 ),
+                # Three legacy JSON columns with no reader and no
+                # writer. instances was replaced by INSTANCE_LOCATION
+                # rows in object_references; daemons and daemon_states
+                # by node_daemon_states, where the existence of a row
+                # *is* the registration. They remain declared for one
+                # release as a rollback fallback and are then dropped
+                # together in a single node_attributes version bump.
+                # daemon_states additionally still has one reader --
+                # _migrate_daemon_states_from_node_attributes(), the
+                # node_daemon_states v2 seeding migration -- which has
+                # to keep working until the column goes.
                 sa.Column('instances', sa.JSON(), nullable=True),
                 sa.Column('daemons', sa.JSON(), nullable=True),
                 sa.Column('daemon_states', sa.JSON(), nullable=True),
@@ -12886,8 +12897,6 @@ def _direct_create_node_attributes(
                 is_network_node=data.is_network_node,
                 is_eventlog_node=data.is_eventlog_node,
                 is_database_node=data.is_database_node,
-                daemons=data.daemons,
-                daemon_states=data.daemon_states,
                 qemu_version=data.qemu_version,
                 libvirt_version=data.libvirt_version,
                 python_version=data.python_version,
@@ -12941,14 +12950,6 @@ def _direct_get_node_attributes(
                 is_network_node=result.is_network_node,
                 is_eventlog_node=result.is_eventlog_node,
                 is_database_node=result.is_database_node,
-                daemons=(
-                    result.daemons
-                    if result.daemons else []
-                ),
-                daemon_states=(
-                    result.daemon_states
-                    if result.daemon_states else {}
-                ),
                 qemu_version=result.qemu_version,
                 libvirt_version=result.libvirt_version,
                 python_version=result.python_version,
@@ -12994,8 +12995,6 @@ def _node_attributes_column_values(
         'is_network_node': data.is_network_node,
         'is_eventlog_node': data.is_eventlog_node,
         'is_database_node': data.is_database_node,
-        'daemons': data.daemons,
-        'daemon_states': data.daemon_states,
         'qemu_version': data.qemu_version,
         'libvirt_version': data.libvirt_version,
         'python_version': data.python_version,
@@ -13453,10 +13452,6 @@ def _node_attrs_to_proto(
         is_network_node=data.is_network_node,
         is_eventlog_node=data.is_eventlog_node,
         is_database_node=data.is_database_node,
-        daemons_json=_json_dumps(data.daemons),
-        daemon_states_json=_json_dumps(
-            data.daemon_states
-        ),
         qemu_version_json=(
             _json_dumps(data.qemu_version)
             if data.qemu_version is not None else ''
@@ -13513,14 +13508,6 @@ def _node_attrs_from_proto(
         is_network_node=d.is_network_node,
         is_eventlog_node=d.is_eventlog_node,
         is_database_node=d.is_database_node,
-        daemons=(
-            json.loads(d.daemons_json)
-            if d.daemons_json else []
-        ),
-        daemon_states=(
-            json.loads(d.daemon_states_json)
-            if d.daemon_states_json else {}
-        ),
         qemu_version=(
             json.loads(d.qemu_version_json)
             if d.has_qemu_version else None
