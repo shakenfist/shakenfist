@@ -1593,3 +1593,592 @@ no output
 `git rev-list --parents -n1 3695f168aa`: 3 hashes (merge commit, two parents)
 `git diff --name-only 3695f168aa^1 3695f168aa`: 3 files, all under docs/plans/
 
+
+### Step 9c -- style conformance
+
+Verdict: clean on every mechanical rule; two candidates raised, neither a
+finding of this plan. Read `shakenfist/mariadb.py` (the cited ranges),
+`shakenfist/daemons/database/main.py`, `shakenfist/daemons/resources/main.py:100-145`,
+`shakenfist/namespace_claim.py:630-700`, and the per-range diff of all 21
+ranges.
+
+Confirmed clean: no new `mariadb.get_all_*(` call site in any range; 0 added
+lines over 120 characters outside generated protobuf modules; 0 added trailing
+whitespace; no wrong-unit `*_mb` / `*_gb` / `*_cpus` names in the new SQL or
+capacity dicts. The three-layer `_direct_*` / `_grpc_*` / public pattern holds
+for all ten RPCs these ranges add, each with a servicer handler and a
+registered counter; the step tabulated all thirty line numbers.
+
+Two candidates, dispositioned below as **pre-existing** and **declined**: the
+two triple-single-quoted SQL literals, and `cpu_schedulable`'s unit-free name.
+
+### Step 9d -- code quality, G1 and G2
+
+Verdict: **no blocking finding.** The admission transaction, the release
+mirror, the reconciler, the claim CRUD transactions and the scheduler's guard
+stages are correct on all four questions asked, and unusually well documented
+about why. Four advisory findings.
+
+1. **The guarded `UPDATE` is the first statement on every path.** Each
+   transaction these ranges added was named with its first statement:
+   `_direct_reconcile_scheduler_capacity` opens on the claim-expiry `UPDATE`
+   (position 0 pinned by a test), `_direct_admit_instance_placement` on the
+   guarded claim or cluster `UPDATE` -- or, on a move, on `_claim_node()`'s
+   guarded node `UPDATE` or `_floored_node_decrement()`, whose own first
+   statement is its guarded `UPDATE` and not its following `SELECT` -- and the
+   three claim CRUD transactions on the guarded `cluster_capacity` `UPDATE`.
+   Every probe runs on its own connection. Phase 1's and phase 2's
+   `engine.begin()` blocks are `ALTER TABLE` migrations, so the rule does not
+   apply to them.
+2. **Nothing leaks between drawdown and placement, because there is no
+   between.** The guarded drawdown, the `placement` attribute write and the
+   `instance_location` insert are one transaction, and the reference rows are
+   the sole authority for release. Death after commit leaves a charged,
+   referenced instance, which is a correct ledger; the reconciler drops it the
+   pass after its state becomes `deleted`. Branch switching is symmetric in
+   both directions, so release always finds the charge on the branch it
+   decrements.
+3. **Both absent-row choices match the guide**, per pool and per the two
+   different answers it documents.
+4. **No guard re-derives usage.** The SQL guards compare only materialised
+   columns, and the scheduler's pre-filters read the ledger rather than
+   recomputing it. One honest exception is named: claim create and grow bind a
+   re-derived `migrated` migration term into the guard, which the design
+   requires, is floored, and is reconciled within a pass. The quantity
+   compared against the limit is still the ledger.
+
+### Step 9e -- code quality, G3, G4 and G6
+
+Verdict: one finding raised as blocking and **withdrawn on adjudication** (see
+*The disagreement* below); one advisory. Four of its five questions came back
+correct.
+
+- `CLAIM_ENFORCEMENT_HARD` has exactly **one** consumer,
+  `shakenfist/mariadb.py:30611`, read once and used once. There is no second
+  reader to disagree with it.
+- **Nothing assumes the two classified stage sets partition the stage space**,
+  which was the defect shape this step was sent to hunt. No reader tests
+  `PERMANENT_CAPACITY_STAGES` membership at all, `constants.py:406` is
+  one-sided and defaults False, and
+  `shakenfist/tests/external_api/test_capacity_error.py:301-342` AST-walks
+  `scheduler.py` and asserts every stage reaching `capacity_error()` is
+  classified, with the claim stage excluded from both sides deliberately. The
+  contract is actively guarded, not merely correct.
+- The affinity scorer matches phase 6's binary model, and mixed weighted and
+  binary specs are refused at validation, so no spec is half-dropped.
+- `floor(load)` is gone, and a correction to this plan's premise: range
+  `113e4efb57` itself replaced it; phase 6 added the RAM band later.
+- The CI claim sizing cannot produce a claim smaller than the instance it
+  charges, because an explicit equality assertion against the live footprint
+  fires by name if it ever would.
+
+### Step 9f -- code quality, G5, G7 and G8
+
+Verdict: no blocking finding. **The three orphan defect fixes -- the ranges
+belonging to no phase row, and the reason G8 exists -- are all still in place
+at `$TIP`**, each with the lines read cited: #3722's affinity-above-load-shedding
+ordering and its "may narrow but never move out of the tier" fallback survive
+verbatim, and phase 6's binary model did not break it because with no scoring
+tags the preferred tier is the whole candidate set; #3918's headroom-aware
+retry seam is intact and a later plan generalised it rather than undoing it;
+and #3937's RAM-aware gate and ranking are intact and extended, reindented by
+another plan but semantically unchanged.
+
+Also verified correct: `/admin/resources` and `GET /admin/claims` both match
+their published examples key for key, and the resources one is machine-pinned;
+`coverage_state` is still filtered in SQL with no Python-side filter
+reintroduced; and `EXCLUSION_REASONS` is genuinely closed -- established by
+grepping every *write* into the `excluded` mapping rather than every `'reason'`
+key, finding two sources and four constants, pinned twice including a
+deliberate independent copy in the cluster tests.
+
+**One result worth recording as a positive.** `tools/ci_headroom_report.py`
+shows phase 5b's sweep done properly: its nine lines there corrected six
+separate sites -- the docstring, the constant comment, `GuardCensus`,
+`guard_record()`, `print_guard_census()` and `print_verdict()` -- and a grep
+for `advisory` or `CLAIM_ENFORCEMENT_HARD` over the file at `$TIP` returns
+nothing. That is the same sweep which missed three sites elsewhere, so the
+record holds both halves.
+
+### Step 9g -- test review
+
+Verdict: coverage is sound on the questions that matter, with three advisory
+findings and **one premise of this plan overturned**.
+
+The substrate map came back as three layers, not the two the brief assumed:
+six `*_live` modules asserting real SQL, each skipped without
+`SF_MARIADB_TEST_DSN` and run in the `schema_enum_widening` job; compiled
+statement text against a mocked DBAPI, which is what the non-live capacity
+modules assert; and `MockMariaDB`, a Python reimplementation of admission on
+which everything caller-side rests.
+
+The claims API surface has both unit and real cluster coverage, including the
+adversarial set -- admin-only, unauthenticated, a claim not readable through
+another namespace, an unknown namespace or claim. There is no merge-queue
+lane-selection hole: the merge caller selects the lane the cluster
+configuration runs on, and a seam test asserts every lane runs in exactly one
+place and that weekly failures file an issue.
+
+### Step 9h -- documentation review
+
+Verdict: **two blocking findings, two advisory**, and the audit's central
+question produced hits on exactly the axis predicted -- whether a claim ceiling
+is advisory or binding. Phase 5b swept the *word* "advisory" and updated six
+pages; it missed two paraphrases of the same fact which do not contain the
+word.
+
+No fifth "advisory" about claim ceilings exists: every hit at `$TIP` is one of
+the four known traps plus one about blob accounting.
+
+**The `CLAUDE.md` fold question (F6) is answered: nothing this plan recorded
+was lost.** Four ranges edited `CLAUDE.md`, which was folded into `AGENTS.md`
+and `docs/` on 2026-09-28. `AGENTS.md` carries none of them, which is correct
+-- all four were reference material the documentation policy sends to `docs/`,
+and each survived there: the typed `node_metrics` projection and the
+`is_hypervisor` gotcha, the three capacity tables and the
+reconciler/guarded-UPDATE split, the placement invariant that
+`Instance.place_instance()` is the sole caller and `Node` has no
+placement-writing helpers -- the one genuine agent-facing invariant, intact --
+and the `state` versus `coverage_state` distinction. The single convention
+that is gone, phase 4's "ceilings are advisory this release, do not add an
+enforcement knob or a 403 path before it does", was correctly retired by phase
+5b, which did exactly what it reserved.
+
+Checked mechanically and clean: 621 backticked identifiers extracted from
+eleven pages and `grep -w`'d against `shakenfist/` and `protos/` at `$TIP`,
+with the only non-matches belonging to `client-python` or other plans. The
+403/507/503/409 matrix agrees across five pages; the absent-counter-row rule
+agrees between two; the glossary's capacity-ledger definition matches the
+`cluster_capacity` columns with no held or peak drift.
+
+### Step 9i -- security review
+
+Verdict: **the ledger's authorisation is correct.** One low disclosure
+finding, three informational notes. No critical, high or medium finding.
+
+- **Reachability holds.** `caller_has_admin_rights()` is the single predicate
+  and every claim verb carries it -- the two claims endpoints' five methods,
+  the events endpoint, `GET /admin/claims`, and `GetClusterCapacity`'s only
+  REST exposure through `/admin/resources`. The scope axis is real rather than
+  decorative: a token needs the admin namespace *and* the scope derived for
+  the resource. The endpoint-authentication pre-commit hook enforces
+  subclassing and decorator order rather than authorisation, and these
+  endpoints satisfy it substantively -- no `@public`, and the public set is
+  pinned at four by a test.
+- **Cross-namespace claim mutation holds, including the body-override shape.**
+  A non-admin cannot reach any claim verb, which a cluster test asserts live by
+  expecting 401 from a namespace's own credential. The body does merge over
+  path arguments, but the overlap is recorded and answered 400 by default; and
+  even with the operator's rollback to warn or off there is no escalation,
+  because an override only changes which namespace all three decorators test,
+  and a claim whose own namespace differs 404s with the same response a
+  missing claim gives, so the URL is not an oracle. On the drawdown side the
+  instance's own namespace is passed, never a request value.
+- **SQL holds.** Every claim and admission statement is expression language;
+  uuids are parsed and quantities bound. The f-strings are `Table.c` lookups
+  keyed by a fixed module constant, so no table, column or namespace name
+  reaches SQL text. The two `sa.text()` statements in the claim path splice a
+  module constant and bind the namespace. Phase 7a's `coverage_state` filter is
+  bound and allowlisted twice, with a test pinning the rendered placeholder.
+- **Quantities hold** against negative, non-integer and credit-producing
+  values, guarded in three independent places -- the declared schema, the
+  handler, and the database layer -- with `BigInteger` columns and every
+  decrement floored.
+- **The disclosure question is answered:** no refusal body and no
+  claim-endpoint audit event tells a caller about another namespace's
+  footprint, cluster-wide totals or node names. Phase 5b's 403 names a claim
+  and recommends growing it; the only ways that claim is not the caller's own
+  are that the caller is the system namespace, or that the target namespace
+  had already trusted the caller to create instances there. The one gap is the
+  finding below, which is a scheduler event rather than a claim refusal.
+- Floor item 3 is clean. The greps are recorded: IPv4 found three hits, all
+  placeholders (a disposable local DSN and two RFC1918 CI netblocks);
+  credential patterns found only generated gRPC stub keyword names and prose;
+  private hostname suffixes found none; and `subprocess` / `os.system` /
+  `shell=True` found zero.
+
+### Step 9j -- the guarded-counter prose re-check
+
+Verdict: **no claim is stale.** Nineteen claims in
+`docs/developer_guide/database_internals.md:238-407` were checked at their
+definitions, eighteen "still true" with the lines read cited and one recorded
+unverifiable -- the phase 0 benchmark's historical measurements, deliberately
+not re-run, whose structural claims do check out. One loose wording, filed
+below. The section's three MariaDB error numbers match
+`_TRANSIENT_TRANSACTION_ERRNOS` exactly, no more and no fewer, and
+`_retry_on_deadlock()` still retries only the deadlock errno, which is what
+makes the section's warning not to widen it correct.
+
+### Step 9k -- the cross-phase lens
+
+Verdict: one blocking finding (the client capability gap, which 9l reached
+independently), three advisory, and the four named candidates for "what did one
+phase assume that another changed" all came back **they agree**, with
+confirming lines cited.
+
+**The enumeration method for question 1**, which this plan required to be
+stated rather than summarised: for each range, `git diff <sha>^1 <sha> -- .
+':(exclude)docs/plans'` filtered to added lines, then one grep per category --
+added quoted lowercase literals in the single advertising module for capability
+tokens; added `*_STAGE` / `*_STAGES` lines in `constants.py` plus a literal
+sweep for the two stage names; added metric constructor lines, with each name
+then grepped against `docs/`; added screaming-case assignments in `config.py`
+for options; per-range counts for each named closed set; added quoted event
+messages outside tests; and the per-range file list under `external_api/`
+plus a tree-wide sweep for `coverage_state`. Each result was then resolved
+three ways -- what advertises it, what consumes it, and whether a test pins it.
+
+The inventory it produced: six capability tokens, all advertised at `$TIP` and
+all six pinned in one test; four exclusion-reason strings and their set, pinned
+twice; the claim stage, unclassified by design and pinned; eleven Prometheus
+metrics; seven configuration options; and the `coverage_state` filter,
+advertised, consumed and documented in four places.
+
+On the four assumption candidates: the cores-to-threads change agrees, and the
+knob that states its unit replaced the three that did not in a commit outside
+these ranges; the #3813 demand-guard fix is in place and not reintroduced, with
+both sides of the comparison still node state; the load ordering, the binary
+affinity model and #3722's re-ranking compose in one contiguous block whose
+comments name each other; and phase 5's consolidation survived another plan's
+generalisation, because that generalisation landed *upstream* of the walk and
+its multi-shape callers do not use it.
+
+### Step 9l -- the client-python floor checklist
+
+Verdict: the five floor items pass or do not apply, and one advisory finding
+which 9k reached independently. Range `135ab53042` (client-python#375) only
+adds, with zero deletions, so item 4 has no orphaned consumer to find; it
+touches nothing under `.github/`, so item 2 does not apply; it changes no
+workflow, packaging or version metadata, so item 5 does not apply; and item 3
+is clean, with the only credential-shaped hits a fixture bearer token and an
+example URL.
+
+No verb or rendering path prints a credential. The renderers index the
+server's always-present keys directly, which is a documented design choice
+rather than a crash risk, and phase 7b's own audit ran 78 payload-stripping
+cases over the claim views.
+
+**Phase 7b is cited, not re-run**, per the shared block. Its merge commit is
+`d484fdc63c` (client-python#442, merged 2026-10-28) and its five verdicts are
+in a *Push audit* section of its own plan file in that repository. Two caveats
+this audit records: it audited `origin/develop...HEAD`, a range *wider* than
+its own work which also covered client-python#433 to #438, so nothing of 7b
+went unaudited but other pull requests were swept in; and its item 1 read "Not
+yet applicable" because the phase had not merged when it was written. That item
+is now answerable, and the answer is `d484fdc63c`.
+
+## The disagreement, and how it was resolved
+
+Two lenses reached opposite verdicts on the same site, which is worth recording
+in full because the site still looks wrong to a careful reader.
+
+**9e reported, as blocking:** `shakenfist/operations/node_inst_netdesc_op.py:302`
+raises `stage=CAPACITY_GUARD_STAGE` unconditionally when every candidate
+refused, with no test of whether the refusals were all claim-stage. Since
+`capacity_guard` is transient and `capacity_claim` is not, a pure claim refusal
+on the reschedule path would be published to the instance as retryable --
+exactly what `shakenfist/constants.py:363-373` says must not happen ("a claim
+refusal which inherited it would promise a retry that can never succeed"). The
+create path honours the distinction through `_claim_only_denial`; this sibling
+caller does not, and both cite the same issue number, so it is demonstrably the
+same contract. The management session confirmed all of that, and confirmed that
+`place_on_candidates()` surfaces a `claim` key in its denials.
+
+**9k reached the opposite verdict** and cited the branch that settles it.
+
+**9k is right, and the finding is withdrawn.** `shakenfist/mariadb.py:30643`
+reads `if old_node_key is not None: pass`, under a comment saying a move "skips
+[the cluster or claim guard] entirely rather than washing an increment against
+a decrement" and "is likewise not refusable at this stage: there is nothing new
+to refuse". A reschedule is always a move: `instance.py:1464` derives
+`old_location` from the instance's existing placement, and
+`node_inst_netdesc_op.py:267-269` builds its candidate list by *excluding* the
+node running the operation, which is the node the instance is currently placed
+on. So `old_node_key` is non-`None` on every reschedule, the claim guard never
+runs, no claim-stage denial can arise, and publishing `CAPACITY_GUARD_STAGE`
+there is correct. It is designed behaviour pinned in both substrates:
+`test_a_move_does_not_draw_down_a_claim_either`
+(`shakenfist/tests/test_mariadb_capacity_admission.py:1156`) and
+`test_a_move_in_a_claimed_namespace_reports_nothing`
+(`..._live.py:999`).
+
+What the audit takes from it. The reachability step is the one that decides a
+finding of this shape, and it was the step the management session had not taken
+when it accepted 9e's report -- confirming that the mechanism exists is
+necessary and not sufficient. Two independent lenses went for this site, so a
+third reader will too; the advisory below adds the one comment that stops them.
+
+### Disposition
+
+Every finding has one of five dispositions. Each carries the file, the line,
+the range and a line confirmed at `$TIP`, or the classification *already
+fixed*; D3 rejects a finding without one.
+
+**Blocking -- fixed in a follow-up pull request before this phase closes.**
+Graded blocking on Michael's decision of 2026-11-28: an operator guide which
+states the feature backwards is a defect in shipped output, even though no
+production code is wrong. D7 keeps the fix out of this pull request.
+
+| # | Site | Range | Why |
+|---|------|-------|-----|
+| B1 | `docs/operator_guide/scheduler.md:1087-1088` -- "in this release that is a warning, not a refusal" | `7bd7bbd03c`, falsified by `31f3350c1c` | Contradicted on its own page at `:602-604`, "The ceiling is enforced ... and it binds". It sits in the audit-events list an operator reads while diagnosing a refusal, so it is read by the person deciding whether a claim can turn creates away, and it would tell them to size a claim small without consequence |
+| B2 | `docs/developer_guide/subsystem_internals.md:12` -- "hard claim ceilings, caller migration and further SQL pushdown are still to come" | `d3a91cdef5` / `0144e36ede` / `7bd7bbd03c`; `31f3350c1c` edited the page without touching its opening | Ceilings landed in `31f3350c1c` and caller migration in `660d4f65e7`. Contradicted on its own page at `:321` and by `ARCHITECTURE.md:212`. "Still to come" is the strongest available statement that the ceiling does not bind |
+| B3 | `docs/operator_guide/capacity_refusals.md:212` -- attributes `capacity_refusal_is_transient()` to `external_api/base.py` | `31f3350c1c` | Defined at `shakenfist/constants.py:391`; `base.py` re-exports the frozensets and calls the function without rebinding the name. One page disagreeing with itself. One line |
+| B4 | `docs/developer_guide/database_internals.md:271-274` -- release described as "a decrement floored with `GREATEST(0, used - :x)`" | `d3a91cdef5` | The code tries a guarded `counter >= x` form first and falls back to the clamp only on a miss, logging and reporting the shortfall. Not false, but it presents the fallback as the only path. One sentence |
+| B5 | `shakenfist/operations/node_inst_netdesc_op.py:300` -- no comment saying why the stage is unconditional | `31f3350c1c` | Not a defect (see *The disagreement*), but two independent lenses read it as one. One comment saying a reschedule is always a move, and so carries no claim-stage denial, stops the next reader re-deriving three files away |
+
+B3 to B5 are one-line changes grouped with B1 and B2 because they land in the
+same pull request and none is worth its own.
+
+**Advisory -- filed as issues.** Grouped by theme on Michael's decision, each
+issue carrying the full evidence for its members.
+
+| Issue | Covers |
+|-------|--------|
+| shakenfist#5110 | The three unobserved cluster-CI skips: `test_scheduler.py:308` and `:319`, and `test_nodes.py`'s reconciler-row skip. The skips are right; being unobserved is the defect. `PLAN-ci-cloud-sizing.md:391` measured one firing in 114 job-runs, so it is not theoretical |
+| shakenfist#5111 | The tenant disclosure asymmetry: `external_api/instance.py:1511` and `instance.py:1679` put node identities and cluster totals in the instance's own event log, where `external_api/placement.py:382` gates identical data on admin rights and says why |
+| shakenfist#5112 | `source-file-size`: `mariadb.py` at 34,127 lines with +4,326 from this plan, a self-labelled ~6,200-line seam and `mariadb_hard_delete.py` as the precedent; plus `scheduler.py` crossing 1,500 at phase 5a unexplained |
+| shakenfist#5113 | Published contracts kept correct by hand: `CLUSTER_CAPACITY_FIGURES` unpinned, `admin_claims_get_example` and `claim_example` untested where their sibling is pinned, `mock_mariadb.py`'s admission double with no parity test, and the opt-in nature of the ordering assertions |
+| shakenfist#5114 | Reconciler behaviour: the pass has no transient-error retry where every sibling transaction does, and an expired claim's `used_*` freezes and is still published |
+| shakenfist#5115 | Duplicated helpers: the dimensions tuple in two modules, and `_admission_denial_dimensions` against `_cluster_capacity_dimensions` |
+| shakenfist#5116 | Scheduler ranking arithmetic: the RAM band ignores `held_memory_mb` where the gate charges it, and two pressures share one 0.25 scale with different full points. The held term is another plan's, so the fix likely belongs there |
+| client-python#464 | The claim verbs check no capability, where two later claim methods in the same file do. The server publishes `namespace-claims` expressly so a client can degrade |
+
+**Declined, with the reason recorded.**
+
+`shakenfist/daemons/resources/main.py:136`, `cpu_schedulable`, range
+`113e4efb57`: a published metric name in threads sitting beside
+`cpu_cores_schedulable`, which states its unit. Declined because the unit is
+not silent -- it is stated in the `_compute_reservations` docstring, in
+`ARCHITECTURE.md:198` and in `docs/developer_guide/subsystem_internals.md:22`
+and `:88` -- and because it is a published key with real consumers, including
+the CI sizing formula stated in terms of it at
+`docs/developer_guide/ci_cloud_sizing.md:26`, `:40` and `:52`. Renaming it
+would break those to fix a name whose unit is documented three times.
+
+**Pre-existing, so issues rather than findings -- and in both cases already
+tracked, so neither was filed.** The push-audit rule says a problem which
+predates the plan is not a finding of it.
+
+* Triple-single-quoted strings, forbidden by the convention, at
+  `shakenfist/mariadb.py:28246` and `:28330`. The sweep is what changes the
+  verdict: `grep -c "'''"` on that file reads 44 today and **18 on
+  `ea3c9bf632`, before phase 0 merged**, and seven files outside tests carry
+  the form. The convention was already broken in this very file before the
+  plan began. Converting two and leaving forty-two would be theatre.
+* Plan and decision citations in production code -- eight plan-file pointers
+  and roughly thirty bare decision labels from these ranges.
+  `python3 tools/check-plan-phase-references.py` reports **370** such
+  citations repository-wide, across at least five unrelated plans, and its
+  own configuration makes this class advisory "while the backlog of those is
+  worked off", prescribing "fix the ones in the files you touch". This plan's
+  share is a fraction of a tooling-tracked backlog with a stated remedy.
+
+**Withdrawn.** The reschedule-path claim stage, raised blocking by 9e. See
+*The disagreement* for why it is correct, and B5 for the comment that records
+it in the code.
+
+**Out of scope -- reported, not filed against this plan.**
+
+* The RAM ranking's missing held term is in this plan's range but the `held_*`
+  counters are `PLAN-placeable-capacity`'s, so shakenfist#5116 says the fix
+  likely belongs there.
+* `sf-database`'s gRPC listener is unauthenticated, so the claim CRUD RPCs
+  carry no caller identity and mesh access bypasses the admin check. These
+  ranges added RPCs to an existing tier with that property; the exposure is
+  `PLAN-sf-as-infra`'s, behind mTLS.
+* `client-python` builds claim URLs by concatenation without quoting. That is
+  the client-wide pattern -- 56 such concatenations and no `quote()` calls --
+  and not something this range introduced.
+* A claim limit has no upper bound. The worst case is a 500 for an
+  already-admin caller, with no credit and no wraparound, because the column
+  raises out-of-range rather than wrapping. Informational.
+* `shakenfist/tests/test_mariadb_capacity_holds.py` carries the strongest
+  ordering assertions in the tree but belongs to `PLAN-placeable-capacity`;
+  read, nothing filed.
+
+**Future work, recorded rather than filed.**
+
+* The `namespace-claim-events` capability token is advertised but named on no
+  documentation page -- the inverted form of the defect this phase exists for.
+  Low confidence, because `docs/` does not catalogue tokens exhaustively.
+* The documented claim-verification workflow at
+  `docs/operator_guide/scheduler.md:843` pairs phase 4b's command with phase
+  7a's ledger and is exercised end to end by nothing. The underlying behaviour
+  is sound -- claim create increments `claimed_*` synchronously in the guarded
+  `UPDATE` -- so this is a coverage gap in a documented workflow, not a wrong
+  document.
+* `client-python` should carry its own `PUSH-AUDIT.md`. A plan phase landing
+  there has only the shared block's five-item floor to apply, which is a floor
+  and not a runbook. Recorded for that repository, as
+  `PLAN-transient-capacity-refusals` phase 7 did before it; not added here,
+  because writing one is a change to another repository's conventions.
+
+## Execution notes
+
+**2026-11-28 (AEDT).** The phase ran in one sitting. Step 9a was the planning
+commit; 9b ran alone, because it writes into this file and runs the tree-level
+checks; 9c to 9l then ran in parallel as ten read-only lenses; 9m is this
+record.
+
+**The D4 decision was confirmed before 9b started**, as the back brief
+required: wave 1's tree-level commands ran once at `$TIP` and none of the
+thirty-one merge commits was checked out. The three-range historical sample the
+plan offered as the cheap alternative was not taken.
+
+**Michael took two gradings at the second gate.** The documentation findings
+are blocking rather than advisory, so they are fixed in a follow-up pull
+request before the phase closes; and the advisory findings are grouped by
+theme into eight issues rather than filed one apiece.
+
+Five corrections to this plan and the master plan, made at their source as the
+steps proved them wrong.
+
+1. **D10's premise was wrong, for an instructive reason.** It told 9j to start
+   with "the sentences phase 5b moved under", and the master plan's phase 9
+   section says the re-check is needed "because phase 5 changes the admission
+   path those names describe". The guarded-counter section is **silent** on
+   enforcement: a grep of `:238-407` for `CLAIM_ENFORCEMENT_HARD`, `403`,
+   `507`, `advisory` or `binding` returns nothing. The section documents the
+   *primitive* -- a zero-row result from a guarded `UPDATE` is a refusal -- not
+   the *policy* of what the API does with one. The flip changed the policy and
+   left the primitive alone, so there was nothing there for it to falsify. The
+   re-check was still worth running; it came back clean because the prose was
+   written at the right altitude.
+2. **The ER_CHECKREAD invariant is not invisible to CI.** The 9g row, and this
+   plan's own framing, said it cannot fail there because CI runs MariaDB 10.11.
+   Both halves are wrong at `$TIP`. It is asserted directly on mocks, needing
+   no database, in `test_mariadb_capacity_admission.py:1586` over five shapes
+   and in `test_mariadb_capacity_claims.py` over create, update and delete. And
+   a server which does raise it runs in CI: the `schema_enum_widening` job runs
+   the live suite on Debian 13, and `tools/ci-enum-widening-test.sh` *refuses
+   to run* unless `@@GLOBAL.innodb_snapshot_isolation` is 1, so a runner-image
+   rebuild cannot silently drop the regime, while a later check rejects a
+   zero-test green tick.
+3. **D6 put `a005fba498` in G7 as a code-bearing range, and it carries no
+   code.** All six of its files outside `docs/plans/` are markdown, with no
+   added test functions. It was 9h's subject entirely and should not have been
+   given to a code-quality lens. The range count is unaffected; the group
+   assignment was wrong.
+4. **`113e4efb57` replaced `floor(load)` itself.** D-level framing and the 9e
+   row implied phase 6 did it and phase 00a was the old form to hunt for.
+   Phase 6 added the RAM band later. Classified already fixed.
+5. **The master plan's phase 9 range instruction was superseded**, which this
+   phase's planning commit corrected at source. F1 has the detail.
+
+**One management-session error, recorded because the audit's own credibility
+rests on saying so.** 9e's blocking finding was confirmed and reported to
+Michael as the audit's headline before 9k landed and contradicted it. The
+confirmation checked that claim denials reach the caller, which is necessary
+and not sufficient; it did not check whether the claim guard runs on a move,
+which is the step that decides it. *The disagreement* records the adjudication.
+
+## Outcome
+
+**The audit found no blocking defect in the plan's production code, and it
+found three places where one phase falsified another and nobody noticed.** On
+the question the phase was created to ask -- what did eighteen phases do to
+each other -- the answer is mostly "they agree", with the agreements cited
+rather than asserted. On the narrower question of whether anything was
+published that nothing consumes, the answer is yes, once, on the client side.
+
+**What was read.** Thirty-one in-repository merge ranges and one in
+`client-python`, run per range and pooled per `PUSH-AUDIT.md`'s range rule
+rather than as the cumulative union the master plan originally asked for.
+Twenty-one of the thirty-one carry code; ten contain nothing but plan files and
+got the two checks that scope them out. Two hundred and ten grep-level
+commands are recorded with their literal output, the tree-level checks ran once
+at `$TIP` and all passed, and ten judgement lenses read the code in the nine
+groups D6 fixed.
+
+**The pattern worth carrying forward.** Phase 5b landed the hard-ceiling flip
+with a sweep for the word "advisory", and that sweep is the audit's single
+richest seam -- in both directions. It was done thoroughly in
+`tools/ci_headroom_report.py`, where nine lines corrected six separate sites
+and nothing survives. It missed two pages where the same fact is paraphrased
+without the word: one page now says a claim exceedance is "a warning, not a
+refusal" four hundred lines from its own heading "The ceiling is enforced", and
+another says hard claim ceilings are "still to come" three hundred lines from
+"Claim ceilings are enforced". Neither is reachable by grepping for a keyword,
+and neither per-phase review could have seen it, because each page was correct
+when its own phase edited it. That is the whole argument for this phase
+existing, demonstrated twice.
+
+**The defect this phase was created by is fixed, and its mirror image is not.**
+Phase 4 shipped the claims API without advertising `auth: namespace-claims`,
+found by a passing question at close-out. The string is now advertised and
+pinned by a test. What nobody checked is whether anything *reads* it: the
+client's five base claim verbs gate on no capability at all, while two later
+claim methods in the same file gate on their own tokens. The asymmetry is
+visible inside a single function. So the plan learned to publish its contracts
+and did not learn to consume them, which is the same lesson from the other
+side.
+
+**Where the code is strong, said plainly, because an audit that only lists
+faults misreports what it read.** The admission transaction, its release
+mirror, the reconciler and the three claim CRUD transactions are correct on
+every question put to them, and are unusually well documented about why -- the
+guarded-`UPDATE`-first invariant holds on every path, including the two where
+the first statement is not the obvious one; nothing leaks between drawdown and
+placement because they are one transaction; both of the reconciler's
+deliberately different absent-row choices match the guide; and no guard
+re-derives usage, with the one re-derivation that exists named and justified.
+The authorisation is correct, including against a body-override attack that is
+real in mechanism and closed in three independent places. The stage
+classification that phase 5b deliberately left as neither transient nor
+permanent is not merely unbroken but actively guarded by a test that AST-walks
+the scheduler to prove every stage is classified. And all nineteen claims in
+the developer guide's guarded-counter pattern section are still true.
+
+**The three orphan defect fixes -- the ranges belonging to no phase row, which
+no phase review ever covered -- are all still in place**, each verified by
+reading the lines rather than by assuming, including the one whose mechanism
+phase 6's binary affinity model could plausibly have broken and did not.
+
+**One lens contradicted another and the deeper one was right.** The record
+keeps both, because the site in question still reads as a defect and the reason
+it is not lives three files away in a `pass` branch. The management session had
+confirmed the wrong verdict before the contradiction arrived; that is recorded
+in the execution notes rather than quietly corrected.
+
+**What is still open.** Five documentation and comment corrections, graded
+blocking, land in a follow-up pull request, and this phase and the plan stay
+`In progress` until they do. Eight issues carry the advisory findings. Two
+findings dissolved under a sweep and became nothing: both turned out to be
+repository-wide conditions older than the plan, one of them already tracked by
+the repository's own tooling with a stated remedy.
+
+### Definition of done
+
+Items 1 to 11, 13 and 15 pass. Item 12 is **not met**, by design: the blocking
+findings land in a follow-up pull request, so item 14 reads `In progress`
+rather than `Complete`, per D9.
+
+| # | Result | How it was checked |
+|---|--------|--------------------|
+| 1 | **pass** | `grep -cE '^#### [0-9a-f]{10}'` on this file reads **31** -- the 21 code-bearing and 10 plan-only in-repository ranges. The two `client-python` ranges are named in prose in step 9l's section, one audited and one cited |
+| 2 | **pass** | Set by the 9a close-out commit: phase 5b reads `31f3350c1c` (#5087) and phase 4b also names `client-python 135ab53042 (#375)`. Phase 9's is the only `—` left |
+| 3 | **pass** | Phase 5b's item 17 now reads "pass, after the fact", with merge-queue run `45877310889`, job `140107936676`, the Debian 13 cluster lane, and an explicit note that `Ubuntu 24.04 cluster` was skipped so the answer covers one cluster platform and not both |
+| 4 | **pass** | The master plan's phase 9 section carries a *Corrected 2026-11-28* paragraph describing the superseded instruction and stating the range rule instead |
+| 5 | **pass** | 9b ran all four at `$TIP`: `pre-commit run --all-files` exit 0, `tox` exit 0, `tools/mermaid-lint.sh` exit 0 and `git diff --exit-code shakenfist/protos` clean after `tox -e genprotos`. The management session independently re-ran `pre-commit run --all-files` (all 17 hooks) and `tools/mermaid-lint.sh`, reading the latter's status from the command itself rather than through a pipe. No hook was retried and no flake accepted |
+| 6 | **pass** | `grep -cE '^.git diff [0-9a-f]{10}\^1 '` reads **210** -- ten commands for each of the 21 code-bearing ranges |
+| 7 | **pass** | `grep -cE '^.git rev-list --parents -n1 '` reads **10**. The management session re-derived all ten independently: every one prints three hashes, and every one's diff lists zero paths outside `docs/plans/` |
+| 8 | **pass** | `grep -cE '^### Step 9[c-l] '` reads **10**. Each names the files it read, including the four whose answer was that they found nothing |
+| 9 | **pass** | 9j reports 18 "still true" with the lines read and 1 "unverifiable" (the phase 0 benchmark's historical measurements, deliberately not re-run), and the error-number comparison reads `[1213, 1205, 1020]` against `frozenset((1213, 1205, 1020))`, which the management session confirmed at `mariadb.py:29282` |
+| 10 | **pass** | 9k's three questions are answered under separate headings, the question 1 enumeration method is stated as seven per-category greps resolved three ways, and the four question 2 candidates are each answered "they agree" with confirming lines |
+| 11 | **pass** | Every row of the Disposition section carries file, line, range, grade and disposition, with a `$TIP` line or the *already fixed* classification. Nothing is recorded without one |
+| 12 | **not met** | By design and per D7. The five blocking findings are documentation and comment corrections whose fix is a separate pull request, which does not exist yet. Every advisory finding does name its issue: shakenfist#5110 to #5116 and client-python#464 |
+| 13 | **pass** | Recorded below under *The struck management-checklist items* |
+| 14 | **in progress** | `python3 tools/check-plan-status.py` exits 0 and the table and `index.md` agree. `index.md` reads `In progress` and `17 of 18`, which D9 requires while a blocking finding is open, and the open item is named: the five corrections B1 to B5 |
+| 15 | **pass** | `grep -c 'ea3c9bf63' docs/plans/PLAN-scheduler-reservations.md` reads **1**, and that line sits inside the *Corrected 2026-11-28* paragraph, so the superseded range is described there rather than instructed |
+
+### The struck management-checklist items
+
+`PUSH-AUDIT.md`'s management checklist ends with two items which do not apply
+to an audit of merged history, and which D8 strikes rather than ticks:
+
+* ~~Commit history is clean.~~ Thirty-one merge commits landed over four
+  months. There is no history to tidy.
+* ~~Branch is up to date.~~ Nothing here is rebaseable.
+
+Reporting either as a pass would be claiming a check that was not performed.

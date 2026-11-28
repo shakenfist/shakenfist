@@ -1403,6 +1403,81 @@ Run this last, after every other phase, so the documentation
 the audit checks is the documentation the plan intended to ship
 and the client surface it reviews is the final one.
 
+### Audit of phases 00a to 8
+
+Run 2026-11-28 over thirty-one in-repository merge ranges and one
+in `client-python`, one pass per range and pooled. Twenty-one
+ranges carry code, about 35,000 non-plan insertions; ten contain
+nothing but plan files, because phase 0 was a decisions document
+and phase 4c's code lives in `shakenfist/private-ci`. The record,
+the per-lens reports and the disposition are in
+[the phase plan](PLAN-scheduler-reservations-phase-09-push-audit.md).
+
+**No blocking defect in production code.** The admission
+transaction, its release mirror, the reconciler and the three claim
+CRUD transactions are correct on every question put to them; the
+guarded-`UPDATE`-first invariant holds on every path; the
+authorisation is correct, including against a body-override attack
+closed in three independent places; and all nineteen claims in the
+developer guide's guarded-counter section are still true. The three
+orphan defect fixes which belong to no phase row, and which no
+phase review ever covered, are all still in place.
+
+**Three places where one phase falsified another.** All three are
+phase 5b's hard-ceiling flip, which was landed with a sweep for the
+word "advisory". The sweep was thorough in
+`tools/ci_headroom_report.py`, where it corrected six separate
+sites. It could not see two paraphrases of the same fact that do
+not contain the word: `docs/operator_guide/scheduler.md:1087` still
+says a claim exceedance is "a warning, not a refusal", four hundred
+lines from its own heading "The ceiling is enforced", and
+`docs/developer_guide/subsystem_internals.md:12` still says hard
+claim ceilings are "still to come", three hundred lines from "Claim
+ceilings are enforced". Each page was correct when its own phase
+edited it, so no per-phase review could have caught either. Graded
+blocking and fixed in a follow-up pull request.
+
+**The defect this phase was created by is fixed; its mirror image
+is not.** Phase 4 shipped the claims API without advertising
+`auth: namespace-claims`. That string is now advertised and pinned
+by a test — but nothing *reads* it: `client-python`'s five base
+claim verbs gate on no capability, while two later claim methods in
+the same file gate on their own tokens. The plan learned to publish
+its contracts and not to consume them. Filed as client-python#464.
+
+**Eight issues carry the advisory findings** — shakenfist#5110 to
+#5116 and client-python#464 — covering unobserved cluster-CI skips,
+a tenant disclosure asymmetry the plan's own later work draws the
+opposite line on, `mariadb.py`'s size (this plan added 4,326 of its
+34,127 lines, and the seam is self-labelled), published contracts
+kept correct only by hand, the reconcile pass's missing retry,
+duplicated helpers, and the ranking's missing held-room term.
+
+**Two findings dissolved under a sweep**, which is the discipline
+working rather than a null result: the triple-single-quote
+convention was already broken eighteen times in the same file
+before phase 0 merged, and the plan-citation-in-code backlog is 370
+instances repository-wide across at least five plans, already
+tracked by `tools/check-plan-phase-references.py` with a stated
+remedy. Neither is this plan's defect.
+
+**One lens contradicted another.** A reschedule publishing a claim
+refusal as transient was reported blocking and withdrawn: a move
+skips the claim guard entirely (`shakenfist/mariadb.py:30643`), so
+no claim-stage denial can arise on that path, which two tests pin.
+The site still reads as a defect, so the audit records why it is
+not and adds a comment saying so.
+
+**Five corrections were made at their source**, the largest being
+that this section's own range instruction had been superseded by
+`PUSH-AUDIT.md`'s range rule a month after it was written. Also:
+the guarded-counter re-check this section asked for was unnecessary
+for the reason it gave, because that section documents the
+primitive rather than the enforcement policy the flip changed; and
+the ER_CHECKREAD invariant is not invisible to CI, being asserted
+directly on mocks and exercised against a MariaDB 11.8 runner whose
+script refuses to run without snapshot isolation on.
+
 ## Dependencies on other plans
 
 - **[`PLAN-sql-pushdown-filtering`](https://github.com/shakenfist/shakenfist/blob/7ef62db1f0f04bf2f9a9489376b785368917a8be/docs/plans/PLAN-sql-pushdown-filtering.md) (retired) is the
