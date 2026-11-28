@@ -65,6 +65,7 @@ metrics. The headlines:
 - A schema backfill runs in bounded batches.
 - An arm which blames the caller catches the caller's own exception
   type.
+- An environment variable is not a test fixture.
 
 ## Things that will bite you
 
@@ -221,9 +222,11 @@ metrics. The headlines:
   `logs.setup()` installs bind the process's stdout at import time, and
   in a stestr worker that is the subunit result stream: uncaptured, one
   run wrote 82 MB into it and a test which logged heavily ran at
-  whatever speed the consumer drained it. `ShakenFistTestCase`
-  redirects those handlers per test and reports the capture only for a
-  failing test, and fails the test which duplicates one. See
+  whatever speed the consumer drained it. Off tox they are
+  `/dev/log` syslog handlers instead, contained the same way.
+  `ShakenFistTestCase` redirects those handlers per test and reports
+  the capture only for a failing test, and fails the test which
+  duplicates one. See
   [docs/developer_guide/standards.md](docs/developer_guide/standards.md#a-tests-log-output-is-captured-and-reported-only-if-it-fails).
 
 - **A unit test holds on to what it allocates at its own peril.** The
