@@ -15560,12 +15560,20 @@ link's state itself.</p>
 <h3 id="fanning-out-across-a-fleet">Fanning out across a fleet<a class="headerlink" href="#fanning-out-across-a-fleet" title="Permanent link">&para;</a></h3>
 <p>One short chain per node, submitted for every node and then awaited
 one node at a time. Each node's <code>dist-upgrade</code> is fate shared with its
-own <code>apt-get update</code>, so a node whose index refresh failed does not
-upgrade against a stale one -- which is what the same two commands
-submitted without edges would do. Every edge here names an operation on
-the same instance as the operation declaring it, so no chain spends any
-dependency wait budget -- which is what makes a <code>dist-upgrade</code> safe
-inside one.</p>
+own <code>apt-get update</code>, so a node whose refresh never finished -- a
+wedged side channel, a fired deadline, a cascade from something it
+depended on -- does not upgrade against a stale index, which is what
+the same two commands submitted without edges would do. An
+<code>apt-get update</code> which <em>ran</em> and exited non-zero is a different case,
+and the edge as written here does not stop the upgrade, because that
+operation <em>completed</em>. <a href="#declaring-dependencies">Declaring
+dependencies</a> says why, and says which field
+asks for the stronger reading; note that <code>require_success</code> is not yet
+expressible through <code>apiclient.agent_dependency()</code>
+(<a href="https://github.com/shakenfist/client-python/issues/462">client-python#462</a>).
+Every edge here names an operation on the same instance as the
+operation declaring it, so no chain spends any dependency wait budget
+-- which is what makes a <code>dist-upgrade</code> safe inside one.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">chains</span> <span class="o">=</span> <span class="p">[]</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">for</span> <span class="n">instance_ref</span> <span class="ow">in</span> <span class="n">instance_refs</span><span class="p">:</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">update</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">instance_execute</span><span class="p">(</span>
@@ -15602,9 +15610,18 @@ nothing in this repository runs them.</p>
   those instances, which may include another caller's work -- and
   <code>Cluster.await_idle()</code> treats <code>abort</code> as a failure alongside <code>error</code>
   and <code>expired</code>, while waiting out any state it does not recognise
-  rather than declaring an instance idle. It does not declare
-  dependency edges today; the fate sharing above is what a chain would
-  buy it.</li>
+  rather than declaring an instance idle. Since
+  <a href="https://github.com/shakenfist/client-python-k3s/pull/177">#177</a> it
+  also declares edges: each command <code>Cluster.execute_and_await()</code>
+  submits to a node carries a <code>depends_on</code> edge on the previous command
+  submitted to <em>that same node</em>, so the rest of a node's sequence is
+  abandoned when the operation before it errored, expired or was
+  aborted. Edges are never declared across nodes, so a fan-out stays
+  concurrent and no chain spends any dependency wait budget. A cluster
+  which does not advertise <code>agentoperation-dependencies</code> gets today's
+  unchained submission and a note saying so, rather than a refusal.
+  That is on the plugin's <code>develop</code> and not yet in a release: <code>v0.4.2</code>
+  is the newest and predates it.</li>
 </ul>
 <p>A second example application is tracked as
 <a href="https://github.com/shakenfist/shakenfist/issues/4825">issue #4825</a>.</p>
