@@ -366,7 +366,7 @@ table entirely (decision D8).
 | 7a. An operator-readable capacity surface | [PLAN-scheduler-reservations-phase-07a-capacity-surface.md](PLAN-scheduler-reservations-phase-07a-capacity-surface.md) | Complete | `e8585a874` (#4654), `3695f168a` (#4687) |
 | 7b. Capacity and claim views in sf-client | [PLAN-scheduler-reservations-phase-07b-client-views.md](https://github.com/shakenfist/client-python/blob/develop/docs/plans/PLAN-scheduler-reservations-phase-07b-client-views.md) (in shakenfist/client-python, on its `develop`) | Complete | client-python `d484fdc` (#442) |
 | 8. Documentation and operator guide, and the client release | [PLAN-scheduler-reservations-phase-08-docs.md](PLAN-scheduler-reservations-phase-08-docs.md) | Complete | `a005fba498` (#4737) |
-| 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started | — |
+| 9. Push audit | [PLAN-scheduler-reservations-phase-09-push-audit.md](PLAN-scheduler-reservations-phase-09-push-audit.md) | In progress | — |
 
 The `Merged` column records what put each phase on `develop`.
 These entries were reconstructed after the fact, because the
@@ -1351,13 +1351,26 @@ review, and nothing in a per-phase audit would have caught
 it. That defect is the reason this phase exists.
 
 So the diff under audit is the plan's cumulative diff, not
-`develop...HEAD`. Every wave-1 and wave-2 command in
-`PUSH-AUDIT.md` that names `develop...HEAD` is rewritten to
-`ea3c9bf63..develop` -- the commit immediately before phase
-0 merged (`87a58a81e^1`, 2026-07-30) -- restricted to the
-paths this plan touches, so the range does not drag in
-unrelated work merged over the same months. The phase plan
-pins the path list. The audit also re-checks every code identifier
+`develop...HEAD`.
+
+*Corrected 2026-11-28 by the phase 9 survey (F1).* This
+section used to say that every wave-1 and wave-2 command in
+`PUSH-AUDIT.md` naming `develop...HEAD` is rewritten to
+`ea3c9bf63..develop` -- the commit immediately before phase 0
+merged (`87a58a81e^1`, 2026-07-30) -- restricted to a path
+list the phase plan pins. That instruction was written on
+2026-08-25 and is superseded. On 2026-09-13 `PUSH-AUDIT.md`
+gained a *What `$RANGE` means* section (`f445a9d31e`) which
+rules the union out in terms: the range comes from the
+`Merged` column, and "a plan with four merges gets four
+passes, not one pass over a union that git cannot express".
+The `plan-push-audit-phase` shared block agrees, and the
+path list goes with it -- every range is a pull request from
+this plan's own branches, so there is no unrelated work in
+one to filter out. The audit therefore runs once per range
+and pools the findings; phase 9's D1 is the range set, which
+is thirty-one merge commits here plus two in `client-python`.
+The audit also re-checks every code identifier
 the developer guide's guarded-counter pattern section cites
 (`docs/developer_guide/database_internals.md`, *Guarded counters for
 finite resources*) against `shakenfist/mariadb.py`, because phase 5
