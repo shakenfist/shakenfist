@@ -451,7 +451,8 @@ class CachedBlobPathTestCase(base.ShakenFistTestCase):
                         helper, '_open_connection',
                         side_effect=exceptions.HTTPError('404')):
                     with mock.patch.object(
-                            helper, '_blob_get') as mock_blob_get:
+                            helper, '_blob_get',
+                            return_value=(mock.MagicMock(), False)) as mock_blob_get:
                         with mock.patch.object(
                                 helper, '_http_get_inner') as mock_http_get:
                             with mock.patch(
@@ -529,7 +530,8 @@ class ResolutionOrderingTestCase(base.ShakenFistTestCase):
                         side_effect=AssertionError(
                             'the source must not be consulted')):
                     with mock.patch.object(
-                            helper, '_blob_get') as mock_blob_get:
+                            helper, '_blob_get',
+                            return_value=(mock.MagicMock(), False)) as mock_blob_get:
                         with mock.patch(
                                 'shakenfist.images.add_event_multi'):
                             helper.transfer_image(cached_only=True)
@@ -557,7 +559,8 @@ class ResolutionOrderingTestCase(base.ShakenFistTestCase):
             with mock.patch.object(images.blob.Blob, 'from_db',
                                    return_value=cached):
                 with mock.patch.object(
-                        helper, '_blob_get') as mock_blob_get:
+                        helper, '_blob_get',
+                        return_value=(mock.MagicMock(), False)) as mock_blob_get:
                     with mock.patch('shakenfist.images.add_event_multi'):
                         helper.transfer_image(cached_only=True)
 
@@ -604,7 +607,8 @@ class ResolutionOrderingTestCase(base.ShakenFistTestCase):
                             helper, '_open_connection',
                             return_value=resp) as mock_open:
                         with mock.patch.object(
-                                helper, '_blob_get') as mock_blob_get:
+                                helper, '_blob_get',
+                                return_value=(mock.MagicMock(), False)) as mock_blob_get:
                             with mock.patch(
                                     'shakenfist.images.add_event_multi'):
                                 helper.transfer_image()
@@ -679,7 +683,8 @@ class ResolutionOrderingTestCase(base.ShakenFistTestCase):
         helper = self._helper(images.BLOB_URL + 'a-blob-uuid')
         with mock.patch('shakenfist.images.requests.get',
                         side_effect=self._fake_get):
-            with mock.patch.object(helper, '_blob_get') as mock_blob_get:
+            with mock.patch.object(helper, '_blob_get',
+                                   return_value=(mock.MagicMock(), False)) as mock_blob_get:
                 with mock.patch('shakenfist.images.add_event_multi'):
                     helper.transfer_image()
 
@@ -904,7 +909,8 @@ class RequireImageChecksumTestCase(base.ShakenFistTestCase):
                         helper, '_open_connection',
                         side_effect=exceptions.HTTPError('404')):
                     with mock.patch.object(
-                            helper, '_blob_get') as mock_blob_get:
+                            helper, '_blob_get',
+                            return_value=(mock.MagicMock(), False)) as mock_blob_get:
                         with mock.patch(
                                 'shakenfist.images.add_event_multi'):
                             helper.transfer_image()

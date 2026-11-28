@@ -1115,3 +1115,52 @@ class BlobExternalViewReferencesTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             {}, blob.Blob._transcodes_from_references(refs[:1]))
         self.assertEqual({}, blob.Blob._transcodes_from_references([]))
+
+
+class EnsureLocalReportsReplicationTestCase(base.ShakenFistTestCase):
+    """ensure_local() says whether it moved the blob.
+
+    The image fetch's usage event tells a blob already on the node from
+    one replicated here, and takes that answer from ensure_local() rather
+    than re-deriving it, so each of its exits has to give the right one.
+    """
+
+    def _blob(self, state=blob.Blob.STATE_CREATED):
+        b = mock.MagicMock()
+        b.STATE_CREATED = blob.Blob.STATE_CREATED
+        b.state.value = state
+        b.depends_on = None
+        return b
+
+    def _ensure_local(self, b, exists):
+        with mock.patch.object(blob.Blob, 'filepath',
+                               return_value='/nonexistent/blob'), \
+                mock.patch('shakenfist.blob.os.path.exists',
+                           side_effect=exists), \
+                mock.patch('shakenfist.blob.add_event_multi'), \
+                mock.patch('shakenfist.blob.util_concurrency.NodeLock'):
+            return blob.Blob.ensure_local(b)
+
+    def test_a_blob_already_here_was_not_replicated(self):
+        b = self._blob()
+        self.assertIs(False, self._ensure_local(b, lambda p: True))
+        b._attempt_transfer.assert_not_called()
+
+    def test_a_transferred_blob_was_replicated(self):
+        b = self._blob()
+        self.assertIs(True, self._ensure_local(b, lambda p: False))
+        b._attempt_transfer.assert_called_once()
+
+    def test_a_blob_which_arrived_under_the_lock_was_not_replicated(self):
+        # Absent on both checks before the lock, present inside it:
+        # another caller's transfer moved it, not this one.
+        answers = iter([False, False, False, True])
+        b = self._blob()
+        self.assertIs(
+            False, self._ensure_local(b, lambda p: next(answers)))
+        b._attempt_transfer.assert_not_called()
+
+    def test_a_blob_not_yet_created_was_not_replicated(self):
+        b = self._blob(state='initial')
+        self.assertIs(False, self._ensure_local(b, lambda p: False))
+        b._attempt_transfer.assert_not_called()

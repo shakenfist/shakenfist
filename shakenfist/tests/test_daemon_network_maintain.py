@@ -115,6 +115,7 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
             maintain.STRAY_VXLAN_HANDLING_FAILING = False
             maintain.QUIESCE_REPORTED.clear()
             maintain.HEALTH_CHECK_LAST.clear()
+            maintain.BUDGET_DEFERRAL_REPORTED = False
 
         _clear()
         self.addCleanup(_clear)
@@ -532,6 +533,106 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
         self.assertTrue(
             any('deferred 1 networks to a later pass' in m
                 for m in messages), messages)
+
+    def _deferral_messages(self, active):
+        node = active['node'].from_db.return_value
+        return [c.args[1] for c in node.add_event.call_args_list
+                if 'health check budget' in c.args[1]]
+
+    def test_a_run_of_deferring_passes_is_reported_once_each_way(self):
+        """The budget is only reached while the node is degraded, which
+        lasts many passes. Reporting every one would be an event row
+        every thirty seconds for the length of the incident, at the
+        moment the database is least able to take it, so the run is
+        reported on the way in and on the way out and the passes between
+        are left to the log line.
+        """
+        def nets():
+            return [
+                _build_mock_network(uuid='net-a', vxid=1, is_okay=True),
+                _build_mock_network(uuid='net-b', vxid=2, is_okay=True),
+                _build_mock_network(uuid='net-c', vxid=3, is_okay=True)]
+
+        first = self._run_one_iteration(
+            network_node=True, networks=nets(),
+            clock_step=6.0, health_check_budget=10.0)
+        messages = self._deferral_messages(first)
+        self.assertEqual(1, len(messages), messages)
+        self.assertIn('deferred 1 networks', messages[0])
+
+        second = self._run_one_iteration(
+            network_node=True, networks=nets(),
+            clock_step=6.0, health_check_budget=10.0)
+        self.assertEqual([], self._deferral_messages(second))
+        # Still deferring, and the log line still says so.
+        self.assertEqual(1, _pass_cost_fields(second)['networks_deferred'])
+
+        recovered = self._run_one_iteration(
+            network_node=True, networks=nets())
+        messages = self._deferral_messages(recovered)
+        self.assertEqual(1, len(messages), messages)
+        self.assertIn('reached every network', messages[0])
+
+        # And a pass after recovery is quiet again.
+        quiet = self._run_one_iteration(network_node=True, networks=nets())
+        quiet['node'].from_db.assert_not_called()
+
+    def test_a_degraded_pass_reads_the_node_once(self):
+        """A pass which both starts deferring and overruns writes both
+        events from one node read, since that is the case the feature
+        exists for.
+        """
+        nets = [_build_mock_network(uuid='net-a', vxid=1, is_okay=True),
+                _build_mock_network(uuid='net-b', vxid=2, is_okay=True),
+                _build_mock_network(uuid='net-c', vxid=3, is_okay=True)]
+        active = self._run_one_iteration(
+            network_node=True, networks=nets,
+            clock_step=10.0, health_check_budget=10.0)
+
+        node = active['node'].from_db.return_value
+        messages = [c.args[1] for c in node.add_event.call_args_list]
+        self.assertEqual(2, len(messages), messages)
+        self.assertTrue(any('health check budget' in m for m in messages))
+        self.assertTrue(any('longer than its' in m for m in messages))
+        active['node'].from_db.assert_called_once()
+
+    def test_a_disabled_budget_skips_the_interface_read(self):
+        """Which networks have guests only orders the health checks, and
+        with the bound disabled every network is checked whatever the
+        order. An operator who sets the budget to zero is asking for the
+        old behaviour, and should get the old cost with it.
+        """
+        nets = [_build_mock_network(uuid='net-a', vxid=1, is_okay=True),
+                _build_mock_network(uuid='net-b', vxid=2, is_okay=True)]
+        active = self._run_one_iteration(
+            network_node=True, networks=nets, health_check_budget=0.0,
+            busy_networks=['net-a'])
+
+        active['mariadb'].find_network_interfaces.assert_not_called()
+
+    def test_pass_seconds_includes_the_stray_vxlan_handling(self):
+        """``pass_seconds`` is the whole pass, through to the stray vxlan
+        handling at its end. That handling is an RPC, instance reads,
+        execs and enqueues, and a pass which overran only there would
+        otherwise report itself inside its cadence. With a clock which
+        advances on every read, a pass which also reaps a stray must
+        report longer than the same pass without one.
+        """
+        from shakenfist.daemons.network import maintain
+
+        quiet = self._run_one_iteration(
+            network_node=True, clock_step=1.0,
+            vxid_to_mac={}, db_network_vxids=[])
+        quiet_seconds = _pass_cost_fields(quiet)['pass_seconds']
+
+        maintain.EXTRA_VLANS_HISTORY[0x123] = 10_000.0 - 400
+        reaping = self._run_one_iteration(
+            network_node=True, clock_step=1.0,
+            vxid_to_mac={0x123: '02:00:00:aa:bb:cc'},
+            db_network_vxids=[])
+        self.assertTrue(reaping['util_concurrency'].execute.called)
+        self.assertGreater(
+            _pass_cost_fields(reaping)['pass_seconds'], quiet_seconds)
 
     def test_busy_networks_are_health_checked_before_empty_ones(self):
         """When the budget is scarce it is spent on the networks which
@@ -1702,8 +1803,10 @@ class MaintainPipelineTest(base.ShakenFistTestCase):
             assert_called_once_with('Extra vxlan present!')
         # The enslaved device is named in the log fields so an operator
         # can work out which domain is holding the stray open.
-        fields = active['log'].with_fields.call_args.args[0]
-        self.assertEqual(['vnet7'], fields['enslaved'])
+        fields = [c.args[0] for c in active['log'].with_fields.call_args_list
+                  if c.args and 'enslaved' in c.args[0]]
+        self.assertEqual(1, len(fields), fields)
+        self.assertEqual(['vnet7'], fields[0]['enslaved'])
         # Untouched, so it is reconsidered as soon as the tap goes.
         self.assertEqual(10_000.0 - 400, maintain.EXTRA_VLANS_HISTORY[0x123])
 

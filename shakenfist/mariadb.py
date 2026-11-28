@@ -27369,11 +27369,13 @@ def dequeue_work_items(
     Returns a list of ``(queue_name, job_name, payload, deliveries)``
     tuples, possibly empty. ``deliveries`` counts this delivery, so one
     is a first delivery and more means an earlier one was lost; zero
-    means an sf-database too old to report it (issue 3974). Items are returned in caller-supplied priority
-    order: the first queue_name in the list is highest priority. Both
-    paths record ``work_queue_worker_id()`` in ``claimed_by``, so a
-    claim names the node whose worker holds it rather than whichever
-    node answered the RPC (issue 4652).
+    means an sf-database too old to report it (issue 3974).
+
+    Items are returned in caller-supplied priority order: the first
+    queue_name in the list is highest priority. Both paths record
+    ``work_queue_worker_id()`` in ``claimed_by``, so a claim names the
+    node whose worker holds it rather than whichever node answered the
+    RPC (issue 4652).
 
     This single query replaces the previous per-queue dequeue loop;
     a sf-net or sf-queues worker that used to issue 10 sequential

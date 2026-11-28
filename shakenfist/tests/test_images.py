@@ -257,16 +257,16 @@ class TransferImageTestCase(base.ShakenFistTestCase):
                         'the source must not be consulted')), \
                 mock.patch.object(
                     helper, '_blob_get',
-                    return_value=fetched_blob) as mock_blob_get:
+                    return_value=(fetched_blob, True)) as mock_blob_get:
             b = helper.transfer_image(cached_only=True)
 
         mock_blob_get.assert_called_once_with('sf://blob/blob-1')
         self.assertEqual(fetched_blob, b)
 
-    def test_a_cluster_fetch_is_recorded_as_a_cache_hit(self, mock_events):
-        """An image the cluster already held is a hit, and the event
-        says so with what it cost. Nothing counted this, so the hit rate
-        could not be had without reading every fetch by hand (#852).
+    def _cluster_fetch_extra(self, mock_events, replicated):
+        """Fetch a version the cluster holds, with ensure_local() either
+        replicating the blob here or finding it already present, and
+        return the event's payload.
         """
         cached_blob = mock.MagicMock(uuid='blob-1')
         fetched_blob = mock.MagicMock(uuid='blob-1')
@@ -280,14 +280,35 @@ class TransferImageTestCase(base.ShakenFistTestCase):
                     side_effect=AssertionError(
                         'the source must not be consulted')), \
                 mock.patch.object(
-                    helper, '_blob_get', return_value=fetched_blob):
+                    helper, '_blob_get',
+                    return_value=(fetched_blob, replicated)):
             helper.transfer_image(cached_only=True)
 
-        extra = self._fetch_extra(mock_events)
-        self.assertTrue(extra['cached'])
+        return self._fetch_extra(mock_events)
+
+    def test_a_cluster_fetch_is_recorded_as_a_cluster_hit(self, mock_events):
+        """An image the cluster held but this node did not is replicated
+        here, and the event says so with what it cost. Nothing counted
+        this, so the hit rate could not be had without reading every
+        fetch by hand (#852).
+        """
+        extra = self._cluster_fetch_extra(mock_events, replicated=True)
+        self.assertEqual('cluster', extra['source'])
         self.assertEqual(4096, extra['bytes'])
         self.assertEqual('blob-1', extra['blob_uuid'])
         self.assertIn('seconds', extra)
+
+    def test_a_blob_already_on_this_node_is_not_a_cluster_hit(
+            self, mock_events):
+        """get_image() calls transfer_image() on every instance create,
+        so a blob already on disk here is the common case on a busy
+        node. It moved nothing, and recording it as a cluster hit would
+        make the hit rate a function of instance churn and charge the
+        blob's size as traffic on every create.
+        """
+        extra = self._cluster_fetch_extra(mock_events, replicated=False)
+        self.assertEqual('node', extra['source'])
+        self.assertEqual('blob-1', extra['blob_uuid'])
 
     def test_a_source_fetch_is_recorded_as_a_cache_miss(self, mock_events):
         """The other half: what the cluster had to pull from the source,
@@ -307,7 +328,7 @@ class TransferImageTestCase(base.ShakenFistTestCase):
             helper.transfer_image()
 
         extra = self._fetch_extra(mock_events)
-        self.assertFalse(extra['cached'])
+        self.assertEqual('internet', extra['source'])
         self.assertEqual(1048576, extra['bytes'])
         self.assertEqual('blob-9', extra['blob_uuid'])
 

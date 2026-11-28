@@ -174,16 +174,33 @@ the internet, meant reading every fetch by hand.
 Each fetch now also records an `image fetch complete` usage event
 carrying:
 
-* `cached` -- true when the image came from within the cluster, false
-  when it came from the source. Counting these gives the cache hit
-  rate.
-* `bytes` -- the size of the blob fetched.
+* `source` -- where the image came from:
+    * `node` -- the blob was already on this node, so nothing moved;
+    * `cluster` -- the cluster held a copy elsewhere, and it was
+      replicated to this node;
+    * `internet` -- the node pulled it from the source.
+* `bytes` -- the size of the blob. It is the same whatever the source,
+  so it is traffic only where `source` says something moved: summing it
+  over `cluster` gives the bytes replicated inside the cluster, and over
+  `internet` the bytes the cluster pulled from outside.
 * `seconds` -- how long the fetch took.
 * `blob_uuid` -- the blob the fetch produced.
 
-A fetch happens at most once per artifact version per node, so this is
+The event is written each time an instance is created from the artifact
+on a node, not once per artifact version per node: the original image
+is checked for even when a transcoded copy is already cached. On a node
+creating many instances from one image most of these events are
+therefore `node`, which is why that case is told apart from `cluster` --
+counted together, the cluster hit rate would follow instance churn
+rather than replication. `cluster` against `internet` is the hit rate
+of the cluster's cache as a whole. A create already writes a handful of
+status events, so one more per create is in proportion with them, and
 nothing like the rate at which a maintenance pass or a poll writes
-events, and the per-fetch cost of recording it is not worth avoiding.
+events.
+
+A fetch which fails records no `image fetch complete` event, so these
+rates are over fetches which succeeded; the failure itself is in the
+artifact's audit events.
 
 This covers the image fetch only. The transcode cache -- the separate
 decision about whether a post-transcode version of an image already

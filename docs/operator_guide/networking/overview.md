@@ -717,18 +717,26 @@ affecting many `dnsmasq` processes at once pays the timeout for each
 affected network. A few hundred networks in the second state is more
 than the 30 second cadence allows for.
 
-Every pass therefore logs what it cost:
+Every pass which runs therefore logs what it cost:
 
 ```
-Maintenance pass complete; health_check_seconds=1.84; networks=112; pass_seconds=2.31
+Maintenance pass complete; health_check_seconds=1.84; networks=112; networks_deferred=0; pass_seconds=2.31
 ```
 
 * `networks` is how many networks the pass health checked.
 * `health_check_seconds` is the wall time inside those checks, summed.
   This is the term which grows with network count.
-* `pass_seconds` is the whole pass. The difference between it and
-  `health_check_seconds` is the pass's fixed cost plus any
-  reconciliations it enqueued.
+* `networks_deferred` is how many networks the pass did not reach
+  because it spent its health check budget (see below).
+* `pass_seconds` is the whole pass, through to the stray vxlan
+  handling at its end. The difference between it and
+  `health_check_seconds` is the pass's fixed cost, any reconciliations
+  it enqueued and the stray vxlan handling.
+
+A pass skipped because the network queues are already backed up (see
+`MAINTAIN_QUEUE_DEPTH_THRESHOLD`) does no work and logs no cost line;
+it records a `maintain pass skipped` event against the node instead, so
+a gap in the log stream has its explanation in the node's events.
 
 These are log lines rather than events deliberately: a pass runs twice
 a minute for the life of the node, and an event row at that rate would
@@ -762,10 +770,19 @@ degraded case, where enough unreachable `dnsmasq` processes to spend
 2 seconds each would otherwise take the pass past its own cadence.
 
 Networks with an interface attached are checked first, then the
-longest-waiting, so the bound defers work rather than starving it: the
-networks a pass did not reach are the ones the next pass starts with. A
-network deferred this way is still counted as one this node is on, so
-it is not mistaken for a stray and reaped while it waits.
+longest-waiting, so within each of those two groups the bound defers
+work rather than starving it: the networks a pass did not reach are the
+ones the next pass starts with. If the networks with interfaces alone
+exhaust the budget, empty networks go unchecked for as long as that
+lasts -- the trade described below. A network deferred this way is
+still counted as one this node is on, so it is not mistaken for a stray
+and reaped while it waits.
+
+Deferring a network defers all of its reconciliation, not just its
+health check. Without a check there is nothing to say a repair is
+needed, so a deferred network has no network rebuild, no vxlan mesh
+repair and no routed address route restored this pass; all of that
+waits for the pass which reaches it.
 
 Preferring networks which have guests on them is what makes a large
 number of unused networks close to free for the network node. It only
@@ -775,16 +792,22 @@ scarce, an empty network has nothing which can fail to get a DHCP
 lease, so it is the right thing to go without. Which networks have
 interfaces is one read of the table per pass, not one per network.
 
-When a pass does defer, it says so against the node:
+When a pass starts deferring, it says so against the node:
 
 ```
-maintain pass spent its 10.0 second health check budget and deferred 37 networks to a later pass
+maintain pass spent its 10.0 second health check budget and deferred 37 networks to a later pass; further passes which defer are logged but not reported again until one reaches every network
 ```
+
+A degraded node usually defers for many passes in a row, so this is
+reported once on the way in, and once more on the way out (`maintain
+pass reached every network inside its health check budget again`).
+The passes in between are in the log stream with their
+`networks_deferred` count.
 
 Unlike the overrun event this is not in itself a fault -- the bound
 working is the pass declining to overrun. It does mean some networks
 went unchecked, so drift on them is repaired a pass or more later than
-it otherwise would be. Seeing it regularly on a healthy cluster means
+it otherwise would be, as described above. Seeing it regularly on a healthy cluster means
 the budget is too small for the network count; seeing it during an
 incident is the bound doing its job.
 
@@ -932,9 +955,12 @@ is emitted by the enqueuing process, not by the dispatcher:
       of the waits of fifteen seconds or more never deferred once,
       and an operation which never defers emits no intermediate
       events, so its whole wait used to be a single bracket with
-      nothing inside it. A large `queue_seconds` means nobody asked
-      for that queue -- it sits low in the dispatcher's priority
-      order and higher lanes filled every batch. A large
+      nothing inside it. With `defer_count` zero, a large
+      `queue_seconds` means nobody asked for that queue -- it sits
+      low in the dispatcher's priority order and higher lanes filled
+      every batch. Where `defer_count` is non-zero, the deferral
+      sleep is counted in `queue_seconds` too, because the wait is
+      measured from the operation's creation. A large
       `dispatch_seconds` means the daemon had the item and sat on
       it, which on `sf-net` usually means one slow operation ahead
       of it on the same partitioned worker, since ops for one target

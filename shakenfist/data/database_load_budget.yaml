@@ -227,6 +227,13 @@ entries:
       sweep the model has no term for (#4072); the reaper now runs on the
       network node only, so these coefficients overstate the pair until
       it is re-derived from a window after that change was deployed.
+      Since #4971 every node's maintenance pass also makes one whole-table
+      call per pass to order its health checks busy networks first, about
+      0.033 qps per node (roughly a third of the base term above), unless
+      MAINTAIN_HEALTH_CHECK_BUDGET_SECONDS is zero. The window these
+      coefficients came from predates that call, so a re-derivation must
+      keep it in the per-node base rather than attribute the drop from
+      #4072 to it.
   - operation: GetNodeDaemonState
     caller_daemon: transfers
     per_node_base_qps: 0.498
