@@ -100,6 +100,24 @@ Both refuse with `404` rather than `403`, so a refusal does not confirm that
 the object exists. Scope enforcement is a separate and earlier gate — a caller
 who fails the scope check gets `403` without either decorator running.
 
+### An object's events are as visible as the object
+
+`requires_instance_ownership` guards `GET /instance/<ref>/events` and nothing
+further filters it: `object_events_response()` reads the rows and returns them,
+with no event-type filter and no per-field redaction. So an event addressed to
+an instance is readable by the namespace which owns that instance, and the
+decision about who may see a figure has to be taken where the event is written
+rather than where it is read.
+
+That is the whole of why the scheduler's capacity denials are evented twice.
+The node and the stage go to the instance; the dimensions the guard compared —
+a node's own `limit`, `used`, `held` and load, or the cluster's totals net of
+every namespace's claims — go to the refusing node, whose events endpoint is
+`@caller_is_admin`. `POST /placement` draws the same line at read time for the
+same figures, and
+[the coding rule](coding_rules.md#an-event-on-a-tenants-object-is-published-to-the-tenant)
+records what happened when the two surfaces disagreed.
+
 ### Resolving a name
 
 Guarding a lookup is a separate problem from performing one, and for a name

@@ -1505,10 +1505,17 @@ class InstancesEndpoint(api_base.Resource):
                 f'{e}')
 
         if placement is None:
+            # Set level. The denials dict carries each candidate's
+            # capacity figures and the cluster's own totals, and this
+            # event lands on the instance, whose event log its namespace
+            # reads -- so it publishes the verdict and not the guard's
+            # working, exactly as placement.py's query does. The detail
+            # is evented against each refusing node by
+            # place_on_candidates() (issue 5111).
             inst.add_event(
                 EVENT_TYPE_AUDIT,
                 'schedule failed, every candidate refused by capacity guard',
-                extra={'candidates': candidates, 'denials': denials})
+                extra=instance.tenant_denial_extra(denials))
 
             # A walk refused at the claim stage everywhere is the
             # namespace's own ceiling, not a full cluster, so it is

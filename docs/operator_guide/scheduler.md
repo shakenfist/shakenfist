@@ -504,15 +504,25 @@ on each candidate in turn, and the guarded claim is the admission, so
 one node being momentarily full only costs an extra round trip. Only
 once every candidate has refused does the request fail, with a 507
 reporting how many candidates refused it.
-The per-candidate detail -- which node was refused, and on which
-dimension(s) (`cpus`, `memory_mb`, `disk_gb`, or the `demand`
-feedforward term described below) -- is attached to the instance's
-`schedule failed, every candidate refused by capacity guard` audit
-event rather than to the response body, so diagnosing a 507 means
-reading the instance's events. It is the same audit detail the
-scheduler has always published, now sourced from the guard that
-actually admitted or refused the placement rather than a snapshot of
-it.
+The per-candidate detail is in the audit events rather than in the
+response body, so diagnosing a 507 means reading events -- but it is
+split across two objects, because an instance's event log is readable
+by the namespace which owns the instance and a node's is not. The
+instance gets which node refused and at which stage (`cluster`,
+`claim` or `node`), and then a set level summary on exhaustion:
+`candidates_refused`, the `failing_stages` seen across the walk, and
+the namespace's own claim where one refused. The figures the guard
+compared -- the dimension(s) (`cpus`, `memory_mb`, `disk_gb`, or the
+`demand` feedforward term described below) with their limits, usage
+and held room, or the cluster's own totals for a cluster-stage
+refusal -- are attached to **the refusing node's** events instead, so
+read `sf-client node events <node>` for those. That split is
+deliberate: those are the same per-node and cluster-wide capacity
+figures `POST /placement` gates on administrator rights, and an
+instance's events are gated on ownership alone (issue 5111). It is
+the same audit detail the scheduler has always published, sourced
+from the guard that actually admitted or refused the placement rather
+than a snapshot of it.
 
 The filter pipeline in front of that walk is evaluated for a requested
 shape -- vCPUs, memory, disk, affinity and namespace -- rather than for
@@ -1077,10 +1087,17 @@ tells the whole story:
   each node's selection weight.
 - Once a candidate is walked for admission, `schedule candidate
   refused by capacity guard` records the failing stage (`cluster`,
-  `claim` or `node`) and dimension(s) from the guarded capacity
-  claim itself -- distinct from, and later than, the pre-filters'
-  `dropped` reasons above. `schedule failed, every candidate refused
-  by capacity guard` follows if every candidate is refused.
+  `claim` or `node`) from the guarded capacity claim itself --
+  distinct from, and later than, the pre-filters' `dropped` reasons
+  above. The same message is recorded against the refusing node
+  carrying the `dimensions` the guard compared, which is where to
+  read the figures; the instance's copy names the node and the stage
+  only, because the dimensions are per-node and cluster-wide capacity
+  detail and an instance's events are readable by its namespace
+  (issue 5111). `schedule failed, every candidate refused by capacity
+  guard` follows if every candidate is refused, summarising the walk
+  as `candidates_refused`, `failing_stages` and -- where a claim
+  refused -- `claims`.
 - `placement admitted over namespace capacity claim` records that the
   admission succeeded but drew the namespace past the claim it holds,
   with the exceeded dimensions in `claim_dimensions`. See [Namespace

@@ -4777,6 +4777,193 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
         self.assertEqual(0, row['used_cpus'])
 
 
+class CapacityDenialDisclosureTestCase(base.ShakenFistTestCase):
+    """A denial's figures do not reach the namespace that owns the instance.
+
+    GET /instance/<ref>/events is gated on ownership alone, so anything
+    evented against an instance is readable by a non-admin namespace.
+    A denial's dimensions are the candidate node's own limit, used,
+    held, cpu_load_1 and expected_demand, or the cluster's totals net
+    of every namespace's claims -- which is the per-node detail
+    external_api/placement.py gates on admin rights. So the instance
+    gets the set level verdict and the node gets the figures (issue
+    5111).
+    """
+
+    def test_a_tenant_summary_names_stages_and_counts_not_figures(self):
+        denials = {
+            'node-a': {
+                'failing_stage': 'node',
+                'dimensions': [{'dimension': 'cpus', 'limit': 16.0,
+                                'used': 16.0, 'held': 2.0,
+                                'cpu_load_1': 14.2, 'exceeded': True}],
+                'claim': '',
+                'demand_only': False,
+            },
+            'node-b': {
+                'failing_stage': 'cluster',
+                'dimensions': [{'dimension': 'memory_mb', 'limit': 65536.0,
+                                'used': 65000.0, 'exceeded': True}],
+                'claim': '',
+                'demand_only': False,
+            },
+        }
+
+        extra = instance.tenant_denial_extra(denials)
+
+        self.assertEqual(
+            {'candidates_refused': 2,
+             'failing_stages': ['cluster', 'node']},
+            extra)
+        # Nothing which could carry a figure, and no node names.
+        self.assertNotIn('dimensions', extra)
+        self.assertNotIn('denials', extra)
+        self.assertNotIn('candidates', extra)
+        self.assertNotIn('node-a', json.dumps(extra))
+
+    def test_a_tenant_summary_names_the_namespaces_own_claim(self):
+        # The claim is the namespace's own ceiling, and the 403 body
+        # already names it, so the record the instance carries and the
+        # refusal the client reads stay the same fact (issue 4568).
+        claim = '9c9d6c96-1dc7-4f53-9f50-7b9e3a1c6a21'
+        denials = {
+            'node-a': {
+                'failing_stage': 'claim',
+                'dimensions': [{'dimension': 'cpus', 'limit': 4.0,
+                                'used': 4.0, 'exceeded': True}],
+                'claim': claim,
+                'demand_only': False,
+            },
+            'node-b': {
+                'failing_stage': 'claim',
+                'dimensions': [],
+                'claim': claim,
+                'demand_only': False,
+            },
+        }
+
+        extra = instance.tenant_denial_extra(denials)
+
+        self.assertEqual(
+            {'candidates_refused': 2,
+             'failing_stages': ['claim'],
+             'claims': [claim]},
+            extra)
+
+    def test_an_empty_denials_dict_summarises_to_nothing_refused(self):
+        self.assertEqual(
+            {'candidates_refused': 0, 'failing_stages': []},
+            instance.tenant_denial_extra({}))
+
+    def test_a_denial_carrying_no_stage_does_not_publish_a_null_stage(self):
+        # A stage is always set today, but a None would otherwise reach
+        # sorted() and raise mid-refusal, turning a 507 into a 500.
+        extra = instance.tenant_denial_extra({
+            'node-a': {'failing_stage': None, 'dimensions': [],
+                       'claim': None, 'demand_only': False}})
+
+        self.assertEqual(
+            {'candidates_refused': 1, 'failing_stages': []}, extra)
+
+
+class CapacityDenialEventTargetsTestCase(base.ShakenFistTestCase):
+    """The walk's own refusal events are split by audience."""
+
+    def setUp(self):
+        super().setUp()
+        fake_config = SFConfig(
+            STORAGE_PATH='/a/b/c',
+            DISK_BUS='virtio',
+            ZONE='sfzone',
+            NODE_NAME='node01',
+        )
+        self.config = mock.patch('shakenfist.instance.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.gmov = mock.patch(
+            'shakenfist.baseobject.get_minimum_object_version', return_value=6)
+        self.mock_gmov = self.gmov.start()
+        self.addCleanup(self.gmov.stop)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance(
+            'cirros', self.instance_uuid, cpus=2, memory=2048,
+            disk_spec=[{'base': 'cirros', 'size': 8}],
+            set_state=instance.Instance.STATE_CREATED)
+        self.inst = instance.Instance.from_db(self.instance_uuid)
+        self.node2 = self.mock_mariadb.node_uuids['node2']
+
+    def _refuse_everywhere(self):
+        def refuse(node, enforce_demand=True):
+            raise exceptions.CapacityAdmissionDenied(
+                'node',
+                [{'dimension': 'cpus', 'limit': 16.0, 'used': 16.0,
+                  'requested': 2.0, 'exceeded': True,
+                  'cpu_load_1': 14.2}])
+        return refuse
+
+    def test_the_instances_refusal_event_carries_no_dimensions(self):
+        with mock.patch.object(self.inst, 'place_instance',
+                               side_effect=self._refuse_everywhere()):
+            with mock.patch('shakenfist.instance.add_event_multi') as events:
+                chosen, denials = self.inst.place_on_candidates(
+                    [self.node2],
+                    'schedule candidate refused by capacity guard')
+
+        self.assertIsNone(chosen)
+
+        tenant = [c for c in events.call_args_list
+                  if c.args[1] == [self.inst]]
+        self.assertEqual(1, len(tenant))
+        self.assertEqual(
+            {'node': self.node2, 'failing_stage': 'node',
+             'enforce_demand': True},
+            tenant[0].kwargs['extra'])
+
+        # But the figures are still recorded -- against the node, whose
+        # event log is admin-only.
+        admin = [c for c in events.call_args_list
+                 if c.args[1] == [(ObjectType.NODE, self.node2)]]
+        self.assertEqual(1, len(admin))
+        self.assertEqual(
+            str(self.inst.uuid), admin[0].kwargs['extra']['instance'])
+        self.assertEqual(
+            denials[self.node2]['dimensions'],
+            admin[0].kwargs['extra']['dimensions'])
+
+    def test_the_demand_waiver_event_is_set_level(self):
+        # The waiver event used to publish the whole denials dict and
+        # the candidate list against the instance.
+        def refuse_on_demand(node, enforce_demand=True):
+            if enforce_demand:
+                raise exceptions.CapacityAdmissionDenied(
+                    'node',
+                    [{'dimension': 'cpus', 'limit': 16.0, 'used': 0.0,
+                      'requested': 2.0, 'exceeded': False},
+                     {'dimension': 'demand', 'limit': 6.0, 'used': 9.2,
+                      'requested': 2.5, 'exceeded': True}])
+
+        with mock.patch.object(self.inst, 'place_instance',
+                               side_effect=refuse_on_demand):
+            with mock.patch('shakenfist.instance.add_event_multi') as events:
+                chosen, _ = self.inst.place_on_candidates(
+                    [self.node2],
+                    'schedule candidate refused by capacity guard')
+
+        self.assertEqual(self.node2, chosen)
+        waivers = [
+            c for c in events.call_args_list
+            if c.args[2].startswith('no candidate admitted and some refused')]
+        self.assertEqual(1, len(waivers))
+        self.assertEqual(
+            {'candidates_refused': 1, 'failing_stages': ['node']},
+            waivers[0].kwargs['extra'])
+
+
 class InstancePortAllocationTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()

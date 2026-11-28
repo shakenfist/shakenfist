@@ -46,6 +46,9 @@ class FakeInstance:
         # waives that clause.
         self._deny = set(deny)
         self._deny_demand = set(deny_demand)
+        # place_on_candidates() names the instance in the refusal event
+        # it addresses to the refusing node, so the double needs one.
+        self.uuid = str(uuid4())
         self.state_sets = []
         self.delete_errors = []
         self.delete_error_stages = []
@@ -233,10 +236,17 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
         refusals = [
             c for c in self.last_instance_events.call_args_list
             if c.args[2] == 'reschedule candidate refused by capacity guard']
-        self.assertEqual(1, len(refusals))
+        # Two events for the one refusal: the tenant-facing one against
+        # [operation, instance], and the detailed one against the node.
+        self.assertEqual(2, len(refusals))
         # args: (event_type, log_targets, message, ...); log_targets is
         # the ordered [operation, instance] list.
         self.assertEqual([op, inst], refusals[0].args[1])
+        self.assertEqual(
+            [(ObjectType.NODE, first)], refusals[1].args[1])
+        # And the guard's working goes only to the node (issue 5111).
+        self.assertNotIn('dimensions', refusals[0].kwargs['extra'])
+        self.assertIn('dimensions', refusals[1].kwargs['extra'])
 
     def test_demand_only_refusals_are_waived_on_a_second_pass(self):
         # The D13 demand feedforward spreads bursts across nodes; when

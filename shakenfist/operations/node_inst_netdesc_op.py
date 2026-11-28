@@ -14,6 +14,7 @@ from shakenfist.exceptions import LowResourceException
 from shakenfist.exceptions import NVRAMTemplateMissing
 from shakenfist.exceptions import UEFIFirmwareUnavailable
 from shakenfist.instance import Instance
+from shakenfist.instance import tenant_denial_extra
 from shakenfist.network.bridged_vxlan_network import BridgedVXLanNetwork
 from shakenfist.network.network import Network
 from shakenfist.network.interface import NetworkInterface
@@ -284,11 +285,16 @@ class NodeInstNetdescOp(BaseClusterOperation):
                 log_targets=[self, inst])
 
             if target is None:
+                # Set level: this event reaches the instance, whose
+                # event log its namespace reads, and the denials dict is
+                # per-node and cluster-wide capacity detail. Each
+                # denial's own figures are evented against the node that
+                # refused by place_on_candidates() (issue 5111).
                 add_event_multi(
                     EVENT_TYPE_AUDIT, [self, inst],
                     'reschedule failed, every candidate refused by capacity '
                     'guard',
-                    extra={'candidates': candidates, 'denials': denials})
+                    extra=tenant_denial_extra(denials))
                 # Every candidate was refused by the capacity guard,
                 # which is the same fact the create path publishes as
                 # the capacity_guard stage. The message is unchanged;

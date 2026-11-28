@@ -280,6 +280,49 @@ def map_weighted_affinity(spec):
     }
 
 
+def tenant_denial_extra(denials):
+    """Render a capacity denials dict down to what its namespace may read.
+
+    A denial carries the guard's working: for the node stage the
+    candidate's own ``limit``, ``used``, ``held``, ``cpu_load_1`` and
+    ``expected_demand``, and for the cluster stage the cluster-wide
+    totals net of what every other namespace has claimed. The owning
+    namespace reads an instance's event log through
+    ``GET /instance/<ref>/events``, which is gated on ownership alone,
+    so eventing those figures against the instance publishes to a
+    tenant exactly the per-node and cluster-wide capacity detail that
+    ``external_api/placement.py`` gates on ``caller_has_admin_rights()``
+    -- "a cluster topology disclosure no other endpoint gives a
+    non-administrator" (issue 5111).
+
+    What a tenant is owed is the set level verdict, which is what this
+    returns: how many candidates refused, which stages refused them,
+    and the claim which refused where one did. The claim is included
+    because a namespace's own ceiling is its own data -- the 403 body
+    ``claim_capacity_error()`` builds already names it, and the record
+    the instance carries and the refusal the client reads have to be
+    the same fact (issue 4568).
+
+    The per-candidate figures are not merely dropped: the refusal event
+    ``place_on_candidates()`` writes against each refusing node keeps
+    them, and node events are admin-only.
+    """
+    extra = {
+        'candidates_refused': len(denials),
+        'failing_stages': sorted({
+            d['failing_stage'] for d in denials.values()
+            if d.get('failing_stage')}),
+    }
+
+    # Every claim-stage denial in one walk is the instance's namespace's
+    # own claim, so this is a list only so that it cannot assert a
+    # uniqueness nothing here checks.
+    claims = sorted({d['claim'] for d in denials.values() if d.get('claim')})
+    if claims:
+        extra['claims'] = claims
+    return extra
+
+
 class Instance(dbowo):
     object_type = ObjectType.INSTANCE
     initial_version = 19
@@ -1629,11 +1672,15 @@ class Instance(dbowo):
         ordered list of objects the event is recorded against, and
         defaults to ``[self]`` (the create path events the instance
         alone); the start redirect passes ``[operation, instance]`` to
-        event both.
+        event both. That event names the node and the stage; the same
+        refusal is evented a second time against the node itself,
+        carrying the dimensions, because an instance's event log is read
+        by its namespace and a node's is not (see
+        ``tenant_denial_extra()``).
 
-        Only ``self.place_instance()`` is read from ``self`` here, which
-        a preflight test double relies on; reading any other attribute
-        would break that double.
+        Only ``self.place_instance()`` and ``self.uuid`` are read from
+        ``self`` here, which a preflight test double relies on; reading
+        any other attribute would break that double.
 
         ``WriteException`` is deliberately not caught here: an
         unreachable database is not a full cluster, and asking the next
@@ -1671,10 +1718,32 @@ class Instance(dbowo):
                         'claim': e.claim_uuid,
                         'demand_only': e.demand_only,
                     }
+                    # Two events for one refusal, because they have
+                    # different audiences. log_targets includes the
+                    # instance, whose event log its namespace reads, so
+                    # it gets the node and the stage and not the
+                    # dimensions -- which are the candidate's own
+                    # capacity figures, or the cluster's totals net of
+                    # every namespace's claims. Those go to the node
+                    # that refused, where only an administrator can read
+                    # them (issue 5111). The node uuid stays on the
+                    # tenant's copy because the filter pipeline in front
+                    # of this walk already events its candidate lists
+                    # against the same instance, so withholding it here
+                    # would withhold nothing while costing a tenant the
+                    # trace of which node took their instance.
                     add_event_multi(
                         EVENT_TYPE_AUDIT, log_targets, refusal_message,
                         extra={
                             'node': candidate,
+                            'failing_stage': e.failing_stage,
+                            'enforce_demand': enforce_demand,
+                        })
+                    add_event_multi(
+                        EVENT_TYPE_AUDIT,
+                        [(ObjectType.NODE, candidate)], refusal_message,
+                        extra={
+                            'instance': str(self.uuid),
                             'failing_stage': e.failing_stage,
                             'dimensions': e.dimensions,
                             'enforce_demand': enforce_demand,
@@ -1684,11 +1753,15 @@ class Instance(dbowo):
         chosen = walk(True)
         if chosen is None and any(
                 d['demand_only'] for d in denials.values()):
+            # Set level, for the reason tenant_denial_extra() gives:
+            # the denials dict is the guard's working, and the candidate
+            # list is which nodes exist. Each denial's own detail is
+            # already evented against the node that refused.
             add_event_multi(
                 EVENT_TYPE_AUDIT, log_targets,
                 'no candidate admitted and some refused on demand '
                 'alone, waiving demand guard',
-                extra={'candidates': candidates, 'denials': denials})
+                extra=tenant_denial_extra(denials))
             chosen = walk(False)
         return chosen, denials
 

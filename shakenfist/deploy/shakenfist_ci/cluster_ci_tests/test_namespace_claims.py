@@ -442,6 +442,40 @@ class ClaimAPIMixin:
         return [e for e in events
                 if str(e.get('message', '')) == CLAIM_OVER_LIMIT_MESSAGE]
 
+    def _refused_instance_uuid(self, name):
+        """The uuid of the instance a refused create left behind.
+
+        A refused create errors the instance and enqueues its delete, so
+        the row leaves the active listing once that delete completes --
+        and both the listing and a name lookup are restricted to active
+        states. One read, taken immediately, rather than a poll:
+        polling cannot bring back a row which has already gone, and the
+        row is there at the instant the refusal is answered. The uuid is
+        all this needs, because the events endpoint keeps answering for
+        a deleted instance until the cleaner hard deletes it an hour
+        later.
+        """
+        for inst in self.test_client.get_instances():
+            if inst.get('name') == name:
+                return inst['uuid']
+        return None
+
+    def _tenant_visible_events(self, instance_uuid):
+        """Every event the owning namespace can read for an instance.
+
+        Read through the namespace's own client, which is the whole
+        point: GET /instance/<ref>/events is gated by
+        requires_instance_ownership and filters nothing further, so
+        this is literally what a tenant sees.
+        """
+        events = self.test_client.get_instance_events(
+            instance_uuid, limit=1000)
+        self.addDetail(
+            'tenant visible events for instance %s' % instance_uuid,
+            content.text_content(json.dumps(
+                events, indent=4, sort_keys=True, default=str)))
+        return events
+
 
 class TestNamespaceClaimLifecycle(ClaimAPIMixin, base.BaseNamespacedTestCase):
     """Claim CRUD and the refusals, with no instances involved."""
@@ -887,6 +921,70 @@ class TestNamespaceClaimAccounting(ClaimAPIMixin,
             'The claim reads %s'
             % (footprint, self._claim_used(refused),
                json.dumps(refused, sort_keys=True, default=str)))
+
+        # And the refusal told the namespace which stage refused without
+        # telling it the cluster's shape. A denial carries the guard's
+        # working -- for a node denial that node's own limit, usage,
+        # held room and load, and for a cluster denial the cluster's
+        # totals net of every namespace's claims -- and the instance's
+        # event log is readable by whoever owns the instance, so those
+        # figures must not be in it (issue 5111). POST /placement draws
+        # the same line for the same data at read time.
+        refused_uuid = self._refused_instance_uuid('claim-exceeds')
+        if refused_uuid is None:
+            # The refused instance's own delete had already finished, so
+            # its name no longer resolves. Nothing is wrong with the
+            # cluster; there is simply nothing left to read.
+            self.skipTest(
+                'The instance refused by the claim had already been '
+                'deleted out of the active listing, so its events could '
+                'not be read. The disclosure boundary is pinned by '
+                'shakenfist/tests/test_instance.py as well.')
+
+        leaked = []
+        summaries = []
+        for event in self._tenant_visible_events(refused_uuid):
+            extra = event.get('extra')
+            if not isinstance(extra, dict):
+                continue
+            for field in ('dimensions', 'denials'):
+                if field in extra:
+                    leaked.append((event.get('message'), field, extra[field]))
+            if str(event.get('message', '')) == (
+                    'schedule failed, every candidate refused by capacity '
+                    'guard'):
+                summaries.append(extra)
+
+        self.assertEqual(
+            [], leaked,
+            'The namespace which owns instance %s can read capacity '
+            'figures out of its event log. Each entry below is (message, '
+            'field, value): %s'
+            % (refused_uuid,
+               json.dumps(leaked, indent=4, sort_keys=True, default=str)))
+
+        # And what it does get is the set level verdict, which is what a
+        # tenant needs: how many candidates refused, which stages, and
+        # its own claim. Asserted rather than assumed, so the test above
+        # cannot pass by the events having gone missing altogether.
+        self.assertNotEqual(
+            [], summaries,
+            'Instance %s was refused at every candidate but carries no '
+            'exhaustion event, so the assertion above proved nothing. '
+            'Its events are attached to this test.' % refused_uuid)
+        for summary in summaries:
+            self.assertIn('candidates_refused', summary)
+            self.assertEqual(
+                ['claim'], summary.get('failing_stages'),
+                'Every candidate was refused by the namespace\'s own '
+                'claim, so that is the only guard stage the summary '
+                'should name: %s'
+                % json.dumps(summary, sort_keys=True, default=str))
+            self.assertEqual(
+                [claim['uuid']], summary.get('claims'),
+                'The summary does not name the claim which refused, '
+                'which is the one thing an operator has to grow: %s'
+                % json.dumps(summary, sort_keys=True, default=str))
 
         # The guard refused the create, so no placement was admitted
         # over this claim and there is no over-limit event anywhere --
