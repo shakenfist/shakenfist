@@ -523,6 +523,36 @@ class CiIdpKeycloakScriptTestCase(base.ShakenFistTestCase):
                         'the daemon.json is written after the install, so the '
                         'daemon has already started with its own rules')
 
+    def test_the_install_names_the_client_package(self):
+        self.assertEqual(0, self._run().returncode)
+        # Debian split the client out of docker.io at 26.1.4, and docker.io
+        # only Recommends docker-cli, so --no-install-recommends without
+        # docker-cli installs a daemon and no docker command. That is how the
+        # first run of this script on a cluster node failed, at the version
+        # check rather than at the install, which is why this asserts on the
+        # package list and not on the error. ca-certificates is withheld by
+        # the same flag and the image pull needs it to verify the registry
+        # over TLS.
+        #
+        # Asserted against the install command alone, not the block it sits
+        # in. The block carries a comment naming each of these packages and
+        # the flag, so a substring test over the whole of it is satisfied by
+        # the prose and would survive the very defect this test exists for --
+        # which is how the first version of it passed against a mutant that
+        # installed only docker.io.
+        installs = self._commands_containing('apt-get install')
+        self.assertEqual(1, len(installs), installs)
+        install = _joined_command(installs[0], 'apt-get install')
+        for package in ('docker.io', 'docker-cli', 'ca-certificates'):
+            self.assertIn(
+                package, install,
+                '%s is not installed, and --no-install-recommends means '
+                'nothing else will pull it in. The install was: %s'
+                % (package, install))
+        # And the flag is still there, because the rest of that Recommends
+        # list has no business on a throwaway CI node.
+        self.assertIn('--no-install-recommends', install)
+
     def test_every_node_is_asked_to_fetch_the_document_sf_api_fetches(self):
         self.assertEqual(0, self._run().returncode)
         asked = {call['target'] for call in self._calls()
@@ -533,6 +563,30 @@ class CiIdpKeycloakScriptTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             {'debian@%s' % CLUSTER['primary'], 'debian@%s' % CLUSTER['sf1'],
              'debian@%s' % CLUSTER['sf2']}, asked)
+
+
+def _joined_command(block, needle):
+    """The one command in ``block`` containing ``needle``, as one line.
+
+    Comment lines are dropped and backslash continuations are joined, so an
+    assertion about what a command does cannot be satisfied by a comment
+    nearby which happens to use the same words.
+    """
+    code = [line for line in block.splitlines()
+            if not line.lstrip().startswith('#')]
+    joined = []
+    for line in code:
+        if joined and joined[-1].endswith('\\'):
+            joined[-1] = '%s %s' % (joined[-1].rstrip('\\').rstrip(),
+                                    line.strip())
+        else:
+            joined.append(line.strip())
+    found = [line for line in joined if needle in line]
+    if len(found) != 1:
+        raise AssertionError(
+            '%d commands contain %r, expected exactly one: %s'
+            % (len(found), needle, found))
+    return found[0]
 
 
 def _image_tag(text):
