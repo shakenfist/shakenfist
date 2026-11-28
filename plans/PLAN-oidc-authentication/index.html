@@ -16417,14 +16417,14 @@ not land anywhere else.</p>
 <td>8. Worked operator examples for Keycloak and Authentik</td>
 <td>shakenfist</td>
 <td><a href="../PLAN-oidc-authentication-phase-08-worked-examples/">PLAN-oidc-authentication-phase-08-worked-examples.md</a></td>
-<td>Proposed</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>25c09b60ae</code> (#5028)</td>
 </tr>
 <tr>
-<td>9. Functional coverage against a containerised IdP</td>
-<td>shakenfist</td>
-<td>TBD</td>
-<td>Not started</td>
+<td>9. Functional coverage against a real provider</td>
+<td>shakenfist, actions</td>
+<td><a href="../PLAN-oidc-authentication-phase-09-functional-idp/">PLAN-oidc-authentication-phase-09-functional-idp.md</a></td>
+<td>Proposed</td>
 <td>—</td>
 </tr>
 <tr>
@@ -16661,16 +16661,45 @@ both providers, and claim matching refuses any claim value
 which is not a string -- so the binding the operator guide
 advises cannot fire. The phase therefore carries a change to
 claim matching as well as the documentation.</p>
-<p><strong>Phase 9 — functional coverage against a containerised
-IdP.</strong> The federation exchange already has functional
-coverage in <code>test_federation.py</code> under
+<p><strong>Phase 9 — functional coverage against a real provider.</strong>
+The <em>service account</em> exchange has functional coverage in
+<code>test_federation.py</code> under
 <code>shakenfist/deploy/shakenfist_ci/cluster_ci_tests/</code>, but
 against a throwaway in-process JWKS server rather than a
 real provider — which is the right trade for testing
-validation and no use at all for testing a flow. This phase
-stands up a real IdP in a container and drives a login
-through it headlessly, which is also the only honest test of
-phase 3's discovery and of phase 8's worked examples.</p>
+validation and no use at all for testing a flow. The human
+login path has none: nothing under <code>cluster_ci_tests/</code>
+mentions <code>/auth/login</code>, <code>/auth/issuers/&lt;uuid&gt;/discover</code>,
+<code>client_id</code> or <code>oidc_scopes</code>, so discovery, the login
+exchange, the credential set, key metadata and the whole
+client flow are untested outside unit tests. This phase
+stands a real provider up and drives a login through it
+headlessly, which is also the only honest test of discovery
+and of the worked operator examples.</p>
+<p>Its plan picked one provider rather than two, and one lane
+rather than four, on a measurement: the primary runs the
+functional suite and has 4096 MiB in the <code>slim-primary</code>
+topology against 12288 MiB in <code>slim-tier</code>, so <code>slim-tier</code> is
+the only lane with room for a provider beside the suite. The
+workflow step that stands it up lands in
+<code>shakenfist/actions</code>, which is why this phase names two
+repositories, and the provider's certificate is issued from
+the certificate authority <code>tools/ci-jwks-ca.sh</code> already
+installs — the cluster resolves discovery, the JWKS fetch
+and the login exchange through the one
+<code>FEDERATION_JWKS_CA_BUNDLE</code> trust store.</p>
+<p>The lane with that memory is the <strong>weekly</strong> one. Both
+merge-gating lanes use the <code>slim-primary</code> topology and so
+have the smaller primary, which means this phase's coverage
+runs once a week against <code>develop</code> and a failure arrives as
+a <code>ci-failure</code> issue rather than blocking a merge. That was
+accepted deliberately, because a provider in 4096 MiB beside
+the suite risks a flaky gate on the fleet's smallest
+primary, and raising that primary is a capacity decision in
+<code>shakenfist/actions</code> in the middle of its own sizing trial.
+So the human login path gains its first real-provider
+coverage here and still has no merge-gating functional test,
+which phase 10 should record.</p>
 <p><strong>Phase 10 — push audit.</strong> Runs <code>PUSH-AUDIT.md</code> over the
 accumulated diff of every phase in this plan against
 <code>develop</code>, not the last phase's diff alone. Findings land as

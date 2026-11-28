@@ -14931,6 +14931,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#human-login-is-covered-against-a-real-provider-weekly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Human login is covered against a real provider, weekly
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -15342,6 +15353,103 @@ weekly lanes against a branch, dispatch it by hand:
 files nothing: <code>report_failures</code> prints the issue it would have filed
 to its log, because the failure is the branch's and not the lane's,
 and only runs of the default branch are reported.</p>
+<h3 id="human-login-is-covered-against-a-real-provider-weekly">Human login is covered against a real provider, weekly<a class="headerlink" href="#human-login-is-covered-against-a-real-provider-weekly" title="Permanent link">&para;</a></h3>
+<p>The federated exchange is tested against a throwaway JWKS server the test
+process runs itself (<code>cluster_ci_tests/test_federation.py</code>), which is the
+right trade for validation and no use at all for a <em>flow</em>: discovery reads
+a document we did not write, and the login exchange trades a token a
+provider minted for its own reasons. So the cluster suite also stands up
+one real OpenID Connect provider, Keycloak in a container on the cluster's
+primary, and <code>cluster_ci_tests/test_oidc_login.py</code> covers, against it:</p>
+<ul>
+<li>discovery, with an issuer configured from the provider's real issuer URL
+  and every login endpoint filled in from the document it publishes;</li>
+<li>the login exchange at <code>/auth/login</code>, with a group bound mapping rule;</li>
+<li>the credential set that login mints, and the metadata on its key,
+  including its provenance;</li>
+<li>a refusal, when the identity's group matches no rule, and a login whose
+  audience is checked against the client identifier rather than the API's
+  URL;</li>
+<li>a real <code>sf-client login --flow device</code>, run as a subprocess, with the
+  test playing the person at the provider's own pages while the client
+  polls, and asserting what the client leaves in its cache.</li>
+</ul>
+<p><strong>This coverage is weekly. It does not gate a merge.</strong> The provider runs
+on the <code>debian-13-slim-tier</code> lane only, because that lane's primary is the
+one with the memory for it: 12288 MiB in the <code>slim-tier</code> topology, against
+4096 MiB in <code>slim-primary</code>, which is what both merge-gating lanes put the
+suite on. A login regression therefore arrives as a <code>ci-failure</code> issue from
+the weekly run, up to a week after the change which caused it, and not as a
+blocked merge. <code>shakenfist/tests/test_ci_oidc_login_guard.py</code> fails a pull
+request which moves that lane into the merge queue or adds a topology the
+suite's rule for "is a provider expected here?" has no answer for.</p>
+<p>On the lane that is supposed to have a provider the tests fail rather than
+skip when the provider's descriptor is missing, so a bring-up step which
+quietly stopped working is a failure and not a silent gap. Which lane that
+is, the suite works out from the cluster rather than from a setting: it
+finds the host running the suite in the node roster by its mesh IP and asks
+whether that node carries the hypervisor, network and database roles
+together, which is the shape of the provider topology's primary and of no
+merge-gating one, with the single-machine deployment carved out first
+because its one node also holds every role. That verdict is
+<code>sizing.provider_is_expected()</code> -- a pure function, so every roster shape
+the fleet can present is exercised on every pull request. It is deliberately
+not a method on the test class: the decision it makes is reached only on a
+lane that runs neither on a pull request nor in the merge queue, so getting
+it wrong either fails every cluster job for a week or skips in a way nobody
+can tell from coverage that has never worked.</p>
+<p><strong>What has no functional coverage.</strong> The authorization code flow is not
+exercised against a running provider, because it needs a browser and the
+suite's host has none. <code>client-python</code>'s own unit tests are what cover it.</p>
+<p><strong>Authentik is not run in CI.</strong> Its coverage is its committed captures
+under <code>shakenfist/tests/files/idp/</code> (a discovery document and a claim set),
+the reproducible lab in <code>tools/idp-lab/</code>, and the walkthrough in the
+operator guide. One provider was chosen because two do not fit: Authentik
+needs four containers and database migrations on a cold first boot, and the
+primary's memory does not stretch to running both.</p>
+<p>Where the pieces live:</p>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bring-up: certificate, container, realm, client, person, descriptor</td>
+<td><code>tools/ci-idp-keycloak.sh</code></td>
+</tr>
+<tr>
+<td>The step which calls it</td>
+<td><code>smoke-cluster.yml</code> in <code>shakenfist/actions</code></td>
+</tr>
+<tr>
+<td>The tests</td>
+<td><code>shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_oidc_login.py</code></td>
+</tr>
+<tr>
+<td>The person's half of a device login, parsed from the provider's HTML</td>
+<td><code>shakenfist/deploy/shakenfist_ci/idp_pages.py</code>, unit tested against the captured pages in <code>shakenfist/tests/files/idp/keycloak-device-*.html</code></td>
+</tr>
+<tr>
+<td>The verdict on whether a provider is expected on this deployment</td>
+<td><code>sizing.provider_is_expected()</code> in <code>shakenfist/deploy/shakenfist_ci/sizing.py</code></td>
+</tr>
+<tr>
+<td>The guard on where the provider may run, and on that verdict</td>
+<td><code>shakenfist/tests/test_ci_oidc_login_guard.py</code></td>
+</tr>
+<tr>
+<td>Regenerating the captures</td>
+<td><code>tools/idp-lab/capture-fixtures.sh</code></td>
+</tr>
+</tbody>
+</table>
+<p>The provider's certificate is signed by the authority <code>tools/ci-jwks-ca.sh</code>
+already installs, which the cluster trusts through
+<code>FEDERATION_JWKS_CA_BUNDLE</code>. <code>sf-client</code> has no equivalent setting, so the
+device login test points it at that authority with <code>REQUESTS_CA_BUNDLE</code>.</p>
 <h2 id="the-live-mariadb-tests">The live MariaDB tests<a class="headerlink" href="#the-live-mariadb-tests" title="Permanent link">&para;</a></h2>
 <p><code>shakenfist/tests/test_mariadb_*_live.py</code> need a real MariaDB server rather
 than the sqlite engine the unit suite uses, so they run in one place: the
