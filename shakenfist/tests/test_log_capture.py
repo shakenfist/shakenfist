@@ -19,6 +19,9 @@ is meant to fail.
 
 import io
 import logging
+import os
+import subprocess
+import sys
 from unittest import mock
 import weakref
 
@@ -267,3 +270,38 @@ class CapturedLogReportingTestCase(_ProbeMixin, base.ShakenFistTestCase):
         self.assertEqual('failure', recorded.outcome)
         self.assertIn('added a second log handler',
                       recorded.details['traceback'].as_text())
+
+
+class LogToStdoutDefaultTestCase(base.ShakenFistTestCase):
+    """Importing the tests package defaults SHAKENFIST_LOG_TO_STDOUT.
+
+    Issue #5107. Asserted in a subprocess because this process has long
+    since imported the package, and because the whole point is what
+    happens to an environment that did not set the variable -- which is
+    not this one, running under tox.
+    """
+
+    PROBE = ('import os, shakenfist.tests; '
+             'print(os.environ.get("SHAKENFIST_LOG_TO_STDOUT"))')
+
+    def _import_with(self, value):
+        env = dict(os.environ)
+        if value is None:
+            env.pop('SHAKENFIST_LOG_TO_STDOUT', None)
+        else:
+            env['SHAKENFIST_LOG_TO_STDOUT'] = value
+        return subprocess.run(
+            [sys.executable, '-c', self.PROBE],
+            env=env, capture_output=True, text=True, timeout=120)
+
+    def test_an_unset_variable_becomes_one(self):
+        result = self._import_with(None)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual('1', result.stdout.strip())
+
+    def test_an_explicit_value_is_not_overridden(self):
+        # setdefault, not assignment: someone deliberately exercising the
+        # syslog branch has to be able to ask for it.
+        result = self._import_with('0')
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual('0', result.stdout.strip())
