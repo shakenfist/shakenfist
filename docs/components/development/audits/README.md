@@ -89,6 +89,7 @@ The following projects are subject to consistency audits:
 - ryll
 - shakenfist
 - sfui
+- teneral
 - uncalibrated-sextant
 - visual-digest-rust
 

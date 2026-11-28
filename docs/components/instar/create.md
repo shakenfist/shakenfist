@@ -8,8 +8,9 @@ image, modulo a documented divergence whitelist (filename, actual-size,
 vmdk per-invocation CIDs, vhdx log-size).
 
 Raw output is host-only — `open(O_CREAT|O_TRUNC) + ftruncate` plus
-optional preallocation — so it does not require KVM. A monolithicFlat
-VMDK is written on the host too (see [below](#monolithicflat)). Every other target
+optional preallocation — so it does not require KVM. A monolithicFlat or
+twoGbMaxExtentFlat VMDK is written on the host too (see
+[below](#monolithicflat) and [below](#twogbmaxextentflat)). Every other target
 format runs the `create.bin` guest in the KVM sandbox and writes the
 metadata via virtio-block.
 
@@ -51,8 +52,8 @@ is qemu-img's grammar. The suffix is case-insensitive, so `1g` is `1G`.
 is refused, as a fraction of a byte is not a size. A fraction that is
 not a whole number of bytes is rounded to the nearest byte, with a half
 rounding upwards. `SIZE` is required unless `-b BACKING` is given, in
-which case it defaults to the backing file's virtual size. A monolithicFlat VMDK cannot have a backing
-file, so it always needs `SIZE`.
+which case it defaults to the backing file's virtual size. A monolithicFlat or twoGbMaxExtentFlat VMDK
+cannot have a backing file, so it always needs `SIZE`.
 
 The full flag surface is reported by `instar create --help`.
 
@@ -62,7 +63,7 @@ The full flag surface is reported by `instar create --help`.
 |--------|------------------------|----------|---------------------------|
 | raw    | (host-only)            | No       | byte-equivalent (file size + zero-fill) |
 | qcow2  | n/a                    | Yes      | info-equivalent (modulo refcount_bits, compat, zstd) |
-| vmdk   | monolithicSparse, streamOptimized, monolithicFlat | Yes (not monolithicFlat) | info-equivalent |
+| vmdk   | monolithicSparse, streamOptimized, monolithicFlat, twoGbMaxExtentFlat | Yes (not the flat subformats) | info-equivalent |
 | vpc    | dynamic, fixed         | Yes (dynamic only) | info-equivalent (modulo CHS virtual_size rounding) |
 | vhdx   | dynamic, fixed         | Yes (dynamic only) | info-equivalent |
 
@@ -132,20 +133,21 @@ Rejected (future work):
 ### vmdk
 
 Honoured:
-- `size`, `subformat` (monolithicSparse|streamOptimized|monolithicFlat)
-- `backing_file`, `backing_fmt` (not with monolithicFlat)
+- `size`, `subformat` (monolithicSparse|streamOptimized|monolithicFlat|twoGbMaxExtentFlat)
+- `backing_file`, `backing_fmt` (not with monolithicFlat or twoGbMaxExtentFlat)
 - `preallocation` (off|falloc|full; `falloc` and `full` are no-ops, `metadata` is refused)
 - `zeroed_grain` (ignored for the sparse subformats; `on` is refused for
-  monolithicFlat, as qemu-img refuses it)
+  the flat subformats, as qemu-img refuses it)
 
 Accepted and ignored: `adapter_type`, `hwversion`, `toolsversion`.
 
-Rejected (instar doesn't emit these subformats):
-- `subformat=twoGbMaxExtent*`
+Rejected (instar doesn't emit this subformat):
+- `subformat=twoGbMaxExtentSparse`
 
-Note: qemu-img doesn't accept an `-o grain_size=` key — grain is set by
-the subformat. instar exposes `--grain-size` as an independent flag, and
-also accepts `-o grain_size`. Neither is valid for monolithicFlat.
+Note: qemu-img has no grain size option for vmdk at any subformat; `-o help`
+lists none and `-o grain_size=` is an invalid parameter. `--grain-size`, and
+`-o grain_size`, are instar's own extension, accepted for the sparse
+subformats and refused for both flat ones, which matches qemu-img's outcome.
 
 #### monolithicFlat
 
@@ -188,11 +190,75 @@ writes any extent name verbatim (see
 the metadata refusal qemu-img leaves a zero-byte descriptor behind;
 instar leaves nothing. If a failure happens after a file has been opened
 (the extent's name is taken by a directory, or the extent cannot be
-sized), instar removes every file it opened.
+sized), instar removes the files it created and leaves any that were
+already there. A file it truncated before failing stays, empty: the
+guarantee is that a file create did not make is not deleted, not that its
+contents are preserved (qemu-img also leaves a truncated file behind).
 
 On success, `--output json` reports the descriptor as `filename`, its
 length as both `metadata_bytes_written` and `file_size_after`, and
 `resolved_unit_size` 0.
+
+#### twoGbMaxExtentFlat
+
+`-o subformat=twoGbMaxExtentFlat` and `--subformat twoGbMaxExtentFlat` are
+the same request. The image is a text descriptor at `FILENAME` plus one raw
+extent per 2 GiB of virtual size, the last holding the remainder, all
+written on the host with no guest. Each extent is sized with `ftruncate`, so
+it is a hole: a 64-extent image of 2 GiB apparent length each allocates
+almost nothing, and a split flat image costs its descriptor plus holes.
+
+Extents are named from `FILENAME` the way qemu-img names them: the basename
+is split at its last `.` and the extents are `<prefix>-f001<postfix>`
+through `-f064<postfix>`, in the same directory (`out.vmdk` gives
+`out-f001.vmdk`, `out-f002.vmdk` and so on). The descriptor is byte for byte
+the one qemu-img 6.2.0 and later writes, including its disk database lines,
+apart from the `CID`: qemu-img writes a random value there and instar writes
+a constant one, so its output is reproducible. Builds from 6.0.0 to 6.1.1
+differ by a single line — they write no `ddb.toolsVersion` and instar does;
+see [quirks.md](/components/instar/quirks/).
+
+Every extent is synced before the descriptor is created, so a `create` that
+fails part-way leaves extent files with no descriptor, never a descriptor
+naming extents that are not there. That ordering is for a failed create
+rather than for a host crash: the containing directory is not synced, so
+after a power loss the descriptor's directory entry can be on disk when an
+extent's is not. On a failure, `create` removes the files it made and leaves
+any that were already there.
+
+Refused, before any file is opened:
+
+| Request | Why |
+|---|---|
+| a `SIZE` needing more than 64 extents (over 128 GiB) | The limit is instar's own and qemu-img has none (it has been measured writing 1000 extents at 2000 GiB and 16384 at 32 TiB). The guest's extent table is a fixed 64-entry array, so instar could not read such an image back, and an image instar cannot read is not output worth writing. 128 GiB exactly is accepted. |
+| a zero `SIZE` | A descriptor with no extent lines is one instar cannot read. |
+| a derived extent that already exists | See below. |
+| `-b` or `-o backing_file`, no `SIZE`, `-o zeroed_grain=on`, `--grain-size` or `-o grain_size`, `preallocation=metadata` | As for monolithicFlat, with the message naming twoGbMaxExtentFlat. |
+| an extent name holding `"`, CR or LF | As for monolithicFlat. |
+
+A pre-existing derived extent is refused and nothing at all is written, not
+even the descriptor: the refusal happens before any file is opened. A
+pre-existing descriptor is the other half of the asymmetry — a create that
+proceeds overwrites it, as `create` has always promised for the path you
+typed, while `out-f001.vmdk` and its siblings are paths instar derived, and
+truncating files nobody named is not done silently.
+
+The refusal is a deliberate divergence from qemu-img, which truncates a
+pre-existing extent in place and succeeds. It is not unambiguously better,
+and it has a cost: a user re-running a failed create in the same directory
+has to remove the extent files themselves, where qemu-img would have
+overwritten them.
+
+On success, `--output json` reports the descriptor as `filename`, its length
+as both `metadata_bytes_written` and `file_size_after`, and
+`resolved_unit_size` 0, as monolithicFlat does. The extents are not counted
+in `file_size_after`: a 128 GiB image spread over 65 files reports the few
+kilobytes of its descriptor, which is the only file `create` wrote bytes
+into.
+
+`twoGbMaxExtentSparse` is not supported for `create`; the supported
+subformats are monolithicSparse, streamOptimized, monolithicFlat and
+twoGbMaxExtentFlat.
 
 ### vpc (VHD)
 

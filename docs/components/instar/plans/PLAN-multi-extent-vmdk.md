@@ -300,8 +300,12 @@ Out of scope:
 Each question carries the planner's recommendation and its reasoning.
 The operator resolved questions 1 and 2 on 2026-11-16, before phase 1's
 plan was written, adopting both recommendations as drafted; each
-question records it. Questions 3 to 6 are still open, and phase 1's
-measurements settle much of 4 and 5.
+question records it. Every question is now resolved: 3 by phase 4
+adopting its recommendation in the shipped emitter, 4 and 5 by the
+operator on 2026-11-26 as phase 5 was planned, and 6 by phase 5's
+survey confirming its premise in the code. Phase 1's measurements
+settled much of 4 and 5, and in both cases changed what was being
+asked -- each records how.
 
 1. **Simultaneous output devices, or sequential extent rotation?**
    *Recommendation: rotation.* Four reasons, in order of weight.
@@ -392,6 +396,16 @@ measurements settle much of 4 and 5.
    subformats carry `ddb.*`, old ones do not. Phase 17 documents it
    explicitly rather than leaving a reader to discover it.
 
+   **Resolved by adoption in phase 4**, as recommended.
+   `build_split_descriptor` emits the whole block --
+   `ddb.virtualHWVersion`, the three `ddb.geometry.*` values,
+   `ddb.adapterType` and `ddb.toolsVersion` -- and the retrofit for
+   `monolithicSparse`, `streamOptimized` and `monolithicFlat` is filed
+   as [#964](https://github.com/shakenfist/instar/issues/964) and named
+   in Future work. The inconsistency the cost paragraph predicts is
+   therefore live from phase 4 onwards, and phase 17 still owes the
+   documentation of it.
+
 4. **How are extent paths derived, and what is refused?**
    *Recommendation:* derive strictly from the output argument's own
    stem and directory (`out.vmdk` -> `out-s001.vmdk`), never from any
@@ -418,6 +432,20 @@ measurements settle much of 4 and 5.
    assumes hostile input. The recommendation above stands
    unresolved; the decision is the operator's.
 
+   **Resolved 2026-11-26: refuse a derived extent that already
+   exists, and keep overwriting the descriptor the user named.** Not
+   the recommendation as drafted, which refused everything. Phase 5's
+   survey found that `create` already advertises the opposite for its
+   own output -- `CreateArgs::filename`'s help text reads "Overwrites
+   if it already exists (matches qemu-img)" and
+   `run_create_vmdk_flat` implements it -- so refusing the named path
+   would make the split subformats the one `create` path that breaks
+   that promise. The line is drawn at what the user typed: `out.vmdk`
+   is theirs to lose, `out-f001.vmdk` is instar's invention. The cost
+   is that a user re-running a failed create must remove the extents
+   themselves, which phase 5 documents rather than presents as
+   unambiguously better.
+
 5. **What is the maximum extent count, and what happens past it?**
    The `%03d` naming implies 999 extents, about 2 TiB. *Recommendation:*
    measure qemu's real ceiling in phase 1 and match it, refusing above
@@ -443,6 +471,21 @@ measurements settle much of 4 and 5.
    documented limit of its own is the operator's decision, still
    open.
 
+   **Resolved 2026-11-26: a documented limit of instar's own, at
+   `MAX_EXTENTS` extents -- 64, which is 128 GiB.** Phase 5's survey
+   found the choice already foreclosed by phase 3, which landed after
+   this question was written: `shared::MAX_CHAIN_EXTENTS = 64` caps
+   the guest's extent table, and `layout_descriptor_extents` refuses a
+   descriptor declaring more rather than reading part of the image. So
+   matching qemu would mean writing images instar's own reader
+   refuses, leaving the differential fuzzer blind above the cap --
+   which is the reverse of question 2's reason for doing the read side
+   first. Phase 4 had reached the same conclusion from the emitter's
+   side and documented it there: a caller that wants readable output
+   must bound `extent_count` at `MAX_EXTENTS`. Phase 5 refuses above
+   it before opening any file, naming the limit, the extent count the
+   size needs, and the size.
+
 6. **Is flat create host-only, like monolithicFlat?**
    *Recommendation: yes,* and it should land *before* the ABI work.
    A flat multi-extent image is N sparse files of known length plus a
@@ -451,6 +494,14 @@ measurements settle much of 4 and 5.
    monolithicFlat create. That makes phase 5 a cheap, user-visible
    delivery that does not depend on phases 6 to 8, and it de-risks the
    descriptor emitter and the path rules by exercising them first.
+
+   **Resolved by adoption in phase 5**, as recommended. Its survey
+   found the seam already where this answer assumed: `run_create`
+   returns early into `run_create_vmdk_flat` before any VM is
+   launched, and the VMM already links the `vmdk` crate and calls its
+   descriptor builder directly. Host-only was not a choice phase 5 had
+   to make, which is why it carries no ABI change and lands before the
+   rotation phases.
 
 ## Execution
 
@@ -563,8 +614,8 @@ this table whether it is merged.
 | 1. Pin and measure qemu's output | [PLAN-multi-extent-vmdk-phase-01-pin.md](/components/instar/plans/PLAN-multi-extent-vmdk-phase-01-pin/) | Complete | 34832d47 |
 | 2. Fixtures and baselines | [PLAN-multi-extent-vmdk-phase-02-fixtures.md](/components/instar/plans/PLAN-multi-extent-vmdk-phase-02-fixtures/) | Complete | 2e8a3022 |
 | 3. Read side: lift the extent ceiling | [PLAN-multi-extent-vmdk-phase-03-read-ceiling.md](/components/instar/plans/PLAN-multi-extent-vmdk-phase-03-read-ceiling/) | Complete | 64e6fbc6 |
-| 4. Multi-extent descriptor emitter | [PLAN-multi-extent-vmdk-phase-04-descriptor.md](/components/instar/plans/PLAN-multi-extent-vmdk-phase-04-descriptor/) | In progress | |
-| 5. Host-only flat create | PLAN-multi-extent-vmdk-phase-05-flat-create.md | Not started | |
+| 4. Multi-extent descriptor emitter | [PLAN-multi-extent-vmdk-phase-04-descriptor.md](/components/instar/plans/PLAN-multi-extent-vmdk-phase-04-descriptor/) | Complete | 3aa85cc5 |
+| 5. Host-only flat create | [PLAN-multi-extent-vmdk-phase-05-flat-create.md](/components/instar/plans/PLAN-multi-extent-vmdk-phase-05-flat-create/) | Planned | |
 | 6. ABI: output rotation | PLAN-multi-extent-vmdk-phase-06-abi.md | Not started | |
 | 7. Core: rotation in the guest | PLAN-multi-extent-vmdk-phase-07-core.md | Not started | |
 | 8. VMM: extent lifecycle and safety | PLAN-multi-extent-vmdk-phase-08-vmm.md | Not started | |
@@ -819,14 +870,22 @@ mechanical.
 
 1. `instar create -f vmdk -o subformat=twoGbMaxExtentSparse` and
    `...=twoGbMaxExtentFlat` produce images byte-identical to
-   qemu-img's for every measured geometry, or divergent only where a
-   divergence is documented and justified.
+   qemu-img's for every measured geometry instar accepts, or divergent
+   only where a divergence is documented and justified. Open question
+   5's resolution bounds that at 64 extents (128 GiB); above it instar
+   refuses where qemu writes.
 2. `instar convert -O vmdk --subformat twoGbMaxExtent*` likewise.
 3. `instar measure` reports what qemu-img reports for both subformats.
 4. instar reads a `twoGbMaxExtent*` image with more than 15 extents,
    and reads `twoGbMaxExtentSparse` sources at all.
-5. The size at which instar refuses a multi-extent image matches
-   qemu-img's, and the refusal leaves nothing behind.
+5. The size at which instar refuses a multi-extent image is its own
+   documented limit, not qemu-img's -- phase 1 measured that qemu has
+   no ceiling, and open question 5 resolves to 64 extents (128 GiB)
+   because that is what the guest's extent table can read back. The
+   message names the limit and the size that reached it, and the
+   refusal leaves nothing behind. This criterion previously asserted a
+   match with qemu-img; that rested on the `%03d`-implies-999 premise
+   phase 1 disproved, and was corrected when phase 5 was planned.
 6. A failure part-way through writing a multi-extent image never
    leaves a descriptor pointing at a set of extents that does not
    match it.
@@ -873,6 +932,25 @@ Filled in as the plan runs. Already known:
   length grows with its extent count. Raised at phase 4's back brief,
   where the operator kept the contract for now and asked for this
   issue.
+
+* [#985](https://github.com/shakenfist/instar/issues/985),
+  `create -f raw` unlinking its output on a late failure whether or not
+  that run created it -- the same defect class phase 5 fixed for the
+  flat VMDK writers, left in raw. Reproducible in one command on ext4
+  (`ftruncate` past the 16 TiB file-size maximum), so it is not a race
+  or a corner of a full filesystem. Found by phase 5's review and filed
+  rather than folded in, because raw is outside this plan's scope and
+  the fix wants its own tests: this is the class that was pinned as
+  intended behaviour by two green tests before phase 5 inverted them.
+
+* [#986](https://github.com/shakenfist/instar/issues/986), two
+  follow-ups on `VmdkCreatedFiles` raised in phase 5's review and
+  deferred there: opening derived extents with `O_EXCL` so the
+  "this run created it" flag is true by construction rather than by a
+  preceding stat, and moving the single-extent writer to
+  `terminal_safe_path` so the `render` closure that exists only to keep
+  the two writers' quoting apart can go. Neither is a defect; the
+  closure should not outlive the deferral that created it.
 
 * Extending phase 4's pin-literal guard,
   `tools/ci/check-vmdk-split-pins.py`, to the VHDX literals in

@@ -56,8 +56,8 @@ occystrap process registry://docker.io/library/python:3.11 tar://python.tar \
 - [Use Cases](/components/occystrap/use-cases/) - Common scenarios and examples
 - [Performance Tuning](/components/occystrap/performance/) - Parallelism flags, connection
   efficiency, and recommended settings
-- [Development](/components/occystrap/development/) - Setup, tests, releasing, and the PR
-  bot commands
+- [Development](/components/occystrap/development/) - Setup, tests, releasing, dependency
+  updates, and the PR bot commands
 
 Design and phase plans, current and historical, live in
 [plans/](plans/), and every one of them is registered in

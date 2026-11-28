@@ -44,7 +44,7 @@ copy lives in shakenfist/development at
   a message explaining what changed and why.
 <!-- shared-block-end -->
 
-This is a single-change plan in the shape of `PLAN-375-guest-idt.md`:
+This is a single-change plan in the shape of [`PLAN-375-guest-idt.md`](https://github.com/shakenfist/instar/blob/8871b068fc3a997bf930c5f59509cdd5246aa8df/docs/plans/PLAN-375-guest-idt.md):
 one pull request, no phase files. Its steps are the Execution table
 below, and the push audit is its last step.
 

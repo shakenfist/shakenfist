@@ -152,8 +152,9 @@ format-coverage programme: instar writes **raw, qcow2, vmdk, vpc (VHD), and
 vhdx** only. qemu-img can additionally *create* vdi / parallels / qcow (v1) /
 qed images; instar refuses those by scope, not by inability (note 15).
 For vmdk, `create` and convert output write monolithicSparse,
-streamOptimized and monolithicFlat; neither writes the split
-twoGbMaxExtent subformats. For vhdx, `create` and convert output write
+streamOptimized and monolithicFlat; `create` also writes
+twoGbMaxExtentFlat, which convert output does not, and neither writes
+twoGbMaxExtentSparse. For vhdx, `create` and convert output write
 both dynamic and fixed (`--subformat fixed`). On vmdk, vpc and vhdx,
 `-o preallocation` accepts `off`, `falloc` and `full` and all three
 write the same image, so the modes are a no-op; `metadata` is refused.
@@ -335,7 +336,7 @@ The `instar convert` operation supports writing output in the following formats:
 |---------------|--------|--------------|
 | **raw** (default) | Supported | Flat byte-for-byte output, sparse by default (`--no-skip-zeros` for dense) |
 | **qcow2** | Supported | QCOW2 v3, 16-bit refcounts, configurable cluster size (512B-64KB), optional zlib compression (`-c`) |
-| **vmdk** | Supported | monolithicSparse (default), streamOptimized with `-c`, monolithicFlat with `--subformat monolithicFlat` (also from `instar create`, written on the host; the extent is named as qemu-img names it), configurable grain size (4KB-64KB via `--grain-size`) for sparse/streamOptimized |
+| **vmdk** | Supported | monolithicSparse (default), streamOptimized with `-c`, monolithicFlat with `--subformat monolithicFlat` (also from `instar create`, written on the host; the extent is named as qemu-img names it), twoGbMaxExtentFlat from `instar create` only (written on the host, at most 64 extents which is 128 GiB, a limit that is instar's own), configurable grain size (4KB-64KB via `--grain-size`) for sparse/streamOptimized |
 | **vpc** (VHD) | Supported | Dynamic VHD, configurable block size (512KB+ via `--block-size`, default 2MB), BAT-based allocation |
 | **vhdx** | Supported | Dynamic or fixed VHDX (`--subformat`, default dynamic), configurable block size (any power of two from 1MB to 256MB via `--block-size`, default qemu-img's for the size: 8MB up to 1GB, 16MB up to 100GB, 32MB up to 32TB, then 64MB), CRC-32C checksums |
 

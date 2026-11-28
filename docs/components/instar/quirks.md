@@ -1405,10 +1405,15 @@ A VMDK descriptor written by `qemu-img create` ends with a Disk Data
 Base: `ddb.virtualHWVersion`, `ddb.geometry.cylinders`, `.heads` and
 `.sectors`, `ddb.adapterType`, and from qemu 6.2.0 `ddb.toolsVersion`
 (`tests/golden/qemu-create-pins.json` has the two groups either side of
-that boundary). instar's descriptors stop at the `#DDB` comment, for
+that boundary). instar's descriptors stop at the `#DDB` comment for
 monolithicFlat (from `create` and `convert`) and for the sparse
-subformats alike. So `-o adapter_type`, `hwversion` and `toolsversion`
-are accepted and change nothing. `qemu-img info` reports the same image
+subformats. `create -f vmdk -o subformat=twoGbMaxExtentFlat` is the
+exception, and the only one: its descriptor carries the whole `ddb.*`
+block in the form qemu 6.2.0 and later writes it, matching the pin byte
+for byte apart from the CID. Retrofitting those lines to the other
+subformats is #964. Either way `-o adapter_type`, `hwversion` and
+`toolsversion` are accepted and change nothing — the split descriptor's
+`ddb.*` values are constants too, not the values you pass. `qemu-img info` reports the same image
 either way: the tests compare its JSON for instar's and qemu's
 monolithicFlat images, ignoring only the CID and allocation.
 
@@ -1418,18 +1423,54 @@ all-zero VHD unique id (#566).
 
 ### VMDK flat extent names must fit the descriptor
 
-A monolithicFlat descriptor names its extent on a line of text, as
+A flat VMDK descriptor names each of its extents on a line of text, as
 `RW <sectors> FLAT "<name>" 0`. qemu-img writes the name verbatim
 (measured with qemu-img 10.0.13): a `"`, CR or LF in the output's
 basename ends the quoted string or the line, so the descriptor names a
 different file or gains lines of its own, and a non-UTF-8 name is
 written as raw bytes. instar refuses the quote, CR and LF in `create`
-and `convert`, before any file is opened, with `<op>: vmdk monolithicFlat
-cannot record the extent name "..." in its descriptor`. It never sees a
+and `convert`, before any file is opened, with `<op>: vmdk <subformat>
+cannot record the extent name "..." in its descriptor` — naming
+monolithicFlat or twoGbMaxExtentFlat, whichever was asked for. Under
+twoGbMaxExtentFlat every extent name is derived from `FILENAME` by
+inserting `-fNNN` before the last `.`, so a refused name is one the
+output's own basename produced. It never sees a
 non-UTF-8 name: its command line takes only UTF-8 arguments, and exits 2
 with `invalid UTF-8 was detected in one or more arguments`. Its
 descriptor reader requires UTF-8 too, so such an image could not be read
 back.
+
+### VMDK split flat create refuses a pre-existing extent
+
+`create -f vmdk -o subformat=twoGbMaxExtentFlat` derives its extent
+paths from `FILENAME` rather than being given them, and refuses to
+overwrite one that already exists: `create: the vmdk
+twoGbMaxExtentFlat extent '...' already exists; instar derived that
+path rather than being given it and will not overwrite it, so nothing
+has been written`. qemu-img truncates such a file in place and
+succeeds — measured across all 80 static builds, where the planted
+file comes back at the extent's length rather than its own, which is
+what tells truncate-in-place from unlink-and-recreate. The refusal
+happens before any file is opened, so a refused create leaves even the
+descriptor untouched; the descriptor itself is still overwritten by a
+create that proceeds, because that is the path the user typed. The cost
+is that re-running a failed create in the same directory needs the
+extent files removed by hand. See
+[create.md](/components/instar/create/#twogbmaxextentflat).
+
+### VMDK split flat create stops at 64 extents (128 GiB)
+
+The guest's extent table is a fixed 64-entry array, so instar refuses a
+twoGbMaxExtentFlat `SIZE` needing more than 64 extents of 2 GiB —
+anything over 128 GiB — and says that the limit is its own rather than
+qemu's. qemu-img has no such ceiling: it has been measured writing 1000
+extents at 2000 GiB and 16384 at 32 TiB. An image instar could not read
+back is not output worth writing, which is why this is a refusal rather
+than a warning. The read side has the same ceiling, from the same array:
+a descriptor declaring more extents than the table holds is refused on
+input with `VMDK descriptor '...' declares N extents, more than the 64
+the guest's extent table holds; refusing to read part of the image`. See
+[create.md](/components/instar/create/#twogbmaxextentflat).
 
 ### VHD `virtual_size` diverges from qemu-img by CHS rounding
 
@@ -1875,10 +1916,10 @@ walk. Caught and fixed during development.
 
 ### qcow2 grow has no image-size ceiling; qcow2 shrink does
 
-After followup-01, qcow2 *grow* is bounded only by what the
-filesystem can hold — the guest's targeted pre-pass stages a
-small bounded set of refcount blocks (≤ 16) regardless of
-image size. Tested end-to-end through 1 TiB → 2 TiB in 163 ms.
+qcow2 *grow* is bounded only by what the filesystem can hold —
+the guest's targeted pre-pass stages a small bounded set of
+refcount blocks (≤ 16) regardless of image size. Tested
+end-to-end through 1 TiB → 2 TiB in 163 ms.
 
 qcow2 *shrink* still uses the older "stage every non-zero
 refcount block" pre-pass and so retains a per-cluster-size

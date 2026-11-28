@@ -1036,15 +1036,29 @@ least-recently-used entries are evicted until the cap is satisfied. This
 is essential for long-running desktop sessions without risk of OOM.
 
 The cap counts pixel bytes only, so it is paired with an entry-count
-cap of `cap_bytes / 96` entries — 96 bytes being an estimate of the
-per-entry container overhead (LRU node, hash-map slot, allocator
-headers) that the byte counter cannot see. Without it a stream of
-tiny images — a 1x1 RGBA image accounts for 4 bytes and really costs
-around a hundred — would fit tens of millions of entries inside a
-256 MiB cap and take gigabytes of RSS. The same pairing applies to
-the GLZ dictionary, which shares the same LRU implementation.
-Entry-cap evictions are counted in `image_cache_evictions_total` /
+cap of `cap_bytes / 128` entries — 128 bytes being a round figure
+charged slightly over the roughly 123 bytes of per-entry container
+overhead (LRU node, the reference-counted header each cached buffer
+carries, hash-map slot, allocator headers) that the byte counter
+cannot see. Without it a stream of tiny images — a 1x1
+RGBA image accounts for 4 bytes and really costs around 120 — would
+fit tens of millions of entries inside a 256 MiB cap and take
+gigabytes of RSS. The same pairing applies to the GLZ dictionary,
+which shares the same LRU implementation. Entry-cap evictions are
+counted in `image_cache_evictions_total` /
 `glz_dictionary_evictions_total` like any other cap-driven eviction.
+
+Both caps count the pixels the cache owns. The GLZ dictionary also
+shares its buffers with decodes in flight: a decode holds a reference
+to its source image, so an entry evicted while one of its fragments
+is being copied stays alive until that copy finishes, and resident
+bytes can briefly exceed `--glz-dictionary-cap-mib` by up to one
+source image per display channel decoding at that moment. That is a
+transient rather than a leak — the entry is freed as soon as the
+decode lets go of it — but it is why a snapshot taken during heavy
+GLZ traffic can read a little above the cap. The image cache lends
+its entries out rather than sharing them, so `--image-cache-cap-mib`
+has no such transient.
 
 ### Interpreting cache statistics in a bug report
 

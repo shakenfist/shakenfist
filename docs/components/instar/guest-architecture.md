@@ -971,3 +971,49 @@ cannot steer it. So no fixture reaches it, and what is tested is the
 mechanism rather than a trigger: that the first failure is the one
 kept, and that recording one really does interrupt a thread blocked in
 a syscall.
+
+## Why the guest ops carry `#[inline(never)]`, and why the IDT is not a replacement
+
+Several guest operation runners are marked `#[inline(never)]`; the
+comments above the runners in, among others, `src/operations/amend`,
+`bitmap`, `commit`, `rebase` and `bench` say why the attribute is
+load-bearing. The history is issue
+[#375](https://github.com/shakenfist/instar/issues/375): built for
+`x86_64-unknown-none` with `opt-level = "z"` and `lto = true`, inlining
+a large runner into the `extern "C"` `_start` produced a miscompiled
+`_start`, and the guest jumped into the middle of an instruction, hit an
+invalid opcode and -- with no IDT -- triple-faulted before doing any
+work. The IDT described above is the safety net that makes a recurrence
+legible; the attributes remain the primary defence. Both exist because
+either alone is insufficient: the attributes stop the miscompile, and
+the IDT stops a future recurrence from being silent.
+
+Two explanations were tested and discarded before the IDT was written,
+and neither is worth testing again:
+
+- **It is not SSE without `CR4.OSFXSR`.** The guest boots with only
+  `CR4.PAE` set, so an SSE instruction would `#UD`, which fits the
+  symptom. But `x86_64-unknown-none` builds with `+soft-float`, and
+  every guest op binary disassembles to zero `xmm` instructions.
+  `CR4.OSFXSR` is irrelevant here.
+- **The miscompile is intermittent, so its absence proves nothing.**
+  On nightly `1.99.0` (2026-07-23) it did not reproduce even when
+  forced: `#[inline(always)]` on `amend`'s `run_qcow2` genuinely
+  inlines it -- the symbol disappears and `_start` grows to about
+  1.7 KB -- and the op still ran correctly. The attributes were
+  therefore non-load-bearing on that toolchain. That is an argument
+  for keeping them, not for removing them: a bug that does not
+  reproduce cannot be shown to be gone, so "remove the workaround and
+  see" is not a test that can pass. The attributes come out when the
+  miscompile has been reproduced and root-caused upstream, which is
+  what #375 stays open for.
+
+A standing fault-injection integration test was considered as an
+end-to-end guard that the exception path still reports rather than
+triple-faults, and deliberately not built: the VMM's guest setup is
+duplicated per operation with no shared injection point, so the
+plumbing would have cost more than the guard was worth against a
+`ud2` injected by hand. The exception path is instead covered by the
+host-side unit tests over `exception_name()` and the serial decoder,
+and the IDT install itself runs on every guest boot, so a broken
+install fails the whole integration suite rather than one test.

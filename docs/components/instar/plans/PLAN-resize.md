@@ -829,7 +829,7 @@ reviewers can find every queued item in one place. Mirrored in
   clusters overflow it with even modest virtual sizes
   (`image too large for the resize scratch buffer`). The
   differential fuzz picker filters the combination today.
-- **Targeted shrink-side pre-pass** (followup-01 set the
+- **Targeted shrink-side pre-pass** ([followup-01](https://github.com/shakenfist/instar/blob/8871b068fc3a997bf930c5f59509cdd5246aa8df/docs/plans/PLAN-resize-followup-01-targeted-prepass.md) set the
   precedent for grow). Today the guest stages every non-zero
   refcount block before the L2 walk for the shrink path,
   retaining the per-cluster-size image-size ceiling

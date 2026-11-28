@@ -330,7 +330,7 @@ Landed as commit `de1c3bc` ("docs: add the qemu-img parity axis.").
 * **Master plan (`PLAN-format-coverage.md`)**:
   * Added a `## Status: Complete (2026-07-20)` header (this master
     plan had none; several sibling master plans — e.g.
-    `PLAN-release-v0.2.md`, `PLAN-distro-matrix-ci.md` — carry one at
+    [`PLAN-release-v0.2.md`](https://github.com/shakenfist/instar/blob/1da53abcad83f6bf5f289a07e67bfad4493aa648/docs/plans/PLAN-release-v0.2.md), [`PLAN-distro-matrix-ci.md`](/components/instar/plans/PLAN-distro-matrix-ci/) — carry one at
     the same position, so this follows an existing, if inconsistent,
     convention rather than inventing a new one).
   * Execution row 7 → Complete (2026-07-20, commit `de1c3bc` for 7a

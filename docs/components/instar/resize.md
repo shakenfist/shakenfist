@@ -123,16 +123,39 @@ bytes from 5246976 to the end of that cluster under both tools. A grow
 zero-check covers.
 
 **Image-size ceiling.** qcow2 grow is bounded only by what the
-filesystem can hold — followup-01's targeted refcount-block
-pre-pass keeps the guest's metadata staging budget O(1) blocks
-regardless of image size. Tested end-to-end through 1 TiB → 2 TiB
-in under 200 ms (`tests/test_resize.py:TestResizeLargeImages`).
-qcow2 shrink retains the older "stage every non-zero refcount
-block" pre-pass and so retains a per-cluster-size ceiling
-(~128 GiB at the default 64 KiB cluster); lifting it is the next
-follow-up in the Future-work section below. Raw / vmdk / vpc /
-vhdx have no analogous metadata-staging step and are bounded
-only by filesystem capacity.
+filesystem can hold — the targeted refcount-block pre-pass keeps the
+guest's metadata staging budget O(1) blocks regardless of image size.
+Tested end-to-end through 1 TiB → 2 TiB in under 200 ms
+(`tests/test_resize.py:TestResizeLargeImages`). qcow2 shrink retains
+the older "stage every non-zero refcount block" pre-pass and so
+retains a per-cluster-size ceiling (~128 GiB at the default 64 KiB
+cluster); lifting it is the next follow-up in the Future-work section
+below. Raw / vmdk / vpc / vhdx have no analogous metadata-staging step
+and are bounded only by filesystem capacity.
+
+Two things about that pre-pass are deliberate, and both are easy to
+undo by accident. The grow flavour is decided from the header's scalar
+fields -- chief among them the cluster size, refcount width, the
+current and new virtual sizes, the current file size (the new L1
+region is appended at EOF, so it decides which refcount blocks the
+flavour touches), the L1 entry count and table offset, and the
+refcount table's offset and cluster count -- plus the refcount
+*table*, and from no refcount-block content. That is what makes the
+targeted staging possible at all: the guest can choose the flavour,
+ask which blocks that flavour will touch, and only then read them. A
+change that made the decision depend on block content would put the
+staging back where it started, because the guest would have to read
+blocks to find out which blocks to read.
+
+And when the planner reports `ScratchTooSmall` for a block the guest
+did not stage, neither the guest nor the host retries with a wider
+stage list. That path was considered and rejected: the
+block-identification helper is the single
+source of truth for what a flavour touches, so a `ScratchTooSmall`
+from it is a bug in that helper, and a fallback that quietly stages
+everything would turn each such bug into a silent return of the
+per-cluster-size ceiling. Failing loudly is what makes the unit tests,
+the crate integration test and the fuzz targets able to catch it.
 
 ## Output format
 
@@ -300,16 +323,16 @@ The create-side carry-forwards are listed in
  cluster_size with even modest virtual sizes overflows the
  scratch buffer (`image too large for the resize scratch
  buffer`). The picker filters the combination today.
-- Targeted shrink-side refcount-block pre-pass. Followup-01
- lifted the per-cluster-size image-size ceiling for qcow2
- *grow* by staging only the refcount blocks the chosen flavour
+- Targeted shrink-side refcount-block pre-pass. The
+ per-cluster-size image-size ceiling is already lifted for qcow2
+ *grow*, by staging only the refcount blocks the chosen flavour
  will touch. Shrink retains the old "stage every non-zero
  block" pre-pass and so retains the ceiling (~128 GiB at the
  default 64 KiB cluster). Lifting it requires a two-phase
  shrink pre-pass: walk L2 tables first to identify which
  clusters will be discarded, then stage only the refcount
  blocks containing those clusters.
-- Planner-side defensive checks for inconsistent host inputs (partially addressed by followup-01d's
+- Planner-side defensive checks for inconsistent host inputs (partially addressed by the
  vmdk `checked_mul`). The VHDX planner can return
  `Ok(plan { total_file_size: 0 })` when the host passes
  impossibly small file sizes — not reachable from real callers

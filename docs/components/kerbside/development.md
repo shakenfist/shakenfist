@@ -865,18 +865,19 @@ deleted instead: `bcrypt`, `flasgger`, `prometheus-client`, `psutil`
 and `pylogrus` all went that way in issue #399, and `flasgger` alone
 took six packages out of the install closure with it.
 
-Renovate also reads `.pre-commit-config.yaml`, because `renovate.json`
-turns its `pre-commit` manager on — it is opt-in, and a repository
-that leaves it off has its linters as the one set of pins nobody
-watches. Two of those hooks have a partner pin elsewhere in the tree,
+Renovate also reads `.pre-commit-config.yaml`, because the fleet
+preset `renovate.json` extends turns its `pre-commit` manager on — it
+is opt-in, and a repository that leaves it off has its linters as the
+one set of pins nobody watches. Two of those hooks have a partner pin elsewhere in the tree,
 and in both cases the pair must move together or CI and the pre-commit
 hook disagree about what passes:
 
 - **shellcheck** is pinned as a hook revision and as a `shellcheck-py`
   dependency of the `shellcheck` tox environment, which is what CI
   runs. Upstream tags a fourth component — `v0.11.0.1` is shellcheck
-  0.11.0, packaging revision 1 — which is not semver, so `renovate.json`
-  also gives that dependency a regex versioning scheme. Without it the
+  0.11.0, packaging revision 1 — which is not semver, so the fleet
+  preset also gives that dependency a regex versioning scheme, for
+  every repository that uses the hook. Without it the
   `github-tags` lookup cannot resolve the current value at all, so the
   hook half of the group is never proposed and the tox pin moves alone.
 - **skillsaw** is pinned as a hook revision and as the `skillsaw==`

@@ -475,7 +475,7 @@ Composition is a plan's worth of work on its own -- it is the
 half of this plan that touches the guest read path, where the
 output half touches only the writer -- so it is decomposed here
 rather than left as one phase to be split later, the way
-`PLAN-resize-followup-01` split its own:
+[`PLAN-resize-followup-01`](https://github.com/shakenfist/instar/blob/8871b068fc3a997bf930c5f59509cdd5246aa8df/docs/plans/PLAN-resize-followup-01-targeted-prepass.md) split its own:
 
 * **Phase 11, host side.** Resolving a differencing parent to a
   real file, applying the same resolution and depth rules qcow2

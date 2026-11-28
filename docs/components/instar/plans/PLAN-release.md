@@ -27,7 +27,7 @@ has since been exercised a second time end-to-end by v0.3.0
   and the documented tag-and-push sequence. v0.2.0 and v0.3.0 both
   went out through it.
 * **Phase 5 (pre-release audit)** — discharged as a v0.2.0 gate;
-  the execution record is in `PLAN-release-v0.2.md`. The recurring
+  the execution record is in [`PLAN-release-v0.2.md`](https://github.com/shakenfist/instar/blob/1da53abcad83f6bf5f289a07e67bfad4493aa648/docs/plans/PLAN-release-v0.2.md). The recurring
   items have since become standing CI rather than per-release
   checklists: `cargo audit` runs in `supply-chain.yml`, clippy in
   `lint.yml`, the functional suite in `functional-tests.yml`, and
@@ -41,13 +41,13 @@ has since been exercised a second time end-to-end by v0.3.0
 The "phase 6 coverage fuzzing" referenced by the old status line
 was never a phase of this plan. Coverage-guided fuzzing and the
 security audit are separately registered master plans
-(`PLAN-coverage-fuzzing.md`, `PLAN-audit.md`) that continue on
+(`PLAN-coverage-fuzzing.md`, [`PLAN-audit.md`](https://github.com/shakenfist/instar/blob/8871b068fc3a997bf930c5f59509cdd5246aa8df/docs/plans/PLAN-audit.md)) that continue on
 their own; they are release-quality work, not first-release
 blockers, and holding this plan open for them was what kept it
 marked in-progress long after it was finished.
 
 Per-release execution lives in its own plan
-(`PLAN-release-v0.2.md`, `PLAN-release-v0.3.md`, future
+([`PLAN-release-v0.2.md`](https://github.com/shakenfist/instar/blob/1da53abcad83f6bf5f289a07e67bfad4493aa648/docs/plans/PLAN-release-v0.2.md), [`PLAN-release-v0.3.md`](https://github.com/shakenfist/instar/blob/8871b068fc3a997bf930c5f59509cdd5246aa8df/docs/plans/PLAN-release-v0.3.md), future
 `PLAN-release-vN.M.md`). Future releases need this plan only as
 background; they do not reopen it.
 
@@ -303,13 +303,13 @@ The README already exists and is comprehensive but needs an
 
 Discharged as a v0.2.0 gate — the execution record, including which
 items passed and which were carried forward, is in
-`PLAN-release-v0.2.md`. The recurring items are now standing CI
+[`PLAN-release-v0.2.md`](https://github.com/shakenfist/instar/blob/1da53abcad83f6bf5f289a07e67bfad4493aa648/docs/plans/PLAN-release-v0.2.md). The recurring items are now standing CI
 (see the Status section). The checklist below is retained as the
 historical statement of what the gate required.
 
 Before tagging v0.2.0:
 
-- [ ] Complete VMM boundary audit (PLAN-audit.md Phase 5) --
+- [ ] Complete VMM boundary audit ([PLAN-audit.md](https://github.com/shakenfist/instar/blob/8871b068fc3a997bf930c5f59509cdd5246aa8df/docs/plans/PLAN-audit.md) Phase 5) --
   this is the most important remaining security item
 - [ ] Run `cargo clippy --all-targets` with no warnings
 - [ ] Run `cargo audit` for known vulnerable dependencies

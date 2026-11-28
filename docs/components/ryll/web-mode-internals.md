@@ -327,6 +327,26 @@ SSRC and codec `codings`) and add them, then create the control
 datachannel and spawn a task that pumps its events into
 `BridgeEvents::on_control_message`.
 
+The `MediaEngine` carries only what the pumps can send: one H.264
+entry (packetization mode 1, profile `42e01f`, the baseline profile
+openh264 emits) and one Opus entry — not webrtc-rs's
+`register_default_codecs`, which would have the answer advertise
+VP8, VP9, AV1, HEVC, RTX and three legacy audio codecs the bridge
+never sends. One H.264 entry serves every browser because `rtc`
+falls back to a mime-type-only match when the fmtp lines differ, so
+Chrome's `42001f` offer and Firefox's `42e01f` offer both match it.
+No RTCP feedback is registered with the codecs; the `nack`,
+`nack pli` and `transport-cc` the answer carries come from the
+interceptor registry, which is where the implementations are.
+
+A viewer that offers no H.264 at all still gets a session. After
+setting the remote description `accept_offer` checks whether video
+negotiated, and if not withdraws the video track, so the answer
+rejects the video m-line (`m=video 0`, RFC 9429 §5.3.1) while audio,
+input, the cursor and the control channel carry on. The page is told
+why the picture is missing by the no-video notice in the hello
+handshake below.
+
 `BridgeEvents` holds the shared state and the callback bodies;
 `BridgeHandler` is a thin newtype around `Arc<BridgeEvents>`
 implementing 0.20's `PeerConnectionEventHandler` trait, which
@@ -418,7 +438,17 @@ entry point for the HTTP `/offer` handler. It:
 3. Sets the local description.
 4. Waits for ICE gathering to complete, by awaiting the sticky
    `gathered` signal raised by `BridgeEvents` (webrtc-rs 0.17's
-   `gathering_complete_promise()` does not exist in 0.20).
+   `gathering_complete_promise()` does not exist in 0.20). The wait
+   is bounded by `GATHER_TIMEOUT` (20 s) and fails with a message
+   saying how many candidates the local description had reached,
+   because this wait is on the request path: unbounded, a gathering
+   that never completed parked the `POST /offer` request, and the
+   encoder restarted for it, for the life of the process. The
+   error is a `GatheringTimeout`, and the handler answers
+   `504 Gateway Timeout` on that type rather than the `400` an
+   unusable offer gets. It decides on the type rather than the
+   message because the other failures quote the SDP parser on the
+   browser's offer.
 5. Returns the fully-resolved answer SDP.
 
 ICE gathering completion is awaited so the answer already
@@ -544,7 +574,8 @@ position, no no-video notice. See ryll#348.
 The browser sends `{"type":"hello"}` as soon as its end of the
 control channel opens, and the server answers with the current
 mouse mode — plus a no-video notice, if that viewer negotiated no
-codec we can send. The server cannot push either unprompted: it
+codec we can send (its answer rejected the video m-line; see
+`WebrtcBridge` above). The server cannot push either unprompted: it
 learned the mouse mode from SPICE session-init, seconds before the
 page loaded, and `send_control` drops anything written before the
 channel is open.
@@ -1338,9 +1369,52 @@ task spawned from `run_web`. Its loop:
    the reap is gated on the signal itself.
 5. Takes the bridge out of `bridge_slot`, calls
    `bridge.close().await`.
-6. Calls `EncoderInfra::stop()` — sends `EncoderControl::Stop`
-   and awaits the encoder task handle (2-second ceiling).
-7. Clears `opus_active_tx`.
+6. Calls `stop_viewer_pipeline` with the offer that installed the
+   bridge it was watching, which — if that offer still owns the
+   encoder — calls `EncoderInfra::stop()` (sends
+   `EncoderControl::Stop` and awaits the encoder task handle,
+   2-second ceiling) and clears `active_opus_tx`.
+
+#### Who may stop the encoder
+
+There is one encoder and one audio slot per process, and both are
+taken over by an offer long before its bridge is installed: `POST
+/offer` restarts the encoder at step 3 and installs its audio sender
+at step 5, then can spend up to `GATHER_TIMEOUT` in `accept_offer`.
+So neither the bridge slot nor `bridge_generation` — which only
+installing a bridge moves — says whether a party that has concluded
+"no viewer is attached" is about to stop its own viewer's encoder or
+a newer one's. Three parties reach that conclusion: the reaper;
+`post_offer` itself as it replaces a viewer's bridge, which closes
+the old bridge and stops the old viewer's pipeline at step 2 rather
+than leaving it to the restart at step 3; and `post_offer`'s own
+failure paths, which close the bridge that will never be installed
+and stop the encoder restarted for it. The rule they share is that
+whoever takes a bridge out and closes it stops the pipeline of the
+offer that installed it. Step 2 needs it as much as the reaper does:
+the restart refuses (the 503 for a missing primary surface) without
+touching the running encoder, and a closed bridge's video pump keeps
+draining that encoder, so leaving it to step 3 left it encoding for
+nobody whenever step 3 failed.
+
+Each request therefore takes a number at entry
+(`WebState::offer_epoch`), the encoder records the number of the
+offer whose restart started it (`EncoderInfra::owner`), and step 7
+records the number against the installed bridge
+(`WebState::installed_offer`). `stop_viewer_pipeline` stops the
+encoder and clears the audio slot only if the caller's offer is
+still the owner, and does both under the encoder lock: a later offer
+installs its audio sender only after its own restart, which needs
+that lock, so the check covers the audio slot too.
+
+Two cases decide the shape. A page reload: the new offer has taken
+the old bridge out and restarted the encoder, the old bridge's death
+reaches the reaper while the new offer is gathering, and the reaper
+must leave the new pipeline alone. And a later offer that entered
+but failed before restarting the encoder (the 503 for a missing
+primary surface) took nothing over, so an earlier offer that then
+fails must still clean up — which is why the number is recorded at
+restart rather than read at entry.
 
 The SPICE session (`run_connection`) is left completely
 untouched. A subsequent `/offer` from the browser rebuilds
@@ -1355,7 +1429,9 @@ observes `None` and no-ops.
 
 A helper alongside `restart()`: sends `EncoderControl::Stop`
 to the running encoder task and joins the handle with a
-2-second timeout. Used by both the reaper (bridge died) and
+2-second timeout, and clears the recorded owner. Used by
+`stop_viewer_pipeline` (the reaper, a replaced bridge and failed
+offers, above) and
 the shutdown path (process exiting). Any orphaned task exits
 naturally on its next send error.
 
