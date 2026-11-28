@@ -65,7 +65,7 @@ any uncertainty explicitly rather than guessing.
 
 ## Situation
 
-Phases 1-5 of the security audit (PLAN-audit.md) are complete.
+Phases 1-5 of the security audit ([PLAN-audit.md](https://github.com/shakenfist/instar/blob/8871b068fc3a997bf930c5f59509cdd5246aa8df/docs/plans/PLAN-audit.md)) are complete.
 Phase 3 (differential fuzzing) compares instar against qemu-img on
 randomly generated valid images, but does not explore the malformed
 input space that coverage-guided fuzzing excels at. The `no_std`

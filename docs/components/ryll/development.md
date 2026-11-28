@@ -641,6 +641,37 @@ advances a fixed eight-colour cycle and one step in eight is black,
 so the viewer legitimately goes black for one interval in eight. The
 script says so at startup.
 
+### Benchmarking GLZ dictionary references
+
+`shakenfist-spice-compression` carries a manual benchmark for the cost
+of cross-image GLZ references, which is what the dictionary's shared
+source handling exists to keep down. It needs no guest and no server:
+
+```sh
+cargo run -p shakenfist-spice-compression --release \
+    --no-default-features --features glz --example glz_references
+```
+
+It decodes a 1920x1080 image built from either one reference or 128
+references into a cached source, checks the decoded pixels before
+timing anything, and prints milliseconds per decode. Read it with
+three caveats:
+
+- It reports **elapsed decode time, not session frame rate**. A
+  hundredfold change here is a change in one decode path, not in what
+  a user sees: the figures measured in
+  [shakenfist/ryll#739](https://github.com/shakenfist/ryll/pull/739)
+  (175.7 ms to 1.5 ms at 128 references) are decode time alone.
+- There is **no threshold and no CI job**. Nothing fails if it
+  regresses, so it is only worth running deliberately, and only
+  against another revision measured the same way — same command, same
+  `--release` profile, same machine, nothing else loaded.
+- It measures **one decoder against a one-entry dictionary**, so it
+  says nothing about the other half of the old cost: the dictionary
+  mutex, held across the copy, with several display channels sharing
+  one dictionary. A change that helps there will not show up in these
+  numbers at all.
+
 ## Manual verification against a desktop guest
 
 Some behaviour cannot be tested from the automated suite at all,

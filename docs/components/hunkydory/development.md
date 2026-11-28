@@ -83,6 +83,24 @@ credentials, and review the whole diff with that in mind before
 enqueueing it; changes under `.github/` and `tools/` deserve the closest
 reading.
 
+## Dependency updates
+
+Renovate proposes dependency updates, but no workflow in this repository
+runs it. The fleet runner, `.github/workflows/renovate-fleet.yml` in
+shakenfist/development, runs Renovate over every managed repository and is
+dispatched about hourly by the conductor; the schedule, the automerge and
+release-age policy, and the pre-commit manager all come from the
+`renovate-fleet` preset that `renovate.json` extends. `renovate.json` itself
+holds only what is particular to this repository: the note on `@vscode/vsce`
+bumps and the custom manager for the node image digest in
+`tools/container-image.sh`. The dependency dashboard issue is where a failed
+preset lookup or an unresolvable dependency shows up, since there is no
+longer a run in this repository's Actions tab to go red.
+
+To run Renovate by hand, dispatch the fleet runner from shakenfist/development
+with `autodiscover_filter` set to `shakenfist/hunkydory`, which limits the run
+to this repository; its `dry_run` input previews without writing.
+
 ## Releasing
 
 Pushing a `v*` tag triggers `release.yml`. Its first job, `ci-gate`,

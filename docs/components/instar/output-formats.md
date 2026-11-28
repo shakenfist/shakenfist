@@ -324,7 +324,8 @@ directly. The addition improves transparency for debugging and scripting.
 
 An image that is several files on disk has one child per file. A VMDK
 descriptor that resolves to separate extent files -- `monolithicFlat` and the
-`twoGbMaxExtent*` split subformats -- exposes an `/extents.N` child per extent
+`twoGbMaxExtent*` split subformats (of which `instar create` can write
+`twoGbMaxExtentFlat`) -- exposes an `/extents.N` child per extent
 ahead of the descriptor's own `/file` child, and qemu-img walks the extents
 from last to first while keeping each one's own index, so the array reads
 `extents.N-1` down to `extents.0` and then `file`. Select a child by its

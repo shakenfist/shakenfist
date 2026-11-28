@@ -119,6 +119,50 @@ backs no required status check, which is why it also runs on pushes to
 would otherwise never be scanned. The weekly cron catches a rule set
 that drifted under an unchanging tree.
 
+### Dependency updates
+
+Renovate runs this repository, but not from this repository. There is
+no `renovate.yml` here: a single fleet runner in
+[shakenfist/development](https://github.com/shakenfist/development)
+works over every managed repository in one pass, and discovers this one
+because `renovate.json` exists at the root. A copy of the workflow here
+would race it -- two Renovate instances over one repository produce
+duplicate or half-written pull requests -- so the copy this repository
+used to carry was deleted rather than disabled.
+
+`renovate.json` is almost empty, and deliberately so. It extends
+`local>shakenfist/development:renovate-fleet`, the preset that carries
+the whole fleet policy: the author and assignee, the dependency
+dashboard, the three day `minimumReleaseAge`, rollback pull requests,
+the `pre-commit` manager that bumps the hook revisions above, action
+digest pinning and the custom manager that keeps a `# renovate:`
+version comment in step with the pin beside it, the Saturday cadence
+for ordinary updates and the monthly one for majors and CI tooling, and
+the rule that merges nothing automatically. A policy copied into every
+repository only reaches the ones somebody re-syncs; extended, a change
+to it reaches the fleet at once.
+
+What stays here is what only this repository needs. `constraints.python`
+matches `requires-python` in `pyproject.toml`, so no update is proposed
+that the oldest supported Python cannot install. The `packageRules`
+entry widening grpc ranges matches nothing today -- the dependencies are
+`oslo.concurrency`, `click` and `pyyaml` -- and is kept against
+clingwrap taking a grpc dependency again rather than as a live example:
+a client installed across many distributions wants the floor of a `>=`
+constraint left alone, because a raised floor or an exact pin sends pip
+to a source build on the Pythons that have no wheels for older releases.
+
+Nothing else belongs at the top level of that file. Renovate resolves a
+repository's own keys after the presets it extends, so a top-level key
+the preset also sets replaces the preset's value outright -- the
+configuration still validates, Renovate still runs, and the fleet
+policy simply stops applying here with nothing to show it. A difference
+this repository genuinely needs goes in a `packageRules` entry scoped
+to what it is about, which Renovate appends to the preset's rules
+instead of replacing them. The
+[audit spec](https://github.com/shakenfist/development/blob/main/docs/audits/renovate.md)
+is the full statement of both the runner and the preset.
+
 ## Merging
 
 Pull requests merge through a merge queue on `develop`, not with the

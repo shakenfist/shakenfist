@@ -1852,7 +1852,10 @@ fails rather than passing.
 
 The project includes a differential fuzzer (`scripts/differential-fuzz.py`)
 that compares instar against qemu-img on randomly generated images. It is
-part of the security audit plan (`PLAN-audit.md`).
+one of the two standing outputs of the security audit, alongside
+coverage-guided fuzzing; both file their own `security-audit` issues
+every night, and [security-audits.md](/components/instar/security-audits/) records what
+the audit covered and found.
 
 ### How it works
 
@@ -2052,6 +2055,15 @@ the nightly's work bought with about 20 minutes of an `xl` runner per
 merge, from the pool the merge queue waits on. The same reasoning
 removed coverage-guided fuzzing's post-merge run; see "CI integration"
 under Coverage-Guided Fuzzing.
+
+Both fuzzing jobs run on virtual-machine runners (`xl`) and not on
+bare metal, and that is a containment decision rather than a capacity
+one: these are the only jobs in the repository that run an unbounded
+number of randomly generated images, for hours, against a tool that
+writes files and starts VMs. A runaway run on a VM runner costs the
+runner; on bare metal it could cost the host the whole label pool
+depends on. Give a new long-running fuzz job a VM runner for the same
+reason, even where it needs no KVM.
 
 On failure, the workflow uploads logs as artifacts. The nightly and a
 manual run also file GitHub Issues with the `security-audit` label,
@@ -2789,7 +2801,7 @@ guards. See the VHD and VHDX notes in
 [chain-config.md](/components/instar/chain-config/#format-specific-notes) for the
 composing path being guarded.
 
-There are **179 cases**, in seventeen groups. The prose below
+There are **184 cases**, in eighteen groups. The prose below
 describes each group, with sub-totals nested inside the larger ones; this
 table is the flat version, so the sum can be checked in one pass. The
 headline, `EXPECTED_CASES` and the case count the script itself reports
@@ -2810,12 +2822,13 @@ here are not, so they are the thing to re-derive if the two disagree.
 | data device | 12 |
 | descriptor attachment | 7 |
 | split descriptor | 7 |
+| split flat create | 5 |
 | data-file entry | 8 |
 | host-offset refusal | 2 |
 | VHDX metadata | 6 |
 | VHD footer copy | 4 |
 | partial last block | 4 |
-| **total** | **179** |
+| **total** | **184** |
 
 Forty-seven cover the writer. Twenty-four mutate a library crate
 (`create`, `vhd`, `vhdx`) and are caught by a Rust unit or round-trip
@@ -3164,6 +3177,27 @@ the padding rule asserted only that `image-s999.vmdk` and
 *floor*. The mutant survived it, and only the broad golden comparison
 failed. The test now also asserts `image-s001.vmdk` and
 `image-s099.vmdk`, and kills it.
+
+Then **4 split-flat-create cases**, on the host path that writes a
+`twoGbMaxExtentFlat` image: the previous group guards the descriptor's
+bytes, these guard what `create` refuses before it writes any. Three
+turn a refusal into a plan that succeeds, which each named test sees as
+an `unwrap_err` on an `Ok` rather than as a different assertion or a
+build error. The first lets the extent count exceed what the guest's
+extent table holds, by bounding at one past the limit instead of at it:
+sixty-five extents stop being refused while sixty-four stay accepted,
+so the mutant is confined to the boundary the test is named for. The
+second disables the zero-size guard, which would otherwise emit a
+descriptor with no extent lines at all. The third stops a derived
+extent that already exists being refused, which is the divergence from
+qemu-img this subformat chose deliberately.
+
+The last is on the cleanup rather than a refusal. It records every
+opened file as one this run created, which is what the code did before:
+a failed create then deletes the descriptor it truncated even though
+the user had it beforehand. It is caught by an assertion on the
+surviving file rather than by an error, because the create fails either
+way -- what differs is what is left on disk afterwards.
 
 Then **8 data-file entry cases**, guarding the fix for
 issue #803. qemu applies two rules to the L2 entries of an image with

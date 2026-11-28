@@ -302,6 +302,23 @@ project's to write. It tracks
 only at those three points, each marked in the file, so a diff against
 the template still reads cleanly.
 
+## Dependency updates
+
+Renovate does not run from this repository. The fleet runner,
+`.github/workflows/renovate-fleet.yml` in
+[shakenfist/development](https://github.com/shakenfist/development),
+works over every `shakenfist/*` repository that carries a Renovate
+configuration, so `renovate.json` here is configuration only, and the
+updates stop if it is deleted. It extends the fleet preset,
+`renovate-fleet.json` in that repository, which holds the whole update
+policy, including the `pre-commit` manager that keeps the hook
+revisions in `.pre-commit-config.yaml` current; what each setting is
+lives there, not here, so that it cannot drift. This file adds only
+`constraints.python`, which moves with `requires-python` in
+`pyproject.toml`. How the runner is dispatched, and what to check when
+updates stop arriving, is in the
+[Renovate audit spec](https://github.com/shakenfist/development/blob/main/docs/audits/renovate.md#the-central-runner).
+
 ## Claude Code skills
 
 The `.claude/skills/` directory contains guidance for AI agents working on

@@ -588,7 +588,9 @@ and a version bump pushed straight to `develop` has no such run.
    `make test-rust`, and then asks before it commits `Release 0.2.0.`,
    pushes the branch and opens a pull request. On `N`, or on any
    failure before the push, it deletes the branch and leaves the
-   checkout as it was.
+   checkout as it was. Run `make audit` before proposing: the comment
+   above the `audit` target in the `Makefile` says which `cargo audit`
+   findings block a release and which do not.
 2. **Merge.** Get the pull request reviewed and land it through the
    merge queue like any other change, then wait for the queue's
    `functional-tests.yml` run on the merged commit to finish.
@@ -689,6 +691,34 @@ first. The version the tag must name is `src/vmm/Cargo.toml`'s;
 the same version. Bump with it, never with `tools/release-version.sh
 set`, which changes only `src/vmm/Cargo.toml` and would leave the
 other crates behind.
+
+### Distribution channels instar does not use
+
+Each of these was considered when the first public release was put
+together and deliberately left out. None is blocked on effort alone,
+so a proposal to add one should start from the reason it is absent.
+
+- **crates.io, for the format crates.** Every crate under
+  `src/crates/` is marked `publish = false`. They are not a general-purpose parser
+  API: they expose the bare-metal call-table ABI the guest
+  operations are built against, with the allocation and panic
+  discipline that implies. Publishing them usefully means designing
+  and maintaining a wrapper layer first, which is a project of its
+  own rather than a packaging step.
+- **cargo-dist and release-plz.** Both model a build that is
+  `cargo build` on a hosted runner. instar's is Docker plus a pinned
+  nightly plus a bare-metal cross-compile, with the guest binaries
+  converted to flat images and size-checked against the guest memory
+  map, so the parts these tools automate are the parts that are not
+  the hard ones here.
+- **A Homebrew tap.** instar needs `/dev/kvm`, so there is no macOS
+  build to tap.
+- **musl static builds, and aarch64 packages.** Neither is planned.
+  The glibc floor, not linking, is what decides which distributions
+  the release runs on -- see "Do not bump the release image's base"
+  above -- and aarch64 waits on test hardware, since a package built
+  for an architecture nothing in CI can boot is a claim rather than a
+  release.
 
 ## GitHub automation
 
@@ -1261,6 +1291,32 @@ Note the interaction with the Renovate rule that freezes
 2.31 sets the floor of the shipped binary) while leaving the crate
 pins in the same file managed.
 
+## Dependency updates
+
+No workflow here runs Renovate. It runs centrally, from
+`shakenfist/development`'s fleet runner, over every repository in the
+organisation, and `renovate.json` extends that repository's
+`renovate-fleet` preset. The preset holds the policy shared across the
+fleet: the schedule (Saturdays, Sydney time, with majors and the
+grouped "CI tooling" pull request on the first of the month), the
+3-day `minimumReleaseAge`, automerge off, the pre-commit manager, SHA
+pins for third-party actions, the dependency dashboard and the
+assignee. [The Renovate audit](https://github.com/shakenfist/development/blob/main/docs/audits/renovate.md)
+describes the runner, its cadence and the preset's contents.
+
+`renovate.json` keeps only what is instar's own: the bullseye freeze on
+the release image's base (see "Do not bump the release image's base"
+above), the crate groups, and the `customManagers` entry for the cargo
+tool pins, which `tools/ci/check-devcontainer-pins.sh` cross-checks
+against both Dockerfiles. Local `packageRules` are applied after the
+preset's, so they win where the two overlap.
+
+Do not add a `.github/workflows/renovate.yml` back: two Renovate
+instances over one repository race on branch creation. If updates seem
+to have stopped, the dependency dashboard issue shows when Renovate
+last saw this repository, and the fleet runner's run history in
+`shakenfist/development` shows why.
+
 ## CI tooling guards
 
 The `ci-tooling` CI job runs the cheap guards over CI's own tooling:
@@ -1333,7 +1389,6 @@ Each review item has an `action` field:
 - `.github/workflows/agent-context.yml` - skillsaw lint of `AGENTS.md`, `CLAUDE.md` and `.claude/`, by running the pre-commit hook (PR and push to develop, both path-filtered)
 - `.github/workflows/lint.yml` - rustfmt and clippy in the containerised toolchain (PR, path-filtered to the Rust tree)
 - `.github/workflows/export-repo-config.yml` - nightly export of this repository's GitHub settings for the fleet configuration audit
-- `.github/workflows/renovate.yml` - self-hosted Renovate dependency updates (hourly)
 - `.github/workflows/mermaid-lint.yml` - renders every mermaid diagram in the repository's markdown and fails on any that does not parse (PR, push to develop, and workflow_dispatch; path-filtered to markdown)
 
 The self-hosted runners have no Docker preinstalled, so any job touching

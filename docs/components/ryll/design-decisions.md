@@ -91,7 +91,20 @@ produced.
    during the BIOS/GRUB/kernel-boot window. The decoder was ruled out
    separately: the control-byte parsing, pixel_flag and image_flag decoding
    and the pixel copy loops were compared against kerbside's Python `glz.py`
-   and found faithful. The cause is still open; the surviving hypotheses and
+   and found faithful. That reference no longer exists upstream -- kerbside
+   deleted its Python SPICE stack in `8bc00cc`, and the older
+   `testclient/ryll/decompressors.py` before it in `32dfbf8` -- so a later
+   comparison has to read it out of kerbside's history
+   (`git show 8bc00cc^:kerbside/utilities/glz.py`). The cross-image copy
+   loop that comparison covered was replaced by a bounded bulk copy in
+   #739, and re-checked against that same file and against spice-server's
+   `glz-encode-match.tmpl.c` and spice-gtk's `decode-glz-tmpl.c`: for
+   RGB32 it copies the same bytes for any well-formed stream. Malformed
+   streams are where the three diverge. Kerbside raises and abandons the
+   rest of the image, spice-gtk fails the decode outright, and ryll clips
+   the copy and carries on, so a reference that overruns its source or the
+   output renders a misaligned image here rather than an error. The cause
+   is still open; the surviving hypotheses and
    the pcap entry point for chasing them are in
    [OPEN-QUESTIONS.md](/components/ryll/plans/OPEN-QUESTIONS/).
 

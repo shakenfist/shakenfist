@@ -177,6 +177,16 @@ qemu writes `RW 4194304 SPARSE "image-s1000.vmdk"` verbatim, and there
 is no ceiling on the count — probed at 1 PiB, qemu-img was still
 writing extents when a timeout stopped it at 70168 of 524288.
 
+#### Extent paths for `instar create`
+
+`instar create -o subformat=twoGbMaxExtentFlat` derives the extent paths
+by the rule above: `<stem>-f001<ext>` through `-f064<ext>`, from the
+output path, in the output's own directory. It refuses, before opening any
+file, a size needing more than 64 extents (128 GiB; the limit is instar's
+own, as the guest's extent table is a fixed 64-entry array), a zero size,
+and a derived extent path that already exists. qemu-img truncates a
+pre-existing extent instead; see [create.md](/components/instar/create/#twogbmaxextentflat).
+
 #### Geometry the descriptor records
 
 The CHS triple in the `ddb.geometry.*` lines is a pure function of the

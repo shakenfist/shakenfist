@@ -32,8 +32,8 @@ useful for any system debugging scenario.
 
 ### Development
 
-- [Development](/components/clingwrap/development/) - CI, merging through the merge queue, and
-  how releases are gated on CI
+- [Development](/components/clingwrap/development/) - CI, dependency updates, merging through
+  the merge queue, and how releases are gated on CI
 
 ## Quick Start
 
