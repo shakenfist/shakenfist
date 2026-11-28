@@ -1113,3 +1113,45 @@ arm is a label, not a diagnosis. The width and the message compound: a
 arm is a prerequisite for replacing it with written prose -- which is what
 the work on not returning SQL text to a caller (issue 5027) does to every
 one of these handlers.
+
+## An environment variable is not a test fixture
+
+Whether a unit test logs to stdout or to the host's syslog was decided by
+`SHAKENFIST_LOG_TO_STDOUT`, which `tox.ini` sets in `[testenv]`.
+`shakenfist_utilities.logs.setup()` reads it and installs a
+`StreamHandler(sys.stdout)` when it is `'1'` and a
+`SysLogHandler('/dev/log')` otherwise, so under tox the syslog branch is
+unreachable and the suite looks correctly behaved.
+
+That variable describes *how the suite was invoked*, not the fact that a test
+is running, and the two are not the same set. Each way of losing it has been
+found separately, after the fact:
+
+- `tools/ci-enum-widening-test.sh` ran `stestr` directly, so the setenv never
+  applied and every test's records went to the CI runner's journal, putting
+  its log stream over the ingest budget (issue 4725). Fixed by exporting the
+  variable in that script, plus `test_ci_stestr_logging.py` to require it of
+  every `tools/*.sh` which invokes stestr.
+- `testenv:cover` did not inherit `{[testenv]setenv}`, so the environment CI
+  actually ran had neither `OS_TEST_TIMEOUT` nor this variable. Fixed by
+  naming the parent setenv -- see the comment that now sits there.
+- A venv interpreter driven directly -- an IDE test explorer, a hand-typed
+  `stestr run`, an agent -- has no file in this repository to patch, because
+  the caller is a person or a tool. On one workstation that wrote 97-100% of
+  the machine's syslog volume, 14.8 GB in a week (issues 5106, 5107).
+
+Three sites, one defect: the decision was taken somewhere that does not know
+whether a test is running. So it moved to two places that do.
+`shakenfist/tests/__init__.py` defaults the variable, because importing the
+test package is the one thing every invocation has in common and discovery
+does it before the modules under test; and `ShakenFistTestCase`'s log capture
+lifts a `/dev/log` handler off its logger for the duration of each test,
+which holds even for a handler installed mid-test by a module imported for
+the first time inside it. `tox.ini` still sets the variable and the shell
+guard still runs -- they are cheap and they document the intent -- but
+nothing now depends on them being remembered.
+
+The general form: when behaviour must differ under test, key it on something
+only true under test. A `conftest`, a package `__init__`, a base class or a
+fixture all qualify. The invoking command line does not, and a guard written
+for one invocation site only covers the sites that are files.

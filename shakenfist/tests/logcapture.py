@@ -35,11 +35,47 @@ redirection until the next test starts, which is why
 case. ``sys.stdout`` and ``sys.stderr`` themselves are deliberately not
 replaced: in a worker stdout is the subunit stream, which subunit writes
 its own packets to.
+
+The host's syslog socket is redirected on the same terms, and for a
+different reason worth stating separately (issue #5106). ``logs.setup()``
+installs a ``SysLogHandler('/dev/log')`` whenever
+``SHAKENFIST_LOG_TO_STDOUT`` is not ``'1'``, which is every way of running
+the suite that does not inherit ``tox.ini``'s setenv: an IDE test
+explorer, a hand-typed ``stestr run`` in an activated venv, an agent
+driving the venv interpreter. That variable describes how the suite was
+invoked rather than the fact that a test is running, and the two times
+this was caught before (#4725, and ``testenv:cover`` not inheriting
+``{[testenv]setenv}``) were both fixed at the invocation site, which the
+third path does not have -- its caller is a person or a tool, not a file
+in this repository. So the decision is taken here instead, where being
+inside a test is the whole premise. Left alone, a run outside tox wrote
+every record to the host's journal: 97-100% of one workstation's syslog
+volume, 14.8 GB in a week.
+
+A syslog handler cannot be redirected the way a console one is -- it owns
+a socket, not a stream, and has no ``setStream()`` -- so it is lifted off
+its logger for the duration of the test and a ``StreamHandler`` on the
+capture buffer is put in its place, carrying the original's formatter and
+level so what a failing test reports is what it would have logged.
+
+The boundary, measured rather than reasoned about. Running
+``shakenfist.tests.test_daemon_{cleaner,loglevel}`` (101 tests) straight
+off the venv interpreter, with no tox and so no setenv, wrote 247 records
+to the host's journal before these changes and none after. Forcing
+``SHAKENFIST_LOG_TO_STDOUT=0`` -- which ``shakenfist/tests/__init__.py``
+leaves alone on purpose, for anyone deliberately exercising the syslog
+branch -- leaks 17 of them, all from ``logs.setup()`` running at *import*
+time and the module logging before any test started. Per-test capture
+cannot cover import time by construction: there is no test yet. The
+default in ``shakenfist/tests/__init__.py`` is what covers it, by making
+the handler a stdout one in the first place, which is the other half of
+why both changes exist.
 """
 
 import io
 import logging
 import sys
+from logging import handlers as logging_handlers
 from unittest.case import SkipTest
 
 
@@ -62,8 +98,39 @@ def _writes_to_console(handler):
                (_REAL_STDOUT, _REAL_STDERR, sys.__stdout__, sys.__stderr__))
 
 
-def console_handlers():
-    """Every StreamHandler currently writing to the real stdout or stderr.
+def _writes_to_host_syslog(handler):
+    """Is this handler writing to a syslog socket on this machine?
+
+    Discriminates on the address rather than the class. A tuple address
+    is a network sink, which is not this host's syslog and not what this
+    module exists to contain; a string address is a unix socket on this
+    machine, which is. Taking away a handler a test built for itself
+    would be overreach, and would make ``duplicate_handlers()`` report it
+    as an escape when it is nothing of the kind. Same distinction
+    ``_writes_to_console()`` draws between the process's real streams and
+    a stream a test substituted.
+
+    ``test_logship.py`` is the existing test which builds its own
+    ``SysLogHandler``, at ``('localhost', 0)`` with the socket mocked, to
+    check that logship leaves the per-module handler in place. Note that
+    it is unaffected either way today: its ``setUp()`` calls
+    ``super().setUp()`` first, so the handler is attached after capture
+    has already started and was never a candidate. The discrimination is
+    what keeps that true if such a handler ever moves to module scope or
+    import time, which is where ``logs.setup()`` installs the real one.
+    """
+    if not isinstance(handler, logging_handlers.SysLogHandler):
+        return False
+    # ``unixsocket`` is what the handler itself concluded: createSocket()
+    # sets it True for a str address and False for a tuple, and __init__
+    # always calls createSocket(), so it is set by the time any handler
+    # reaches us. Read that rather than re-deriving it from .address,
+    # which would restate a stdlib decision instead of using it.
+    return bool(getattr(handler, 'unixsocket', False))
+
+
+def _handlers_matching(predicate):
+    """Every (logger, handler) pair whose handler satisfies ``predicate``.
 
     Walks every logger, because ``logs.setup()`` installs its handler on
     the calling module's own logger rather than on the root.
@@ -77,9 +144,26 @@ def console_handlers():
 
     for logger in loggers:
         for handler in list(logger.handlers):
-            if isinstance(handler, logging.StreamHandler) and _writes_to_console(handler):
+            if predicate(handler):
                 found.append((logger, handler))
     return found
+
+
+def console_handlers():
+    """Every StreamHandler currently writing to the real stdout or stderr."""
+    return _handlers_matching(
+        lambda handler: (isinstance(handler, logging.StreamHandler)
+                         and _writes_to_console(handler)))
+
+
+def syslog_handlers():
+    """Every SysLogHandler currently bound to this host's syslog socket."""
+    return _handlers_matching(_writes_to_host_syslog)
+
+
+def escaping_handlers():
+    """Every handler currently writing outside the test."""
+    return console_handlers() + syslog_handlers()
 
 
 def note_failure(flag, exc_info):
@@ -122,6 +206,7 @@ class LogCapture:
     def __init__(self):
         self.buffer = io.StringIO()
         self._restore = []
+        self._substituted = []
         self._redirected = set()
 
     def start(self):
@@ -129,15 +214,33 @@ class LogCapture:
             self._redirected.add(id(logger))
             self._restore.append((handler, handler.stream))
             handler.setStream(self.buffer)
+
+        # A syslog handler owns a socket rather than a stream, so there is
+        # no setStream() to point at the buffer. Lift it off its logger for
+        # the test and stand a StreamHandler in for it, so the records are
+        # still captured for a failing test rather than merely silenced.
+        for logger, handler in syslog_handlers():
+            self._redirected.add(id(logger))
+            stand_in = logging.StreamHandler(self.buffer)
+            # Carry the formatter and level across: what a failing test
+            # reports should be what it would have written to syslog, and a
+            # handler-level filter is part of that.
+            stand_in.setFormatter(handler.formatter)
+            stand_in.setLevel(handler.level)
+            logger.removeHandler(handler)
+            logger.addHandler(stand_in)
+            self._substituted.append((logger, handler, stand_in))
         return self
 
     def duplicate_handlers(self):
-        """Loggers given a second console handler during this test.
+        """Loggers given a second escaping handler during this test.
 
-        Capture redirects every console handler which existed when the
-        test started, so anything still writing to the real stdout or
-        stderr was installed while the test ran. On a logger which had
-        none that is ordinary: a module imported for the first time
+        Capture redirects every handler which existed when the test
+        started -- console handlers by pointing their stream at the
+        buffer, host-syslog handlers by standing a buffer handler in for
+        them -- so anything still writing to the real stdout, stderr or
+        ``/dev/log`` was installed while the test ran. On a logger which
+        had none that is ordinary: a module imported for the first time
         inside a test calls ``logs.setup()``, which is how that logger
         gets its one handler, and the next test captures it.
 
@@ -151,7 +254,7 @@ class LogCapture:
         """
         return sorted({'%s (%s)' % (logger.name or 'root',
                                     type(handler).__name__)
-                       for logger, handler in console_handlers()
+                       for logger, handler in escaping_handlers()
                        if id(logger) in self._redirected})
 
     def stop(self, keep=False):
@@ -165,6 +268,14 @@ class LogCapture:
         while self._restore:
             handler, stream = self._restore.pop()
             handler.setStream(stream)
+
+        # Undone in reverse, and the stand-in is removed before the real
+        # handler goes back, so a logger never briefly carries both.
+        while self._substituted:
+            logger, handler, stand_in = self._substituted.pop()
+            logger.removeHandler(stand_in)
+            stand_in.close()
+            logger.addHandler(handler)
 
         captured = self.buffer.getvalue() if keep else None
         self.buffer.close()

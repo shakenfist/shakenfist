@@ -65,6 +65,7 @@ metrics. The headlines:
 - A schema backfill runs in bounded batches.
 - An arm which blames the caller catches the caller's own exception
   type.
+- An environment variable is not a test fixture.
 
 ## Things that will bite you
 
