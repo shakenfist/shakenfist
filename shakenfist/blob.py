@@ -713,7 +713,18 @@ class Blob(dbo):
 
     def ensure_local(
             self, instance_object: Any = None, wait_for_other_transfers: bool = True
-    ) -> None:
+    ) -> bool:
+        """Make sure this blob, and anything it depends on, is on this node.
+
+        Returns True when this call replicated the blob here, and False
+        when it did not need to: the blob was already present, arrived
+        through another caller's transfer while this one waited, or is
+        not in a state which can be replicated. A caller which wants to
+        know whether the blob crossed the network -- the image fetch's
+        usage event does -- gets the same answer this method acted on,
+        rather than re-deriving it from the filesystem and racing a
+        concurrent transfer. Dependencies are not counted.
+        """
         affected_objects = [self]
         if instance_object:
             affected_objects.append(instance_object)
@@ -722,7 +733,7 @@ class Blob(dbo):
             add_event_multi(
                 EVENT_TYPE_STATUS, affected_objects,
                 'blob not in created state, replication to this node cancelled')
-            return
+            return False
 
         # Replicate any blob this blob depends on
         if self.depends_on:
@@ -735,7 +746,7 @@ class Blob(dbo):
         blob_path = Blob.filepath(self.uuid)
         if os.path.exists(blob_path):
             self.observe()
-            return
+            return False
 
         add_event_multi(
             EVENT_TYPE_STATUS, affected_objects, 'replicating blob to this node')
@@ -770,7 +781,7 @@ class Blob(dbo):
             add_event_multi(
                 EVENT_TYPE_AUDIT, affected_objects, 'blob now exists on this node')
             self.observe()
-            return
+            return False
 
         # Fetch with a few retries
         attempts = 0
@@ -780,12 +791,12 @@ class Blob(dbo):
                     # Check the blob didn't show up without us
                     if os.path.exists(blob_path):
                         self.observe()
-                        return
+                        return False
 
                     # Attempt a transfer
                     self._attempt_transfer(
                         affected_objects, partial_path, blob_path)
-                    return
+                    return True
             except (ConnectionRefusedError, BlobTransferSetupFailed,
                     BlobFetchFailed, NodeLockUnavailable) as e:
                 # NodeLockUnavailable is this node's nodelock daemon not

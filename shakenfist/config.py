@@ -915,6 +915,29 @@ class SFConfig(BaseSettings):
             'broken, which rebuilds the network.'
         )
     )
+    MAINTAIN_HEALTH_CHECK_BUDGET_SECONDS: float = Field(
+        10.0,
+        description=(
+            'How long one maintain pass may spend health checking networks '
+            'before it defers the rest to later passes. Zero disables the '
+            'bound. A healthy network is checked in milliseconds, so on a '
+            'well cluster this is never reached whatever the network count; '
+            'what it bounds is the degraded case, where each unreachable '
+            'dnsmasq costs a full DHCP_PROBE_TIMEOUT and a node with many '
+            'networks can take longer to check them than the thirty second '
+            'interval the pass runs at. The default is a third of that '
+            'interval, which leaves the rest of the pass -- the '
+            'reconciliations it enqueues and the stray vxlan check -- room '
+            'to finish inside the cadence. Networks with an interface '
+            'attached are checked first, then the longest-waiting, so a '
+            'pass which runs out of budget defers networks to a later pass '
+            'rather than starving them within each of those tiers. If the '
+            'networks with interfaces alone exhaust the budget, empty '
+            'networks go unchecked until it is no longer scarce, which is '
+            'the intended trade: an empty network has no guest which can '
+            'fail to get a lease.'
+        )
+    )
     MAINTAIN_RECONCILE_COOLDOWN_SECONDS: int = Field(
         60,
         description=(

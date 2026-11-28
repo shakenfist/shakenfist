@@ -44,12 +44,21 @@ def dependency_defer_delay(defer_count: int) -> float:
 
 
 class Job(util_concurrency.Job):
-    def __init__(self, queue_name, jobname, workitem, batch_size=None):
+    def __init__(self, queue_name, jobname, workitem, batch_size=None,
+                 dequeued_at=None, deliveries=None):
         super().__init__()
 
         self.queue_name = queue_name
         self.jobname = jobname
         self.workitem = workitem
+        # When the dispatcher's claim returned this item, and how many
+        # times the item has been handed out. Both are reported on the
+        # execution duration event, where they separate time the row
+        # sat in the database queue from time this daemon held it after
+        # claiming it, and a redelivery from a first delivery
+        # (issue 3974).
+        self.dequeued_at = dequeued_at
+        self.deliveries = deliveries
         # Size of the dispatcher's dequeue batch that delivered this
         # job. Propagated onto ``op.dispatcher_batch_size`` so the
         # coalescing fold in ``BaseClusterOperation.execute`` can skip
@@ -309,4 +318,7 @@ class Job(util_concurrency.Job):
         # carrying events from both.
         op.add_event(
             EVENT_TYPE_USAGE, 'execution duration',
-            extra=op.execution_duration_extra(start_time, self.queue_name))
+            extra=op.execution_duration_extra(
+                start_time, self.queue_name,
+                dequeued_at=self.dequeued_at,
+                deliveries=self.deliveries))

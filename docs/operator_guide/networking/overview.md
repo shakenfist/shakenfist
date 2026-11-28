@@ -695,6 +695,122 @@ namespace loopback interface up` when it does. If the loopback cannot
 be brought up, that is reported like any other probe which could not
 run.
 
+## What a maintenance pass costs
+
+The maintenance pass runs every 30 seconds, and the work it does grows
+with the number of networks the node is on. On a hypervisor that is the
+networks it has instances for; on the network node it is every active
+network in the cluster, whether or not anything is using it.
+
+Most of that cost is the per-network health checks, and on the network
+node the most expensive of those is the DHCP readiness probe described
+above: it starts an interpreter through `sf-privexec` inside the
+network's namespace and waits for an answer, with `DHCP_PROBE_TIMEOUT`
+(2 seconds by default) as its worst case. A healthy network answers in
+well under that. A wedged `dnsmasq`, or a namespace the probe cannot
+reach, costs the full timeout. The probes run one network at a time.
+
+So the pass has two cost regimes, and the difference between them is
+large: a node whose networks are all healthy pays roughly an
+interpreter start each, while a node in the middle of an incident
+affecting many `dnsmasq` processes at once pays the timeout for each
+affected network. A few hundred networks in the second state is more
+than the 30 second cadence allows for.
+
+Every pass which runs therefore logs what it cost:
+
+```
+Maintenance pass complete; health_check_seconds=1.84; networks=112; networks_deferred=0; pass_seconds=2.31
+```
+
+* `networks` is how many networks the pass health checked.
+* `health_check_seconds` is the wall time inside those checks, summed.
+  This is the term which grows with network count.
+* `networks_deferred` is how many networks the pass did not reach
+  because it spent its health check budget (see below).
+* `pass_seconds` is the whole pass, through to the stray vxlan
+  handling at its end. The difference between it and
+  `health_check_seconds` is the pass's fixed cost, any reconciliations
+  it enqueued and the stray vxlan handling.
+
+A pass skipped because the network queues are already backed up (see
+`MAINTAIN_QUEUE_DEPTH_THRESHOLD`) does no work and logs no cost line;
+it records a `maintain pass skipped` event against the node instead, so
+a gap in the log stream has its explanation in the node's events.
+
+These are log lines rather than events deliberately: a pass runs twice
+a minute for the life of the node, and an event row at that rate would
+say nothing the first one said. Reconstruct pass duration against
+network count from the log stream.
+
+The one case which *is* an event is a pass slower than its own
+interval, recorded against the node:
+
+```
+maintain pass took 47.2 seconds, longer than its 30 second interval
+```
+
+That is worth acting on, because the pass's own sleep cannot claw the
+time back: every repair the next pass would have made is late by the
+overrun. If you see it, the log line's `health_check_seconds` says
+whether the cost is in the health checks (and so in the probes, and so
+most likely in how many networks are unwell) or elsewhere.
+
+### Bounding the health checks
+
+`MAINTAIN_HEALTH_CHECK_BUDGET_SECONDS` (10 seconds by default, a third
+of the interval) is how long one pass may spend health checking before
+it defers the rest to a later pass. Setting it to zero disables the
+bound.
+
+Because a healthy network is checked in milliseconds, a well cluster
+never reaches this however many networks it has: the bound costs
+nothing until something is actually wrong. What it stops is the
+degraded case, where enough unreachable `dnsmasq` processes to spend
+2 seconds each would otherwise take the pass past its own cadence.
+
+Networks with an interface attached are checked first, then the
+longest-waiting, so within each of those two groups the bound defers
+work rather than starving it: the networks a pass did not reach are the
+ones the next pass starts with. If the networks with interfaces alone
+exhaust the budget, empty networks go unchecked for as long as that
+lasts -- the trade described below. A network deferred this way is
+still counted as one this node is on, so it is not mistaken for a stray
+and reaped while it waits.
+
+Deferring a network defers all of its reconciliation, not just its
+health check. Without a check there is nothing to say a repair is
+needed, so a deferred network has no network rebuild, no vxlan mesh
+repair and no routed address route restored this pass; all of that
+waits for the pass which reaches it.
+
+Preferring networks which have guests on them is what makes a large
+number of unused networks close to free for the network node. It only
+decides anything when the budget is scarce -- on a well cluster every
+network is checked every pass whatever the count -- and when it is
+scarce, an empty network has nothing which can fail to get a DHCP
+lease, so it is the right thing to go without. Which networks have
+interfaces is one read of the table per pass, not one per network.
+
+When a pass starts deferring, it says so against the node:
+
+```
+maintain pass spent its 10.0 second health check budget and deferred 37 networks to a later pass; further passes which defer are logged but not reported again until one reaches every network
+```
+
+A degraded node usually defers for many passes in a row, so this is
+reported once on the way in, and once more on the way out (`maintain
+pass reached every network inside its health check budget again`).
+The passes in between are in the log stream with their
+`networks_deferred` count.
+
+Unlike the overrun event this is not in itself a fault -- the bound
+working is the pass declining to overrun. It does mean some networks
+went unchecked, so drift on them is repaired a pass or more later than
+it otherwise would be, as described above. Seeing it regularly on a healthy cluster means
+the budget is too small for the network count; seeing it during an
+incident is the bound doing its job.
+
 ## Stray vxlan reaping
 
 Which networks a node should be carrying is a closed question: a network
@@ -798,12 +914,16 @@ events emitted by the operation itself). The enqueue-side dedup event
 is emitted by the enqueuing process, not by the dispatcher:
 
 * **`execution duration`** (`EVENT_TYPE_USAGE`). Emitted when the
-  dispatcher finishes running an op. Carries four fields in `extra`:
+  dispatcher finishes running an op. Carries these fields in `extra`:
     * `seconds` — wall-clock time spent inside `op.execute()`
       (state writes, coalescing fold, the `_apply_*` work, the
       terminal state write).
     * `wait_seconds` — time between when the op was first inserted
-      into `cluster_operations` and when the dispatcher claimed it.
+      into `cluster_operations` and when the dispatcher began
+      executing it. Note that this runs to the start of execution,
+      not to the claim: the two differ by however long the daemon
+      held the item after claiming it, which is what
+      `dispatch_seconds` below separates out.
       This is not queueing alone: it also counts deliberate
       deferral while an op waits on a dependency, and the seconds a
       `*_high_io` background op spends gated off while the local
@@ -823,6 +943,41 @@ is emitted by the enqueuing process, not by the dispatcher:
     * `queue_name` — the queue the op was claimed from. Useful for
       attributing wait time to a specific priority lane (e.g.
       `networknode-clusteroperation-user_facing_high_io`).
+    * `dequeued_at`, `queue_seconds` and `dispatch_seconds` — when
+      the dispatcher's claim returned this item, and the two halves
+      `wait_seconds` divides into: `queue_seconds` is time the row
+      sat in the database queue unclaimed, and `dispatch_seconds` is
+      time this daemon held it after claiming it. They sum to
+      `wait_seconds`.
+
+      This is the distinction that matters when a wait is long and
+      `defer_count` is zero, which is most of them: over nine in ten
+      of the waits of fifteen seconds or more never deferred once,
+      and an operation which never defers emits no intermediate
+      events, so its whole wait used to be a single bracket with
+      nothing inside it. With `defer_count` zero, a large
+      `queue_seconds` means nobody asked for that queue -- it sits
+      low in the dispatcher's priority order and higher lanes filled
+      every batch. Where `defer_count` is non-zero, the deferral
+      sleep is counted in `queue_seconds` too, because the wait is
+      measured from the operation's creation. A large
+      `dispatch_seconds` means the daemon had the item and sat on
+      it, which on `sf-net` usually means one slow operation ahead
+      of it on the same partitioned worker, since ops for one target
+      are routed to one worker thread and run serially.
+
+      Absent on events from a build before this existed, and from a
+      dispatcher talking to an `sf-database` which does not report
+      the claim.
+    * `deliveries` — how many times this work item has been handed
+      to a worker, this delivery included, so a first delivery is
+      `1`. Anything higher means an earlier delivery did not resolve
+      the item: a worker which crashed or was lost holding it, which
+      the cluster's stuck-row reaper later gave back. `defer_count`
+      counts deliberate deferrals only, so without this a redelivery
+      reads exactly like a first attempt. Absent when the
+      `sf-database` answering the claim is too old to report it,
+      rather than reported as `1`.
 
   The combined event replaces an earlier split into separate
   `'started executing'` and `'execution duration'` events. The

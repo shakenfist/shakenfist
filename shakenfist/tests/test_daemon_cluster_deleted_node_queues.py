@@ -76,8 +76,10 @@ class DeletedNodeQueueDrainTestCase(base.ShakenFistTestCase):
             for row in self.work_queue:
                 if row['queue_name'] in queue_names and not row['claimed']:
                     row['claimed'] = True
+                    row['attempts'] = row.get('attempts', 0) + 1
                     items.append(
-                        (row['queue_name'], str(row['id']), row['payload']))
+                        (row['queue_name'], str(row['id']), row['payload'],
+                         row['attempts']))
                     if len(items) >= limit:
                         break
             return items

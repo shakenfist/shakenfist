@@ -18,6 +18,7 @@ from shakenfist.artifact import BLOB_URL
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_STATUS
+from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.constants import QCOW2_CLUSTER_SIZE
 from shakenfist.constants import TRANSCODE_DESCRIPTION
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
@@ -418,7 +419,7 @@ class ImageFetchHelper:
                         'child_blob_uuid': depends_on
                         })
                 fetched_blobs.append(
-                    self._blob_get('sf://blob/%s' % depends_on))
+                    self._blob_get('sf://blob/%s' % depends_on)[0])
 
             # We might already have a transcoded version of the image cached. If so
             # we use that. Otherwise, we might have a transcoded version within the
@@ -543,16 +544,52 @@ class ImageFetchHelper:
         # Both the branch and the fetch read `resolved`, so there is one
         # answer to "what are we fetching, and what may we check it
         # against" rather than two which can drift apart.
+        # Whether the cluster already held this image is the one thing
+        # about an image fetch nothing counted. The two branches below
+        # have always said which way it went, but only as a message, so
+        # a cache hit rate -- or the bytes a cluster pulls from the
+        # internet -- could not be had without reading every fetch by
+        # hand (issue 852).
+        #
+        # A copy the cluster holds is either already on this node or
+        # has to be replicated here, and those are different costs: the
+        # first moves nothing, the second moves the whole blob across
+        # the cluster network. get_image() calls this on every instance
+        # create, so without the distinction a node creating many
+        # instances from one image would report each create as a cache
+        # hit with the blob's size against it. ensure_local() says
+        # which, from the check it acted on.
+        fetch_started = time.time()
+
         if resolved.url.startswith(BLOB_URL):
             add_event_multi(
                 EVENT_TYPE_STATUS, self.objects,
                 'fetching image from within the cluster')
-            b = self._blob_get(resolved.url)
+            b, replicated = self._blob_get(resolved.url)
+            source = 'cluster' if replicated else 'node'
         else:
+            source = 'internet'
             add_event_multi(
                 EVENT_TYPE_STATUS, self.objects,
                 'fetching image from the internet')
             b = self._http_get_inner(resolved)
+
+        # One event per call, carrying where the image came from and
+        # what it cost, so the hit rates and the bytes are a count over
+        # the event stream rather than a reading exercise. That is once
+        # per instance create from this artifact on this node, which
+        # already writes a handful of status events per create, so one
+        # more is in proportion. ``bytes`` is the blob's size whatever
+        # the source; it is traffic only where ``source`` says something
+        # moved.
+        add_event_multi(
+            EVENT_TYPE_USAGE, self.objects, 'image fetch complete',
+            extra={
+                'source': source,
+                'seconds': time.time() - fetch_started,
+                'bytes': b.size,
+                'blob_uuid': str(b.uuid),
+            })
 
         return b
 
@@ -663,7 +700,11 @@ class ImageFetchHelper:
             self.artifact.state = Artifact.STATE_CREATED
 
     def _blob_get(self, url):
-        """Fetch a blob from the cluster."""
+        """Fetch a blob from the cluster.
+
+        Returns the blob and whether this call replicated it to this
+        node, which is False when it was already here.
+        """
 
         blob_uuid = url[len(BLOB_URL):]
         b = blob.Blob.from_db(blob_uuid)
@@ -671,8 +712,8 @@ class ImageFetchHelper:
             raise exceptions.BlobMissing(
                 f'Failed to lookup blob {blob_uuid}')
 
-        b.ensure_local(instance_object=self.instance)
-        return b
+        replicated = b.ensure_local(instance_object=self.instance)
+        return b, replicated
 
     def _http_get_inner(self, resolved):
         """Fetch image if not downloaded and return image path."""

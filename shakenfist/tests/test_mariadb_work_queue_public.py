@@ -65,9 +65,9 @@ class PublicWorkQueueDispatchTestCase(base.ShakenFistTestCase):
         # claimed_by names the worker rather than the database node.
         mock_config.NODE_NAME = 'node-alpha'
         mock_config.NODE_UUID = 'uuid-alpha'
-        grpc.return_value = [('q', '42', {'payload': True})]
+        grpc.return_value = [('q', '42', {'payload': True}, 1)]
         result = mariadb.dequeue_work_items(['q'], limit=5)
-        self.assertEqual([('q', '42', {'payload': True})], result)
+        self.assertEqual([('q', '42', {'payload': True}, 1)], result)
         grpc.assert_called_once_with(['q'], 'uuid-alpha', 5)
         direct.assert_not_called()
 
@@ -83,11 +83,11 @@ class PublicWorkQueueDispatchTestCase(base.ShakenFistTestCase):
         # which never matches the uuid a startup reset clears.
         mock_config.NODE_NAME = 'node-alpha'
         mock_config.NODE_UUID = None
-        direct.return_value = [('q', '7', {'op': 'x'})]
+        direct.return_value = [('q', '7', {'op': 'x'}, 1)]
 
         result = mariadb.dequeue_work_items(['q'])
 
-        self.assertEqual([('q', '7', {'op': 'x'})], result)
+        self.assertEqual([('q', '7', {'op': 'x'}, 1)], result)
         # Default limit is 10 -- see dequeue_work_items signature.
         direct.assert_called_once_with(['q'], 'node-alpha', 10)
         grpc.assert_not_called()
@@ -403,9 +403,11 @@ class MockMariaDBWorkQueueTestCase(base.ShakenFistTestCase):
         # limit=1 to exercise the "one at a time" pattern.
         items = mariadb.dequeue_work_items(['q1'], limit=1)
         self.assertEqual(1, len(items))
-        qn1, name1, payload1 = items[0]
+        qn1, name1, payload1, deliveries1 = items[0]
         self.assertEqual('q1', qn1)
         self.assertEqual({'task': 't1'}, payload1)
+        # A first claim is the first delivery (issue 3974).
+        self.assertEqual(1, deliveries1)
 
         processing, queued, deferred = mariadb.get_work_queue_length(
             'q1')
@@ -413,7 +415,7 @@ class MockMariaDBWorkQueueTestCase(base.ShakenFistTestCase):
 
         items = mariadb.dequeue_work_items(['q1'], limit=1)
         self.assertEqual(1, len(items))
-        _, _, payload2 = items[0]
+        _, _, payload2, _ = items[0]
         self.assertEqual({'task': 't2'}, payload2)
 
         self.assertEqual([], mariadb.dequeue_work_items(['q1']))
@@ -438,10 +440,10 @@ class MockMariaDBWorkQueueTestCase(base.ShakenFistTestCase):
         # Both q_high rows first (in insertion order), then q_low.
         self.assertEqual(
             ['q_high', 'q_high', 'q_low', 'q_low'],
-            [qn for qn, _, _ in items])
+            [qn for qn, _, _, _ in items])
         self.assertEqual(
             ['high_a', 'high_b', 'low_a', 'low_b'],
-            [payload['task'] for _, _, payload in items])
+            [payload['task'] for _, _, payload, _ in items])
 
     def test_deferred_job_is_not_dequeued_until_ready(self):
         mariadb.enqueue_work_item('q', {'task': 'later'}, delay=60.0)
@@ -449,6 +451,22 @@ class MockMariaDBWorkQueueTestCase(base.ShakenFistTestCase):
         processing, queued, deferred = mariadb.get_work_queue_length(
             'q')
         self.assertEqual((0, 0, 1), (processing, queued, deferred))
+
+    def test_a_redelivered_item_reports_a_higher_delivery_count(self):
+        """The count is what tells a redelivery after a lost worker
+        from a first delivery, which deferrals do not explain and
+        ``defer_count`` cannot distinguish (issue 3974).
+        """
+        mariadb.enqueue_work_item('q', {'task': 't'})
+
+        items = mariadb.dequeue_work_items(['q'], limit=1)
+        self.assertEqual(1, items[0][3])
+
+        # Giving the claim back is what the stuck-row reaper does for a
+        # worker which died holding the item.
+        mariadb.restart_work_queue('q')
+        items = mariadb.dequeue_work_items(['q'], limit=1)
+        self.assertEqual(2, items[0][3])
 
     def test_restart_clears_claims(self):
         mariadb.enqueue_work_item('q', {'task': 't'})

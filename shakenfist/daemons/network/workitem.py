@@ -248,9 +248,10 @@ class Job(util_concurrency.Job):
         """One partition of the network worker pool.
 
         Drains its own FIFO queue of pre-routed (queue_name, jobname, op,
-        batch_size) tuples. Exits once stop is set or the abort path
-        fires, finishing the operation it is running first; the dispatcher
-        gives back the claims on whatever is still in its queue.
+        batch_size, dequeued_at, deliveries) tuples. Exits once stop is
+        set or the abort path fires, finishing the operation it is
+        running first; the dispatcher gives back the claims on whatever
+        is still in its queue.
         """
         defer_delays: dict[str, float] = {}
         while not stop.is_set() and daemon.check_abort_path(self.abort_path):
@@ -259,14 +260,16 @@ class Job(util_concurrency.Job):
             except queue_module.Empty:
                 continue
 
-            queue_name, jobname, op, batch_size = item
+            (queue_name, jobname, op, batch_size,
+             dequeued_at, deliveries) = item
             util_concurrency.set_thread_name(jobname)
             LOG.debug(
                 f'Network worker {index} is now processing job {jobname}')
             resolve = True
             try:
                 self._cluster_operation_execute(
-                    queue_name, op, batch_size, defer_delays)
+                    queue_name, op, batch_size, defer_delays,
+                    dequeued_at, deliveries)
             except (DatabaseUnavailable, StateWriteFailed):
                 # The database went away mid-operation, or answered but
                 # reported a state write as failed (issue 4273: an
@@ -337,11 +340,13 @@ class Job(util_concurrency.Job):
         was deduplicated onto the stranded operation and waited with it
         (#4660). Must only be called once the workers have exited.
         """
-        jobs = [(queue_name, jobname) for queue_name, jobname, _ in unrouted]
+        jobs = [(queue_name, jobname)
+                for queue_name, jobname, *_ in unrouted]
         for worker_queue in worker_queues:
             while True:
                 try:
-                    queue_name, jobname, _, _ = worker_queue.get_nowait()
+                    (queue_name, jobname,
+                     *_) = worker_queue.get_nowait()
                 except queue_module.Empty:
                     break
                 jobs.append((queue_name, jobname))
@@ -388,7 +393,7 @@ class Job(util_concurrency.Job):
             }).info('Released claims on network work items not run')
 
     def _route_item(self, queue_name, jobname, workitem, batch_size,
-                    worker_count):
+                    worker_count, dequeued_at=None, deliveries=None):
         """Load a claimed work item's operation and pick its worker.
 
         Returns the worker index and the item to queue for it, or None for
@@ -421,7 +426,8 @@ class Job(util_concurrency.Job):
 
         op.current_defer_count = workitem.get('defer_count', 0)
         index = zlib.crc32(self._routing_key(op).encode()) % worker_count
-        return index, (queue_name, jobname, op, batch_size)
+        return index, (queue_name, jobname, op, batch_size,
+                       dequeued_at, deliveries)
 
     def execute(self):
         LOG.info('Starting network worker')
@@ -456,6 +462,11 @@ class Job(util_concurrency.Job):
         # interrupted are routed once it is back rather than left claimed.
         unrouted: collections.deque = collections.deque()
         batch_size = 0
+        # Carried across iterations with unrouted, for the same reason:
+        # when a database outage leaves items unrouted, the pass which
+        # routes them did not claim them, and the claim time to report
+        # is still the one from the claim that produced them.
+        dequeued_at = None
 
         try:
             # The queue names list is constant for the dispatcher's
@@ -478,6 +489,13 @@ class Job(util_concurrency.Job):
                         items = mariadb.dequeue_work_items(
                             queue_names, limit=BATCH_SIZE)
 
+                        # When the claim returned, for every item in
+                        # it. Reported on each op's execution duration
+                        # event, where it separates time the row sat in
+                        # the queue from time this daemon held it after
+                        # claiming it (issue 3974).
+                        dequeued_at = time.time()
+
                         if not items:
                             if not was_previously_idle:
                                 util_concurrency.set_thread_name('idle')
@@ -494,11 +512,12 @@ class Job(util_concurrency.Job):
                         unrouted.extend(items)
 
                     while unrouted:
-                        queue_name, jobname, workitem = unrouted[0]
+                        (queue_name, jobname, workitem,
+                         deliveries) = unrouted[0]
                         try:
                             routed = self._route_item(
                                 queue_name, jobname, workitem, batch_size,
-                                worker_count)
+                                worker_count, dequeued_at, deliveries)
                         except DatabaseCallFailed as e:
                             # The tier answered with a failure, which is
                             # usually permanent for this item: pausing
@@ -586,7 +605,8 @@ class Job(util_concurrency.Job):
         unrouted.popleft()
 
     def _cluster_operation_execute(self, queue_name, op, batch_size,
-                                   defer_delays):
+                                   defer_delays, dequeued_at=None,
+                                   deliveries=None):
         # Executing is deliberately not here. An op dequeued in executing
         # is a sibling a coalescing survivor folded and did not complete,
         # because the survivor failed, deferred or died; running it now is
@@ -751,4 +771,6 @@ class Job(util_concurrency.Job):
         # carrying events from both.
         op.add_event(
             EVENT_TYPE_USAGE, 'execution duration',
-            extra=op.execution_duration_extra(start_time, queue_name))
+            extra=op.execution_duration_extra(
+                start_time, queue_name, dequeued_at=dequeued_at,
+                deliveries=deliveries))

@@ -170,10 +170,15 @@ class WorkQueueDequeueBatchTestCase(base.ShakenFistTestCase):
         row_a.id = 42
         row_a.queue_name = 'my-queue'
         row_a.payload = {'task': 'do-thing-a'}
+        # attempts as the SELECT read it, before the UPDATE below
+        # incremented it, so the delivery counts reported are one more
+        # (issue 3974).
+        row_a.attempts = 0
         row_b = mock.Mock()
         row_b.id = 43
         row_b.queue_name = 'my-queue'
         row_b.payload = {'task': 'do-thing-b'}
+        row_b.attempts = 2
         mock_select_result = mock.Mock()
         mock_select_result.fetchall.return_value = [row_a, row_b]
         mock_update_result = mock.Mock()
@@ -186,8 +191,8 @@ class WorkQueueDequeueBatchTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(
             [
-                ('my-queue', '42', {'task': 'do-thing-a'}),
-                ('my-queue', '43', {'task': 'do-thing-b'}),
+                ('my-queue', '42', {'task': 'do-thing-a'}, 1),
+                ('my-queue', '43', {'task': 'do-thing-b'}, 3),
             ],
             result)
         self.assertEqual(mock_conn.execute.call_count, 2)

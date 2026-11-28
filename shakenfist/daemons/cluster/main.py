@@ -689,7 +689,7 @@ class Monitor(daemon.Daemon):
                 while items := mariadb.dequeue_work_items(
                         node_queues, limit=100):
                     self.pet_watchdog()
-                    for queue_name, jobname, workitem in items:
+                    for queue_name, jobname, workitem, _ in items:
                         n.add_event(
                             EVENT_TYPE_AUDIT,
                             'deleting work item for deleted node',

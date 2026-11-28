@@ -498,6 +498,20 @@ message DequeuedItem {
   string queue_name = 1;
   string job_name = 2;
   string work_item = 3;  // JSON-encoded data
+  // How many times this work item has now been handed to a worker,
+  // including this delivery, which is work_queue.attempts after the
+  // claim incremented it. A value above one means an earlier delivery
+  // did not resolve the item -- a crashed or lost worker, recovered by
+  // the stuck-row reaper -- which deliberate deferrals do not explain
+  // and which defer_count cannot distinguish from a first delivery
+  // (issue 3974).
+  //
+  // A server from before this field existed sends nothing and it
+  // arrives as zero, which clients report as unknown rather than as a
+  // first delivery. So during a mixed-version upgrade window the
+  // execution duration event simply carries no deliveries field, as it
+  // did before.
+  uint32 deliveries = 4;
 }
 
 message DequeueReply {

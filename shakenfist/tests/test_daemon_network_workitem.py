@@ -736,13 +736,14 @@ class PartitionedDispatchTest(base.ShakenFistTestCase):
         }
         items = [
             (QUEUE_NAME, f'job-{u}',
-             {'operation_type': 'net_op', 'operation_uuid': u})
+             {'operation_type': 'net_op', 'operation_uuid': u}, 1)
             for u in ['op-a1', 'op-b1', 'op-a2', 'op-b2']]
 
         executions = []
         exec_lock = threading.Lock()
 
-        def fake_execute(queue_name, op, batch_size, defer_delays):
+        def fake_execute(queue_name, op, batch_size, defer_delays,
+                         dequeued_at=None, deliveries=None):
             with exec_lock:
                 executions.append(
                     (threading.current_thread().name, op.uuid))
@@ -897,14 +898,17 @@ class DatabaseUnavailableTest(base.ShakenFistTestCase):
         and the worker moves on to the next item rather than dying."""
         executed = []
 
-        def fake_execute(queue_name, op, batch_size, defer_delays):
+        def fake_execute(queue_name, op, batch_size, defer_delays,
+                         dequeued_at=None, deliveries=None):
             executed.append(op.uuid)
             if op.uuid == 'op-1':
                 raise exceptions.DatabaseUnavailable('down')
 
         items = [
-            (QUEUE_NAME, 'job-op-1', FakeNetOp('op-1', 'net-a'), 1),
-            (QUEUE_NAME, 'job-op-2', FakeNetOp('op-2', 'net-a'), 1),
+            (QUEUE_NAME, 'job-op-1', FakeNetOp('op-1', 'net-a'), 1,
+             10_000.0, 1),
+            (QUEUE_NAME, 'job-op-2', FakeNetOp('op-2', 'net-a'), 1,
+             10_000.0, 1),
         ]
 
         with mock.patch(
@@ -926,7 +930,8 @@ class DatabaseUnavailableTest(base.ShakenFistTestCase):
         enqueue-side dedup adopted the orphan forever."""
         executed = []
 
-        def fake_execute(queue_name, op, batch_size, defer_delays):
+        def fake_execute(queue_name, op, batch_size, defer_delays,
+                         dequeued_at=None, deliveries=None):
             executed.append(op.uuid)
             if op.uuid == 'op-1':
                 raise exceptions.StateWriteFailed(
@@ -934,8 +939,10 @@ class DatabaseUnavailableTest(base.ShakenFistTestCase):
                     'to MariaDB')
 
         items = [
-            (QUEUE_NAME, 'job-op-1', FakeNetOp('op-1', 'net-a'), 1),
-            (QUEUE_NAME, 'job-op-2', FakeNetOp('op-2', 'net-a'), 1),
+            (QUEUE_NAME, 'job-op-1', FakeNetOp('op-1', 'net-a'), 1,
+             10_000.0, 1),
+            (QUEUE_NAME, 'job-op-2', FakeNetOp('op-2', 'net-a'), 1,
+             10_000.0, 1),
         ]
 
         with mock.patch(
@@ -953,12 +960,15 @@ class DatabaseUnavailableTest(base.ShakenFistTestCase):
         kill the worker thread; the next item is still processed."""
         executed = []
 
-        def fake_execute(queue_name, op, batch_size, defer_delays):
+        def fake_execute(queue_name, op, batch_size, defer_delays,
+                         dequeued_at=None, deliveries=None):
             executed.append(op.uuid)
 
         items = [
-            (QUEUE_NAME, 'job-op-1', FakeNetOp('op-1', 'net-a'), 1),
-            (QUEUE_NAME, 'job-op-2', FakeNetOp('op-2', 'net-a'), 1),
+            (QUEUE_NAME, 'job-op-1', FakeNetOp('op-1', 'net-a'), 1,
+             10_000.0, 1),
+            (QUEUE_NAME, 'job-op-2', FakeNetOp('op-2', 'net-a'), 1,
+             10_000.0, 1),
         ]
 
         with mock.patch(
@@ -991,7 +1001,7 @@ class DispatcherStopTest(base.ShakenFistTestCase):
     def items(self, count):
         return [
             (QUEUE_NAME, str(i),
-             {'operation_type': 'net_op', 'operation_uuid': f'op-{i}'})
+             {'operation_type': 'net_op', 'operation_uuid': f'op-{i}'}, 1)
             for i in range(count)]
 
     def load(self, op_uuid, **kwargs):
@@ -1042,7 +1052,8 @@ class DispatcherStopTest(base.ShakenFistTestCase):
         release = threading.Event()
         executed = []
 
-        def fake_execute(queue_name, op, batch_size, defer_delays):
+        def fake_execute(queue_name, op, batch_size, defer_delays,
+                         dequeued_at=None, deliveries=None):
             executed.append(op.uuid)
             if op.uuid == 'op-0':
                 release.wait(10)
@@ -1070,7 +1081,8 @@ class DispatcherStopTest(base.ShakenFistTestCase):
     def test_items_not_run_at_shutdown_are_given_back(self):
         executed = []
 
-        def fake_execute(queue_name, op, batch_size, defer_delays):
+        def fake_execute(queue_name, op, batch_size, defer_delays,
+                         dequeued_at=None, deliveries=None):
             executed.append(int(op.uuid[3:]))
 
         def load(op_uuid, **kwargs):
@@ -1153,7 +1165,8 @@ class DispatcherStopTest(base.ShakenFistTestCase):
     def test_a_failed_release_does_not_hide_why_the_dispatcher_failed(self):
         release = threading.Event()
 
-        def fake_execute(queue_name, op, batch_size, defer_delays):
+        def fake_execute(queue_name, op, batch_size, defer_delays,
+                         dequeued_at=None, deliveries=None):
             if op.uuid == 'op-0':
                 release.wait(10)
 
@@ -1179,7 +1192,8 @@ class DispatcherStopTest(base.ShakenFistTestCase):
     def assert_poison_item_left_claimed(self, load):
         executed = []
 
-        def fake_execute(queue_name, op, batch_size, defer_delays):
+        def fake_execute(queue_name, op, batch_size, defer_delays,
+                         dequeued_at=None, deliveries=None):
             executed.append(op.uuid)
 
         def dequeue(queue_names, limit):
@@ -1233,7 +1247,8 @@ class DispatcherStopTest(base.ShakenFistTestCase):
     def test_items_a_database_outage_interrupted_are_routed_afterwards(self):
         executed = []
 
-        def fake_execute(queue_name, op, batch_size, defer_delays):
+        def fake_execute(queue_name, op, batch_size, defer_delays,
+                         dequeued_at=None, deliveries=None):
             executed.append(op.uuid)
 
         def load(op_uuid, **kwargs):

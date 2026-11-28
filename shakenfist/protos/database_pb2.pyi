@@ -124,20 +124,37 @@ class DequeuedItem(_message.Message):
     QUEUE_NAME_FIELD_NUMBER: _builtins.int
     JOB_NAME_FIELD_NUMBER: _builtins.int
     WORK_ITEM_FIELD_NUMBER: _builtins.int
+    DELIVERIES_FIELD_NUMBER: _builtins.int
     queue_name: _builtins.str
     job_name: _builtins.str
     work_item: _builtins.str
     """JSON-encoded data"""
+    deliveries: _builtins.int
+    """How many times this work item has now been handed to a worker,
+    including this delivery, which is work_queue.attempts after the
+    claim incremented it. A value above one means an earlier delivery
+    did not resolve the item -- a crashed or lost worker, recovered by
+    the stuck-row reaper -- which deliberate deferrals do not explain
+    and which defer_count cannot distinguish from a first delivery
+    (issue 3974).
+
+    A server from before this field existed sends nothing and it
+    arrives as zero, which clients report as unknown rather than as a
+    first delivery. So during a mixed-version upgrade window the
+    execution duration event simply carries no deliveries field, as it
+    did before.
+    """
     def __init__(
         self,
         *,
         queue_name: _builtins.str = ...,
         job_name: _builtins.str = ...,
         work_item: _builtins.str = ...,
+        deliveries: _builtins.int = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["job_name", b"job_name", "queue_name", b"queue_name", "work_item", b"work_item"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["deliveries", b"deliveries", "job_name", b"job_name", "queue_name", b"queue_name", "work_item", b"work_item"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

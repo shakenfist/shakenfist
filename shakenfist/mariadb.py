@@ -24803,7 +24803,7 @@ def _grpc_work_queue_enqueue(
 def _grpc_work_queue_dequeue_batch(
         queue_names: list[str],
         worker_id: str,
-        limit: int) -> list[tuple[str, str, dict[str, Any]]]:
+        limit: int) -> list[tuple[str, str, dict[str, Any], int]]:
     """Claim up to ``limit`` available jobs via the database microservice.
 
     ``worker_id`` is this node's name, and the server records it in
@@ -24811,8 +24811,13 @@ def _grpc_work_queue_dequeue_batch(
     made every claim on a shared ``any-*`` queue look like the database
     node's, so nothing could tell a dead worker's claim from a live
     peer's (issue 4652). Returns a list of ``(queue_name, job_name,
-    payload)`` tuples in the server-supplied priority order
+    payload, deliveries)`` tuples in the server-supplied priority order
     (top-priority first).
+
+    ``deliveries`` is zero from a server which does not send the field,
+    which callers report as unknown rather than as a first delivery: a
+    mixed-version window says nothing about redelivery instead of
+    saying something wrong (issue 3974).
     """
     if not queue_names or limit <= 0:
         return []
@@ -24822,7 +24827,8 @@ def _grpc_work_queue_dequeue_batch(
             queue_names=queue_names, limit=limit, worker_id=worker_id)
         reply = _grpc_call(stub.Dequeue, request)
         return [
-            (item.queue_name, item.job_name, json.loads(item.work_item))
+            (item.queue_name, item.job_name, json.loads(item.work_item),
+             item.deliveries)
             for item in reply.items
         ]
     except grpc.RpcError as e:
@@ -25551,11 +25557,14 @@ def _direct_work_queue_enqueue(
 def _direct_work_queue_dequeue_batch(
         queue_names: list[str],
         worker_id: str,
-        limit: int) -> list[tuple[str, str, dict[str, Any]]]:
+        limit: int) -> list[tuple[str, str, dict[str, Any], int]]:
     """Claim up to ``limit`` eligible jobs across ``queue_names``.
 
-    Returns a list of ``(queue_name, job_name, payload_dict)`` tuples,
-    possibly empty. Rows are ordered by the caller-supplied position
+    Returns a list of ``(queue_name, job_name, payload_dict,
+    deliveries)`` tuples, possibly empty. ``deliveries`` counts this
+    delivery too, so a first delivery is one and anything above it
+    means an earlier delivery of the same item did not resolve
+    (issue 3974). Rows are ordered by the caller-supplied position
     of ``queue_name`` in ``queue_names`` (index 0 = top priority) and
     then by ``scheduled_at``, so a single SELECT returns the most
     important eligible work first. Uses ``FOR UPDATE SKIP LOCKED`` so
@@ -25586,7 +25595,8 @@ def _direct_work_queue_dequeue_batch(
     try:
         with engine.connect() as conn:
             select_stmt = (
-                sa.select(table.c.id, table.c.queue_name, table.c.payload)
+                sa.select(table.c.id, table.c.queue_name, table.c.payload,
+                          table.c.attempts)
                 .where(table.c.queue_name.in_(queue_names))
                 .where(table.c.claimed_at.is_(None))
                 .where(
@@ -25615,8 +25625,12 @@ def _direct_work_queue_dequeue_batch(
             )
             conn.execute(update_stmt)
             conn.commit()
+            # ``attempts`` was read before the update above
+            # incremented it, so the delivery count this claim
+            # represents is one more than the row said.
             return [
-                (r.queue_name, str(r.id), dict(r.payload or {}))
+                (r.queue_name, str(r.id), dict(r.payload or {}),
+                 (r.attempts or 0) + 1)
                 for r in rows
             ]
     except OperationalError as e:
@@ -27353,15 +27367,19 @@ def work_queue_worker_id() -> str:
 def dequeue_work_items(
         queue_names: list[str],
         limit: int = 10,
-) -> list[tuple[str, str, dict[str, Any]]]:
+) -> list[tuple[str, str, dict[str, Any], int]]:
     """Claim up to ``limit`` eligible jobs across ``queue_names``.
 
-    Returns a list of ``(queue_name, job_name, payload)`` tuples,
-    possibly empty. Items are returned in caller-supplied priority
-    order: the first queue_name in the list is highest priority. Both
-    paths record ``work_queue_worker_id()`` in ``claimed_by``, so a
-    claim names the node whose worker holds it rather than whichever
-    node answered the RPC (issue 4652).
+    Returns a list of ``(queue_name, job_name, payload, deliveries)``
+    tuples, possibly empty. ``deliveries`` counts this delivery, so one
+    is a first delivery and more means an earlier one was lost; zero
+    means an sf-database too old to report it (issue 3974).
+
+    Items are returned in caller-supplied priority order: the first
+    queue_name in the list is highest priority. Both paths record
+    ``work_queue_worker_id()`` in ``claimed_by``, so a claim names the
+    node whose worker holds it rather than whichever node answered the
+    RPC (issue 4652).
 
     This single query replaces the previous per-queue dequeue loop;
     a sf-net or sf-queues worker that used to issue 10 sequential

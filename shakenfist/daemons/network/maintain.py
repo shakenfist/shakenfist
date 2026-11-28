@@ -10,12 +10,14 @@ from shakenfist.constants import EVENT_TYPE_STATUS
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist import instance
+from shakenfist.network import interface
 from shakenfist import mariadb
 from shakenfist.network import network
 from shakenfist.node import Node
 from shakenfist.operations.baseoperation import get_all_network_queues
 from shakenfist.operations.baseoperation import get_node_network_queues
 from shakenfist.schema.ipam_reservation import ReservationType
+from shakenfist.schema.object_filter import ObjectFilterCriteria
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
@@ -56,6 +58,29 @@ EXTRA_VLANS_WARNED: dict[int, set[str]] = {}
 QUIESCE_REPORTED: set[str] = set()
 STRAY_VXLAN_HANDLING_FAILING: bool = False
 
+# Whether the current run of passes which spent their health check
+# budget has been reported. The budget is only reached while the node is
+# degraded, which usually lasts many passes, so the deferral is reported
+# once on the way in and once on the way out rather than as a node event
+# every thirty seconds for the length of the incident. The per-pass
+# detail stays in the log line.
+BUDGET_DEFERRAL_REPORTED: bool = False
+
+# How often a maintenance pass is meant to run. The loop below sleeps
+# towards this interval, and it is also what a pass is judged to have
+# outgrown: a pass which takes longer than its own cadence delays every
+# repair the next one would have made, and the loop's sleep cannot claw
+# that time back (issue 4971).
+PASS_INTERVAL_SECONDS = 30
+
+# When each network was last health checked, by uuid. A pass works
+# through the networks it is on longest-waiting first and stops once it
+# has spent its health check budget, so this is what makes the
+# remainder the next pass's first business rather than starving them
+# (issue 4971). Pruned against what a pass visited, like the report
+# caches above, so a deleted network does not linger.
+HEALTH_CHECK_LAST: dict[str, float] = {}
+
 
 def forget_unvisited_quiesces(visited_networks):
     """Drop once-per-episode report entries for networks a pass did not visit.
@@ -71,6 +96,53 @@ def forget_unvisited_quiesces(visited_networks):
     QUIESCE_REPORTED.intersection_update(visited)
     network.DHCP_PROBE_FAILURE_REPORTED.intersection_update(visited)
     network.DHCP_PROBE_SERVING_REPORTED.intersection_update(visited)
+    for uuid in set(HEALTH_CHECK_LAST) - visited:
+        del HEALTH_CHECK_LAST[uuid]
+
+
+def networks_with_interfaces():
+    """The uuids of networks which currently have an interface attached.
+
+    One read of the whole table rather than one per network: this runs
+    every maintenance pass, and the per-network form would be a
+    networks-per-thirty-seconds sweep. It is still a whole-table read
+    on every node, hypervisors included, at one per pass: about 0.033
+    qps per node, charged to the (FindNetworkInterfaces, net) pair,
+    which is roughly a third again on that pair's budgeted per-node
+    base. The pair's note in database_load_budget.yaml records this
+    caller so a re-derivation keeps it. The pass skips the read when
+    the health check budget is disabled, because the order it feeds
+    cannot then change anything.
+    """
+    criteria = ObjectFilterCriteria(
+        states=list(interface.NetworkInterface.ACTIVE_STATES))
+    return {
+        str(ni.network_uuid)
+        for ni in mariadb.find_network_interfaces(criteria)}
+
+
+def health_check_order(network_uuids, busy_networks=frozenset()):
+    """The networks a pass should health check, in the order to do it.
+
+    Networks with an interface attached come first, then the network
+    which has waited longest for a check, then the uuid to break ties
+    so the order is stable and the rotation deterministic rather than
+    dependent on dictionary order.
+
+    The order only decides anything when a pass runs out of health
+    check budget, which on a well cluster never happens -- every check
+    costs milliseconds and every network is reached. It matters during
+    degradation, when the budget is scarce, and there the networks with
+    guests on them are the ones worth spending it on: an empty network
+    has nothing which can fail to get a DHCP lease. That is also what
+    makes many unused networks close to free for the network node,
+    which is what issue 925 asked for (#925).
+    """
+    return sorted(
+        network_uuids,
+        key=lambda u: (str(u) not in busy_networks,
+                       HEALTH_CHECK_LAST.get(str(u), 0.0),
+                       str(u)))
 
 
 # Instance states in which a domain on this node may still be attached
@@ -670,17 +742,119 @@ class Job(util_concurrency.Job):
         QUIESCE_REPORTED.discard(str(n.uuid))
         return False
 
+    def _report_pass_cost(self, pass_started, networks_considered,
+                          health_seconds, networks_deferred):
+        """Report what one maintenance pass cost.
+
+        The log line is emitted every pass. It is deliberately the
+        cheap half of this: a report can reconstruct pass duration
+        against network count from the log stream without the pass
+        writing a database row every thirty seconds, which is how the
+        queue waits are already reported (``tools/queue-wait-report.py``).
+
+        Events are emitted only for conditions an operator can act on:
+        a pass which outgrew ``PASS_INTERVAL_SECONDS``, and the start
+        and end of a run of passes which spent their health check
+        budget. One event per pass for the life of a
+        healthy node would say nothing the first did not -- the same
+        rule the per-network status events in ``network.py`` follow,
+        and the reason they are once per episode rather than once per
+        pass.
+
+        ``health_seconds`` is wall time inside ``is_okay()`` and
+        ``is_mesh_okay()`` summed over the networks this pass
+        considered. On the network node that is dominated by the DHCP
+        readiness probe, so it is the term which grows with network
+        count; the difference between it and ``pass_seconds`` is the
+        fixed cost of the pass, the reconciliations it enqueued and the
+        stray vxlan handling at its end.
+
+        A pass skipped by the queue-depth guard does no work and reports
+        nothing here; its node event says why it was skipped.
+        """
+        pass_seconds = time.time() - pass_started
+        fields = {
+            'networks': networks_considered,
+            'networks_deferred': networks_deferred,
+            'pass_seconds': round(pass_seconds, 3),
+            'health_check_seconds': round(health_seconds, 3),
+        }
+        LOG.with_fields(fields).info('Maintenance pass complete')
+
+        # Spending the budget is worth saying out loud, because it means
+        # some networks were not checked at all this pass. It is not an
+        # overrun -- the bound is what stops the overrun -- so it is
+        # reported whether or not the pass was slow, and against the node
+        # for the same reason the overrun is: no single network is at
+        # fault. It is reported once per run of deferring passes, on the
+        # way in and on the way out, for the reason the latch above
+        # gives.
+        global BUDGET_DEFERRAL_REPORTED
+        deferral_message = None
+        if networks_deferred and not BUDGET_DEFERRAL_REPORTED:
+            deferral_message = (
+                'maintain pass spent its %.1f second health check budget '
+                'and deferred %d networks to a later pass; further passes '
+                'which defer are logged but not reported again until one '
+                'reaches every network' % (
+                    config.MAINTAIN_HEALTH_CHECK_BUDGET_SECONDS,
+                    networks_deferred))
+        elif not networks_deferred and BUDGET_DEFERRAL_REPORTED:
+            deferral_message = (
+                'maintain pass reached every network inside its health '
+                'check budget again')
+
+        overrun_message = None
+        if pass_seconds >= PASS_INTERVAL_SECONDS:
+            # A pass this slow is reported against the node rather than
+            # any one network, because no single network is at fault --
+            # the cost is the sum over all of them. Unlike the deferral
+            # this is reported every time: each overrun delays the next
+            # pass's repairs by its own amount, so each is its own fault.
+            overrun_message = (
+                'maintain pass took %.1f seconds, longer than its %d second '
+                'interval' % (pass_seconds, PASS_INTERVAL_SECONDS))
+
+        if not deferral_message and not overrun_message:
+            return
+
+        # One node read for both, since a degraded pass is exactly the
+        # one which both defers and overruns.
+        n = Node.from_db(config.NODE_NAME, suppress_failure_audit=True)
+        if not n:
+            return
+        if deferral_message:
+            n.add_event(EVENT_TYPE_AUDIT, deferral_message, extra=fields)
+            BUDGET_DEFERRAL_REPORTED = bool(networks_deferred)
+        if overrun_message:
+            n.add_event(EVENT_TYPE_AUDIT, overrun_message, extra=fields)
+
     def execute(self):
         LOG.info('Starting network maintenance')
         last_loop = 0
 
         while daemon.check_abort_path(self.abort_path):
-            if time.time() - last_loop < 30:
+            if time.time() - last_loop < PASS_INTERVAL_SECONDS:
                 time.sleep(1)
                 continue
 
             last_loop = time.time()
             LOG.info('Maintaining existing networks')
+
+            # What this pass cost, reported at the end of it. The pass
+            # does work proportional to the number of networks this node
+            # is on, and on the network node the most expensive part of
+            # that is the DHCP readiness probe inside
+            # ``Network.is_okay()`` -- an interpreter start through
+            # privexec into the network's namespace, whose worst case is
+            # ``DHCP_PROBE_TIMEOUT``, once per DHCP network per pass.
+            # Nothing measured any of it, so there was no way to say
+            # whether a pass on a node with many networks still fits
+            # inside its own cadence (issue 4971).
+            pass_started = time.time()
+            health_seconds = 0.0
+            networks_considered = 0
+            networks_deferred = 0
 
             # Queue-depth safety guard. If the network queue family is
             # already backed up, piling more reconciliation requests on
@@ -746,8 +920,20 @@ class Job(util_concurrency.Job):
                     if resv and resv.reservation_type == ReservationType.ROUTED:
                         routed_by_network[resv.user_uuid].append(addr)
 
-            # Ensure we are on every network we have a host for
-            for network_uuid in host_networks:
+            # Ensure we are on every network we have a host for, taking
+            # the ones which have waited longest for a health check
+            # first. With a health check budget the tail of this list
+            # may not be checked this pass, and the order is what makes
+            # that tail the next pass's first business.
+            #
+            # Which networks have guests on them only reorders the list,
+            # and the order only matters when the budget can run out, so
+            # with the bound disabled the read is not worth making.
+            busy_networks = frozenset()
+            if config.MAINTAIN_HEALTH_CHECK_BUDGET_SECONDS:
+                busy_networks = networks_with_interfaces()
+            for network_uuid in health_check_order(
+                    host_networks, busy_networks):
                 n = network.Network.from_db(
                     network_uuid, suppress_failure_audit=True)
                 if not n:
@@ -784,8 +970,39 @@ class Job(util_concurrency.Job):
                     # Network state changed in the last minute, punt for now
                     continue
 
+                # Health check budget. A healthy network is checked in
+                # milliseconds, so this is never reached on a well
+                # cluster whatever the network count; what it bounds is
+                # the degraded case, where every unreachable dnsmasq
+                # costs a full DHCP_PROBE_TIMEOUT and the pass can take
+                # longer to check its networks than the interval it runs
+                # at (issue 4971). The networks not reached this pass
+                # are the ones this list starts with next pass.
+                #
+                # The continue skips the whole rest of this body for a
+                # deferred network, not just its health check: no routed
+                # address check, no repair and no mesh ensure is enqueued
+                # for it this pass. That is the point -- without a health
+                # check there is nothing to say a repair is needed -- but
+                # it does mean all of its reconciliation waits for the
+                # pass which reaches it.
+                #
+                # This sits below the seen_vxids append on purpose: a
+                # network missing from seen_vxids looks stray to the
+                # reaper at the end of the pass, so deferring a network
+                # before that point would have its devices deleted for
+                # no reason other than the pass running out of time.
+                budget = config.MAINTAIN_HEALTH_CHECK_BUDGET_SECONDS
+                if budget and health_seconds >= budget:
+                    networks_deferred += 1
+                    continue
+
+                HEALTH_CHECK_LAST[str(n.uuid)] = time.time()
+                networks_considered += 1
+                health_started = time.time()
                 network_okay = n.is_okay()
                 mesh_okay = n.is_mesh_okay() if network_okay else False
+                health_seconds += time.time() - health_started
 
                 # Routed addresses are the third thing which can drift:
                 # either of the two routes for one can be missing on a
@@ -963,7 +1180,7 @@ class Job(util_concurrency.Job):
                     self._handle_stray_vxlans(overdue)
                     STRAY_VXLAN_HANDLING_FAILING = False
                 except Exception as e:
-                    # This is the last thing the pass does, and the
+                    # This is the last work the pass does, and the
                     # only part of it which depends on an RPC added
                     # after the rest of the daemon shipped. An sf-net
                     # talking to an sf-database which does not
@@ -986,3 +1203,11 @@ class Job(util_concurrency.Job):
                         STRAY_VXLAN_HANDLING_FAILING = True
                         util_exceptions.ignore_exception(
                             'network maintain stray vxlan handling', e)
+
+            # Last, so pass_seconds is the whole pass: the stray vxlan
+            # handling above is an RPC, instance reads, execs and
+            # enqueues, and a pass which overran only there would
+            # otherwise report a duration inside its cadence.
+            self._report_pass_cost(
+                pass_started, networks_considered, health_seconds,
+                networks_deferred)

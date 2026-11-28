@@ -162,6 +162,51 @@ something artifacts have of their own; [the database
 internals](../developer_guide/database_internals.md#the-transient-failure-retry-budget-rides-on-the-work-item)
 describe where the counter lives and why.
 
+## What an image fetch cost, and whether it was cached
+
+An instance which needs an image either gets it from a copy the cluster
+already holds, or the node pulls it from the source. Which way it went
+has always been visible as a status event on the artifact -- `fetching
+image from within the cluster` or `fetching image from the internet` --
+but only as a message, so a hit rate, or the bytes a cluster pulls from
+the internet, meant reading every fetch by hand.
+
+Each fetch now also records an `image fetch complete` usage event
+carrying:
+
+* `source` -- where the image came from:
+    * `node` -- the blob was already on this node, so nothing moved;
+    * `cluster` -- the cluster held a copy elsewhere, and it was
+      replicated to this node;
+    * `internet` -- the node pulled it from the source.
+* `bytes` -- the size of the blob. It is the same whatever the source,
+  so it is traffic only where `source` says something moved: summing it
+  over `cluster` gives the bytes replicated inside the cluster, and over
+  `internet` the bytes the cluster pulled from outside.
+* `seconds` -- how long the fetch took.
+* `blob_uuid` -- the blob the fetch produced.
+
+The event is written each time an instance is created from the artifact
+on a node, not once per artifact version per node: the original image
+is checked for even when a transcoded copy is already cached. On a node
+creating many instances from one image most of these events are
+therefore `node`, which is why that case is told apart from `cluster` --
+counted together, the cluster hit rate would follow instance churn
+rather than replication. `cluster` against `internet` is the hit rate
+of the cluster's cache as a whole. A create already writes a handful of
+status events, so one more per create is in proportion with them, and
+nothing like the rate at which a maintenance pass or a poll writes
+events.
+
+A fetch which fails records no `image fetch complete` event, so these
+rates are over fetches which succeeded; the failure itself is in the
+artifact's audit events.
+
+This covers the image fetch only. The transcode cache -- the separate
+decision about whether a post-transcode version of an image already
+exists -- is not instrumented, so a transcode hit rate still has to be
+read out of the surrounding events.
+
 ## Sharing artifacts
 
 Artifacts in the system namespace can be shared with all other namespaces.
