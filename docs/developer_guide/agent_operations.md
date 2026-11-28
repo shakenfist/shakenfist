@@ -328,12 +328,20 @@ link's state itself.
 
 One short chain per node, submitted for every node and then awaited
 one node at a time. Each node's `dist-upgrade` is fate shared with its
-own `apt-get update`, so a node whose index refresh failed does not
-upgrade against a stale one -- which is what the same two commands
-submitted without edges would do. Every edge here names an operation on
-the same instance as the operation declaring it, so no chain spends any
-dependency wait budget -- which is what makes a `dist-upgrade` safe
-inside one.
+own `apt-get update`, so a node whose refresh never finished -- a
+wedged side channel, a fired deadline, a cascade from something it
+depended on -- does not upgrade against a stale index, which is what
+the same two commands submitted without edges would do. An
+`apt-get update` which *ran* and exited non-zero is a different case,
+and the edge as written here does not stop the upgrade, because that
+operation *completed*. [Declaring
+dependencies](#declaring-dependencies) says why, and says which field
+asks for the stronger reading; note that `require_success` is not yet
+expressible through `apiclient.agent_dependency()`
+([client-python#462](https://github.com/shakenfist/client-python/issues/462)).
+Every edge here names an operation on the same instance as the
+operation declaring it, so no chain spends any dependency wait budget
+-- which is what makes a `dist-upgrade` safe inside one.
 
 ```python
 chains = []
@@ -375,9 +383,18 @@ nothing in this repository runs them.
   those instances, which may include another caller's work -- and
   `Cluster.await_idle()` treats `abort` as a failure alongside `error`
   and `expired`, while waiting out any state it does not recognise
-  rather than declaring an instance idle. It does not declare
-  dependency edges today; the fate sharing above is what a chain would
-  buy it.
+  rather than declaring an instance idle. Since
+  [#177](https://github.com/shakenfist/client-python-k3s/pull/177) it
+  also declares edges: each command `Cluster.execute_and_await()`
+  submits to a node carries a `depends_on` edge on the previous command
+  submitted to *that same node*, so the rest of a node's sequence is
+  abandoned when the operation before it errored, expired or was
+  aborted. Edges are never declared across nodes, so a fan-out stays
+  concurrent and no chain spends any dependency wait budget. A cluster
+  which does not advertise `agentoperation-dependencies` gets today's
+  unchained submission and a note saying so, rather than a refusal.
+  That is on the plugin's `develop` and not yet in a release: `v0.4.2`
+  is the newest and predates it.
 
 A second example application is tracked as
 [issue #4825](https://github.com/shakenfist/shakenfist/issues/4825).
