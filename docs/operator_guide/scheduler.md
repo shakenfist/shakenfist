@@ -1084,8 +1084,11 @@ tells the whole story:
 - `placement admitted over namespace capacity claim` records that the
   admission succeeded but drew the namespace past the claim it holds,
   with the exceeded dimensions in `claim_dimensions`. See [Namespace
-  capacity claims](#namespace-capacity-claims); in this release that is
-  a warning, not a refusal.
+  capacity claims](#namespace-capacity-claims). A create which would
+  exceed the claim is refused, so this event records an admission the
+  claim guard could not refuse: a ground-truth write recording an
+  instance already running on a node, which counts against the claim
+  without being refusable.
 - A schedule with no surviving pre-filter candidates raises an error
   recorded as `schedule has no candidates at stage <name>, aborting`
   -- the stage name plus the previous event's `dropped` map identify

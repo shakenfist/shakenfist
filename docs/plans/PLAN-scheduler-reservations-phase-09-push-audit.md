@@ -1914,7 +1914,7 @@ Every finding has one of five dispositions. Each carries the file, the line,
 the range and a line confirmed at `$TIP`, or the classification *already
 fixed*; D3 rejects a finding without one.
 
-**Blocking -- fixed in a follow-up pull request before this phase closes.**
+**Blocking -- fixed in #5119, the follow-up pull request.**
 Graded blocking on Michael's decision of 2026-11-28: an operator guide which
 states the feature backwards is a defect in shipped output, even though no
 production code is wrong. D7 keeps the fix out of this pull request.
@@ -2073,6 +2073,17 @@ confirmation checked that claim denials reach the caller, which is necessary
 and not sufficient; it did not check whether the claim guard runs on a move,
 which is the step that decides it. *The disagreement* records the adjudication.
 
+**2026-11-28 (AEDT), the same day.** The audit record merged as `4aac34728b`
+(#5117). The five blocking corrections then landed as #5119, one commit per
+finding, and that pull request carries this close-out: the phase and the plan
+reach `Complete` there rather than here, because D9 holds them open while a
+finding has no disposition and the corrections did not exist when the record
+was written. Each correction was re-swept after it was made, since the defect
+being fixed was a keyword sweep missing paraphrases: every surviving use of
+"advisory" in `docs/` is about the placement query, which is advisory by
+construction, and the one remaining "still to come" outside the plans is
+`ARCHITECTURE.md`'s, on SQL pre-filter pushdown, which is accurate.
+
 ## Outcome
 
 **The audit found no blocking defect in the plan's production code, and it
@@ -2141,18 +2152,22 @@ it is not lives three files away in a `pass` branch. The management session had
 confirmed the wrong verdict before the contradiction arrived; that is recorded
 in the execution notes rather than quietly corrected.
 
-**What is still open.** Five documentation and comment corrections, graded
-blocking, land in a follow-up pull request, and this phase and the plan stay
-`In progress` until they do. Eight issues carry the advisory findings. Two
+**What was open, and how it closed.** Five documentation and comment
+corrections, graded blocking, landed in #5119: one commit each, four pages
+corrected and one comment added, with no change in behaviour. That pull
+request also carries this close-out, because the phase and the plan could not
+reach `Complete` until the corrections existed. Eight issues carry the
+advisory findings. Two
 findings dissolved under a sweep and became nothing: both turned out to be
 repository-wide conditions older than the plan, one of them already tracked by
 the repository's own tooling with a stated remedy.
 
 ### Definition of done
 
-Items 1 to 11, 13 and 15 pass. Item 12 is **not met**, by design: the blocking
-findings land in a follow-up pull request, so item 14 reads `In progress`
-rather than `Complete`, per D9.
+Every item passes. Items 12 and 14 were met by #5119 rather than by the audit
+record: item 12's follow-up pull request did not exist when the record was
+written, and item 14 could not read `Complete` until it did, per D9. Both
+rows below say how they were closed.
 
 | # | Result | How it was checked |
 |---|--------|--------------------|
@@ -2167,9 +2182,9 @@ rather than `Complete`, per D9.
 | 9 | **pass** | 9j reports 18 "still true" with the lines read and 1 "unverifiable" (the phase 0 benchmark's historical measurements, deliberately not re-run), and the error-number comparison reads `[1213, 1205, 1020]` against `frozenset((1213, 1205, 1020))`, which the management session confirmed at `mariadb.py:29282` |
 | 10 | **pass** | 9k's three questions are answered under separate headings, the question 1 enumeration method is stated as seven per-category greps resolved three ways, and the four question 2 candidates are each answered "they agree" with confirming lines |
 | 11 | **pass** | Every row of the Disposition section carries file, line, range, grade and disposition, with a `$TIP` line or the *already fixed* classification. Nothing is recorded without one |
-| 12 | **not met** | By design and per D7. The five blocking findings are documentation and comment corrections whose fix is a separate pull request, which does not exist yet. Every advisory finding does name its issue: shakenfist#5110 to #5116 and client-python#464 |
+| 12 | **pass** | Every advisory finding names its issue: shakenfist#5110 to #5116 and client-python#464. The five blocking findings are fixed in #5119, one commit per finding, which is where D7 puts them; `In progress` here until that existed |
 | 13 | **pass** | Recorded below under *The struck management-checklist items* |
-| 14 | **in progress** | `python3 tools/check-plan-status.py` exits 0 and the table and `index.md` agree. `index.md` reads `In progress` and `17 of 18`, which D9 requires while a blocking finding is open, and the open item is named: the five corrections B1 to B5 |
+| 14 | **pass** | `python3 tools/check-plan-status.py` exits 0 and the table and `index.md` agree. With B1 to B5 landed, `index.md` reads `Complete` and `18 of 18` and the master plan's phase 9 row reads `Complete` with no `Merged` cell, which is what D9 asks of the last row |
 | 15 | **pass** | `grep -c 'ea3c9bf63' docs/plans/PLAN-scheduler-reservations.md` reads **1**, and that line sits inside the *Corrected 2026-11-28* paragraph, so the superseded range is described there rather than instructed |
 
 ### The struck management-checklist items

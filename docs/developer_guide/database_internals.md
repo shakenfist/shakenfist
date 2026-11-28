@@ -269,9 +269,12 @@ neither should grow one.
   no window between checking and taking. The mysqldb dialect sets
   `CLIENT_FOUND_ROWS`, so the count is rows matched rather than changed,
   which is what lets a zero-sized request read as a grant. Release is
-  the mirror, a decrement floored with `GREATEST(0, used - :x)`; a
-  release that had to clamp has found drift and should say so, as
-  `_floored_node_decrement()` does.
+  the mirror, and is guarded too: a `used >= :x` decrement first, and
+  only on a miss the unguarded `GREATEST(0, used - :x)` form, which
+  cannot drive a counter negative when a reconcile pass has already
+  recomputed it from ground truth. The clamp is therefore the drift
+  signal, so a release which had to clamp says which counter it was and
+  by how much, as `_floored_node_counter_decrement()` does.
 - **A reconciler** which recomputes every counter from ground truth on
   a cadence, and is the only writer which *creates* a pool's row. An
   absent row therefore means "not reconciled yet", and the guard must
